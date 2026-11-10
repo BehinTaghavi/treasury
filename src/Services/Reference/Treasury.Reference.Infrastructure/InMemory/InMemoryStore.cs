@@ -22,6 +22,8 @@ public sealed class InMemoryReferenceDatabase : IDisposable
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
+    internal ChartSnapshot? Chart;
+    internal DetailsSnapshot? Details;
 
     public IReadOnlyList<OutboxMessage> OutboxMessages
     {
@@ -44,6 +46,10 @@ internal sealed class PendingChanges
     public Dictionary<string, string> Idempotency { get; } = [];
 
     public List<OutboxMessage> Outbox { get; } = [];
+
+    public ChartSnapshot? Chart { get; set; }
+
+    public DetailsSnapshot? Details { get; set; }
 }
 
 public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWork
@@ -74,6 +80,8 @@ public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWo
                 }
 
                 db.Outbox.AddRange(pending.Outbox);
+                db.Chart = pending.Chart ?? db.Chart;
+                db.Details = pending.Details ?? db.Details;
             }
 
             return result;

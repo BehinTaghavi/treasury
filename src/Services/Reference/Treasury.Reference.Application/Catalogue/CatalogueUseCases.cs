@@ -1,5 +1,4 @@
 using System.Globalization;
-using Treasury.BuildingBlocks.Domain;
 using Treasury.Reference.Application.Abstractions;
 using Treasury.Reference.Domain.Catalogue;
 
@@ -20,6 +19,8 @@ public sealed record CatalogueItemView(Guid Id, string Kind, Guid? ParentId, str
 /// <summary>Use cases of the Basic Information lists. Each write is one command in one transaction.</summary>
 public sealed class CatalogueUseCases(IUnitOfWork unitOfWork, ICatalogueRepository items, IIdempotencyStore idempotency)
 {
+    private readonly CommandRunner _runner = new(unitOfWork, idempotency);
+
     private static readonly StringComparer PersianOrder = StringComparer.Create(CultureInfo.GetCultureInfo("fa-IR"), ignoreCase: true);
 
     public Task<Result<Guid>> AddAsync(AddCatalogueItemCommand command, CancellationToken cancellationToken) =>
@@ -110,50 +111,6 @@ public sealed class CatalogueUseCases(IUnitOfWork unitOfWork, ICatalogueReposito
             return Result<Guid>.Ok(item.Id);
         }, cancellationToken);
 
-    /// <summary>Idempotency + one transaction + translation of rule violations into results (same pattern as cashflow-svc).</summary>
-    private async Task<Result<Guid>> RunAsync(string idempotencyKey, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            return Result<Guid>.Fail("Request.IdempotencyKeyRequired", "An idempotency key is required for every write.");
-        }
-
-        var previous = await idempotency.GetResultAsync(idempotencyKey, cancellationToken).ConfigureAwait(false);
-        if (previous is not null)
-        {
-            return Result<Guid>.Ok(Guid.Parse(previous));
-        }
-
-        try
-        {
-            return await unitOfWork.ExecuteAsync(async ct =>
-            {
-                var result = await work(ct).ConfigureAwait(false);
-                if (!result.IsSuccess)
-                {
-                    throw new CommandFailedException(result); // nothing of a failed command is saved
-                }
-
-                await idempotency.SaveResultAsync(idempotencyKey, result.Value.ToString(), ct).ConfigureAwait(false);
-                return result;
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (CommandFailedException failed)
-        {
-            return failed.Result;
-        }
-        catch (DomainException ex)
-        {
-            return Result<Guid>.From(ex);
-        }
-        catch (ConcurrencyConflictException ex)
-        {
-            return Result<Guid>.Fail("Concurrency.Conflict", ex.Message);
-        }
-    }
-
-    private sealed class CommandFailedException(Result<Guid> result) : Exception(result.ErrorMessage)
-    {
-        public Result<Guid> Result { get; } = result;
-    }
+    private Task<Result<Guid>> RunAsync(string idempotencyKey, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken cancellationToken) =>
+        _runner.RunAsync(idempotencyKey, work, id => id.ToString(), Guid.Parse, cancellationToken);
 }
