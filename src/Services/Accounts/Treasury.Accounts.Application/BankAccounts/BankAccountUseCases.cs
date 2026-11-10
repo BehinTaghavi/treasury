@@ -1,5 +1,6 @@
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 
 namespace Treasury.Accounts.Application.BankAccounts;

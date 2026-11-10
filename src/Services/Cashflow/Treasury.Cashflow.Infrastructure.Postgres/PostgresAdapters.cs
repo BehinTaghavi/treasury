@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using NpgsqlTypes;
+using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Domain.ChequeBooks;

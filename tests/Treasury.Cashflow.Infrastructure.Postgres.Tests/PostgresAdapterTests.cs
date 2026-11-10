@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Domain;
 using Npgsql;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;

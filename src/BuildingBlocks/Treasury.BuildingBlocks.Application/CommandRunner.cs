@@ -1,9 +1,9 @@
 using Treasury.BuildingBlocks.Domain;
 
-namespace Treasury.Reference.Application.Abstractions;
+namespace Treasury.BuildingBlocks.Application;
 
 /// <summary>
-/// Runs a write command: idempotency key, one transaction, rule violations turned into results (same pattern as cashflow-svc).
+/// Runs a write command: idempotency key, one transaction, rule violations turned into results.
 /// A failed command saves nothing, its idempotency record included.
 /// </summary>
 public sealed class CommandRunner(IUnitOfWork unitOfWork, IIdempotencyStore idempotency)
@@ -36,6 +36,7 @@ public sealed class CommandRunner(IUnitOfWork unitOfWork, IIdempotencyStore idem
                 var result = await work(ct).ConfigureAwait(false);
                 if (!result.IsSuccess)
                 {
+                    // Abort the transaction: nothing of a failed command is saved.
                     throw new CommandFailedException<T>(result);
                 }
 

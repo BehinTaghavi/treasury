@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Reference.Api;
 using Treasury.Reference.Application.Abstractions;
 using Treasury.Reference.Application.Catalogue;
