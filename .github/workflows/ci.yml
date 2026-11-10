@@ -54,6 +54,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with: { package_json_file: frontend/package.json }   # pnpm version from its packageManager field
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
       - run: cd frontend && pnpm install --frozen-lockfile && pnpm test && pnpm build
