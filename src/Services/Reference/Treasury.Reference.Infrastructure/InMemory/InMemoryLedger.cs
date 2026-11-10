@@ -86,6 +86,16 @@ public sealed class InMemoryLedgerRepository(InMemoryReferenceDatabase db) : ILe
             .Select(g => new DetailTypeView(g.Key, g.Count()))
             .ToList());
 
+    public Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken) =>
+        Task.FromResult((Chart()?.Accounts ?? []).Where(a => a.Code == code)
+            .Select(a => new LedgerAccountView(a.Code, a.Name, a.Level.ToString(), a.ParentCode, a.IsPostable, a.IsActive, a.Detail1Types, a.Detail2Types))
+            .FirstOrDefault());
+
+    public Task<DetailAccountView?> DetailAsync(string code, CancellationToken cancellationToken) =>
+        Task.FromResult((Details()?.Details ?? []).Where(d => d.Code == code)
+            .Select(d => new DetailAccountView(d.Code, d.Name, d.Type, d.IsCostCenter, d.IsActive))
+            .FirstOrDefault());
+
     private ChartSnapshot? Chart()
     {
         var pending = InMemoryUnitOfWork.Pending;

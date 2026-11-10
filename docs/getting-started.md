@@ -7,6 +7,7 @@
 ```bash
 dotnet run --project src/Services/Cashflow/Treasury.Cashflow.Api          # http://localhost:5081, in-memory, Development
 dotnet run --project src/Services/Reference/Treasury.Reference.Api        # http://localhost:5082, Basic Information lists
+dotnet run --project src/Services/Accounts/Treasury.Accounts.Api          # http://localhost:5083, bank accounts (asks reference-svc on 5082)
 cd frontend && pnpm install
 pnpm --filter @treasury/remote-receipts build && pnpm --filter @treasury/remote-receipts preview   # http://localhost:5174
 pnpm --filter @treasury/remote-basic-info build && pnpm --filter @treasury/remote-basic-info preview # http://localhost:5175

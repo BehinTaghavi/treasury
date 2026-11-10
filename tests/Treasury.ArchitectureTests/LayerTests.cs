@@ -55,12 +55,13 @@ public sealed class LayerTests
         }
     }
 
-    private static readonly string[] Services = ["Cashflow", "Reference"];
+    private static readonly string[] Services = ["Cashflow", "Reference", "Accounts"];
 
     /// <summary>Every service follows the same layer rules (one folder per service, CLAUDE.md). Services do not reference each other.</summary>
     [Theory]
     [InlineData("Cashflow")]
     [InlineData("Reference")]
+    [InlineData("Accounts")]
     public void Each_service_keeps_its_layers_and_does_not_reference_another_service(string service)
     {
         Assembly Load(string layer) => Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"Treasury.{service}.{layer}.dll"));

@@ -218,6 +218,28 @@ public sealed class PostgresLedgerRepository : ILedgerRepository, ILedgerQueries
         return list;
     }
 
+    public async Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT code, name, level, parent_code, is_postable, is_active, detail1_types, detail2_types FROM reference.ledger_account WHERE code = @code");
+        cmd.Parameters.AddWithValue("code", code);
+        await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await r.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? new LedgerAccountView(r.GetString(0), r.GetString(1), ((LedgerLevel)r.GetInt16(2)).ToString(), r.IsDBNull(3) ? null : r.GetString(3),
+                r.GetBoolean(4), r.GetBoolean(5), r.GetFieldValue<string[]>(6), r.GetFieldValue<string[]>(7))
+            : null;
+    }
+
+    public async Task<DetailAccountView?> DetailAsync(string code, CancellationToken cancellationToken)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command("SELECT code, name, type, is_cost_center, is_active FROM reference.detail_account WHERE code = @code");
+        cmd.Parameters.AddWithValue("code", code);
+        await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await r.ReadAsync(cancellationToken).ConfigureAwait(false)
+            ? new DetailAccountView(r.GetString(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetBoolean(3), r.GetBoolean(4))
+            : null;
+    }
+
     private static async Task SaveHeaderAsync(
         TransactionContext tx, long loadedVersion, string insertSql, string updateSql, Action<NpgsqlCommand> bind, string what, CancellationToken ct)
     {

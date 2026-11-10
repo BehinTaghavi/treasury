@@ -53,6 +53,12 @@ public static class LedgerEndpoints
         api.MapGet("/details", async (string? search, string? type, bool? includeInactive, int? take, LedgerUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.SearchDetailsAsync(search, type, includeInactive ?? false, take ?? 100, ct).ConfigureAwait(false)));
 
+        api.MapGet("/accounts/{code}", async (string code, LedgerUseCases useCases, CancellationToken ct) =>
+            await useCases.AccountAsync(code, ct).ConfigureAwait(false) is { } a ? Results.Ok(a) : Results.NotFound());
+
+        api.MapGet("/details/{code}", async (string code, LedgerUseCases useCases, CancellationToken ct) =>
+            await useCases.DetailAsync(code, ct).ConfigureAwait(false) is { } d ? Results.Ok(d) : Results.NotFound());
+
         api.MapGet("/detail-types", async (LedgerUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.DetailTypesAsync(ct).ConfigureAwait(false)));
     }

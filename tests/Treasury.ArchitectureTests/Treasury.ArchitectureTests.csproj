@@ -3,5 +3,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Api\Treasury.Cashflow.Api.csproj" />
     <ProjectReference Include="..\..\src\Services\Reference\Treasury.Reference.Api\Treasury.Reference.Api.csproj" />
+    <ProjectReference Include="..\..\src\Services\Accounts\Treasury.Accounts.Api\Treasury.Accounts.Api.csproj" />
   </ItemGroup>
 </Project>

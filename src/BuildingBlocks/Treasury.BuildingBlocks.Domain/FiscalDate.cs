@@ -1,11 +1,11 @@
 using System.Globalization;
-using Treasury.BuildingBlocks.Domain;
 
-namespace Treasury.Cashflow.Domain.Common;
+namespace Treasury.BuildingBlocks.Domain;
 
 /// <summary>
 /// A calendar date. Stored as a real date (never as text); Jalali (Shamsi) is only an input and display format.
-/// Replaces the 8-character text dates of the old and MVC systems (rule R2).
+/// Replaces the 8-character text dates of the old and MVC systems (rule R2). Shared by every service: the only Jalali parser
+/// (CLAUDE.md rule 5); moved here from cashflow-svc when accounts-svc needed it.
 /// </summary>
 public readonly record struct FiscalDate : IComparable<FiscalDate>
 {

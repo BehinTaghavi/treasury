@@ -38,6 +38,12 @@ public static class Endpoints
                 ? Results.Ok(await useCases.ListAsync(kind, parentId, includeInactive ?? false, ct).ConfigureAwait(false))
                 : Results.NotFound());
 
+        // One entry by id; 404 when it is not in that list. reference-svc's own ledger routes (/ledger/...) are matched first.
+        api.MapGet("/{list}/{id:guid}", async (string list, Guid id, CatalogueUseCases useCases, CancellationToken ct) =>
+            Lists.TryGetValue(list, out var kind) && await useCases.GetAsync(id, ct).ConfigureAwait(false) is { } item && item.Kind == kind.ToString()
+                ? Results.Ok(item)
+                : Results.NotFound());
+
         api.MapPost("/{list}", async (string list, AddItemRequest r, HttpRequest http, CatalogueUseCases useCases, CancellationToken ct) =>
             Lists.TryGetValue(list, out var kind)
                 ? ToHttp(await useCases.AddAsync(new AddCatalogueItemCommand(Key(http), kind, r.Name, r.ParentId, r.Code), ct).ConfigureAwait(false), list)

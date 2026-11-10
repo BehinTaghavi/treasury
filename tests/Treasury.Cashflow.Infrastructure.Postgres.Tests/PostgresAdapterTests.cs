@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using Npgsql;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;
@@ -154,7 +155,7 @@ public sealed class PostgresAdapterTests : IDisposable
         var stale = await _unitOfWork.ExecuteAsync(ct => _instruments.GetAsync(id, ct), CancellationToken.None);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "ملت"), CancellationToken.None)).IsSuccess);
 
-        stale!.ReturnToIssuer(Domain.Common.FiscalDate.ParseJalali("1405/08/04"), "clerk-2", null);
+        stale!.ReturnToIssuer(FiscalDate.ParseJalali("1405/08/04"), "clerk-2", null);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
             _unitOfWork.ExecuteAsync(async ct =>
             {

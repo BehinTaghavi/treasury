@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Accounts\Treasury.Accounts.Domain\Treasury.Accounts.Domain.csproj" />
+  </ItemGroup>
+</Project>

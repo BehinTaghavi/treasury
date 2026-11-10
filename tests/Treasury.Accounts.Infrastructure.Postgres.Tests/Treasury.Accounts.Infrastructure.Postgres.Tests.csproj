@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Integration tests of accounts-svc's PostgreSQL adapters against a real PostgreSQL 17 (same setup as the other services).
+       Needs NuGet (Npgsql); not part of the offline build. Set TREASURY_TEST_PG; without it skipped locally, failed on CI. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Accounts\Treasury.Accounts.Infrastructure.Postgres\Treasury.Accounts.Infrastructure.Postgres.csproj" />
+    <Compile Include="..\Support\PostgresDatabase.cs" Link="PostgresDatabase.cs" />
+    <Compile Include="..\Treasury.Accounts.Application.Tests\FakeReference.cs" Link="FakeReference.cs" />
+  </ItemGroup>
+</Project>

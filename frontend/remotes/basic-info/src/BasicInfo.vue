@@ -8,6 +8,7 @@ import type { Locale } from '@treasury/ui-kit'
 import CatalogueList from './CatalogueList.vue'
 import ChartAccounts from './ledger/ChartAccounts.vue'
 import DetailAccounts from './ledger/DetailAccounts.vue'
+import BankAccounts from './accounts/BankAccounts.vue'
 import type { ListSpec } from './types'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), {
@@ -31,11 +32,11 @@ const lists: ListSpec[] = [
 const ledgerSections: { id: string; title: [string, string] }[] = [
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
+  { id: 'bank-accounts', title: ['حساب‌های بانکی', 'Bank accounts'] },
 ]
 
 // Next pull requests (docs/plan.md, Phase B). Shown so the owner sees the whole menu.
 const comingNext: [string, string][] = [
-  ['حساب‌های بانکی', 'Bank accounts'],
   ['دسته چک‌ها', 'Cheque books'],
   ['عطف‌ها', 'References'],
   ['گروه بابت‌ها و بابت‌ها', 'Purpose groups and purposes'],
@@ -72,6 +73,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <CatalogueList v-if="current" :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
       <ChartAccounts v-else-if="selected === 'chart'" :key="'chart' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <BankAccounts v-else-if="selected === 'bank-accounts'" :key="'bank-accounts' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>
 </template>
