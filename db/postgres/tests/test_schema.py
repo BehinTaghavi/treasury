@@ -150,3 +150,15 @@ def test_a_rial_amount_has_no_exchange_rate(db):
                        issue_date, counterparty_id, counterparty_name, purpose, state)
                    VALUES (1405, %s, 'Received', 'OrdinaryCheque', 10, 'IRR', 5, 10, '2026-04-01', %s, 'x', 'y', 'InCashDesk')""",
                 (uuid.uuid4(), uuid.uuid4()))
+
+
+def test_the_scripts_can_run_again_after_years_were_opened_by_an_administrator(db):
+    # Every restart of deploy/docker-compose.yml re-runs apply.sh; it failed with "permission denied for table instrument_fy1405".
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"))
+    result = subprocess.run([str(HERE / "apply.sh"), params["dbname"]], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    with psycopg.connect(db) as c:
+        owners = {r[0] for r in c.execute(
+            "SELECT pg_get_userbyid(relowner) FROM pg_class WHERE relnamespace = 'cashflow'::regnamespace AND relname LIKE 'instrument%fy14%'")}
+    assert owners == {"treasury_owner"}

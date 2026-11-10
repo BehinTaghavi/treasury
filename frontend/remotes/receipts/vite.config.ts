@@ -11,6 +11,9 @@ export default defineConfig({
       name: 'receipts',
       filename: 'remoteEntry.js',
       manifest: true,
+      // No generated type declarations: plain tsc cannot read .vue files (error TYPE-001 on every build) and the shell
+      // loads remotes at run time without them. Use vue-tsc here if a remote's types are ever needed.
+      dts: false,
       exposes: {
         './ReceivedCheques': './src/ReceivedCheques.vue',
       },

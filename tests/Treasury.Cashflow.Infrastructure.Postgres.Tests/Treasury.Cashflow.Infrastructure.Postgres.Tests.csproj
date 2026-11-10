@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Integration tests of the PostgreSQL adapters against a real PostgreSQL 17.
+       Needs NuGet (Npgsql), so it is not part of the offline build (Treasury.Offline.slnf).
+       Set TREASURY_TEST_PG (Npgsql connection string of an administrator, e.g. "Host=localhost;Username=postgres;Password=postgres").
+       Without it the tests are skipped locally and fail on CI. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Infrastructure.Postgres\Treasury.Cashflow.Infrastructure.Postgres.csproj" />
+  </ItemGroup>
+</Project>

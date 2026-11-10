@@ -1,0 +1,13 @@
+# Build context of the API images is the repository root: send only what the Dockerfiles copy.
+**/bin/
+**/obj/
+**/node_modules/
+**/.nuxt/
+**/.output/
+**/dist/
+.git/
+legacy/
+frontend/
+tools/
+docs/
+deploy/.env

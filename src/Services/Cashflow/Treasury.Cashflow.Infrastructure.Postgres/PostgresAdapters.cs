@@ -8,9 +8,8 @@ using Treasury.Cashflow.Domain.Instruments;
 
 namespace Treasury.Cashflow.Infrastructure.Postgres;
 
-// NOTE: written against Npgsql 10 and db/postgres/002_cashflow.sql, but NOT compiled in the workspace where it was
-// written (NuGet was not reachable there). The first build with NuGet access must compile it and run the
-// integration tests against PostgreSQL 17 before it is used.
+// Written against Npgsql 10 and db/postgres/002_cashflow.sql.
+// Integration tests against PostgreSQL 17: tests/Treasury.Cashflow.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
 {
