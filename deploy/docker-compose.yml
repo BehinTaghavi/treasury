@@ -33,7 +33,7 @@ services:
     command:
       - |
         set -e
-        /db/apply.sh treasury
+        bash /db/apply.sh treasury
         psql -v ON_ERROR_STOP=1 -d treasury -c "ALTER ROLE cashflow_svc PASSWORD '$${CASHFLOW_DB_PASSWORD}'"
         for fy in $${FISCAL_YEARS}; do
           IFS=: read y s e <<< "$$fy"
@@ -81,7 +81,8 @@ services:
     image: nginx:1.29-alpine
     depends_on: [shell, remote-receipts, cashflow-api, keycloak]
     ports:
-      - "${GATEWAY_PORT:-8080}:80"
+      # Only this computer can open the system unless GATEWAY_ADDRESS=0.0.0.0 is set (there is no login yet).
+      - "${GATEWAY_ADDRESS:-127.0.0.1}:${GATEWAY_PORT:-8080}:80"
     volumes:
       - ./gateway.conf:/etc/nginx/conf.d/default.conf:ro
 

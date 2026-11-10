@@ -21,7 +21,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 3. ~~Run `deploy/docker-compose.yml` end to end; fix what fails.~~ Done 10 Nov 2026 (`deploy/smoke-test.sh`; fixed: ports lost behind the gateway, host files copied into images).
 4. ~~Make `.github/workflows/ci.yml` the required status check: .NET build + tests, DB tests, migration tests, frontend tests.~~ CI green 10 Nov 2026, with a new `compose` job. **Remaining (owner, in GitHub settings):** mark the checks `dotnet`, `database-and-migration`, `frontend`, `compose` as required for `main`.
 5. Migration preflight and dry run on an anonymised copy of `Cashnajoo86` (the owner provides it outside GitHub); share the reconciliation report.
-6. Deployment notes for the test server (for the reviewer).
+6. ~~Test server.~~ Done 10 Nov 2026: the owner's Windows PC with double-click start/stop (`docs/test-server-windows.md`). Still to do: deployment notes for the pilot server (office or ArvanCloud) before Phase C.
 
 ## Done log
 | Date | What |
@@ -29,3 +29,4 @@ Update this file when a task finishes (what is done, what is next). Months count
 | 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
 | 2026-11-09 | Phase 0 first package delivered |
 | 2026-11-10 | Phase A tasks 1–4: first build with NuGet (0 warnings), 81 .NET tests incl. 14 PostgreSQL adapter tests, Docker Compose runs end to end, CI green with a `compose` job; environment setup script |
+| 2026-11-10 | Test server on the owner's Windows PC (double-click scripts, guide); fixed: the system could not restart after a stop |

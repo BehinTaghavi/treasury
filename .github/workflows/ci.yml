@@ -74,6 +74,12 @@ jobs:
           } > deploy/.env
       - run: docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
       - run: deploy/smoke-test.sh http://localhost:8080
+      # A stopped system must start again with its data (db-init re-runs apply.sh on every start).
+      - name: Restart and check again
+        run: |
+          docker compose -f deploy/docker-compose.yml --env-file deploy/.env stop
+          docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
+          deploy/smoke-test.sh http://localhost:8080
       - if: failure()
         run: docker compose -f deploy/docker-compose.yml --env-file deploy/.env ps -a && docker compose -f deploy/docker-compose.yml --env-file deploy/.env logs --tail 100
       - if: always()

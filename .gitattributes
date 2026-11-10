@@ -1,0 +1,4 @@
+# Shell scripts run inside Linux containers, also when the files come from a Windows PC.
+*.sh text eol=lf
+# Windows double-click scripts are stored with CRLF line endings exactly as Windows needs them.
+*.cmd -text

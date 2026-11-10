@@ -36,6 +36,8 @@ deploy/smoke-test.sh                    # checks shell, receipts screen, Keycloa
 ```
 Open http://localhost:8080 → "دریافت‌ها". The smoke test writes one test cheque: run it on test servers only.
 
+On a Windows PC without the command line (the product owner's test server): `docs/test-server-windows.md`.
+
 ## Migrating old cheques
 See `tools/migration/README.md`.
 
