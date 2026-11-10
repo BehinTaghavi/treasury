@@ -36,7 +36,8 @@ In its first-start screen, choose the container engine **dockerd (moby)** and un
    (Until the first pull request is merged, Claude gives you a link to the version under review instead.)
 2. In your Downloads folder, **right-click the ZIP → Properties**. If there is an **Unblock** tick box at the bottom, tick it and click **OK**.
    This stops Windows from blocking the start files.
-3. **Right-click the ZIP → Extract All…** and extract it, for example into *Documents\Treasury*.
+3. **Right-click the ZIP → Extract All…** (with WinRAR: **Extract files…**) and extract it into **`C:\Treasury`**.
+   Avoid *Documents* and *Desktop*: on many PCs they are synced with OneDrive, which can get in Docker's way.
 
 ## 4. Start it
 1. In the extracted folder, open **deploy → windows**.
