@@ -219,6 +219,8 @@ def map_cheque(row: LegacyCheque, source_db: str, currency_by_curid: dict[int, s
                         warnings.append(f"cleared on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
                 elif row.stcode == 14:
                     b.apply("RecordBounced", d4, "D4 (bounced)", "legal action (GoInlaw)" if row.goinlaw else None)
+                    if due is not None and b.last_date < due:  # rule N2 / Q11, as for clearings above
+                        warnings.append(f"bounced on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
             elif row.stcode == 15:
                 b.apply("ReturnToIssuer", d3, "D3 (returned)")
             elif row.stcode == 16:

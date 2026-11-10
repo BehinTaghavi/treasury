@@ -166,16 +166,13 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// Not in the old program: Form_D_Check_vos_m only checks that a date is given ("تاريخ نامشخص است").
     /// </summary>
     public void RecordCleared(FiscalDate date, string userId, string? reference = null) =>
-        Apply(InstrumentAction.RecordCleared, date, userId, reference, null, validate: () =>
-        {
-            if (DueDate is { } due && date < due)
-            {
-                throw new DomainException("Instrument.ClearedBeforeDueDate", $"Clearing date {date} is earlier than the due date ({due}).");
-            }
-        });
+        Apply(InstrumentAction.RecordCleared, date, userId, reference, null,
+            validate: () => RequireNotBeforeDueDate(date, "Instrument.ClearedBeforeDueDate", "Clearing"));
 
+    /// <summary>The bank returned the cheque. Rule N2 also applies (CEO, 10 Nov 2026, answer to Q11): not before the due date.</summary>
     public void RecordBounced(FiscalDate date, string userId, string? reason, string? reference = null) =>
-        Apply(InstrumentAction.RecordBounced, date, userId, reference, reason);
+        Apply(InstrumentAction.RecordBounced, date, userId, reference, reason,
+            validate: () => RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce"));
 
     public void ReturnToIssuer(FiscalDate date, string userId, string? note = null) =>
         Apply(InstrumentAction.ReturnToIssuer, date, userId, null, note);
@@ -297,6 +294,14 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         _history.Add(new InstrumentHistoryEntry(action, from, to, date, userId, reference, note));
         Raise(new InstrumentStateChanged(Id, Direction, Kind, action, from, to, date, Amount, Counterparty.Id, Number, Destination, userId));
+    }
+
+    private void RequireNotBeforeDueDate(FiscalDate date, string code, string what)
+    {
+        if (DueDate is { } due && date < due)
+        {
+            throw new DomainException(code, $"{what} date {date} is earlier than the due date ({due}).");
+        }
     }
 
     private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate)

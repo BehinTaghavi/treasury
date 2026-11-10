@@ -49,5 +49,5 @@ Every step belongs to the fiscal year in which it happens; the instrument belong
 
 ## Date rules for new operations
 - **N1** (new, Q6): a step may not be dated before the previous step of the same instrument.
-- **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. Whether the same applies to **bounced** cheques is Q11.
+- **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. The same applies to **bounces** (`Instrument.BouncedBeforeDueDate`; answer to Q11, 10 Nov 2026).
 

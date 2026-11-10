@@ -127,6 +127,17 @@ public sealed class ReceivedInstrumentTests
     }
 
     [Fact]
+    public void A_cheque_cannot_bounce_before_its_due_date_N2_Q11()
+    {
+        // Answer to Q11 (CEO, 10 Nov 2026): rule N2 applies to bounces too.
+        var cheque = ReceivedCheque(due: "1405/09/01");
+        cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
+        Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => cheque.RecordBounced(D("1405/08/30"), User, "کسری موجودی")).Code);
+        cheque.RecordBounced(D("1405/09/01"), User, "کسری موجودی");
+        Assert.Equal(InstrumentState.Bounced, cheque.State);
+    }
+
+    [Fact]
     public void An_invalid_transition_is_reported_before_the_due_date_rule_N2()
     {
         var cheque = ReceivedCheque(due: "1405/09/01");

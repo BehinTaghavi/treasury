@@ -135,3 +135,9 @@ def test_old_cheque_cleared_before_its_due_date_is_kept_with_a_warning_n2():
     m = ok(map_cheque(received(13, d3="13860720", d4="13860725", maturity="13860801"), SRC))
     assert m.state == "Cleared" and m.steps[-1].event_date == date(2007, 10, 17)
     assert any("rule N2" in w for w in m.warnings)
+
+
+def test_old_cheque_bounced_before_its_due_date_is_kept_with_a_warning_n2():
+    m = ok(map_cheque(received(14, d3="13860720", d4="13860725", maturity="13860801"), SRC))
+    assert m.state == "Bounced" and any("bounced on" in w and "rule N2" in w for w in m.warnings)
+
