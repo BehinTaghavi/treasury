@@ -1,0 +1,61 @@
+﻿@model  List<CSD.Treasury.DataModel.TransferFromBackupBank>
+@using CSD.Treasury.UI.Models;
+
+
+<table class="table table-striped ">
+    <thead>
+        <tr>
+            <th colspan="9"><h3>@Resources.Transfer</h3></th>
+        </tr>
+        <tr>
+            <th>@Resources.Date @Resources.PickUp</th>
+            <th>@Resources.Price @Resources.PickUp</th>
+            <th>@Resources.From @Resources.Bank</th>
+            <th>@Resources.To @Resources.Bank</th>
+            <th>@Resources.RequestId</th>
+        </tr>
+    </thead>
+    @foreach (var item in Model)
+    {
+
+        var bank = @Utility.GetBankInfoBankId(item.From_BankID);
+        var Backup = @Utility.GetBankInfoBankId(item.To_BankID);
+        <tbody>
+            <tr>
+                <td data-lang-number="fa">@(Utility.DateStructure(item.TransferDate))</td>
+                <td data-lang-number="fa">@Math.Truncate((decimal)item.Price).ToString("#,##0")</td>
+                <td>@Utility.GetBasicBankInfoWithBankId(item.From_BankID)/@(bank.BranchName)/@bank.Bank_AccountNumber</td>
+                <td>@Utility.GetBasicBankInfoWithBankId(item.To_BankID) /@(Backup.BranchName)/@Backup.Bank_AccountNumber</td>
+                <td data-lang-number="fa">@item.RequestID</td>
+                <td>
+                    @if (!item.IsOk)
+                    {
+                        @Ajax.ActionLink(Resources.Edit, "EditTransfer", "DashBoard", new { area = "Management", TransferId = item.TransferId }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + @Resources.Edit + "', 'md')"
+               }, new { @class = "btn  btn-material-light-blue-A700 btn-xs" })
+
+                        @Ajax.ActionLink("تایید", "ConfirmTransfer", "DashBoard", new { area = "Management", TransferId = item.TransferId }, new AjaxOptions
+                   {
+                       HttpMethod = "POST",
+                       OnSuccess = "successMessage(data);updateTable();",
+                       OnComplete= "setTimeout(function () {location.reload();}, 1000)"
+
+                   }, new { title = "تایید", @class = "btn btn-material-light-blue-A700 btn-xs" })
+                    }
+                    else
+                    {
+                        @Ajax.ActionLink("لغو تایید", "ConfirmTransfer", "DashBoard", new { area = "Management", TransferId = item.TransferId }, new AjaxOptions
+         {
+             HttpMethod = "POST",
+             OnSuccess = "successMessage(data);updateTable();",
+             OnComplete= "setTimeout(function () {location.reload();}, 1000)"
+
+         }, new { title = "تایید", @class = "btn btn-material-light-blue-A700 btn-xs" })
+                    }
+                </td>
+            </tr>
+        </tbody>
+    }
+
+</table>

@@ -1,0 +1,92 @@
+﻿@model IEnumerable<CSD.Treasury.Service.CityService.City>
+<div class="btn-toolbar">
+    <div class="clearfix">
+        <div class="pull-right">
+            @Ajax.ActionLink(Resources.Create, "CreateCity", "Region", new { Area = "BasicInfo", provinceID = ViewBag.ProvinceID, countryID = ViewBag.CountryID }, new AjaxOptions
+       {
+           OnSuccess = "modal(data,'" + Resources.Create + " " + Resources.City + "', 'md');"
+       }, new { @class = "btn btn-sm btn-material-green-600" })
+            <a class="btn btn-white btn-sm" data-ajax="true" data-ajax-success="modal(data,'@Resources.Province', 'md')" href="@Url.Action("ListProvince", "Region", new { area = "BasicInfo", CountryID = ViewBag.CountryID})"><i class="zmdi zmdi-chevron-left zmdi-hc-lg"></i></a>
+        </div>
+    </div>
+</div>
+<table class="table table-striped sortable">
+    <thead>
+        <tr>
+            <th>
+                @Resources.Name
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.HasRelation("City", "CityID", item.CityID.ToString(), "Receipt_Detail", "CityID");
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.CityDescription)
+                </td>
+                <td>
+                    @Ajax.ActionLink(Resources.Edit, "EditCity", "Region", new { Area = "BasicInfo", id = item.CityID, countryID = ViewBag.CountryID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Province + "', 'md');"
+               }, new { @class = "btn btn-success btn-xs" })
+
+                    @if (related1)
+                    {
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                    }
+                    else
+                    {
+                        @Html.ActionLink(Resources.Delete, "DeleteCity", "Region", new { Area = "BasicInfo", CityID = item.CityID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+@section scripts{
+    <script>
+        $(document).ready(function () {
+            $(function () {
+                $("#myTable").tablesorter();
+            });
+        });
+    </script>
+}
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>

@@ -1,0 +1,55 @@
+﻿@model CSD.Treasury.Service.cmpBranchesService.cmpBranch
+
+@{
+    ViewBag.Title = "Edit";
+}
+@using (Ajax.BeginForm("Edit", "Branch", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);updateTable('branchList');"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(model => model.cmpBranchID)
+    @Html.HiddenFor(model => model.cmpBranchAddress)
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.TextBoxFor(model => model.cmpBranchName, new { data_lang_number="fa", @class = "form-control floating-label", @placeholder = Resources.BranchName })
+                @Html.ValidationMessageFor(model => model.cmpBranchName, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </div>
+}
+<div class="panel-heading">@Resources.Tel</div>
+<div class="panel-body mdc-bg-grey-50">
+    @Html.Action("TelIndex", "BranchInfo", new { area = "BasicInfo", ID = Model.cmpBranchID })
+</div>
+<hr />
+<div class="panel-heading">@Resources.Fax</div>
+<div class="panel-body mdc-bg-grey-50">
+    @Html.Action("FaxIndex", "BranchInfo", new { area = "BasicInfo", ID = Model.cmpBranchID })
+</div>
+<hr />
+<div class="panel-heading">@Resources.Email</div>
+<div class="panel-body mdc-bg-grey-50">
+    @Html.Action("EmailIndex", "BranchInfo", new { area = "BasicInfo", ID = Model.cmpBranchID })
+</div>
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+
+    function updateTable(listId) {
+        var url = document.getElementById(listId).getAttribute("ls-action");
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#" + listId).html(data);
+            }
+        });
+    }
+
+</script>

@@ -1,0 +1,108 @@
+﻿@model List<CSD.Treasury.DataModel.File>
+   
+
+<link href="@Url.Content("~/Content/css/dropzone.css")" rel="stylesheet" />
+<form class="dropzone" enctype="multipart/form-data" id="attachment">
+    <div class="fallback">
+        <input name="files" type="file" multiple />
+    </div>
+</form>
+<table class="table">
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var rowId = Guid.NewGuid().ToString("N");
+            <tr id="@Hash.GetHashString(item.fileID.ToString())">
+                <td style="width: 10%;">
+                    @*@Ajax.ActionLink(" ", "ShowDeleteConfirm", "Attachment",new { id = item.fileID }, new AjaxOptions
+               {
+                    HttpMethod = "Post",
+                   OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+                   //OnSuccess = "deleteRow(" + rowId + ")"
+               }, new { @class = "btn btn-danger zmdi zmdi-delete btn-flat" })*@
+
+                    @Html.ActionLink(Resources.Delete, "Delete", "Attachment", new { Area = "Payment", id = item.fileID }, new { @class = "btn btn-danger btn-xs delete" })
+                </td>
+                <td style="width: 10%;">
+                    @switch (item.fileType)
+                    {
+                        case "pdf":
+                            <i class="zmdi zmdi-collection-pdf"></i>
+                            break;
+                        case "xls":
+                            <i class="fa fa-file-excel-o"></i>
+                            break;
+                        case "doc":
+                            <i class="zmdi zmdi-file-text"></i>
+                            break;
+                        case "jpg":
+                            <i class="zmdi zmdi-image"></i>
+                            break;
+                        default:
+                            <i class="zmdi zmdi-file-text"></i>
+                            break;
+                    }
+                </td>
+                <td style="width: 60%;">
+                    @Html.ActionLink(item.fileName, "GetContentAttachedFile", "Attachment", new { fileID = item.fileID}, new { target="_blank"})
+                </td>
+                <td style="width: 20%;">
+                    <div class="text-right">
+                        @item.fileSize بایت
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<script src="~/Scripts/dropzone.js"></script>
+<script>
+    var myDropzone = new Dropzone("#attachment", {
+        @*url: "@Url.Action("Create", "Attachment", new { TableName = ViewBag.TableName, relatedID = ViewBag.RelatedId })",*@
+        url:"/Payment/Attachment/Create?TableName=@(ViewBag.TableName)&relatedID=@(ViewBag.RelatedId)",
+        paramName: "file", // The name that will be used to transfer the file
+        maxFilesize: .5, // MB
+        addRemoveLinks: true
+    });
+
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+    //Dropzone.options.myAwesomeDropzone = {
+    //    paramName: "file", // The name that will be used to transfer the file
+    //    maxFilesize: 2, // MB
+    //    accept: function (file, done) {
+    //        if (file.name == "justinbieber.jpg") {
+    //            done("Naha, you don't.");
+    //        }
+    //        else { done(); }
+    //    }
+    //};
+</script>

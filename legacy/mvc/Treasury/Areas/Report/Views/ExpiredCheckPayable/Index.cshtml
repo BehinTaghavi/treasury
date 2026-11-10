@@ -1,0 +1,34 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@{
+    Layout = null;
+    string Persiandate = ViewBag.PersianDate;
+}
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+<div>
+@Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+    Actions =
+    {
+        GetReportSnapshot ="List/?Date="+Persiandate ,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+    },
+    Toolbar =
+    {
+          BackgroundColor = System.Drawing.Color.Silver,
+        ShowPrintButton = true,
+         ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+
+    },
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+</div>

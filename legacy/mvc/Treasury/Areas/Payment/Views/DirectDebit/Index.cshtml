@@ -1,0 +1,261 @@
+﻿@{
+    ViewBag.Title = "Index";
+}
+
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/directDebit.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/directDebitUC.js")"></script>
+
+@section PageHeader{
+    @Resources.List @Resources.DirectDebit
+}
+
+<div ng-app="treasury" ng-controller="directDebitController" ng-init="DateNow = '@(ViewBag.DateNow)'">
+    <form name="form" novalidate ng-submit="saveDirectDebit()">
+        <div class="row">
+            <div class="col-sm-3 col-md-2">
+                <label class="control-label">بانک</label>
+                <select class="form-control input-sm" required name="basicBank_ID"
+                        ng-options="item as item.BasicBankDescription for item in basicbankList"
+                        ng-model="basicBank"></select>
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label class="control-label">شعبه و شماره حساب</label>
+                <select class="form-control input-sm" required name="bank_ID"
+                        ng-options="item as item.Bank_AccountNumber for item in (bankList | filter:{'BasicBankID':basicBank.BasicBankId})"
+                        ng-model="bank"></select>
+                @*<select class="form-control" ng-model="bank_ID" required name="bank_ID">
+                        <option ng-repeat="item in bankList" ng-if="item.BasicBankID == basicBank.BasicBankID" value="{{item.BankID}}">{{item.Bank_AccountNumber}}</option>
+                    </select>*@
+                <span ng-if="basicBank && !(bankList | filter:{'BasicBankID':basicBank.BasicBankID}).length">شعبه ایی برای این بانک وجود ندارد</span>
+            </div>
+        </div>
+        <hr ng-if="bank" />
+        <p ng-if="bank && (bankList | filter:{'BankID':bank.BankID})[0].Unique_Account_No">
+            <b>تفصیل اول:</b> {{(bankList | filter:{'BankID':bank.BankID})[0].Unique_Account_No}}
+        </p>
+        <p ng-if="bank && (bankList | filter:{'BankID':bank.BankID})[0].Unique_Account_No_two">
+            <b>تفصیل دوم:</b> {{(bankList | filter:{'BankID':bank.BankID})[0].Unique_Account_No_two}}
+        </p>
+        <p ng-if="bank && (bankList | filter:{'BankID':bank.BankID})[0].Account_No">
+            <b>معین / معین در معین:</b> {{(bankList | filter:{'BankID':bank.BankID})[0].Account_No}}
+        </p>
+
+        <hr />
+        <div class="row">
+            <div class="col-xs-12">
+                <table class="table table-striped petyCash">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>@Resources.Date</th>
+                            <th>@Resources.BehalfGroup</th>
+                            <th>@Resources.Reference</th>
+                            <th>@Resources.Behalf</th>
+                            <th>حساب معین / معین در معین</th>
+                            <th>تفصیل اول</th>
+                            <th>تفصیل دوم</th>
+                            <th>@Resources.Price</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in model.DirectDebit_TransactionLs">
+                            <td class="text-center">{{$index + 1}}</td>
+                            <td>
+                                <div ng-class="{'has-error': !form.PayDate_{{$index}}.$pristine && form.PayDate_{{$index}}.$invalid, 'has-success': form.PayDate_{{$index}}.$valid}">
+                                    <div class="input-append">
+                                        <input date-p
+                                               class="form-control Date"
+                                               required
+                                               type="text"
+                                               ui-mask="9999/99/99"
+                                               ng-pattern="DatePattern"
+                                               autocomplete="off"
+                                               name="PayDate_{{$index}}"
+                                               readonly
+                                               placeholder="____/__/__" lang="en"
+                                               ng-model="item.PayDate"
+                                               ng-change="changeText(DateNow);"
+                                               maxDate="{{DateNow}}">
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <select class="form-control input-sm" required name="behalfGroup_{{$index}}" ng-options="behalfGroup as behalfGroup.BehalfGroupDescription for behalfGroup in model.BehalfGroupList" ng-model="item.behalfGroup" ng-change="changeBehalfGroupevent(item)" style="max-width: 150px"></select>
+                            </td>
+                            <td>
+                                <div ng-repeat="ref in item.References">
+                                    <div ng-init="id = guid()">
+                                        <input type="text"
+                                               required
+                                               ng-bind="ref.ReferenceID"
+                                               ng-model="ref.value"
+                                               name="a{{id}}"
+                                               class="form-control input-sm"
+                                               placeholder="{{ref.referenceTypeDescription}}" title="{{ref.referenceTypeDescription}}" />
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+
+                                <select class="form-control input-sm"
+                                        required name="BehalfID_{{$index}}"
+                                        ng-class="{'has-error': !form.BehalfID_{{$index}}.$pristine && form.BehalfID_{{$index}}.$invalid, 'has-success': form.BehalfID_{{$index}}.$valid}"
+                                        ng-options="behalf.BehalfID as behalf.BehalfDescription for behalf in item.BehalfList " ng-model="item.BehalfID"></select>
+                            </td>
+                            <td>
+                                {{item.account.account_code}} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {{item.account.Account_Name}}
+                            </td>
+                            <td>
+                                @*<button class="btn btn-sm btn-flat"
+                                            ng-class="item.UniqueAccount1.Name == '' ? 'btn-material-orange-700' : 'btn-success'"
+                                            ng-click="changeUniqueAccount(item.UniqueAccount)">
+                                        {{item.UniqueAccount.Name != '' ? item.UniqueAccount.Name : "تفصیل"}}
+                                    </button>*@
+                                @*<button ng-if="item.account.Has_Unique_Account" class="btn btn-sm"
+                                            ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                            ng-click="changeUniqueAccount(item.UniqueAccount1)">
+                                        {{item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "انتخاب تفصیل اول"}}
+                                    </button>
+                                    <input ng-if="item.account.Has_Unique_Account" type="hidden" ng-model="item.UniqueAccount1.Code" name="UniqueAccount1_{{$index}}" required />*@
+
+
+                                <a ng-if="item.account.Has_Unique_Account"
+                                   class="btn btn-sm"
+                                   ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "انتخاب تفصیل اول"'>
+                                </a>
+                                <input ng-if="item.account.Has_Unique_Account" type="hidden" name="UniqueAccount1_{{$index}}" required ng-model="item.UniqueAccount1.Code" />
+
+
+
+                            </td>
+                            <td>
+                                @*<button ng-if="item.account.Has_Unique_Account_Two" class="btn btn-sm"
+                                            ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                            ng-click="changeUniqueAccount(item.UniqueAccount2)">
+                                        {{item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "انتخاب تفصیل دوم"}}
+                                    </button>
+                                    <input ng-if="item.account.Has_Unique_Account_Two" type="hidden" ng-model="item.UniqueAccount2.Code" name="UniqueAccount2_{{$index}}" required />*@
+
+                                <a ng-if="item.account.Has_Unique_Account_Two"
+                                   class="btn btn-sm"
+                                   ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "انتخاب تفصیل دوم"'>
+                                </a>
+                                <input ng-if="item.account.Has_Unique_Account_Two" type="hidden" name="UniqueAccount2_{{$index}}" required ng-model="item.UniqueAccount2.Code" />
+                            </td>
+                            <td>
+                                <div class="form-group" style="margin-bottom: 20px">
+                                    <input type="number" class="form-control input-sm" required name="Price_{{$index}}"
+                                           ng-class="{'has-error': !form.Price_{{$index}}.$pristine && form.Price_{{$index}}.$invalid, 'has-success': form.Price_{{$index}}.$valid}"
+                                           ng-model="item.Price" placeholder="@Resources.Price" ng-change="updateSumPrice()" />
+                                    <p class="help-block">{{item.Price | number}} ریال</p>
+                                </div>
+
+                            </td>
+
+                            <td class="text-center">
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-material-red-A700 btn-xs" title="حذف" ng-click="deleteItem(item)"><i class="zmdi zmdi-hc-lg zmdi-close"></i></button>
+                                    <button type="button" class="btn btn-material-green-600 btn-xs" title="کپی" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-yellow-50">
+                            <th colspan="8" class="text-left">جمع کل :</th>
+                            <th>
+                                <h4 class="mdc-text-grey-700" lang="en">
+                                    {{sumKol | number}}
+                                </h4>
+                            </th>
+                            <th></th>
+                        </tr>
+                    </tfoot>
+                </table>
+                <div class="clearfix">
+                    <div class="pull-right">
+                        <button type="button" ng-click="addDetail()" class="btn btn-material-grey-600">@Resources.Create @Resources.DirectDebit</button>
+                    </div>
+                    <div class="pull-left">
+                        <span class="mdc-text-red-A700" ng-if="!form.$dirty || form.$invalid">لطفا موارد فرم را به صورت کامل تکمیل نمایید</span>
+                        <span class="mdc-text-red-A700" ng-if="!(!form.$dirty || form.$invalid) && model.detailsLs.length == 0">حداقل یک برداشت وارد نمایید</span>
+                        <span class="mdc-text-red-A700" ng-if="hasDateError"> تاریخ دریافت را کوچکتر مساوی تاریخ امروز انتخاب نمایید</span>
+                        &nbsp;
+                        <button class="btn btn-material-green-600" ng-class="{'btn-success': !(!form.$dirty || form.$invalid || model.DirectDebit_TransactionLs.length == 0), 'btn-material-red-600': !form.$dirty || form.$invalid || model.DirectDebit_TransactionLs.length == 0}" ng-disabled="form.$invalid || model.DirectDebit_TransactionLs.length == 0 || hasDateError || isDisableBtn" type="submit">@Resources.Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+        <div class="modal md ang fade" role="dialog" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button  type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                        <h4 class="modal-title"></h4>
+                    </div>
+
+                    <div class="modal-body">
+                        <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+    .table.petyCash > tbody > tr > td, .table.petyCash > tbody > tr > th, .table.petyCash > tfoot > tr > td, .table.petyCash > tfoot > tr > th, .table.petyCash > thead > tr > td, .table.petyCash > thead > tr > th {
+        white-space: nowrap;
+    }
+
+    .datepcker .btn.btn-xs {
+        padding: 0px 5px;
+        font-size: 15px;
+        margin: 5px;
+    }
+</style>
+
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("List", "DirectDebit", new { area = "Payment" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+    $(document).ready(function () {
+        jQuery(function ($) {
+            $(".Date").mask("9999/99/99");
+        });
+
+    });
+
+</script>

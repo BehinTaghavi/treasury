@@ -1,0 +1,178 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+
+@{
+    ViewBag.Title = "ResultOfIntegrationRequest";
+}
+@*<td colspan="10">
+    <table>*@
+@foreach (var child in Model.List)
+{
+    var related = Utility.HasRelation("Request_Payment", "RequestID", child.RequestID.ToString(), "Payment", "RequestID");
+
+<tr class="@(child.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfDuplication ? "mdc-bg-grey-100" : "")@((child.AggrigateOrDuplicationStatusID == (int)RequestDescription.Integration || child.AggrigateOrDuplicationStatusID == (int)RequestDescription.IntegrationRequest) ? "mdc-bg-green-50" : "")" style="@(child.AggrigateOrDuplicationStatusID == (int)RequestDescription.Integration ? "opacity: .5" : "")">
+    <td class="text-center"></td>
+    <td class="text-center">
+        @if (child.AggrigateOrDuplicationStatusID != (int)RequestDescription.Integration && child.Confirmed == null && child.Pay_TypeDetailID_source != null)
+        {
+            if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("AcceptRequestPayment"))
+            {
+                <div class="checkbox">
+                    <label style="padding: 0">
+                        @(child.Confirmed )
+                        <input type="checkbox" class="dataprop" value="@child.RequestID" />
+                    </label>
+                </div>
+            }
+        }
+    </td>
+
+    <td>@(child.RequestID)</td>
+
+    <td>
+        @if (!string.IsNullOrEmpty(child.DueDate))
+        {
+            <b data-lang-number="fa" class="mdc-text-light-blue-900">
+                @(child.DueDate.Substring(0, 4) + "/" + child.DueDate.Substring(4, 2) + "/" + child.DueDate.Substring(6, 2))
+            </b>
+        }
+    </td>
+    <td>
+        <b data-lang-number="fa" style="font-size: 15px" class="mdc-text-light-blue-900">
+            @Math.Truncate(child.PayAmount).ToString("#,##0")
+        </b>
+    </td>
+    <td>@Utility.GetUniqueAccount(child.Unique_Account_No)</td>
+
+    @*    <td>
+           @switch (child.Priority)
+            {
+                case (short)Priority.High:
+                    <b class='mdc-text-green-700'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+                case (short)Priority.Normal:
+                    <b class='mdc-text-lime-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+                case (short)Priority.Low:
+                    <b class='mdc-text-amber-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+
+        </td>  }*@
+    <td>
+        @*@if (child.Cancellation != null)
+        {
+            <text>@Resources.Cancel</text>
+        }
+        else if (child.Delivered != null)
+        {
+            <text>@Resources.Delivered</text>
+        }
+        else if (child.Paid != null)
+        {
+            <text>@Resources.Paid</text>
+        }
+        else if (child.ConfirmPayment != null)
+        {
+            <text>@Resources.ConfirmPayment</text>
+        }
+        else if (child.Confirmed != null)
+        {
+            <text>@Resources.Confirm</text>
+        }
+
+        else if (child.Unknown != null)
+        {
+            <text>@Resources.Unknown</text>
+        }*@
+    </td>
+    <td>@(Model.DueDate)</td>
+    <td>
+        <b>
+            @{
+                var Behalf = Utility.GetBehalf(child.BehalfID);
+                if (Behalf.Count() >= 15)
+                {
+                    @(Behalf.Substring(0, 15) + "...")
+                }
+                else
+                {
+                    @(Behalf)
+                }
+
+            }
+
+
+
+        </b>
+    </td>
+
+    <td></td>
+    <td></td>
+    <td>
+
+
+        @if (child.AggrigateOrDuplicationStatusID != (int)RequestDescription.Integration)
+        {
+
+
+
+            <div class="dropdown">
+                <button class="btn btn-material-light-blue-A700 btn-sm dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                    عملیات
+                    &nbsp;&nbsp;<span class="caret"></span>
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                    <li>
+
+                        @Ajax.ActionLink("نمایش", "RequestPayment", "Request", new { area = "Payment", requestId = child.RequestID, Type = 0 }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+               }, null)
+                    </li>
+                    <li>
+                        @Html.ActionLink("گزارش", "RequestDetails", "RequestPayment", new { Area = "Report", RequestId = child.RequestID }, null)
+                    </li>
+                    <li>
+                        @Html.ActionLink("کپی", "Copy", "request", new { area = "payment", RequestID = child.RequestID }, null)
+                    </li>
+
+                    @if (child.Confirmed == null && child.ConfirmPayment == null && child.Paid == null && child.Delivered == null)
+                    {
+
+                        if (related)
+                        {
+                            <li>
+                                <a class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</a>
+                            </li>
+                        }
+                        else
+                        {
+                            @Html.ActionLink("ویرایش", "Edit", "request", new { area = "payment", requestId = child.RequestID, pageIndex = Model.PageIndex, limitation = true }, null)
+                        }
+
+                    }
+                    @if (child.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                    {
+                        <li>
+                            @Ajax.ActionLink("ضمیمه", "List", "Attachment", new { area = "Payment", Id = child.RequestID, TableName = "Request_Payment" }, new AjaxOptions
+                   {
+                       InsertionMode = InsertionMode.Replace,
+                       OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+                   }, null)
+                        </li>
+                    }
+                </ul>
+            </div>
+
+        }
+    </td>
+
+
+
+
+
+</tr>
+
+
+}
+@*</table>
+    </td>*@

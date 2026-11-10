@@ -1,0 +1,48 @@
+﻿@using CSD.Treasury.UI.Models
+
+@*@section PageHeader{
+        @Resources.PayableDueDateCheque
+    }*@
+
+@section list{
+    @if (Request.IsAuthenticated && (User.IsInRole("Admin") || User.IsInRole("Manager")))
+    {
+        <div id="Result">
+            <div id="Table2">
+                @Html.Action("ChequeDueDateList", "DashBoard", new { Area = "Management" })
+            </div>
+            @Html.Action("ReceiveChequeDueDateList", "DashBoard", new { Area = "Management" })
+
+            <div id="ResultTransfer">
+                @Html.Action("TransferFromBackupBankList", "DashBoard", new { Area = "Management" })
+            </div>
+        </div>
+    }
+    @*<div>
+            @Html.Action("", "DashBoard", new { Area= "Management" })
+        </div>*@
+}
+
+@*@Html.ActionLink(Resources.FuturePaymentStatus, "FuturePaymentStatus", "DashBoard", new { Area = "Management" }, null)*@
+@*@Html.Action("PayDay", "DashBoard", new { Area = "Management" })*@
+<script typ e="text/javascript">
+
+    function updateTable() {
+        var url = '@(Url.Action("TransferFromBackupBankList", "DashBoard", new { area = "Management", BasicBankID = ViewBag.BasicBankID }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#ResultTransfer").html(data);
+            }
+        });
+    }
+      function updateTable2() {
+        var url = '@(Url.Action("ChequeDueDateList", "DashBoard", new { area = "Management"}))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Table2").html(data);
+            }
+        });
+    }
+</script>

@@ -1,0 +1,149 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelExpiredCheque
+@using CSD.Treasury.Resourse
+@using CSD.Treasury.MVCHelpers
+@using CSD.Treasury.UI.Models
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>@Resources.RequestIdCompressed</th>
+            <th>@Resources.RequestDate</th>
+            <th>@Resources.PayAmount </th>
+            <th>@Resources.ExchangeType</th>
+            <th>@Resources.ChequeNo</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.Deadline</th>
+            <th>@Resources.BankAccountNumber -@Resources.Bank</th>
+            <th>@Resources.Unique_Account_No 1</th>
+            <th>@Resources.BehalfGroup</th>
+
+            @*<th></th>*@
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+        <tr>
+            <td data-lang-number="fa">@{i++;}  @i</td>
+            <td data-lang-number="fa">@item.RequestID</td>
+            <td data-lang-number="fa">@Utility.GetPersianDate(item.RequestDate)</td>
+            <td data-lang-number="fa">@Math.Truncate(item.PayAmount).ToString("N0") </td>
+            <td>@item.ExchangeTypeDescription</td>
+            <td data-lang-number="fa">@item.ChequeNo</td>
+            <td data-lang-number="fa">@Utility.GetPersianDate(item.DueDate)</td>
+            <td data-lang-number="fa">@(item.mohlat)</td>
+            <td data-lang-number="fa">
+                @item.Bank_AccountNumber
+            </td>
+            <td>@Utility.GetUniqueAccount(item.Unique_Account_No)</td>
+
+            <td>
+                @if (item.BehalfDescription.Count() > 25)
+                {
+                    @(item.BehalfDescription.Substring(0, 20) + "...")
+                }
+                else
+                {
+                    @(item.BehalfGroupDescription)
+                }
+
+
+            </td>
+
+            @*<td>
+             @Ajax.IActionLink("", "ShowVocher", "Pay", new { area = "Payment", RequestID = item.RequestID }, new AjaxOptions
+        {
+            OnSuccess = "modal(data,'" + Resources.Show + "'+'/سند', 'lg:not(.xlg)');"
+        }, new { title = Resources.Show + "/سند", @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+         </td>*@
+        </tr>
+                    }
+    </tbody>
+</table>
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                (@Resources.Total : @Model.TotalItemCount)
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "ShowALLExpired", "ExpiredCheckPayable", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "ShowALLExpired", "ExpiredCheckPayable", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "ShowALLExpired", "ExpiredCheckPayable", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

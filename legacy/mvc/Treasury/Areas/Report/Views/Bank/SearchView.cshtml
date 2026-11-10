@@ -1,0 +1,73 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "SearchView";
+}
+@section PageHeader{
+    موجودی بانک
+}
+@using (Html.BeginForm("Index", "Bank", new { Area = "Report" }, FormMethod.Get, new { id = "SearchForm" }))
+{
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                <select class="form-control floating-label" id="BankType" name="BankType">
+                    <option value="false">حسابهای جاری</option>
+                    <option value="True">سپرده های بانکی</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.BasicBank, new SelectList(ViewBag.BasicBank, "BasicBankId", "BasicBankDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank })
+            </div>
+            <div class="form-group">
+                @Html.DropDownListFor(model => model.BankId, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber })
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date,@readonly = "readonly", @autocomplete = "off" })
+                @Html.ValidationMessageFor(model => model.FromDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date, @readonly = "readonly", @autocomplete = "off" })
+                @Html.ValidationMessageFor(model => model.ToDate)
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+
+<script>
+ 
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+    $('#BasicBank').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val(), BankType: $('#BankType').val() }, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+
+</script>

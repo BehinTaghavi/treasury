@@ -1,0 +1,180 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<StiSerializer version="1.02" type="Net" application="StiReport">
+  <Dictionary Ref="1" type="Dictionary" isKey="true">
+    <BusinessObjects isList="true" count="0" />
+    <Databases isList="true" count="0" />
+    <DataSources isList="true" count="2">
+      <BasicBanks Ref="2" type="DataTableSource" isKey="true">
+        <Alias>BasicBanks</Alias>
+        <Columns isList="true" count="4">
+          <value>BasicBankId,System.String</value>
+          <value>BasicBankDescription,System.String</value>
+          <value>BasicBankDescription2,System.String</value>
+          <value>BasicBankImage,System.String</value>
+        </Columns>
+        <Dictionary isRef="1" />
+        <Name>BasicBanks</Name>
+        <NameInSource>Treasury</NameInSource>
+      </BasicBanks>
+      <Banks Ref="3" type="DataTableSource" isKey="true">
+        <Alias>Banks</Alias>
+        <Columns isList="true" count="24">
+          <value>BankID,System.String</value>
+          <value>BasicBankID,System.String</value>
+          <value>Bank_AccountNumber,System.String</value>
+          <value>BranchCode,System.String</value>
+          <value>BranchName,System.String</value>
+          <value>BranchName2,System.String</value>
+          <value>OpeningDate,System.String</value>
+          <value>OpeningValue,System.String</value>
+          <value>HasExchangeTransaction,System.String</value>
+          <value>ExchangeTypeID,System.String</value>
+          <value>IsActive,System.String</value>
+          <value>HasBackup,System.String</value>
+          <value>Backup_BankID,System.String</value>
+          <value>Account_No,System.String</value>
+          <value>Unique_Account_No,System.String</value>
+          <value>Unique_Account_No_two,System.String</value>
+          <value>Assign_Account_No,System.String</value>
+          <value>Returns_Account_No,System.String</value>
+          <value>SortOrder,System.String</value>
+          <value>IS_Facilities,System.String</value>
+          <value>CityID,System.String</value>
+          <value>MaxPermissiveSignatureCount,System.String</value>
+          <value>MinPermissiveSignatureCount,System.String</value>
+          <value>Deposited,System.String</value>
+        </Columns>
+        <Dictionary isRef="1" />
+        <Name>Banks</Name>
+        <NameInSource>Treasury</NameInSource>
+      </Banks>
+    </DataSources>
+    <Relations isList="true" count="0" />
+    <Report isRef="0" />
+    <Variables isList="true" count="0" />
+  </Dictionary>
+  <EngineVersion>EngineV2</EngineVersion>
+  <GlobalizationStrings isList="true" count="0" />
+  <MetaTags isList="true" count="0" />
+  <Pages isList="true" count="1">
+    <Page1 Ref="4" type="Page" isKey="true">
+      <Border>None;Black;2;Solid;False;4;Black</Border>
+      <Brush>Transparent</Brush>
+      <Components isList="true" count="2">
+        <DataBand1 Ref="5" type="DataBand" isKey="true">
+          <Brush>Transparent</Brush>
+          <BusinessObjectGuid isNull="true" />
+          <ClientRectangle>0,0.2,7.72,0.3</ClientRectangle>
+          <Components isList="true" count="1">
+            <Text1 Ref="6" type="Text" isKey="true">
+              <Border>Left, Right;[105:105:105];1;Solid;False;4;[105:105:105]</Border>
+              <Brush>WhiteSmoke</Brush>
+              <ClientRectangle>0,0,2.4,0.2</ClientRectangle>
+              <Conditions isList="true" count="0" />
+              <Font>B Nazanin,14</Font>
+              <Margins>0,0,0,0</Margins>
+              <Name>Text1</Name>
+              <Page isRef="4" />
+              <Parent isRef="5" />
+              <Text>{BasicBanks.BasicBankDescription}</Text>
+              <TextBrush>Black</TextBrush>
+              <Type>Expression</Type>
+            </Text1>
+          </Components>
+          <Conditions isList="true" count="0" />
+          <DataRelationName isNull="true" />
+          <DataSourceName>BasicBanks</DataSourceName>
+          <Filters isList="true" count="0" />
+          <Name>DataBand1</Name>
+          <Page isRef="4" />
+          <Parent isRef="4" />
+          <Sort isList="true" count="0" />
+        </DataBand1>
+        <DataBand2 Ref="7" type="DataBand" isKey="true">
+          <Brush>Transparent</Brush>
+          <ClientRectangle>0,0.9,7.72,0.3</ClientRectangle>
+          <Components isList="true" count="1">
+            <Text2 Ref="8" type="Text" isKey="true">
+              <Border>Left, Right;[105:105:105];1;Solid;False;4;[105:105:105]</Border>
+              <Brush>WhiteSmoke</Brush>
+              <ClientRectangle>0.6,0.1,4.8,0.2</ClientRectangle>
+              <Conditions isList="true" count="0" />
+              <Font>B Nazanin,14</Font>
+              <Margins>0,0,0,0</Margins>
+              <Name>Text2</Name>
+              <Page isRef="4" />
+              <Parent isRef="7" />
+              <Text>{Banks.BranchCode}{Banks.BranchName}</Text>
+              <TextBrush>Black</TextBrush>
+              <Type>Expression</Type>
+            </Text2>
+          </Components>
+          <Conditions isList="true" count="0" />
+          <DataRelationName isNull="true" />
+          <DataSourceName>Banks</DataSourceName>
+          <Filters isList="true" count="0" />
+          <Name>DataBand2</Name>
+          <Page isRef="4" />
+          <Parent isRef="4" />
+          <Sort isList="true" count="0" />
+        </DataBand2>
+      </Components>
+      <Conditions isList="true" count="0" />
+      <Guid>ac4f18f871f645baa4862ed3d6a27b66</Guid>
+      <Margins>0.39,0.39,0.39,0.39</Margins>
+      <Name>Page1</Name>
+      <PageHeight>11</PageHeight>
+      <PageWidth>8.5</PageWidth>
+      <PaperSize>Letter</PaperSize>
+      <Report isRef="0" />
+      <Watermark Ref="9" type="Stimulsoft.Report.Components.StiWatermark" isKey="true">
+        <Font>Arial,100</Font>
+        <TextBrush>[50:0:0:0]</TextBrush>
+      </Watermark>
+    </Page1>
+  </Pages>
+  <PrinterSettings Ref="10" type="Stimulsoft.Report.Print.StiPrinterSettings" isKey="true" />
+  <ReferencedAssemblies isList="true" count="8">
+    <value>System.Dll</value>
+    <value>System.Drawing.Dll</value>
+    <value>System.Windows.Forms.Dll</value>
+    <value>System.Data.Dll</value>
+    <value>System.Xml.Dll</value>
+    <value>Stimulsoft.Controls.Dll</value>
+    <value>Stimulsoft.Base.Dll</value>
+    <value>Stimulsoft.Report.Dll</value>
+  </ReferencedAssemblies>
+  <ReportAlias>Report</ReportAlias>
+  <ReportChanged>10/25/2017 4:26:48 PM</ReportChanged>
+  <ReportCreated>10/25/2017 11:25:54 AM</ReportCreated>
+  <ReportFile>D:\Project94\Treasury.git.1396\Treasury\Treasury\Report\ReportTest.mrt</ReportFile>
+  <ReportGuid>d4cd62d2c62d40e4a842189515b42397</ReportGuid>
+  <ReportName>Report</ReportName>
+  <ReportUnit>Inches</ReportUnit>
+  <ReportVersion>2015.2.0</ReportVersion>
+  <Script>using System;
+using System.Drawing;
+using System.Windows.Forms;
+using System.Data;
+using Stimulsoft.Controls;
+using Stimulsoft.Base.Drawing;
+using Stimulsoft.Report;
+using Stimulsoft.Report.Dialogs;
+using Stimulsoft.Report.Components;
+
+namespace Reports
+{
+    public class Report : Stimulsoft.Report.StiReport
+    {
+        public Report()        {
+            this.InitializeComponent();
+        }
+
+        #region StiReport Designer generated code - do not modify
+		#endregion StiReport Designer generated code - do not modify
+    }
+}
+</Script>
+  <ScriptLanguage>CSharp</ScriptLanguage>
+  <Styles isList="true" count="0" />
+</StiSerializer>

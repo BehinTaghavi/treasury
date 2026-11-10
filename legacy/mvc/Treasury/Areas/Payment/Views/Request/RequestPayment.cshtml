@@ -1,0 +1,372 @@
+﻿@model CSD.Treasury.DataModel.Request_Payment
+@using CSD.Treasury.Service.Request_Payment_StatusDetailsService
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.UI.Models
+
+@if (Model != null)
+{
+
+    var IfHaveRefrence = Utility.GetReferenceTypeValue(Model.RequestID);
+
+    <div class="row">
+        <div class="col-sm-7">
+            <div class="col-sm-12">
+                <p class="pardes">
+                    <label>
+                        @Resources.RequestId
+                    </label>
+                    <span data-lang-number="fa">
+                        @(Model.RequestID)
+                    </span>
+                </p>
+
+
+                <p class="pardes">
+                    <label>
+                        شماره سریال دفترداری
+                    </label>
+                    @if (ViewBag.VocherNo != null)
+                    {
+                        <span data-lang-number="fa">
+                            @(ViewBag.VocherNo)
+                        </span>
+                    }
+                    else
+                    {
+                        <span data-lang-number="fa">
+                            سند ارسال نشده
+                        </span>
+                    }
+                </p>
+
+
+            </div>
+
+            <div class="col-sm-12">
+                <p class="pardes">
+                    <label>
+                        @Resources.RequsetName
+                    </label>
+                    @Utility.GetUserName(Model.UserID)/@Utility.GetUserLocation(Model.UserID)
+                </p>
+            </div>
+
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.RequestDate
+                    </label>
+                    @Utility.GetPersianDate(Model.RequestDate)
+                </p>
+            </div>
+
+            @if (Model.DueDate != null)
+            {
+                <div class="col-sm-6">
+                    <p class="pardes">
+                        <label>
+                            @Resources.DueDate
+                        </label>
+                        @Utility.GetPersianDate(Model.DueDate)
+                    </p>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(Utility.GetRequest_Payment_DeliveryTime((int)Model.RequestID)))
+            {
+                <div class="col-sm-6">
+                    <p class="pardes">
+                        <label>
+                            تاریخ تحویل
+                        </label>
+                        @Utility.GetRequest_Payment_DeliveryTime((int)Model.RequestID)
+                    </p>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(Utility.GetRequest_Payment_BardashtTime((int)Model.RequestID)))
+            {
+                <div class="col-sm-6">
+                    <p class="pardes">
+                        <label>
+                            تاریخ برداشت
+                        </label>
+                        @Utility.GetRequest_Payment_BardashtTime((int)Model.RequestID)
+                    </p>
+                </div>
+            }
+            <div class="col-sm-12">
+                <p class="pardes">
+                    <label>
+                        @Resources.Unique_Account_No /@Resources.Code
+                    </label>
+                    @Utility.GetUniqueAccount(Model.Unique_Account_No)/ @(Model.Unique_Account_No)
+                </p>
+            </div>
+            @if (Model.Main_Unique_Account_No != null)
+            {
+
+                <div class="col-sm-6">
+                    <p class="pardes">
+                        <label>
+                            @Resources.Main_Unique_Account_No
+                        </label>
+                        @Utility.GetUniqueAccount(Model.Main_Unique_Account_No)  @(Model.Main_Unique_Account_No)
+                    </p>
+                </div>
+            }
+
+
+
+            <div class="col-sm-12">
+                <p class="pardes">
+                    <label>
+                        @Resources.Behalf
+                    </label>
+                    @Utility.GetBehalfGroup(ViewBag.BehalfGroupID) /
+                    @Utility.GetBehalf(Model.BehalfID)
+                </p>
+            </div>
+
+            @*<div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Priority
+                    </label>
+                    @TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), Model.Priority))
+                </p>
+            </div>*@
+            @if (Model.Description != null)
+            {
+                <div class="col-sm-6">
+                    <p class="pardes">
+                        <label>
+                            @Resources.AccountNo /@Resources.Sheba
+                        </label>
+                        @{
+                            var a = Model.Description.Split(';')[0];
+                        }
+
+                        @*@(Utility.GetAccountNum(int.Parse(Model.Description.Split(';')[0])))
+                            @(Utility.GetShebaNum(int.Parse(Model.Description.Split(';')[0])))*@
+                    </p>
+                </div>
+            }
+
+            @if (IfHaveRefrence != "")
+            {
+                <div class="col-sm-12">
+                    <p class="pardes">
+                        @*<label>
+                                @Resources.Reference
+                            </label>*@
+                        @Html.Raw(Utility.GetReferenceTypeValue(Model.RequestID, true))
+                    </p>
+                </div>
+            }
+        </div>
+
+
+        <div class="col-sm-5">
+
+            <div class="panel panel-default">
+                <div class="panel-body mdc-bg-grey-100">
+
+                    <p class="pardes">
+                        <label>
+                            @Resources.PayAmount
+                        </label>
+                        <span data-lang-number="fa">
+                            @Math.Truncate(Model.PayAmount).ToString("N0")
+                        </span>
+                    </p>
+
+
+                    <p class="pardes">
+                        <label>
+                            @Resources.ExchangeType
+                        </label>
+                        @if (Model.ExchangeTypeID == null)
+                        {@Resources.Rial}
+                    @*else
+                        { <span>دلار</span>}*@
+
+                    </p>
+                  
+                    @if (Model.ExchangeTypeID != null)
+                    {
+                        <p class="pardes">
+                            <label>
+                                @Resources.ExchangeRate
+                            </label>
+                            <span data-lang-number="fa">
+                                @Math.Truncate(Convert.ToDecimal(Model.ExchangeRate)).ToString("N0")
+                            </span>
+                        </p>
+
+                    }
+                    @if (Model.ChequeNo != 0)
+                    {
+                        <p class="pardes">
+                            <label>
+                                @Resources.ChequeNo
+                            </label>
+                            <span data-lang-number="fa">
+                                @Model.ChequeNo
+                            </span>
+                        </p>
+                    }
+
+                </div>
+            </div>
+
+            <div class="panel panel-default">
+                <div class="panel-body  mdc-bg-grey-100">
+                    <p class="pardes">
+                        <label>
+                            @Resources.ReceiptPayType
+                        </label>
+
+                        @if (Model.Pay_TypeDetailID_source != null)
+                        {
+                            @Utility.GetReceipt_Pay_TypeDetailTitle(Model.Pay_TypeDetailID_source.Value)
+                        }
+                        else
+                        {
+                            <span>نامشخص</span>
+                        }
+                    </p>
+                    @*<p class="pardes">
+                            <label>
+                                @Resources.From
+                            </label>
+                            @TreasuryEnums.GetTitleFromResource("Source_DestinationType", Enum.GetName(typeof(Source_DestinationType), Model.Source_TypeID))
+                        </p>*@
+                    <p class="pardes">
+                        <label>
+                            @Resources.From
+                        </label>
+                        <span data-lang-number="fa">
+
+                            @if (Model.Source_PaymentValue != null)
+                            {
+                                <span>@(Utility.GetBasicBankInfoWithBankId(int.Parse(Model.Source_PaymentValue)))</span>
+                                var Bank = Utility.GetBankInfoBankId(int.Parse(Model.Source_PaymentValue));
+                                if (Bank != null)
+                                {
+                                    <span>@(Bank.BranchName)</span>
+                                    <span>@(Bank.Bank_AccountNumber)</span>
+                                }
+                            }
+                            else
+                            {
+                                <span>نامشخص</span>
+                            }
+                        </span>
+                    </p>
+                    @if (Model.Pay_TypeDetailID_source != null)
+                    {
+                        if (Model.Pay_TypeDetailID_source == 5)
+                        {
+                            <p class="pardes">
+                                <label>
+                                    @Resources.To
+                                </label>
+                                @*</p>
+                                    <p class="pardes">
+                                        <label>
+                                            @Resources.Number  @Resources.Destination
+                                        </label>*@
+                                <span data-lang-number="fa">
+                                    @if (Model.Destination_PaymentValue != null)
+                                    {
+                                        @Utility.GetBasicBankInfoWithBankId(int.Parse(Model.Destination_PaymentValue))
+                                        <span></span>
+                                        @Utility.GetBankInfoBankId(int.Parse(Model.Source_PaymentValue)).BranchName
+                                        <span></span>
+                                        @Utility.GetBankInfoBankId(int.Parse(Model.Destination_PaymentValue)).Bank_AccountNumber
+                                    }
+
+                                </span>
+                            </p>
+                        }
+
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        @*@if (ViewBag.CancelCheque == true)
+            {*@
+        @*@Ajax.ActionLink("کنسل / عودت چک", "CancelRequest", "Request", new { Area = "Payment", RequestId = Model.RequestID, Status = Model.Status },
+            new AjaxOptions {
+                HttpMethod = "get",
+
+                OnSuccess = "successMessage(data);console.log(data);$('#cancellink').prop('disabled', true);"
+            }, new { @class = "btn btn-primary" ,id = "cancellink" })*@
+
+        @*<div class="col-md-4">
+                @Html.TextBox("date", null, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = "تاریخ کنسل/عودت", @Readonly = "readonly" })
+                @Html.ValidationMessage("date", "", new { @class = "text-danger" })
+
+            </div>*@
+        @*<div class="col-md-4">
+                <a href="@Url.Action("CancelRequest", "Request", new { Area = "Payment", RequestId = Model.RequestID, Status = Model.Status })" id="btnActionLink" class="btn btn-primary">
+                    کنسل / عودت چک
+                </a>
+
+            </div>*@
+
+        @*  }*@
+
+        @*@if (Model.ChequeNo.Value != 0)
+            {
+                <div class="col-md-4">
+                    @Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row", new { Area = "Management", IsPayment = false, requestId = Model.RequestID, IsReturend = false, Receipt_Pay_TypeID = 1, BehalfGroupID = Utility.GetBehalfGroupBybehalfId(Model.BehalfID).BehalfGroupID, StatusID = 3, ReferenceId = Model.RequestID }, new AjaxOptions
+                {
+                   OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+                }, new { @class = "btn btn-primary", id = "cancellink" })
+                </div>
+            }*@
+    </div>
+
+}
+else
+{
+    <p> یافت نشد </p>
+}
+<script>
+    $(function () {
+        $('#btnActionLink').click(function (e) {
+            e.preventDefault();
+            $.ajax({
+                url: e.target.href,
+                data:
+                {
+                    date: $('#date').val()
+                },
+                method: "GET"
+            }).done(function (data) {
+                successMessage(data);
+                $('#btnActionLink').attr('disabled', true);
+            });
+        });
+    });
+
+    $("#date").datepicker({
+        dateFormat: "yy/mm/dd",
+        changeMonth: true,
+        changeYear: true,
+        showButtonPanel: true
+    });
+</script>
+
+<style>
+    .modal-dialog {
+        width: 900px;
+    }
+</style>
+
+
+
+
+

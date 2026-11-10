@@ -1,0 +1,47 @@
+﻿@using CSD.Treasury.UI.Models
+@model LoginViewModel
+@{
+    ViewBag.Title = "ورود به سیستم";
+}
+@Styles.Render("~/Content/account")
+<div class="row">
+    <div class="col-md-5">
+        <section id="loginForm" class="well">
+            @using (Html.BeginForm("Login", "Account", new { ReturnUrl = ViewBag.ReturnUrl }, FormMethod.Post, new { @class = "form-horizontal", role = "form" }))
+            {
+                @Html.AntiForgeryToken()
+                <h4>ورود سیستم</h4>
+                <hr />
+                <div class="container-fluid">
+                    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+                    <div class="form-group">
+                        @*<label for="UserName" class="control-label">@Resources.UserName</label>*@
+                        @Html.TextBoxFor(m => m.UserName, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.UserName, lang="en"  })
+                        @Html.ValidationMessageFor(m => m.UserName, "", new { @class = "text-danger" })
+                    </div>
+                    <div class="form-group">
+                        @*<label for="Password" class="control-label">@Resources.Password</label>*@
+                        @Html.PasswordFor(m => m.Password, new { data_lang_number="fa", @class = "form-control left floating-label", placeholder = Resources.Password, lang = "en" })
+                        @Html.ValidationMessageFor(m => m.Password, "", new { @class = "text-danger" })
+                    </div>
+                    @*<div class="form-group">
+                        <div class="checkbox">
+                            <label>
+                                <input name="RememberMe" type="checkbox">&nbsp;&nbsp;مرا به خاطر بسپار
+                            </label>
+                        </div>
+                    </div>*@
+                    <div class="form-group">
+                        <div class="text-left">
+                            <button type="submit" class="btn btn-primary">ورود</button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </section>
+    </div>
+</div>
+
+@section Scripts {
+    @Scripts.Render("~/bundles/jqueryval")
+}

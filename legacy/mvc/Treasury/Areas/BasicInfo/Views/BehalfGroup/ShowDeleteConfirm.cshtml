@@ -1,0 +1,30 @@
+﻿@model CSD.Treasury.Service.BehalfGroupService.BehalfGroup
+
+<p>@Resources.AreYouSure</p>
+<div>
+    @using (Ajax.BeginForm("Delete", "ExchangeType", new AjaxOptions
+    {
+        OnSuccess = "successMessage(data); OnSuccessdelete(data)"
+    }, new { enctype = "multipart/form-data" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.BehalfGroupID)
+
+        <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+
+        </div>
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+
+    function OnSuccessdelete(data) {
+        deleteRow('@Hash.GetHashString(Model.BehalfGroupID.ToString())');
+        closeModal('md');
+    }
+</script>
+

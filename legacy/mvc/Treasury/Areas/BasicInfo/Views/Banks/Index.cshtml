@@ -1,0 +1,115 @@
+﻿@using CSD.Treasury.UI.Models;
+@{
+    var Bank= Resources.BasicBank + " " + Utility.GetBasicBankInfo(ViewBag.BasicBankID);
+    ViewBag.Title = Bank;
+}
+<link href="@Url.Content("~/Content/css/select2.min.css")" rel="stylesheet" />
+@section PageHeader{
+    @(Resources.Branch+"/"+Resources.BankAccount+"/" + Bank)
+}
+@section btnToolbar{
+   <div class="mdc-bg-grey-50">
+    <div class="btn-toolbar">
+        <div class="clearfix">
+            <div class="pull-right">
+
+                @Ajax.ActionLink(Resources.Create, "Create", "Banks", new { Area = "BasicInfo", BasicBankID = ViewBag.BasicBankID }, new AjaxOptions
+           {
+               OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.Branch +"/"+Bank+ "', 'lg:not(.xlg)')"
+           }, new { @class = "btn btn-material-green-600 btn-sm" })
+
+            </div>
+            <div class="pull-left">
+                @Html.ActionLink(Resources.Back, "Index", "BasicBank", new { Area = "BasicInfo" }, new { @class = "btn btn-default btn-sm" })
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Banks", new { Area = "BasicInfo" })
+    </div>
+}
+
+
+
+<script src="@Url.Content("~/Scripts/select2.full.min.js")"></script>
+@Scripts.Render("~/bundles/jqueryval")
+<script type="text/javascript">
+
+    function updateTable() {
+        var url = '@(Url.Action("List", "Banks", new { area = "BasicInfo", BasicBankID = ViewBag.BasicBankID }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }
+
+    $('select').select2({
+        containerCssClass: "form-control",
+        dir: "rtl"
+    });
+    //today
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+
+    //last month
+    var lstmonth = new Date();
+    var day = lstmonth.getDate();
+    var month = lstmonth.getMonth(); //January is 0!
+    var year = lstmonth.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    lstmonth = year + '-' + month + '-' + day;
+
+    function toGargDate(date) {
+        var day = date.getDate();
+        var month = date.getMonth() + 1; //January is 0!
+        var year = date.getFullYear();
+        if (day < 10) day = '0' + day;
+        if (month < 10) month = '0' + month;
+        date = year + '-' + month + '-' + day;
+        return moment(date, 'jYYYY/jM/jD').format('YYYY/M/D');
+    }
+
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+
+    $(".from.datepicker").val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date()
+    });
+
+    $(".until.datepicker").val(moment(today, 'YYYY-M-D').format('jYYYY/jMM/jDD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date()
+    });
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+</script>
+
+

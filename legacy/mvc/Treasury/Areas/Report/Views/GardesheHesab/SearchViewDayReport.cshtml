@@ -1,0 +1,115 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.UI.Models;
+@{
+//var CustomBankLS = (List<BasicBankAndBank>)ViewBag.CustomBankLS;
+}
+@using CSD.Treasury.Resourse
+@section PageHeader{
+گزارش دریافت ،پرداخت در روز
+}
+
+@using (Html.BeginForm("Index1", "GardesheHesab", new { Area = "Report" }, FormMethod.Post, new { id = "SearchForm" }))
+{
+
+
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group" >
+                <select class = "form-control floating-label" id="BankType" name="BankType" placeholder ="">
+                    <option>نوع حساب</option>
+                    <option value="false">حسابهای جاری</option>
+                    <option value="True">سپرده های بانکی</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @*@Html.DropDownListFor(d => d.BasicBank, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank, @autocomplete = "off" })*@
+                @Html.DropDownListFor(d => d.BasicBank, new SelectList(ViewBag.BasicBank, "BasicBankId", "BasicBankDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank, @autocomplete = "off" })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(model => model.BankId, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber, @autocomplete = "off" })
+            </div>
+        </div>
+       
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder =  Resources.Date, @autocomplete = "off", @readonly = "readonly" })
+                @Html.ValidationMessageFor(model => model.FromDate)
+            </div>
+        </div>
+    
+       
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+
+    //$(".until.datepicker").datepicker({
+    //    isRTL: true,
+    //    dateFormat: "yy/mm/dd",
+    //    maxDate: new Date()
+    //});
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+        $('#report').click(function () {
+
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+    @*$('#BankType').change(function () {
+        var address = "@(Url.Action("GetBasicBank", "GardesheHesab", new { Area = "Report" }))";
+        $("#BasicBank").load(address, { BasicBankID: $('#BankType').val() }, function (data) {
+            $("#BasicBank").val($("#BasicBank option:first").val());
+        });
+
+    });*@
+    $('#BankType').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val(), BankType: $('#BankType').val()}, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+    $('#BasicBank').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val(), BankType: $('#BankType').val()}, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+    @*$(function () {
+        $('body').on("click", "#report", function () {
+
+            var data = $('#SearchForm').serializeArray();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            xhttp.open("POST", "@Url.Action("Index", "GardesheHesab", new { Area = "Report" })", true);
+            xhttp.send(new FormData(document.querySelector("#SearchForm")));
+        })
+    });*@
+</script>

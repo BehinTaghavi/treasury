@@ -1,0 +1,95 @@
+﻿@model IEnumerable<CSD.Treasury.DataModel.BankCard>
+
+<table class="table table-striped">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>
+                @Resources.AccountNo
+            </th>
+            <th>
+                @Resources.CardNO
+            </th>
+            <th>
+                @Resources.IsActive
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.CardIsUsedInRequest(item.CardID);
+
+            <tr>
+                <td data-lang-number="fa">
+                    @Html.DisplayFor(modelItem => item.Card_AccountNo)
+                </td>
+                <td data-lang-number="fa">
+                    @Html.DisplayFor(modelItem => item.Card_NO)
+                </td>
+
+                <td>
+                    @if (item.IsActive)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+
+                </td>
+                <td>
+                    <div class="btn-group">
+                        @Ajax.ActionLink(Resources.Edit, "Edit", "BankCards", new { Area = "BasicInfo", id = item.CardID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.BankCard + "', 'md');"
+                   }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+                      
+                        @if (!related1)
+                        {
+                            @Html.ActionLink(Resources.Delete, "Delete", "BankCards", new { Area = "BasicInfo", id = item.CardID }, new { @class = "btn btn-danger btn-xs delete" })
+                        }
+                        else
+                        {
+                            <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                        }
+                    </div>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+</script>
+

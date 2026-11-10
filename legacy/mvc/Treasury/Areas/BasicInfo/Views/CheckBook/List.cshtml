@@ -1,0 +1,188 @@
+﻿@model IEnumerable<CSD.Treasury.Service.ChequesService.Cheque>
+@{ 
+    int i = 0;
+}
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>@Resources.CheckBook</th>
+            <th>@Resources.IsActive </th>
+            <th>@Resources.FirstPageNumber</th>
+            <th>@Resources.LastPageNumber</th>
+            <th>@Resources.TotalPageCount</th>
+            <th>@Resources.LastUsedPaperNo</th>
+            <th>@Resources.NoSheet</th>
+            <th></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var fileId = Utility.CheckIfHasFile(item.ChequeFormatID.Value, "ChequeFormatTypes");
+            var related1 = Utility.HasRelation("ChequeFormatTypes", "ChequeFormatID", item.ChequeFormatID.ToString(), "ChequeFormatTypeDetails", "ChequeFormatID");
+            //var related2 = Utility.HasRelation("ChequeFormatTypes", "ChequeFormatID", item.ChequeFormatID.ToString(), "Cheques", "ChequeFormatID");
+
+            <tr>
+                <td>
+                    @(i = i + 1)
+                </td>
+                <td>
+                    @Utility.GetChequeDesc(item.FormatDescriptionID_Main)
+                </td>
+                <td>
+                    @switch (item.IsActive)
+                    {
+                        case true:
+                            <i class="zmdi zmdi-check-circle zmdi-hc-lg mdc-text-green-600"></i>
+                            break;
+                        case false:
+                            <i class="zmdi zmdi-minus-circle zmdi-hc-lg mdc-text-red-700"></i>
+                            break;
+                    }
+                </td>
+                <td>
+                    @(item.FirstPageNumber)
+                </td>
+                <td>
+                    @(item.LastPageNumber)
+                </td>
+                <td>
+                    @(item.TotalPageCount)
+                </td>
+                <td>
+                    @if (item.LastPageNumber >= item.FirstPageNumber)
+                    {
+                        @(item.LastUsedPaperNo)
+                    }
+
+                </td>
+                <td>
+                    @if (item.LastUsedPaperNo == item.LastPageNumber)
+                    {
+                        <i class="zmdi zmdi-check-circle zmdi-hc-lg mdc-text-green-600"></i>
+
+                    }
+                </td>
+
+                <td>
+                    @if ((item.FirstPageNumber == 0 && item.LastPageNumber == 0 && item.LastUsedPaperNo == 0 && item.TotalPageCount == 0))
+                    {
+                        @Ajax.ActionLink(Resources.Edit + " " + Resources.CheckBook, "Edit", "CheckBook", new { Area = "BasicInfo", ChequeID = item.ChequeID, id = item.ChequeFormatID.Value, BasicBankID = item.BasicBankID }, new AjaxOptions
+                        {
+                            OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.CheckBook + "', 'md');"
+                        }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+                        @Html.ActionLink(Resources.Delete + " " + Resources.CheckBook, "Delete", "CheckBook", new { Area = "BasicInfo", id = item.ChequeFormatID.Value }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+                    else if (related1 || item.LastUsedPaperNo == item.LastPageNumber)
+                    {
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                    }
+                    else
+                    {
+                        @Html.ActionLink(Resources.Delete + " " + Resources.CheckBook, "Delete", "CheckBook", new { Area = "BasicInfo", id = item.ChequeFormatID.Value }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                </td>
+
+                <td>
+                    @if (fileId != 0)
+                    {
+
+                        if (Utility.CheckIfExistChequeType(item.ChequeFormatID.Value))
+                        {
+                            @Html.ActionLink(Resources.Design + " " + Resources.Cheque + "/" + Resources.Edit, "Edit", "Cheque", new { Area = "BasicInfo", id = item.ChequeFormatID.Value, BankId = item.BankID, BasicBankId = item.BasicBankID }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+                            @Html.ActionLink(Resources.Copy + " " + Resources.Cheque , "Copy", "CheckBook", new { Area = "BasicInfo", ChequeFormatID = item.ChequeFormatID.Value, BankId = item.BankID, BasicBankId = item.BasicBankID }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+
+                        }
+                        else
+                        {
+                            @Html.ActionLink(Resources.Design + " " + Resources.Cheque, "Create", "Cheque", new { Area = "BasicInfo", id = item.ChequeFormatID.Value, BankId = item.BankID, BasicBankId = item.BasicBankID }, new { @class = "btn btn-material-green-600 btn-xs" })
+                        }
+
+                        if ((item.FirstPageNumber == 0 && item.LastPageNumber == 0 && item.LastUsedPaperNo == 0 && item.TotalPageCount == 0))
+                        {
+                            @Ajax.ActionLink(Resources.Delete + " " + Resources.Scan, "Delete", "Attachment", new { Area = "Payment", id = fileId, ChequeFormatID=item.ChequeFormatID }, new AjaxOptions
+                       {
+                           HttpMethod = "Post",
+                           OnSuccess = "successMessage(data);closeModal('md');updateTableChequeLs(" + item.BankID + "," + item.BasicBankID + ");"
+                       }, new { @class = "btn btn-danger btn-xs" })
+                        }
+                        else if (related1)
+                        {
+                            <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                        }                     
+                        else 
+                        {
+                            @Ajax.ActionLink(Resources.Delete + " " + Resources.Scan, "Delete", "Attachment", new { Area = "Payment", id = fileId }, new AjaxOptions
+                            {
+                                HttpMethod = "Post",
+                                OnSuccess = "successMessage(data);closeModal('md');updateTableChequeLs(" + item.BankID + "," + item.BasicBankID + ");"
+                            }, new { @class = "btn btn-danger btn-xs" })
+                        }
+
+
+
+                    }
+                    else
+                    {
+
+                        @*@Ajax.ActionLink(Resources.Scan, "Index", "Scan", new { Area = "BasicInfo", id = item.ChequeFormatID.Value, BasicBankID = item.BasicBankID, BankID = item.BankID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Scan + "', 'md');updateTableChequeLs(" + item.BankID + "," + item.BasicBankID + ");"
+                   }, new { @class = "btn btn-material-blue-700 btn-xs" })*@
+
+                        @Ajax.ActionLink(Resources.Save + " " + Resources.Scan, "SaveScanFileView", "Scan", new { Area = "BasicInfo", id = item.ChequeFormatID.Value, BasicBankID = item.BasicBankID, BankID = item.BankID }, new AjaxOptions
+                   {
+
+                       OnSuccess = "modal(data,'" + Resources.Save + " " + Resources.Scan + "', 'md');updateTableChequeLs(" + item.BankID + "," + item.BasicBankID + ");"
+                   }, new { @class = "btn btn-material-blue-700 btn-xs" })
+
+
+                    }
+
+
+
+
+
+                </td>
+
+            </tr>
+        }
+    </tbody>
+</table>
+<script type="text/javascript">
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+function () {
+}).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+</script>

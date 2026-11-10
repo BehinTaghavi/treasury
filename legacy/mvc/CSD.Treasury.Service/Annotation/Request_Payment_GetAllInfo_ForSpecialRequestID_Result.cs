@@ -1,0 +1,64 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace CSD.Treasury.Service.Request_PaymentService
+{
+    public partial class Request_Payment_GetAllInfo_ForSpecialRequestID_Result
+    {
+        public decimal RequestID { get; set; }
+        public string FiscalYear { get; set; }
+        public int UserID { get; set; }
+        public string RequestDate { get; set; }
+        public System.TimeSpan RequestCreatedTime { get; set; }
+        public string Reference { get; set; }
+        public string Unique_Account_No { get; set; }
+        public string Main_Unique_Account_No { get; set; }
+        public decimal PayAmount { get; set; }
+        public int ExchangeTypeID { get; set; }
+        public short Priority { get; set; }
+        public Nullable<decimal> ExchangeRate { get; set; }
+        public Nullable<decimal> EquivalencePrice { get; set; }
+        public int BehalfID { get; set; }
+        public Nullable<int> referenceTypeID { get; set; }
+        public string referenceTypeValue { get; set; }
+        public Nullable<int> Pay_TypeDetailID_source { get; set; }
+        public Nullable<int> Source_TypeID { get; set; }
+        public string Source_PaymentValue { get; set; }
+        public string DueDate { get; set; }
+        public Nullable<int> Destination_TypesID { get; set; }
+        public string Destination_PaymentValue { get; set; }
+        public string User_FullName { get; set; }
+        public string User_FullName2 { get; set; }
+        public string Source_DestinationTypeDescription { get; set; }
+        public string Source_DestinationTypeDescription2 { get; set; }
+        public string referenceTypeDescription { get; set; }
+        public string referenceTypeDescription2 { get; set; }
+        public string LocationName { get; set; }
+        public string LocationName2 { get; set; }
+        public string Receipt_Pay_TypeDetailDescription { get; set; }
+        public string Receipt_Pay_TypeDetailDescription2 { get; set; }
+        public bool Has_Source { get; set; }
+        public Nullable<int> Receipt_Pay_TypeDetail_Source_TypeID { get; set; }
+        public bool Has_Destination { get; set; }
+        public Nullable<int> DestinationTypeID { get; set; }
+        public bool Has_due_date { get; set; }
+        public int Receipt_Pay_TypeID { get; set; }
+        public string Receipt_Pay_TypeDescription { get; set; }
+        public string Receipt_Pay_TypeDescription2 { get; set; }
+        public bool UsedInBehalfs { get; set; }
+        public bool UsedInPayAndReciepts { get; set; }
+        public string ExchangeTypeDescription { get; set; }
+        public string ExchangeTypeDescription2 { get; set; }
+        public string cmpBranchName { get; set; }
+        public string cmpBranchName2 { get; set; }
+        public string BehalfGroupDescription { get; set; }
+        public string BehalfGroupDescription2 { get; set; }
+        public string BehalfGroup_Account { get; set; }
+        public string BehalfDescription { get; set; }
+        public string BehalfDescription2 { get; set; }
+    }
+  
+}

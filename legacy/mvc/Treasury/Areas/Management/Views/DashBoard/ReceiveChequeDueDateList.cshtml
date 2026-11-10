@@ -1,0 +1,67 @@
+﻿@using CSD.Treasury.Service.ProceduresDB
+@using CSD.Treasury.UI.Models
+@model List<GetRecieptHeaderAndDetail_ByRecieptTypeId_Result>
+@{
+    ViewBag.Title = "ReceiveChequeDueDateList";
+}
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th colspan="8"><h3>@Resources.ReceiveDueDateCheque</h3></th>
+        </tr>
+        <tr class="mdc-bg-grey-100">
+            <th>@Resources.ReceiptDetailId</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.ReceiptPayType</th>
+            <th>@Resources.Price/@Resources.Rial</th>
+            <th>@Resources.Unique_Account_No/@Resources.Unique_Account_Code</th>
+            <th>@Resources.Behalf</th>
+            <th>@Resources.Status</th>
+            <th></th>
+        </tr>
+    </thead>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td data-lang-number="fa">@(item.ReceiptDetailId)</td>
+            <td data-lang-number="fa">@Utility.GetPersianDate(item.DueDate)</td>
+            <td>@(item.Receipt_Pay_TypeDetailDescription)</td>
+            <td data-lang-number="fa">@Math.Truncate(item.EquivalencePrice.Value).ToString("#,##0")  </td>
+            <td id="Unique_Account_No">
+                @if (item.DetailUnique_Account_No_One_Title.Length > 15)
+                {
+                    @(item.DetailUnique_Account_No_One_Title.Substring(0, 10) + "...")<span>/</span>
+                    @(item.DetailUnique_Account_No)
+                }
+                else
+                {
+                    @(item.DetailUnique_Account_No_One_Title.Substring(0, 8) + "...")<span>/</span>
+                    @(item.DetailUnique_Account_No)
+                }
+       
+            </td>
+            <td>
+            @if (item.BehalfDescription.Length > 15)
+            {
+                @(item.BehalfDescription.Substring(0, 10) + "...")
+            }
+            else
+            {
+                @(item.BehalfDescription)
+            }
+            
+          </td>
+            <td>@item.PlaningTypeDesc</td>
+            <td>
+                @if (item.PlaningTypeID == 1)
+                {
+                    @Html.ActionLink(Resources.Planing, "ReceiptList", "Receipt", new { Area = "Payment", State = -1, ReceiptDetailId = item.ReceiptDetailId, RecieptTypeId = 19 }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+                }
+                @if (item.PlaningTypeID == 2)
+                {
+                    @Html.ActionLink(Resources.Planing, "ReceiptList", "Receipt", new { Area = "Payment", State = -2, ReceiptDetailId = item.ReceiptDetailId, RecieptTypeId = 19 }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+                }
+            </td>
+        </tr>
+    }
+</table>

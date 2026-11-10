@@ -1,0 +1,92 @@
+﻿@model IEnumerable<CSD.Treasury.DataModel.CashDesk>
+<table class="table table-striped sortable">
+    <tr class="mdc-bg-grey-200">
+        <th>
+            @Html.DisplayNameFor(model => model.cmpBranchID)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.Account_No)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.CashDeskDescription)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.Unique_Account_No)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.Unique_Account_No_two)
+        </th>
+        <th></th>
+    </tr>
+
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.cmpBranch.cmpBranchName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Account_No)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.CashDeskDescription)
+            </td>
+
+            <td>
+                @Html.DisplayFor(modelItem => item.Unique_Account_No)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Unique_Account_No_two)
+            </td>
+            <td>
+                @Ajax.ActionLink(Resources.Edit, "Edit", "CashDesks", new { Area = "BasicInfo", id = item.CashDeskID }, new AjaxOptions
+                  {
+                      OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.CashDesk + "', 'md');"
+                  }, new { @class = "btn btn-success btn-xs" })
+
+
+
+                @Html.ActionLink(Resources.Delete, "Delete", "CashDesks", new { Area = "BasicInfo", id = item.CashDeskID }, new { @class = "btn btn-danger btn-xs delete" })
+
+                @*@Ajax.ActionLink(Resources.Details, "Details", "CashDesk", new { Area = "BasicInfo", id = item.CashDeskID }, new AjaxOptions
+                    {
+                        OnSuccess = "modal(data,'" + Resources.Details + " " + Resources.CashDesk+ "', 'md');"
+                    }, new { @class = "btn btn-success btn-xs" })*@
+            </td>
+        </tr>
+    }
+
+</table>
+<script type="text/javascript">
+    
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+        function () {
+        var xmlhttp = new XMLHttpRequest();
+        xmlhttp.onreadystatechange = function () {
+        if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+        var data = JSON.parse(xmlhttp.responseText);
+        if (data.result == true) {
+        item.deleteParentByTagName("tr", "danger", 1500, function () {
+        alertify.success(data.Message);
+        })
+        }
+        else {
+        alertify.error(data.Message);
+        }
+        }
+        };
+        xmlhttp.open("POST", item.href, true);
+        xmlhttp.send();
+        },
+        function () {
+        }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+        }
+
+</script>

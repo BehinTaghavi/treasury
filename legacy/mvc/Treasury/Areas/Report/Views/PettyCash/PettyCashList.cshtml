@@ -1,0 +1,158 @@
+﻿@model  CSD.Treasury.UI.Models.SearchModelPettyCash2
+@using CSD.Treasury.Service.ProceduresDB
+@using CSD.Treasury.Resourse
+@using CSD.Treasury.UI.Models
+@*@model List<GetPettyCashHeaderAndDetails_ByPettyCashId_Result>*@
+@{
+    ViewBag.Title = "PettyCashList";
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>کدمعین</th>
+            <th>@Resources.account_code</th>
+            <th>@Resources.Unique_Account_Code</th>
+            <th>@Resources.Unique_Account_No</th>
+            <th>@Resources.Unique_Account_Code 2</th>
+            <th>@Resources.Unique_Account_No 2</th>
+            <th>تاییدیه</th>
+            <th> واخواهی</th>
+            <th>تاریخ پرداخت</th>
+            <th>@Resources.Price</th>
+            <th>@Resources.Description</th>
+
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+            <tr>
+                <td>
+                    @{
+                        i++;
+                    }
+                    @(i)
+                </td>
+                @*<td>@(item.BehalfGroupDescription)</td>
+                    <td>@(item.BehalfDescription)</td>*@
+                <td>@(item.DetailAccount_no)</td>
+                <td>@(item.DetailsAccountName)</td>
+                <td>@(item.DetailsUnique_Account_Code)</td>
+                <td>@(item.DetailsUnique_Account_Title)</td>
+                <td>@(item.DetailsUnique_Account_No_two_Code)</td>
+                <td>@(item.DetailsUnique_Account_No_two_Title)</td>
+                <td>
+                    @if (item.IsAccept)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                </td>
+                <td>
+                    @if (item.IsAcceptVakhahi)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                </td>
+                <td>@(item.PayDate)</td>
+                @* <td>@Utility.GetPersianDate(item.PettyCashTransactionDate)</td>*@
+                <td>@(item.Price)</td>
+                <td>@(item.Description)</td>
+                @*<td>@(item.VariziAmount_Or_sharjeTankhah)</td>*@
+            </tr>
+                        }
+    </tbody>
+</table>
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                (@Resources.Total : @Model.TotalItemCount)
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "PettyCashList", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "PettyCashList", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "PettyCashList", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

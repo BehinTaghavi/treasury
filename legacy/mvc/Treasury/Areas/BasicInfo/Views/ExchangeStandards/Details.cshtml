@@ -1,0 +1,42 @@
+﻿@model CSD.Treasury.DataModel.ExchangeStandard
+
+@{
+    ViewBag.Title = "Details";
+}
+
+<h2>Details</h2>
+
+<div>
+    <h4>ExchangeStandard</h4>
+    <hr />
+    <dl class="dl-horizontal">
+        <dt>
+            @Html.DisplayNameFor(model => model.Price)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.Price)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.Config.AccDatabaseName)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.Config.AccDatabaseName)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.ExchangeType.ExchangeTypeDescription)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.ExchangeType.ExchangeTypeDescription)
+        </dd>
+
+    </dl>
+</div>
+<p>
+    @Html.ActionLink("Edit", "Edit", new { /* id = Model.PrimaryKey */ }) |
+    @Html.ActionLink("Back to List", "Index")
+</p>

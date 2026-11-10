@@ -1,0 +1,33 @@
+container 9
+-32757 3
+form 116
+module 24
+report 146
+macro 6
+-32758 1
+query 40
+local table 26
+ODBC-linked table 27
+
+## ODBC-linked table
+Babs, Bank, Bankacc, Bundle, Check, Checkbacked, Checkdrop, Checkl, Deps, Emps, Findtext, Globals, Invsamount, Mains, Ms, Povouch, Rights, Rights_m, Subs, Subsrow, Voucher, Voucher_row, t_RelatedSubsideryToUniques, t_accounts, t_unique_accounts, t_voucher, t_voucher_row
+
+## linked Access table
+
+
+## local table
+Balance, Bankrep, Bankrep_t, Checkst, Checktype, Coyearinfo, Dailyrep, Flds, Hepconames, Mainrep, Month, Ms0, Najorep, Rights1, Shart, Sorts, Symbol, Sys_fldlist, Taaod, Taaodonerow, Tafs, Tbls, Trans, Voucher_errors, Voucher_notok, Voucher_row_tmp
+
+## module
+Func_Repcondition, Func_Reporder, Onebyonevoucher, Our_date, Sub_Changeinmain, Sub_Checktypename, Sub_Verrors, Sub_delallsel, Sub_delchecks, Sub_delpovouch, Sub_delvoucher, Sub_editbacc, func_Coname, func_Endofmonth, func_Endofweek, func_datefarsi, func_delmains, func_fdate, func_nomtoword_l, func_numfarsi, func_tellmelast, func_tellmelastuser, global_vars, sub_updatecard
+
+## macro
+Calc, Dailyrep, Dailyrep_banks, S_Pardakht, S_Reqs, S_daryaft
+
+## form
+001, 21, Accamounts, Advance, Advance_row, Auditform, Babatrep, Babs, Babsrepfrm, Babss, Balance, Bank, Bank_rep, Bankacc, Branch, Bundle, Bundle_m, Cashandpetty, Ch_dups, Check_Print_m, Check_Print_single, Check_d_dates, Check_d_longsalarm, Check_deliv, Check_deliv_m, Check_longtocash_m, Check_p_longs, Check_p_longsalarm, Check_p_vos, Check_p_vos_m, Check_pay_m, Check_s, Check_s_Finder, Checkbacked, Checkl, Copy of Porder, DP_s_all, DP_s_all_m, DP_search, D_Check, D_Check1, D_Check_Kh_m, D_Check_Od, D_Check_Od_m, D_Check_Vag, D_Check_Vag_m, D_Check_Vos, D_Check_kh, D_Check_resid, D_Check_search, D_Check_vos_m, D_Naghd, D_variz, Date_Sarresid, Date_Sarresid_alarm, Date_card, Date_dcheck, Date_dcheck_entez, Date_notchecks, Date_pcheck, Deaily_rep, Ebtit, Emps, Emps_advance, Filter_Bundle, Findtext, Findtextnaghd, Globals, HepcoBrief, HepcoForm, HepcoPerson, Invsamount, Jaam_el, Main, Mainrep, Mainrep_m, Mainrep_s, Menu_update, Naghd_pay_m, Naghd_s, Najorepfrm, Notes, P_Bardasht, P_Naghd, Payables, Po_vouch, Porder, Porder_Search_m, Porder_search, Pordernew, Pordersub_vouch, Rights, Rights_m, Sal, Sal1, Sarresid_check, Seldate, Shart, Shart_m, Sm, Sorts, Sperson, Subsrow, Taaod, TaaodTamin, V_Search_m, V_Search_row_m, V_errors, V_notok, V_search, V_search_row, Voucher, Voucher_create, Voucher_row, Voucher_send, \
+
+## report
+B_D_printnaghd, B_D_printvariz, B_P_print, B_P_print1, B_P_print_Safteh, B_P_printbardasht, B_P_printnaghd, Babrep1, Babrep2, Babrep3, Babrepnew1, Babrepnew1curs, Babrepnew1month, Babrepnew2, Babrepnewbalance, Babrepnewnajo, Bankrep, Bankrep_d_1, Bankrep_d_jv, Bankrep_s, CH_Kar50, CH_Kesh10, CH_Kesh25, CH_Kesh50, CH_Kesh50_0, CH_MELLAT100, CH_MELLAT25, CH_MELLAT50, CH_MELLAT50_Z, CH_MELLAT50_new, CH_MELLAT50_newest, CH_MELLI100, CH_MELLI25, CH_MELLI25_new, CH_MELLI50, CH_MELLI50_new, CH_Maskan10, CH_Maskan25, CH_Maskan50, CH_Novin25, CH_Parsian100, CH_Parsian25, CH_Parsian50, CH_Pasargaad10, CH_Pasargaad25, CH_Pasargaad50, CH_REFAH100, CH_REFAH25, CH_REFAH50, CH_REFAHnew100, CH_REFAHnew25, CH_REFAHnew50, CH_SADERAT100, CH_SADERAT50, CH_SEPAH100, CH_SEPAH25, CH_SEPAH50, CH_SEPAH50carbon, CH_SINA25, CH_Saman25, CH_TEJARAT100, CH_TEJARAT25, CH_TEJARAT50, CH_TEJARAT500, CH_TEJARAT50new, CH_TOSE100, CH_TOSE50, CH_maadan50, Card, Card0, Card_sub, Card_sub0, Card_subcur, Cardcur, Check, Check_Print_rep, Check_bundle, Check_d_longsrepalarm, Check_p_longsrep, Check_p_longsrepalarm, Check_s_Finder, Copy of Resid_check, DP_searchrep, D_Check, D_Check_Jaam, D_Check_Jaam_el, D_Check_all, D_Check_all_byperson, D_Check_audit, D_Check_entez, D_Check_manager, D_Check_rep, D_search_print, Dailyrep, Dailyrep0, Dailyrep_notcheck, Dailyrepbanks, Dailyrepbanks_sub, Dailyrepbanks_sub_sub, Dailyrepbanks_sub_sub_p, HepcoFormRep, HepcoRep, HepcoRep4column, HepcoRepbrief, Hepcobyperson, Hepcomain, Hepcomainnag, Jaam_Residacc, Jaam_Residsales, Mainrep, Najorep_D, P_Check, P_Check_Najo, P_Check_Najo_Tax, P_search_print, Po_Ss, Porder_search_print, Porder_search_print1, Rep_voucher, Rep_voucher_land, Rep_voucher_row, Rep_voucher_row_bp, Rep_voucher_row_land, Resid_check, Resid_check0, Resid_check_all, Residcheckallsub, Rfp_print, Sarresid_P, Sarresid_P_alarm, Sarresid_P_byperson, Shart_print, Sorts_print, Subsrowrep, Taaodrep, Taaodrepall, TaaodrepallTamin, TaaodrepallTaminkoli, Taaodrepcompact, Taaodrepcompactonerow, V_errors_rep, Vams, longs_indetail, longs_indetailmonth, maye, simlaki
+
+## connect targets {'DATABASE=Cashnajoo05;DSN=Sqlcsd', 'DATABASE=AccIrannajo05;DSN=Sqlcsd', 'DATABASE=Cashnajoo86;DSN=Sqlcsd'}

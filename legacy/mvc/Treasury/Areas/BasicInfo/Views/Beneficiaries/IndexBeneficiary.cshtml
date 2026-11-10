@@ -1,0 +1,92 @@
+﻿@{
+    ViewBag.Title = "IndexBeneficiary";
+}
+
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<div ng-app="myapp" ng-controller="BeneficiaryCtrl">
+    <table class="table table-striped sortable">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th>عنوان حقوقی ثبت</th>
+                <th>شماره تفصیل</th>
+                <th>نام تفصیل</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="item in BeneficiaryLS">
+                <td>{{item.LegalAccountName}}</td>
+                <td>{{item.Unique_Account_No}}</td>
+                <td></td>
+            </tr>
+        </tbody>
+        <tfoot>
+
+            <tr>
+
+                <td align="center" colspan="6">
+
+                    <span class="form-group pull-left page-size form-inline">
+
+                        <select id="ddlPageSize" class="form-control control-color"
+                                ng-model="pageSize"
+                                ng-change="changePageSize()">
+
+                            <option value="5">5</option>
+
+                            <option value="10">10</option>
+
+                            <option value="25">25</option>
+
+                            <option value="50">50</option>
+
+                        </select>
+
+                    </span>
+
+                    <div class="pull-right">
+                        <pagination total-items="totalcount" ng-change="pagechanged()" items-per-page="pageSize" direction-links="true" ng-model="pageIndex" max-size="maxsize" class="pagination" boundary-links="true" rotate="false" num-pages="numPages"></pagination>
+                        totalcount: {{totalcount}}
+                        pagesize:   {{pageSize}}
+                        pageIndex:  {{pageIndex}}
+                        maxSize:    {{maxsize}}
+                        <a class="btn btn-primary">Page: {{pageIndex}} / {{numPages}}</a>
+
+                    </div>
+
+                </td>
+
+            </tr>
+
+        </tfoot>
+    </table>
+
+</div>
+
+<script>
+    var app = angular.module("myapp", []).controller("BeneficiaryCtrl",function ($scope,$http)
+    {
+             $scope.maxsize = 5;
+             $scope.totalcount =0;
+             $scope.pageIndex = 1;
+             $scope.pageSize = 10;
+             $scope.LS = function () {
+                 $http.get("/BasicInfo/Beneficiaries/ListBeneficiary?pageIndex=" + $scope.pageIndex + "&PageSize=" + $scope.pageSize).then(function (response) {
+                     $scope.BeneficiaryLS = response.data.list;
+                     $scope.totalcount = response.data.totalcount;
+                 })}
+             $scope.LS();
+
+             $scope.pagechanged = function () {
+                 $scope.LS();
+
+             }
+
+             $scope.changePageSize = function () {
+                 $scope.pageIndex = 1;
+                 $scope.LS();
+
+             }
+         });
+
+</script>

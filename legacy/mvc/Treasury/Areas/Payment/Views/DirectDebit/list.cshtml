@@ -1,0 +1,287 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.MVCHelpers
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+}
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>
+<table class="table">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+
+            <th></th>
+            <th>#</th>
+            <th>@Resources.Number</th>
+            <th>@Resources.Date</th>
+            <th>@Resources.Bank</th>
+            <th>@Resources.BehalfGroup</th>
+            <th>@Resources.Behalf</th>
+            <th>@Resources.Unique_Account_No 1</th>
+            @*<th>@Resources.Unique_Account_No 2</th>*@
+            <th>@Resources.PayAmount</th>
+            <th data-defaultsort='disabled'></th>
+            <th data-defaultsort='disabled'></th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+            var rel = "";
+            if (item.ChildList != null && item.ChildList.Count != 0)
+            {
+                rel = Guid.NewGuid().ToString("N");
+            }
+            <tr id="@Hash.GetHashString(item.RequestID.ToString())" style="@(item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication ? "opacity: .5" : "")" class="@(item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication ? "mdc-bg-grey-300" : "")@(item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegration ? "mdc-bg-green-200" : "")">
+                <td>
+                    @if (item.ChildList != null && item.ChildList.Count != 0)
+                    {
+                        <a class="show_hide btn btn-xs btn-link" rel=".@rel"><i class="zmdi zmdi-chevron-left zmdi-hc-3x"></i></a>
+                    }
+                </td>
+
+
+                <td>
+                    @{i++;}
+                    @i
+                </td>
+                <td data-lang-number="fa">@(item.RequestID)</td>
+                <td>
+                    <span data-lang-number="fa">
+                        @(item.RequestDate.Substring(0, 4) + "/" + item.RequestDate.Substring(4, 2) + "/" + item.RequestDate.Substring(6, 2))
+                    </span>
+                </td>
+                <td>
+
+                    @if (item.Source_PaymentValue != null)
+                    {
+                        @(Utility.GetBankInfoBankId(int.Parse(item.Source_PaymentValue)).BranchName)  @(Utility.GetBankInfoBankId(int.Parse(item.Source_PaymentValue)).Bank_AccountNumber)
+                    }
+                </td>
+
+                <td>@Utility.GetBehalfGroupBybehalfId(item.BehalfID).BehalfGroupDescription</td>
+
+                <td>
+                    @Utility.GetBehalf(item.BehalfID)
+                </td>
+
+                <td>
+                    @if (item.Unique_Account_No != "000000")
+                {
+                        @(Utility.GetUniqueAccount(item.Unique_Account_No))@(item.Unique_Account_No)
+
+                    }
+                </td>
+                @*<td>
+                    @if (item.Unique_Account_No != "000000")
+                    {
+                        @Utility.GetUniqueAccount(item.Main_Unique_Account_No)@(item.Main_Unique_Account_No)
+
+                    }
+                </td>*@
+                <td>
+                    <h4 data-lang-number="fa">
+                        @Math.Truncate(item.PayAmount).ToString("#,##0") ریال
+                    </h4>
+                </td>
+                <td>
+                    @if (item.AggrigateOrDuplicationStatusID != null)
+                    {
+                        @TreasuryEnums.GetTitleFromResource("AggrigateOrDuplicationStatusID", Enum.GetName(typeof(RequestDescription), item.AggrigateOrDuplicationStatusID))
+                    }
+
+                </td>
+
+                <td>
+                    @if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                    {
+                    <div class="btn-group btn-group">
+
+
+                        @*غیرفعال کردن حذف و ویرایش برای برداشت مسقیم برداشته شد
+                        ویرایش و حدف هیچ وقت غیرفعال نمی شوند*@
+                        @if (Utility.HasAccVoucherNo(item.RequestID) && false)
+                        {
+                            <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                            <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                        }
+                        else
+                        {
+                            if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                            {
+                                @Ajax.IActionLink("", "List", "Attachment", new { area = "Payment", Id = item.RequestID, TableName = "Request_Payment" }, new AjaxOptions
+                           {
+                               InsertionMode = InsertionMode.Replace,
+                               OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+                           }, new { title = Resources.AttachFile, @class = "btn btn-material-teal-600 btn-xs" }, "zmdi zmdi-hc-lg zmdi-file")
+
+                                @Html.IActionLink("", "Delete", "DirectDebit", new { Area = "Payment", requestId = item.RequestID }, new { title = Resources.Delete, data_lang_number = "fa", @class = "delete btn btn-material-red-A700 btn-xs" }, "zmdi zmdi-hc-lg zmdi-delete")
+
+                                @Ajax.IActionLink("", "Edit", "directDebit", new { area = "Payment", requestId = item.RequestID }, new AjaxOptions
+                      {
+                          OnSuccess = "modal(data,'" + Resources.Edit + "', 'lg:not(.xlg)');"
+                      }, new { title = Resources.Edit, @class = "btn btn-material-light-blue-A700 btn-xs" }, "zmdi zmdi-hc-lg zmdi-edit")
+
+                            }
+
+                        }
+
+                        @Ajax.IActionLink("", "details", "DirectDebit", new { area = "Payment", requestId = item.RequestID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Show + "', 'md');"
+                   }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+                        @Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row", new { Area = "Management", IsPayment = false, requestId = item.RequestID, IsReturend = false, Receipt_Pay_TypeID = 4, BehalfGroupID = Utility.GetBehalfGroupBybehalfId(item.BehalfID).BehalfGroupID, StatusID = 29, ReferenceId = item.RequestID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data, 'نمایش سند', 'lg.ang');",
+                   }, new { @class = "btn btn-material-blue-700 btn-xs" })
+                      
+                    </div>
+
+                    }
+                </td>
+                <td>
+
+
+            </tr>
+
+
+
+                        }
+
+    </tbody>
+</table>
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "DirectDebit", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+        //OnSuccess = "reLoadListSuccess()"
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "DirectDebit", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+        //OnSuccess = "reLoadListSuccess()"
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "DirectDebit", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+        //OnSuccess = "reLoadListSuccess()"
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+
+<script type="text/javascript">
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+    $(document).ready(function () {
+        $('.show_hide').showHide({
+            speed: 200,  // speed you want the toggle to happen
+            easing: '',  // the animation effect you want. Remove this line if you dont want an effect and if you haven't included jQuery UI
+            changeText: 1, // if you dont want the button text to change, set this to 0
+            showText: '<i class="zmdi zmdi-chevron-left zmdi-hc-3x"></i>',// the button text to show when a div is closed
+            hideText: '<i class="zmdi zmdi-chevron-down zmdi-hc-3x"></i>' // the button text to show when a div is open
+        });
+    });
+</script>
+
+

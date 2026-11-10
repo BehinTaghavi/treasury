@@ -1,0 +1,92 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelExpiredCheque
+@{
+    Layout = null;
+    var S = "LoadExpiredCheckPayable";
+}
+@using CSD.Treasury.Resourse
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+ <div class="pull-left">
+    @Html.ActionLink(Resources.Back, "ALLExpiredCheckPayable", "ExpiredCheckPayable", new { Area = "Report" }, new { @class = "btn btn-default btn-sm" })
+</div>
+<div>
+   
+    @*@if (!string.IsNullOrEmpty(Model.FiscalYear))
+    {
+        S = S + "/?FiscalYear=" + Model.FiscalYear + "";
+    }*@
+    @if (!string.IsNullOrEmpty(Model.RequestDateFrom) && !string.IsNullOrEmpty(Model.RequestDateTo))
+    {
+        S = S + "&RequestDateFrom=" + Model.RequestDateFrom + "&RequestDateTo=" + Model.RequestDateTo + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.DueDateFrom) && !string.IsNullOrEmpty(Model.DueDateTo))
+    {
+        S = S + "&DueDateFrom=" + Model.DueDateFrom + "&DueDateTo=" + Model.DueDateTo + "";
+    }
+    @if (Model.ExchangeTypeID != 0)
+    {
+        S = S + "'&ExchangeTypeID=" + Model.ExchangeTypeID + "";
+    }
+    @*@if (Model.BehalfID != 0)
+    {
+        S = S + "&BehalfID=" + Model.BehalfID + "";
+    }*@
+    @if (Model.BehalfGroupID != 0)
+    {
+        S = S + "&BehalfGroupID=" + Model.BehalfID + "";
+    }    
+    @if (Model.PayAmount != 0)
+    {
+        S = S + "&PayAmount=" + Model.PayAmount + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.Unique_Account_No))
+    {
+        S = S + "&Unique_Account_No='" + Model.Unique_Account_No + "'";
+    }
+  
+    @if (Model.ChequeNo != 0)
+    {
+        S = S + "&ChequeNo=" + Model.ChequeNo + "";
+    }
+    @if (Model.RequsetId != 0)
+    {
+        S = S + "&RequsetId=" + Model.RequsetId + "";
+    }
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+   
+    
+    Actions =
+    {
+        GetReportSnapshot = S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",    
+       
+
+    },
+    Toolbar =
+    {
+         BackgroundColor = System.Drawing.Color.Silver,
+         ShowPrintButton = true,
+         ShowAboutButton=false,
+         PrintDestination=StiPrintDestination.Default,
+         
+         
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+
+
+    },
+    
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml"),
+
+})
+</div>
+
+
+

@@ -1,0 +1,93 @@
+﻿@model IEnumerable<CSD.Treasury.Service.ReferenceTypeService.ReferenceType>
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>
+                @Resources.ReferenceType
+            </th>
+            <th>
+                @Resources.ReferenceType-@Resources.EN
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.HasRelation("ReferenceType", "referenceTypeID", item.referenceTypeID.ToString(), "ReferenceTypes_By_BehalfGroup", "referenceTypeID");          
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.referenceTypeDescription)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.referenceTypeDescription2)
+                </td>
+                <td>
+                    @if (related1)
+                    {
+
+                        <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                    }
+                    else
+                    {
+                        @Ajax.ActionLink(Resources.Edit, "Edit", "RefrenceType", new { Area = "BasicInfo", id = item.referenceTypeID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.ReferenceType + "', 'md');"
+                   }, new { @class = "btn btn-success btn-xs" })
+
+                        @Html.ActionLink(Resources.Delete, "Delete", "RefrenceType", new { Area = "BasicInfo", id = item.referenceTypeID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+                
+                    
+
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+@section scripts{
+    <script>
+        $(document).ready(function () {
+            $(function () {
+                $("#myTable").tablesorter();
+            });
+        });
+    </script>
+}
+
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>

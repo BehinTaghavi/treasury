@@ -1,0 +1,68 @@
+﻿@model CSD.Treasury.Service.PettyCashService.PettyCash
+@{
+    ViewBag.Title = "Details";
+}
+
+<div class="row">
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.PettyCashName
+            </label>
+            @(Model.PettyCashName)
+        </p>
+    </div>
+    <div  data-lang-number="fa" class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.Price
+            </label>
+            @(Model.PettyCash_Ammount)
+        </p>
+    </div>
+    <div  data-lang-number="fa" class="col-sm-12">
+        <p class="pardes">
+            <label>
+                @Resources.account_code /@Resources.Code
+            </label>
+
+            @Utility.Getaccounts(Model.Account_No)/@(Model.Account_No)
+        </p>
+    </div>
+    <div  data-lang-number="fa" class="col-sm-12">
+        <p class="pardes">
+            <label>
+                @Resources.Unique_Account_No /@Resources.Code
+            </label>
+            @Utility.GetUniqueAccount(Model.Unique_Account_No)/ @(Model.Unique_Account_No)
+        </p>
+    </div>
+    <div  data-lang-number="fa" class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.Settle_Limit
+            </label>
+           
+            @(Model.Settle_Limit)
+        </p>
+    </div>
+    <div  data-lang-number="fa" class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.PayCeiling
+            </label>
+
+            @(Model.PayCeiling)
+        </p>
+    </div>
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.UserName
+            </label>
+            @Utility.GetUserName(Model.UserID)
+        </p>
+    </div>
+   
+</div>
+

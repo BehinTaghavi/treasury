@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Base types shared by all domain models. Must not reference any framework or infrastructure package. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.BuildingBlocks.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

@@ -1,0 +1,260 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch1
+@using CSD.Treasury.MVCHelpers
+@{
+    string title = "";
+}
+
+@section PageHeader{
+    @if (Model.RecieptTypeId == 18)
+    {
+        title ="چک روز";
+        <span>@Resources.List @Resources.Receipt  @Resources.Cheque   @Resources.Cash</span>
+    }
+    else if (Model.RecieptTypeId == 19)
+    {
+        title = Resources.Cheque + " " + Resources.Deferred;
+        <span>@Resources.List @Resources.Receipt @Resources.Cheque  @Resources.Deferred</span>
+    }
+    else if (Model.RecieptTypeId == 21)
+    {
+        title = Resources.Cheque + " " + Resources.Disciplinary;
+        <span>@Resources.List @Resources.Receipt  @Resources.Cheque  @Resources.Disciplinary</span>
+
+    }
+    @*else if (Model.RecieptTypeId == 21)
+        {
+            title = Resources.Cheque;
+            <span>@Resources.List @Resources.Receipt  @Resources.Receive  @Resources.Cheque</span>
+        }*@
+    else if (Model.RecieptTypeId == 22)
+    {
+        title = Resources.GetCash;
+        <span>@Resources.List @Resources.GetCash</span>
+    }
+    else if (Model.RecieptTypeId == 23)
+    {
+        title = Resources.CashDeposit;
+        <span>@Resources.List @Resources.Receipt @Resources.CashDeposit</span>
+    }
+    else if (Model.RecieptTypeId == 24)
+    {
+        title = Resources.ATM;
+        <span>@Resources.List @Resources.Receipt @Resources.ATM</span>
+    }
+    else if (Model.RecieptTypeId == 25)
+    {
+        title = Resources.PromissoryNote;
+        <span>@Resources.List @Resources.Receipt @Resources.Receive  @Resources.PromissoryNote</span>
+    }
+    else if (Model.RecieptTypeId == 28)
+    {
+        title = Resources.PromissoryNote;
+        <span>@Resources.List @Resources.Receipt @Resources.PromissoryNote  @Resources.Disciplinary</span>
+    }
+}
+
+@section btnToolbar{
+    @using (Ajax.BeginForm("List", "Receipt", new { Area = "Payment" },
+                                                                        new AjaxOptions()
+                                                                        {
+                                                                            UpdateTargetId = "Result",
+                                                                            InsertionMode = InsertionMode.Replace,
+                                                                        }, new { id = "SearchForm" }))
+    {
+        @Html.HiddenFor(d => d.RecieptTypeId)
+
+        <div class="mdc-bg-grey-100">
+            <div class="btn-toolbar">
+                <div class="clearfix">
+                    <div class="pull-right">
+                        @Html.ActionLink(Resources.Receive + " " + title, "ShowReceiptForm", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                        @*@if (Model.RecieptTypeId == 18 || Model.RecieptTypeId == 19 || Model.RecieptTypeId == 21)
+                            {
+                                @Html.ActionLink(Resources.Receive + " " + Resources.Cheque, "Cheque", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                            }
+                            else if (Model.RecieptTypeId == 22)
+                            {
+                                @Html.ActionLink(Resources.GetCash, "GetCash", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                            }
+                            else if (Model.RecieptTypeId == 23)
+                            {
+                                @Html.ActionLink(Resources.CashDeposit, "CashDeposit", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                            }
+                            else if (Model.RecieptTypeId == 24)
+                            {
+                                @Html.ActionLink(Resources.ATM, "ATM", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                            }
+                            else if (Model.RecieptTypeId == 25)
+                            {
+                                @Html.ActionLink(Resources.Receive + " " + Resources.PromissoryNote, "PromissoryNote", "Receipt", new { area = "payment", headerId = 0, ReceiptPayTypeId = Model.RecieptTypeId }, new { @class = "btn btn-material-green-600 btn-sm" })
+                            }*@
+                    </div>
+
+
+
+                </div>
+            </div>
+        </div>
+            <div class="mdc-bg-grey-50" style="padding: 15px 0">
+                <div class="clearfix">
+                    <div class="col-sm-4 col-md-3">
+                        <div class="form-group">
+                            @Html.TextBoxFor(model => model.ReceiptId, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.ReceiptDetailId })
+                        </div>
+                    </div>
+                    <div class="col-sm-4 col-md-3">
+                        <div class="form-group">
+                            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                        </div>
+                    </div>
+                    <div class="col-sm-4 col-md-3">
+                        <div class="form-group">
+                            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        </div>
+                    </div>
+                    <div class="col-sm-4 col-md-3">
+                        <div class="form-group">
+                            @Html.DropDownList("BehalfGropId", new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = @CSD.Treasury.Resourse.Resources.BehalfGroupID })
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <div class="form-group">
+                        @Html.DropDownList("BehalfID", Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Behalf })
+                    </div>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <div class="form-group">
+                        @Html.TextBoxFor(model => model.PayAmount, new { @type = "number", data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Price, @min = 0 })
+                    </div>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <div class="form-group">
+                        @Html.TextBoxFor(model => model.FiscalYear, new { @type = "number", data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.FiscalYear })
+                    </div>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <div class="form-group">
+                        @Html.TextBoxFor(model => model.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.From+" "+ Resources.Date+ " " + Resources.Receive })
+                    </div>
+                </div>
+                <div class="col-sm-4 col-md-3">
+                    <div class="form-group">
+                        @Html.TextBoxFor(model => model.DueDateTo, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.To + " " + Resources.Date+ " " + Resources.Receive })
+                    </div>
+                </div>
+                <div class="clearfix">
+                    <div class="col-sm-12">
+                        <div class="text-left">
+                            <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+    }
+}
+
+
+<div id="Result">
+    @Html.Action("List", "Receipt", new { Area = "Payment", Model })
+</div>
+
+
+<script>
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+
+    });
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $("body").on("change", "#BehalfGropId", function () {
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBehalfs", "Request", new { Area = "Payment" }))";
+            $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                $("#BehalfID").val($("#BehalfID option:first").val());
+            });
+        }
+        else {
+            $("#BehalfID").html("");
+        }
+    })
+
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.message);
+                                   })
+
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>
+

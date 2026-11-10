@@ -1,0 +1,132 @@
+﻿@model IEnumerable<CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType>
+
+@section PageHeader{
+    @(Resources.List +" "+Resources.CheckBook+"-"+ Resources.BasicBank + " " + Utility.GetBasicBankInfo(ViewBag.BasicBankID)+" "+Utility.GetBankInfoBankId(ViewBag.BankID).BranchName)
+}
+@section btnToolbar{
+    @Ajax.ActionLink(Resources.Create + " " + Resources.CheckBook, "Create", "ChequeFormatType", new { Area = "BasicInfo", BasicBankID = ViewBag.BasicBankID, BankID = ViewBag.BankID }, new AjaxOptions
+{
+    OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.CheckBook + "', 'md')"
+}, new { @class = "btn btn-material-grey btn-xs" })
+    }
+@section list{ 
+<div id="Result">
+    <table class="table">
+        <thead>
+            <tr>
+                <td colspan="2">@Resources.CheckBook</td>
+
+                <td>@Resources.Cheque</td>
+            </tr>
+        </thead>
+        <tbody>
+
+
+            @foreach (var item in Model)
+            {
+                var fileId = Utility.CheckIfHasFile(item.ChequeFormatID, "ChequeFormatTypes");
+
+                <tr>
+                    <td>
+                        @Utility.GetChequeDesc(item.FormatDescriptionID_Main)
+                    </td>
+                    <td>
+                        @Ajax.ActionLink(Resources.Edit + " " + Resources.CheckBook, "Edit", "CheckBook", new { Area = "BasicInfo", id = item.ChequeFormatID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.CheckBook + "', 'md');"
+               }, new { @class = "btn btn-success btn-xs" })
+
+     
+
+                        @Html.ActionLink(Resources.Delete + " " + Resources.CheckBook, "Delete", "CheckBook", new { Area = "BasicInfo", id = item.ChequeFormatID }, new { @class = "btn btn-danger btn-xs delete" })
+                    </td>
+                    <td>
+                        @if (fileId != 0)
+                        {
+                          
+                                if (Utility.CheckIfExistChequeType(item.ChequeFormatID))
+                                {
+                                    @Html.ActionLink(Resources.Design + " " + Resources.Cheque, "Edit", "Cheque", new { Area = "BasicInfo", id = item.ChequeFormatID }, new { @class = "btn btn-material-grey btn-xs" })
+                                }
+                                else
+                                {
+                                    @Html.ActionLink(Resources.Design + " " + Resources.Cheque, "Create", "Cheque", new { Area = "BasicInfo", id = item.ChequeFormatID }, new { @class = "btn btn-material-grey btn-xs" })
+                                }
+                                @Ajax.ActionLink(Resources.Delete + " " + Resources.Scan, "Delete", "Attachment", new { Area = "Payment", id = fileId }, new AjaxOptions
+                       {
+                           HttpMethod = "Post",
+                           OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+                       }, new { @class = "btn btn-danger btn-xs" })
+                            }
+                            else
+                            {
+
+                                @Ajax.ActionLink(Resources.Scan, "Index", "Scan", new { Area = "BasicInfo", id = item.ChequeFormatID }, new AjaxOptions
+                       {
+                           OnSuccess = "modal(data,'" + Resources.Scan + "', 'md');updateTable();"
+                       }, new { @class = "btn btn-material-grey  btn-xs" })
+
+                                @Ajax.ActionLink(Resources.Save + " " + Resources.Scan, "SaveScanFileView", "Scan", new { Area = "BasicInfo", id = item.ChequeFormatID }, new AjaxOptions
+                       {
+                           OnSuccess = "modal(data,'" + Resources.Save + Resources.Scan + "', 'md');updateTable();"
+                       }, new { @class = "btn btn-material-grey  btn-xs" })
+
+
+                            }
+
+                    
+
+
+
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    </div>
+    }
+    <script type="text/javascript">
+
+        function updateTableChequeLs(BankId, BasicBankID) {
+            var url = '@(Url.Action("GetChequeTypeByBankId", "ChequeFormatType", new { area = "BasicInfo" }))';
+
+            $.ajax({
+                url: url, type: 'get',
+                data: { BankId: BankId, BasicBankID: BasicBankID },
+                success: function (data, status) {
+                    $("#Result").html(data);
+                }
+            });
+        }
+
+        var deleteBtn = document.getElementsByClassName("delete");
+
+        for (var i = 0; i < deleteBtn.length; i++) {
+            deleteBtn[i].addEventListener("click", deleteItem);
+        }
+        function deleteItem(e) {
+            e.preventDefault();
+            var item = this;
+            alertify.confirm("", '@Resources.AreYouSure',
+                       function () {
+                           var xmlhttp = new XMLHttpRequest();
+                           xmlhttp.onreadystatechange = function () {
+                               if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                                   var data = JSON.parse(xmlhttp.responseText);
+                                   if (data.result == true) {
+                                       item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                           alertify.success(data.Message);
+                                       })
+                                   }
+                                   else {
+                                       alertify.error(data.Message);
+                                   }
+                               }
+                           };
+                           xmlhttp.open("POST", item.href, true);
+                           xmlhttp.send();
+                       },
+      function () {
+      }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+        }
+    </script>

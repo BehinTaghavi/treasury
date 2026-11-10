@@ -1,0 +1,13 @@
+﻿@using (Html.BeginForm("SaveScanFile", "Scan", new { Area = "BasicInfo", relatedID = ViewBag.relatedID }, FormMethod.Post, new { enctype = "multipart/form-data" }))
+{
+    @Html.Hidden("BankID", new {ViewBag.BankID })
+    @Html.Hidden("BasicBankID", new  { ViewBag.BasicBankID })
+    <div class="clearfix">
+        <div class="pull-right">
+            <input type="file" name="file" class="btn" />
+        </div>
+        <div class="pull-left">
+            <button type="submit" class="btn btn-primary">@Resources.Save</button>
+        </div>
+    </div>
+}

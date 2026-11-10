@@ -1,0 +1,128 @@
+﻿@model IEnumerable<CSD.Treasury.Service.BeneficiariesDetailInfoService.BeneficiariesDetailInfo>
+<div class="btn-toolbar">
+    <div class="clearfix">
+        <div class="pull-right">
+            @Ajax.ActionLink(Resources.Create, "CreateDetails", "Beneficiaries", new { Area = "BasicInfo", BeneficiarID = ViewBag.BeneficiarID }, new AjaxOptions
+       {
+           OnSuccess = "modal(data,'" + Resources.Create + " " + Resources.Details + " " + Resources.Beneficiaries + "', 'md');"
+       }, new { @class = "btn btn-sm btn-material-green-600" })
+        </div>
+    </div>
+</div>
+<table class="table table-striped sortable">
+    <thead>
+        <tr>
+            <th>@Resources.Bank</th>
+            <th>
+                @Resources.BranchName @Resources.Bank
+            </th>
+            <th>
+                @Resources.BankAccountNumber
+            </th>
+            <th>@Resources.Sheba</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.HasRelation("Beneficiaries", "Unique_Account_No", ViewBag.Unique_Account_No, "Request_Payment", "Unique_Account_No");
+
+
+            <tr>
+                <td>
+                    @Utility.GetBasicBankInfo(item.BankID)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Bank_BranchName)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Bank_AccountNumber)
+                </td>
+                <th>
+                    @Html.DisplayFor(modelItem => item.Bank_ShebaNo)
+                </th>
+                <td>
+                    @if (User.IsInRole("EditBeneficiaries"))
+                    {    
+                        @Ajax.ActionLink(Resources.Edit, "EditDetails", "Beneficiaries", new
+                   {
+                       Area = "BasicInfo",
+                       id = item.BeneficiarDetailID
+                   }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Details + " " + Resources.Beneficiaries + "', 'md');"
+                   }, new { @class = "btn btn-success btn-xs" })
+                    }
+                  
+                    @if (related1 )
+                    {
+                        <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError"> @Resources.Edit </button>
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError"> @Resources.Delete </button>
+                    }
+                    else
+                    {
+                        @Ajax.ActionLink(Resources.Edit, "EditDetails", "Beneficiaries", new
+                   {
+                       Area = "BasicInfo",
+                       id = item.BeneficiarDetailID
+                   }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Details + " " + Resources.Beneficiaries + "', 'md');"
+                   }, new { @class = "btn btn-success btn-xs" })
+                        @Html.ActionLink(Resources.Delete, "DeleteDetails", "Beneficiaries", new { Area = "BasicInfo", BeneficiarDetailID = item.BeneficiarDetailID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+@section scripts
+                  {
+    @*<script>
+            $(document).ready(function () {
+                $(function () {
+                    $("#myTable").tablesorter();
+                });
+            });
+        </script>*@
+}
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>
+<style>
+    .modal.md {
+        z-index: 100000;
+    }
+</style>

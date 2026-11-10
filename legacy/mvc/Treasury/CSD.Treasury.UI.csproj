@@ -1,0 +1,1460 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props" Condition="Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" />
+  <Import Project="..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props" Condition="Exists('..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props')" />
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>
+    </ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{DCFF8A6A-F836-4F8A-8E5D-1D98A3E33A77}</ProjectGuid>
+    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CSD.Treasury.UI</RootNamespace>
+    <AssemblyName>CSD.Treasury.UI</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <MvcBuildViews>true</MvcBuildViews>
+    <UseIISExpress>true</UseIISExpress>
+    <IISExpressSSLPort />
+    <IISExpressAnonymousAuthentication />
+    <IISExpressWindowsAuthentication />
+    <IISExpressUseClassicPipelineMode />
+    <UseGlobalApplicationHostFile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+    <TargetFrameworkProfile />
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+    <Use64BitIISExpress />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>full</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Antlr3.Runtime">
+      <HintPath>..\packages\Antlr.3.4.1.9004\lib\Antlr3.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CodeDom.Providers.DotNetCompilerPlatform, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\lib\net45\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Stimulsoft.Base, Version=2018.3.3.0, Culture=neutral, PublicKeyToken=ebe6666cba19647a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\Stimulsoft.Base.dll</HintPath>
+    </Reference>
+    <Reference Include="Stimulsoft.Report, Version=2018.3.3.0, Culture=neutral, PublicKeyToken=ebe6666cba19647a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\Stimulsoft.Report.dll</HintPath>
+    </Reference>
+    <Reference Include="Stimulsoft.Report.Mvc, Version=2018.3.3.0, Culture=neutral, PublicKeyToken=ebe6666cba19647a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\Stimulsoft.Report.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="Stimulsoft.Report.Web, Version=2018.3.3.0, Culture=neutral, PublicKeyToken=ebe6666cba19647a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\Stimulsoft.Report.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="Stimulsoft.Report.WebDesign, Version=2018.3.3.0, Culture=neutral, PublicKeyToken=ebe6666cba19647a, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>.\Stimulsoft.Report.WebDesign.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data.Linq" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web.DynamicData" />
+    <Reference Include="System.Web.Entity" />
+    <Reference Include="System.Web.ApplicationServices" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Abstractions" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Web.Mvc, Version=4.0.0.1, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.AspNet.Mvc.5.2.3\lib\net45\System.Web.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Routing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Web.Services" />
+    <Reference Include="System.EnterpriseServices" />
+    <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.Web.Infrastructure.1.0.0.0\lib\net40\Microsoft.Web.Infrastructure.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http">
+    </Reference>
+    <Reference Include="System.Net.Http.WebRequest">
+    </Reference>
+    <Reference Include="System.Web.Optimization">
+      <HintPath>..\packages\Microsoft.AspNet.Web.Optimization.1.1.3\lib\net40\System.Web.Optimization.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.Razor.3.2.3\lib\net45\System.Web.Razor.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Deployment, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Deployment.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <Private>True</Private>
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.3\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="WebGrease">
+      <Private>True</Private>
+      <HintPath>..\packages\WebGrease.1.5.2\lib\WebGrease.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>..\packages\Newtonsoft.Json.6.0.4\lib\net45\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework">
+      <HintPath>..\packages\EntityFramework.6.1.3\lib\net45\EntityFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework.SqlServer">
+      <HintPath>..\packages\EntityFramework.6.1.3\lib\net45\EntityFramework.SqlServer.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNet.Identity.Core">
+      <HintPath>..\packages\Microsoft.AspNet.Identity.Core.2.2.1\lib\net45\Microsoft.AspNet.Identity.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNet.Identity.Owin">
+      <HintPath>..\packages\Microsoft.AspNet.Identity.Owin.2.2.1\lib\net45\Microsoft.AspNet.Identity.Owin.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.AspNet.Identity.EntityFramework">
+      <HintPath>..\packages\Microsoft.AspNet.Identity.EntityFramework.2.2.1\lib\net45\Microsoft.AspNet.Identity.EntityFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="Owin">
+      <HintPath>..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin">
+      <HintPath>..\packages\Microsoft.Owin.3.0.1\lib\net45\Microsoft.Owin.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Host.SystemWeb">
+      <HintPath>..\packages\Microsoft.Owin.Host.SystemWeb.3.0.1\lib\net45\Microsoft.Owin.Host.SystemWeb.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security">
+      <HintPath>..\packages\Microsoft.Owin.Security.3.0.1\lib\net45\Microsoft.Owin.Security.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.Facebook">
+      <HintPath>..\packages\Microsoft.Owin.Security.Facebook.3.0.1\lib\net45\Microsoft.Owin.Security.Facebook.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.Cookies">
+      <HintPath>..\packages\Microsoft.Owin.Security.Cookies.3.0.1\lib\net45\Microsoft.Owin.Security.Cookies.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.OAuth">
+      <HintPath>..\packages\Microsoft.Owin.Security.OAuth.3.0.1\lib\net45\Microsoft.Owin.Security.OAuth.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.Google">
+      <HintPath>..\packages\Microsoft.Owin.Security.Google.3.0.1\lib\net45\Microsoft.Owin.Security.Google.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.Twitter">
+      <HintPath>..\packages\Microsoft.Owin.Security.Twitter.3.0.1\lib\net45\Microsoft.Owin.Security.Twitter.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Security.MicrosoftAccount">
+      <HintPath>..\packages\Microsoft.Owin.Security.MicrosoftAccount.3.0.1\lib\net45\Microsoft.Owin.Security.MicrosoftAccount.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="App_Start\BundleConfig.cs" />
+    <Compile Include="App_Start\FilterConfig.cs" />
+    <Compile Include="App_Start\IdentityConfig.cs" />
+    <Compile Include="App_Start\RouteConfig.cs" />
+    <Compile Include="App_Start\Startup.Auth.cs" />
+    <Compile Include="Areas\BasicInfo\BasicInfoAreaRegistration.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BankBalanceController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BankCardsController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BanksController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BasicBankController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BehalfController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BehalfGroupController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BeneficiariesController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BranchController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\BranchInfoController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\CashDesksController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\CashierController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\CheckBookController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ChequeController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ChequeFormatTypeController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ExchangeRatesController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ExchangeStandardsController.cs" />
+    <Compile Include="Areas\BasicInfo\Models\CustomImage.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ExchangeTypeController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\LocationController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\PettyCashController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\RefrenceTypeController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\RegionController.cs" />
+    <Compile Include="Areas\BasicInfo\Controllers\ScanController.cs" />
+    <Compile Include="Areas\Management\Controllers\Vocher_RowController.cs" />
+    <Compile Include="Areas\Management\Controllers\Vocher_RowReceiptController.cs" />
+    <Compile Include="Areas\Payment\Controllers\ComeBackController.cs" />
+    <Compile Include="Areas\Payment\Controllers\DirectDebitController.cs" />
+    <Compile Include="Areas\Payment\Controllers\PettyCashController.cs" />
+    <Compile Include="Areas\Payment\Controllers\RequestController.cs" />
+    <Compile Include="Areas\Payment\Models\ChequeDetails.cs" />
+    <Compile Include="Areas\Management\Controllers\DashBoardController.cs" />
+    <Compile Include="Areas\Management\Controllers\UserController.cs" />
+    <Compile Include="Areas\Management\ManagementAreaRegistration.cs" />
+    <Compile Include="Areas\Payment\Controllers\AttachmentController.cs" />
+    <Compile Include="Areas\Payment\Controllers\ChequePaymentController.cs" />
+    <Compile Include="Areas\Payment\Controllers\PayController.cs" />
+    <Compile Include="Areas\Payment\Controllers\ReceiptController.cs" />
+    <Compile Include="Areas\Payment\Models\CustomExchange.cs" />
+    <Compile Include="Areas\Payment\PaymentAreaRegistration.cs" />
+    <Compile Include="Areas\Report\Controllers\BankController.cs" />
+    <Compile Include="Areas\Report\Controllers\BehalfGroupReportController.cs" />
+    <Compile Include="Areas\Report\Controllers\BehalfReportController.cs" />
+    <Compile Include="Areas\Report\Controllers\BeneficiariesReportController.cs" />
+    <Compile Include="Areas\Report\Controllers\CashDeskController.cs" />
+    <Compile Include="Areas\Report\Controllers\DailyReportController.cs" />
+    <Compile Include="Areas\Report\Controllers\DaryaftaniPardakhtaniController.cs" />
+    <Compile Include="Areas\Report\Controllers\ExpiredCheckPayableController.cs" />
+    <Compile Include="Areas\Report\Controllers\ExpiredCheckReceivableController.cs" />
+    <Compile Include="Areas\Report\Controllers\GardesheHesabController.cs" />
+    <Compile Include="Areas\Report\Controllers\NaghdinegiController.cs" />
+    <Compile Include="Areas\Report\Controllers\PaymentController.cs" />
+    <Compile Include="Areas\Report\Controllers\PettyCashController.cs" />
+    <Compile Include="Areas\Report\Controllers\ReceiptCheckController.cs" />
+    <Compile Include="Areas\Report\Controllers\RequestPaymentController.cs" />
+    <Compile Include="Areas\Report\Controllers\VocherController.cs" />
+    <Compile Include="Areas\Report\Models\BehalfModel.cs" />
+    <Compile Include="Areas\Report\Models\GardeshHesabSearchModel.cs" />
+    <Compile Include="Areas\Report\Models\bankbalanceModel.cs" />
+    <Compile Include="Areas\Report\ReportAreaRegistration.cs" />
+    <Compile Include="Controllers\AccountController.cs" />
+    <Compile Include="Controllers\BaseController.cs" />
+    <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\ManageController.cs" />
+    <Compile Include="Global.asax.cs">
+      <DependentUpon>Global.asax</DependentUpon>
+    </Compile>
+    <Compile Include="fonts\Helper\CultureHelper.cs" />
+    <Compile Include="fonts\Helper\Hash.cs" />
+    <Compile Include="Models\AggrigationModel.cs" />
+    <Compile Include="Models\BankBalanceModel.cs" />
+    <Compile Include="Models\BaseViewPage.cs" />
+    <Compile Include="Models\BasicBankAndBank.cs" />
+    <Compile Include="Models\BranchInfo.cs" />
+    <Compile Include="Models\CheckBookStatus.cs" />
+    <Compile Include="Models\chequeInfo.cs" />
+    <Compile Include="Models\CustomCashier.cs" />
+    <Compile Include="Models\CustomDebitPay.cs" />
+    <Compile Include="Models\CustomDetails.cs" />
+    <Compile Include="Models\CustomHeader.cs" />
+    <Compile Include="Models\CustomPettyCash_TransactionDetail.cs" />
+    <Compile Include="Models\CustomPettyCash_TransactionHeader.cs" />
+    <Compile Include="Models\CustomPrincipal.cs" />
+    <Compile Include="Models\CustomPrincipalSerializeModel.cs" />
+    <Compile Include="Models\CustomReceiptHeaderDetails.cs" />
+    <Compile Include="Models\CustomRequestPayment.cs" />
+    <Compile Include="Models\Custom_Bank.cs" />
+    <Compile Include="Models\Custom_Details.cs" />
+    <Compile Include="Models\Custom_OtherPeroperty.cs" />
+    <Compile Include="Models\Custom_Reciept.cs" />
+    <Compile Include="Models\Custom_Reciept_Details.cs" />
+    <Compile Include="Models\Custom_Reciept_Header.cs" />
+    <Compile Include="Models\Custom_Reciept_OtherPropery_Detail.cs" />
+    <Compile Include="Models\Dupplication.cs" />
+    <Compile Include="Models\Issuance.cs" />
+    <Compile Include="Models\CustomRP.cs" />
+    <Compile Include="Models\Group.cs" />
+    <Compile Include="Models\ICustomPrincipal.cs" />
+    <Compile Include="Infrastructure\CSDMembershipProvider.cs" />
+    <Compile Include="Models\AccountViewModels.cs" />
+    <Compile Include="Models\IdentityModels.cs" />
+    <Compile Include="Models\ManageViewModels.cs" />
+    <Compile Include="Models\PettyCash_TransactionCustom.cs" />
+    <Compile Include="Models\PostRegisterPaidVoucher.cs" />
+    <Compile Include="Models\RequestPayment.cs" />
+    <Compile Include="Models\Request_Payment_withLastStates.cs" />
+    <Compile Include="Models\SearchModel.cs" />
+    <Compile Include="Models\Utility.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Startup.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAIN.cab" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINActiveX.exe" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINHTML5Edition.exe" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINx64.cab" />
+    <Content Include="Areas\BasicInfo\Resources\dynamsoft.webtwain.config.js" />
+    <Content Include="Areas\BasicInfo\Resources\dynamsoft.webtwain.initiate.js" />
+    <Content Include="Areas\BasicInfo\Resources\dynamsoft.webtwain.install.js" />
+    <None Include="Areas\BasicInfo\Resources\dynamsoft.webtwain.intellisense.js" />
+    <Content Include="Areas\BasicInfo\Resources\dynamsoft.webtwain.intellisense.nonvs.js" />
+    <Content Include="Areas\BasicInfo\Resources\reference\btn-download.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\hint.css" />
+    <Content Include="Areas\BasicInfo\Resources\reference\html5_editor.css" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\changeimagesize.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\close.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\crop.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\crop_grey.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\deskew.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\fit.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\fith.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\fitw.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\flip.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\hand.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\img.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\mirror.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\next.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\next_grey.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\originalsize.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\plug-in-blocked.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\previous.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\previous_grey.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\print.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\rectselect.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\restore.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\rotate.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\rotateleft.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\rotateright.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\save.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\stretch.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\zoomin.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\zoomin_grey.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\zoomout.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\imgs\zoomout_grey.png" />
+    <Content Include="Areas\BasicInfo\Resources\reference\loading.gif" />
+    <Content Include="Areas\BasicInfo\Resources\reference\logo.gif" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\Create.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\list.cshtml" />
+    <Content Include="Content\css\bootstrap-datepicker.css" />
+    <Content Include="Content\css\component.css" />
+    <Content Include="Content\css\datetimepicker.css" />
+    <Content Include="Content\css\demo.css" />
+    <Content Include="Content\css\icons.css" />
+    <Content Include="Content\css\normalize.css" />
+    <Content Include="Content\css\print.css" />
+    <Content Include="Content\css\print.min.css" />
+    <Content Include="fonts\codropsicons\codropsicons.svg" />
+    <Content Include="fonts\codropsicons\license.txt" />
+    <Content Include="fonts\linecons\license.txt" />
+    <Content Include="fonts\linecons\linecons.dev.svg" />
+    <Content Include="fonts\linecons\linecons.svg" />
+    <Content Include="fonts\linecons\lte-ie7.js" />
+    <Content Include="fonts\linecons\Read Me.txt" />
+    <Content Include="Logo\logo.png" />
+    <Content Include="Scripts\angular-persian-date.js" />
+    <Content Include="Scripts\angular-sanitize.js" />
+    <Content Include="Scripts\angular-ui-utils.min.js" />
+    <Content Include="Scripts\angular.min.js" />
+    <Content Include="Scripts\bootstrap-datepicker.fa.js" />
+    <Content Include="Scripts\bootstrap-datepicker.js" />
+    <Content Include="Scripts\checklist-model.js" />
+    <Content Include="Scripts\classie.js" />
+    <Content Include="Scripts\dateparser.js" />
+    <Content Include="Scripts\datepicker-tpls.js" />
+    <Content Include="Scripts\datetimepicker.js" />
+    <Content Include="Scripts\datetimepicker.templates.js" />
+    <Content Include="Areas\Payment\Views\Request\Confirmation.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\_Create.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\RequestPaymentRow.cshtml" />
+    <Content Include="Areas\Payment\Views\PettyCash\_Index.cshtml" />
+    <Content Include="Areas\Report\Views\PettyCash\PettyCashReport.cshtml" />
+    <Content Include="Report\PettyCashReport.mrt" />
+    <Content Include="Areas\Payment\Views\PettyCash\GetHeaders.cshtml" />
+    <Content Include="Areas\Report\Views\PettyCash\PettyCashListReport.cshtml" />
+    <Content Include="Report\PettyCashLIstReport.mrt" />
+    <Content Include="Areas\Report\Views\PettyCash\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\_ViewStart.cshtml" />
+    <Content Include="fonts\codropsicons\codropsicons.eot" />
+    <Content Include="fonts\codropsicons\codropsicons.ttf" />
+    <Content Include="fonts\codropsicons\codropsicons.woff" />
+    <Content Include="fonts\linecons\linecons.eot" />
+    <Content Include="fonts\linecons\linecons.ttf" />
+    <Content Include="fonts\linecons\linecons.woff" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\Details.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\PettyCash\Details.cshtml" />
+    <Content Include="ClassDiagram1.cd" />
+    <Content Include="Areas\Payment\Views\Receipt\Receipt.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\Details.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowReceiptForm.cshtml" />
+    <Content Include="Areas\Report\Views\ReceiptCheck\Index.cshtml" />
+    <Content Include="Areas\Report\Views\ReceiptCheck\List.cshtml" />
+    <Content Include="Areas\Report\Views\ReceiptCheck\ShowReport.cshtml" />
+    <Content Include="Report\ReceiptChecksLs.mrt" />
+    <Content Include="Report\RequestReport.mrt" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowReceiptDetails.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\CheckBookStatus.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\Index.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\RequestsCanceled.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\ShowRequestsCanceled.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\FollowUpReceipt.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowFollowUpReceipt.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ReceiptDetailsById.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\FollowUpPayment.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\ShowFollowUpPayment.cshtml" />
+    <Content Include="Report\checkBookStatusReport.mrt" />
+    <Content Include="Areas\Payment\Views\Pay\ShowModalDatetime.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\PlannedReceiptList.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankBalance\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankBalance\ShowBalance.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\ReceiveChequeDueDateList.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\TransferFromBackupBankList.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\details.cshtml" />
+    <Content Include="Areas\Report\Views\RequestPayment\RequestDetails.cshtml" />
+    <Content Include="Report\RequestPaymentReport.mrt" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowVocherList.cshtml" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowVocherListFrame.cshtml" />
+    <Content Include="Areas\Report\Views\GardesheHesab\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\GardesheHesab\Index.cshtml" />
+    <Content Include="Report\GardeshHesabReport1.mrt" />
+    <Content Include="Areas\Report\Views\Bank\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\Bank\Index.cshtml" />
+    <Content Include="Report\BankBalanceReport.mrt">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Report\ExpiredCheckPayableReport.mrt" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\Index.cshtml" />
+    <Content Include="Report\ExpiredCheckReceivableReport.mrt" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\Index.cshtml" />
+    <Content Include="Areas\Report\Views\GardesheHesab\SearchView1.cshtml" />
+    <Content Include="Areas\Report\Views\GardesheHesab\Index1.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\SearchView.cshtml" />
+    <Content Include="Report\Report1.mrt" />
+    <Content Include="Areas\Report\Views\GardesheHesab\Report1.cshtml" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowVocherListReceipt.cshtml" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowVocherListFrameReceipt.cshtml" />
+    <Content Include="Report\ReportTest.mrt" />
+    <Content Include="Areas\Management\Views\Vocher_Row\RegisterPaidVoucher.cshtml" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowRegisteredPaidVoucher.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\Index1.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\AggregationRequest.cshtml" />
+    <Content Include="Areas\Report\Views\RequestPayment\IntegratedRequest.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowVocher.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\ShowVocher.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowAllReceiptList.cshtml" />
+    <Content Include="Report\PaymentChequeAggregatedReport.mrt" />
+    <Content Include="Areas\Report\Views\RequestPayment\PaymentChequeAgreggatedReport.cshtml" />
+    <Content Include="Areas\Management\Views\User\EditProfile.cshtml" />
+    <Content Include="Report\PettyCashLIstReport2.mrt" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\IndexForm.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\getBeneficiariesUC.cshtml" />
+    <Content Include="Areas\Report\Views\Vocher\ShowVocher.cshtml" />
+    <Content Include="Report\VocherReport.mrt" />
+    <Content Include="Report\ChequeReport.mrt" />
+    <Content Include="Areas\Report\Views\RequestPayment\ChequeReport.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Create.cshtml" />
+    <Content Include="Areas\Payment\Views\PettyCash\Search.cshtml" />
+    <Content Include="Report\IntegratedRequestReport11.mrt">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Areas\Report\Views\PettyCash\PettyCashList.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\SaveAccountSheba.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\EditTransfer.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ReceiptReport.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\Details.cshtml" />
+    <Content Include="Content\HelpFile\RequestHelp.docx" />
+    <Content Include="Areas\Payment\Views\Request\BardashtDate.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\SearchViewburse.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\listburse.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankBalance\ShowBalanceShort.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\ResultOfIntegrationRequest.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\ResultOfIntegrationRequest.cshtml" />
+    <Content Include="Areas\Report\Views\GardesheHesab\SearchViewDayReport.cshtml" />
+    <Content Include="Areas\Report\Views\DailyReport\SearchViewdailyreport.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\SearchViewSeporde.cshtml" />
+    <Content Include="Areas\Report\Views\CashDesk\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\CashDesk\Index.cshtml" />
+    <Content Include="Areas\Report\Views\BehalfGroupReport\SearchView.cshtml" />
+    <Content Include="Areas\Report\Views\BehalfGroupReport\Index.cshtml" />
+    <Content Include="Areas\Report\Views\BehalfReport\Index.cshtml" />
+    <Content Include="Areas\Report\Views\BehalfReport\SearchView.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\CheckdeliveyReport.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ReceiptReportdelivey.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\Show.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\ShowPayment.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\CreateFromRequest.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\ALLExpiredCheckPayable.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\ShowALLExpired.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\Search.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckPayable\ExpiredCheckPayableReport.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\ALLExpiredCheckReceivable.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\ShowALLExpired.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\Search.cshtml" />
+    <Content Include="Areas\Report\Views\ExpiredCheckReceivable\ExpiredCheckListReport.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\SearchViewStatus.cshtml" />
+    <Content Include="Areas\Report\Views\Naghdinegi\listStatus.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\CancelAggregationRequest.cshtml" />
+    <Content Include="Content\HelpFile\99-182.docx" />
+    <Content Include="Areas\Payment\Views\Pay\ExtendDueDate1.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\Createt.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\Details.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeStandards\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\Details.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeRates\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\Details.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CashDesks\List.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\DaryaftaniPardakhtaniAti.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\ListPerZinaf.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\IndexPerZinafSarresid.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\IndexPerZinaf.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\ListPerZinafSarresid.cshtml" />
+    <Content Include="Areas\Report\Views\DaryaftaniPardakhtani\ReportDaryaftaniPardakhtani.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\ExtendDueDate.cshtml" />
+    <Content Include="Areas\Management\Views\Vocher_Row\ShowVoucherInfo.cshtml" />
+    <Content Include="Content\HelpFile\1401-050.docx" />
+    <Content Include="Content\HelpFile\1401-054.docx" />
+    <Content Include="Areas\Report\Views\BehalfGroupReport\BehalfGroupIndex.cshtml" />
+    <Content Include="Areas\Report\Views\BeneficiariesReport\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\RequestPaymentHelp.cshtml" />
+    <None Include="Properties\PublishProfiles\FolderProfile.pubxml" />
+    <Content Include="Report\GardeshHesabReport_copy.mrt" />
+    <Content Include="Report\GardeshHesabReport.mrt">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Report\CashDeskReport.mrt" />
+    <Content Include="Report\GetAllPaymentReceiptByBehalfGroup.mrt" />
+    <Content Include="Report\GetAllPaymentReceiptByBehalf.mrt" />
+    <None Include="Properties\PublishProfiles\FolderProfile1.pubxml" />
+    <Content Include="Report\Checkdelivey.mrt" />
+    <Content Include="Report\AllExpiredCheckPayable.mrt">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Report\AllExpiredCheckReceivable.mrt" />
+    <Content Include="Report\ChequeReportSatna.mrt" />
+    <Content Include="Report\BehalfGroupList.mrt" />
+    <Content Include="Report\BeneficiariesLs.mrt" />
+    <None Include="Report\IntegratedRequestReport1.mrt" />
+    <Content Include="Areas\Report\Views\Payment\IndexChecksIssued.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\ListChecksIssued.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\Search.cshtml" />
+    <Content Include="Areas\Report\Views\Payment\ShowChecksIssued.cshtml" />
+    <Content Include="Report\ListChecksIssued.mrt" />
+    <Content Include="Report\IntegratedRequestReportBankF.mrt" />
+    <Content Include="Report\ReceiptandPaymentbybehalf.mrt" />
+    <Content Include="Report\RLs.mrt" />
+    <Content Include="Report\ReceiptReport.mrt" />
+    <Content Include="Report\ReceiptReportdelivey.mrt" />
+    <None Include="Scripts\jquery-1.10.2.intellisense.js" />
+    <Content Include="Scripts\html.js" />
+    <Content Include="Scripts\jquery.mask.min.js" />
+    <Content Include="Scripts\jquery.searchabledropdown-1.0.8.min.js" />
+    <Content Include="Scripts\material\dist\angular-bootstrap-material.js" />
+    <Content Include="Scripts\material\dist\angular-bootstrap-material.min.js" />
+    <Content Include="Scripts\material\src\scripts\abm.js" />
+    <Content Include="Scripts\material\src\scripts\directives\checkbox.js" />
+    <Content Include="Scripts\material\src\scripts\directives\component.js" />
+    <Content Include="Scripts\material\src\scripts\directives\control-label.js" />
+    <Content Include="Scripts\material\src\scripts\directives\form-control.js" />
+    <Content Include="Scripts\material\src\scripts\directives\form-group.js" />
+    <Content Include="Scripts\material\src\scripts\directives\radio.js" />
+    <Content Include="Scripts\material\src\scripts\directives\toggle.js" />
+    <Content Include="Scripts\material\src\scripts\services\abmConfig.js" />
+    <Content Include="Scripts\material\src\scripts\services\isChar.js" />
+    <Content Include="Scripts\material\src\scripts\services\ripple.js" />
+    <Content Include="Scripts\material\src\templates\checkbox.html" />
+    <Content Include="Scripts\material\src\templates\form-group.html" />
+    <Content Include="Scripts\material\src\templates\input.html" />
+    <Content Include="Scripts\material\src\templates\label.html" />
+    <Content Include="Scripts\material\src\templates\radio.html" />
+    <Content Include="Scripts\material\src\templates\toggle.html" />
+    <Content Include="Scripts\mlpushmenu.js" />
+    <Content Include="Scripts\modernizr.custom.js" />
+    <Content Include="Scripts\position.js" />
+    <Content Include="Scripts\print.min.js" />
+    <Content Include="Scripts\Resources\app.js" />
+    <Content Include="Scripts\Resources\Controller\BasicInfo\Beneficiaries\BeneficiariesController.js" />
+    <Content Include="Scripts\Resources\Controller\BasicInfo\Beneficiaries\BeneficiariesUC.js" />
+    <Content Include="Scripts\Resources\Controller\BasicInfo\ExchangeTypeController.js" />
+    <Content Include="Scripts\Resources\Controller\chequeController.js" />
+    <Content Include="Scripts\Resources\Controller\directDebit.js" />
+    <Content Include="Scripts\Resources\Controller\directDebitUC.js" />
+    <Content Include="Scripts\Resources\Controller\Duplication.js" />
+    <Content Include="Scripts\Resources\Controller\pettyCashSearch.js" />
+    <Content Include="Scripts\Resources\Controller\pettyCashUC.js" />
+    <Content Include="Scripts\Resources\Controller\pettyCash.js" />
+    <Content Include="Scripts\persian-datepicker-tpls.js" />
+    <Content Include="Scripts\persiandate.js" />
+    <Content Include="Areas\Payment\Views\web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Content\bootstrap-theme.css" />
+    <Content Include="Content\bootstrap-theme.min.css" />
+    <Content Include="Content\bootstrap.css" />
+    <Content Include="Content\bootstrap.min.css" />
+    <Content Include="Content\css\account.css" />
+    <Content Include="Content\css\alertify.css" />
+    <Content Include="Content\css\alertify.rtl.css" />
+    <Content Include="Content\css\animate.min.css" />
+    <Content Include="Content\css\bootstrap-datepicker.min.css" />
+    <Content Include="Content\css\bootstrap-material-design.css" />
+    <Content Include="Content\css\bootstrap-rtl.css" />
+    <Content Include="Content\css\bootstrap-sortable.css" />
+    <Content Include="Content\css\bootstrap-timepicker.css" />
+    <Content Include="Content\css\bootstrap.css" />
+    <Content Include="Content\css\custom-bootstrap.css" />
+    <Content Include="Content\css\dropzone.css" />
+    <Content Include="Content\css\font-awesome.min.css" />
+    <Content Include="Content\css\jquery.dropdown.css" />
+    <Content Include="Content\css\material-design-color-palette.min.css" />
+    <Content Include="Content\css\material-design-iconic-font.min.css" />
+    <Content Include="Content\css\material-fullpalette.css" />
+    <Content Include="Content\css\material.css" />
+    <Content Include="Content\css\metisMenu.css" />
+    <Content Include="Content\css\morris.css" />
+    <Content Include="Content\css\ripples.css" />
+    <Content Include="Content\css\roboto.css" />
+    <Content Include="Content\css\sb-admin-2.css" />
+    <Content Include="Content\css\select2.min.css" />
+    <Content Include="Content\css\skins\Pink.css" />
+    <Content Include="Content\css\skins\Dark-Red.css" />
+    <Content Include="Content\css\skins\Dark-Orange.css" />
+    <Content Include="Content\css\skins\Orange.css" />
+    <Content Include="Content\css\skins\Light-Green.css" />
+    <Content Include="Content\css\skins\Green.css" />
+    <Content Include="Content\css\skins\Light-Teal.css" />
+    <Content Include="Content\css\skins\Teal.css" />
+    <Content Include="Content\css\skins\Light-Blue.css" />
+    <Content Include="Content\css\skins\Blue.css" />
+    <Content Include="Content\css\skins\Dark-Purple.css" />
+    <Content Include="Content\css\skins\Purple.css" />
+    <Content Include="Content\css\skins\Medium-Dark-Blue.css" />
+    <Content Include="Content\css\skins\Dark-Blue.css" />
+    <Content Include="Content\css\skins\Cordovan.css" />
+    <Content Include="Content\css\skins\Dark-Cordovan.css" />
+    <Content Include="Content\css\skins\Neutral-Grey.css" />
+    <Content Include="Content\css\skins\Black.css" />
+    <Content Include="Content\css\skins\default.css" />
+    <Content Include="Content\css\snackbar.min.css" />
+    <Content Include="Content\css\style.css" />
+    <Content Include="Content\css\timeline.css" />
+    <Content Include="Content\images\Cheque.jpg" />
+    <Content Include="Content\images\country-flag\Afghanistan.png" />
+    <Content Include="Content\images\country-flag\African Union%28OAS%29.png" />
+    <Content Include="Content\images\country-flag\Albania.png" />
+    <Content Include="Content\images\country-flag\Algeria.png" />
+    <Content Include="Content\images\country-flag\American Samoa.png" />
+    <Content Include="Content\images\country-flag\Andorra.png" />
+    <Content Include="Content\images\country-flag\Angola.png" />
+    <Content Include="Content\images\country-flag\Anguilla.png" />
+    <Content Include="Content\images\country-flag\Antarctica.png" />
+    <Content Include="Content\images\country-flag\Antigua &amp; Barbuda.png" />
+    <Content Include="Content\images\country-flag\Arab League.png" />
+    <Content Include="Content\images\country-flag\Argentina.png" />
+    <Content Include="Content\images\country-flag\Armenia.png" />
+    <Content Include="Content\images\country-flag\Aruba.png" />
+    <Content Include="Content\images\country-flag\ASEAN.png" />
+    <Content Include="Content\images\country-flag\Australia.png" />
+    <Content Include="Content\images\country-flag\Austria.png" />
+    <Content Include="Content\images\country-flag\Azerbaijan.png" />
+    <Content Include="Content\images\country-flag\Bahamas.png" />
+    <Content Include="Content\images\country-flag\Bahrain.png" />
+    <Content Include="Content\images\country-flag\Bangladesh.png" />
+    <Content Include="Content\images\country-flag\Barbados.png" />
+    <Content Include="Content\images\country-flag\Belarus.png" />
+    <Content Include="Content\images\country-flag\Belgium.png" />
+    <Content Include="Content\images\country-flag\Belize.png" />
+    <Content Include="Content\images\country-flag\Benin.png" />
+    <Content Include="Content\images\country-flag\Bermuda.png" />
+    <Content Include="Content\images\country-flag\Bhutan.png" />
+    <Content Include="Content\images\country-flag\Bolivia.png" />
+    <Content Include="Content\images\country-flag\Bosnia &amp; Herzegovina.png" />
+    <Content Include="Content\images\country-flag\Botswana.png" />
+    <Content Include="Content\images\country-flag\Brazil.png" />
+    <Content Include="Content\images\country-flag\Brunei.png" />
+    <Content Include="Content\images\country-flag\Bulgaria.png" />
+    <Content Include="Content\images\country-flag\Burkina Faso.png" />
+    <Content Include="Content\images\country-flag\Burundi.png" />
+    <Content Include="Content\images\country-flag\Cambodja.png" />
+    <Content Include="Content\images\country-flag\Cameroon.png" />
+    <Content Include="Content\images\country-flag\Canada.png" />
+    <Content Include="Content\images\country-flag\Cape Verde.png" />
+    <Content Include="Content\images\country-flag\CARICOM.png" />
+    <Content Include="Content\images\country-flag\Cayman Islands.png" />
+    <Content Include="Content\images\country-flag\Central African Republic.png" />
+    <Content Include="Content\images\country-flag\Chad.png" />
+    <Content Include="Content\images\country-flag\Chile.png" />
+    <Content Include="Content\images\country-flag\China.png" />
+    <Content Include="Content\images\country-flag\CIS.png" />
+    <Content Include="Content\images\country-flag\Colombia.png" />
+    <Content Include="Content\images\country-flag\Commonwealth.png" />
+    <Content Include="Content\images\country-flag\Comoros.png" />
+    <Content Include="Content\images\country-flag\Congo-Brazzaville.png" />
+    <Content Include="Content\images\country-flag\Congo-Kinshasa.png" />
+    <Content Include="Content\images\country-flag\Cook Islands.png" />
+    <Content Include="Content\images\country-flag\Costa Rica.png" />
+    <Content Include="Content\images\country-flag\Cote d%27Ivoire.png" />
+    <Content Include="Content\images\country-flag\Croatia.png" />
+    <Content Include="Content\images\country-flag\Cuba.png" />
+    <Content Include="Content\images\country-flag\Cyprus.png" />
+    <Content Include="Content\images\country-flag\Czech Republic.png" />
+    <Content Include="Content\images\country-flag\Denmark.png" />
+    <Content Include="Content\images\country-flag\Djibouti.png" />
+    <Content Include="Content\images\country-flag\Dominica.png" />
+    <Content Include="Content\images\country-flag\Dominican Republic.png" />
+    <Content Include="Content\images\country-flag\Egypt.png" />
+    <Content Include="Content\images\country-flag\El Salvador.png" />
+    <Content Include="Content\images\country-flag\England.png" />
+    <Content Include="Content\images\country-flag\Equador.png" />
+    <Content Include="Content\images\country-flag\Equatorial Guinea.png" />
+    <Content Include="Content\images\country-flag\Eritrea.png" />
+    <Content Include="Content\images\country-flag\Estonia.png" />
+    <Content Include="Content\images\country-flag\Ethiopia.png" />
+    <Content Include="Content\images\country-flag\European Union.png" />
+    <Content Include="Content\images\country-flag\Faroes.png" />
+    <Content Include="Content\images\country-flag\Fiji.png" />
+    <Content Include="Content\images\country-flag\Finland.png" />
+    <Content Include="Content\images\country-flag\France.png" />
+    <Content Include="Content\images\country-flag\Gabon.png" />
+    <Content Include="Content\images\country-flag\Gambia.png" />
+    <Content Include="Content\images\country-flag\Georgia.png" />
+    <Content Include="Content\images\country-flag\Germany.png" />
+    <Content Include="Content\images\country-flag\Ghana.png" />
+    <Content Include="Content\images\country-flag\Gibraltar.png" />
+    <Content Include="Content\images\country-flag\Greece.png" />
+    <Content Include="Content\images\country-flag\Greenland.png" />
+    <Content Include="Content\images\country-flag\Grenada.png" />
+    <Content Include="Content\images\country-flag\Guadeloupe.png" />
+    <Content Include="Content\images\country-flag\Guam.png" />
+    <Content Include="Content\images\country-flag\Guatemala.png" />
+    <Content Include="Content\images\country-flag\Guernsey.png" />
+    <Content Include="Content\images\country-flag\Guinea-Bissau.png" />
+    <Content Include="Content\images\country-flag\Guinea.png" />
+    <Content Include="Content\images\country-flag\Guyana.png" />
+    <Content Include="Content\images\country-flag\Haiti.png" />
+    <Content Include="Content\images\country-flag\Honduras.png" />
+    <Content Include="Content\images\country-flag\Hong Kong.png" />
+    <Content Include="Content\images\country-flag\Hungary.png" />
+    <Content Include="Content\images\country-flag\Iceland.png" />
+    <Content Include="Content\images\country-flag\India.png" />
+    <Content Include="Content\images\country-flag\Indonesia.png" />
+    <Content Include="Content\images\country-flag\Iran.png" />
+    <Content Include="Content\images\country-flag\Iraq.png" />
+    <Content Include="Content\images\country-flag\Ireland.png" />
+    <Content Include="Content\images\country-flag\Islamic Conference.png" />
+    <Content Include="Content\images\country-flag\Isle of Man.png" />
+    <Content Include="Content\images\country-flag\Israel.png" />
+    <Content Include="Content\images\country-flag\Italy.png" />
+    <Content Include="Content\images\country-flag\Jamaica.png" />
+    <Content Include="Content\images\country-flag\japan.png" />
+    <Content Include="Content\images\country-flag\Jersey.png" />
+    <Content Include="Content\images\country-flag\Jordan.png" />
+    <Content Include="Content\images\country-flag\Kazakhstan.png" />
+    <Content Include="Content\images\country-flag\Kenya.png" />
+    <Content Include="Content\images\country-flag\Kiribati.png" />
+    <Content Include="Content\images\country-flag\Kosovo.png" />
+    <Content Include="Content\images\country-flag\Kuwait.png" />
+    <Content Include="Content\images\country-flag\Kyrgyzstan.png" />
+    <Content Include="Content\images\country-flag\Laos.png" />
+    <Content Include="Content\images\country-flag\Latvia.png" />
+    <Content Include="Content\images\country-flag\Lebanon.png" />
+    <Content Include="Content\images\country-flag\Lesotho.png" />
+    <Content Include="Content\images\country-flag\Liberia.png" />
+    <Content Include="Content\images\country-flag\Libya.png" />
+    <Content Include="Content\images\country-flag\Liechtenstein.png" />
+    <Content Include="Content\images\country-flag\Lithuania.png" />
+    <Content Include="Content\images\country-flag\Luxembourg.png" />
+    <Content Include="Content\images\country-flag\Macao.png" />
+    <Content Include="Content\images\country-flag\Macedonia.png" />
+    <Content Include="Content\images\country-flag\Madagascar.png" />
+    <Content Include="Content\images\country-flag\Malawi.png" />
+    <Content Include="Content\images\country-flag\Malaysia.png" />
+    <Content Include="Content\images\country-flag\Maldives.png" />
+    <Content Include="Content\images\country-flag\Mali.png" />
+    <Content Include="Content\images\country-flag\Malta.png" />
+    <Content Include="Content\images\country-flag\Marshall Islands.png" />
+    <Content Include="Content\images\country-flag\Martinique.png" />
+    <Content Include="Content\images\country-flag\Mauritania.png" />
+    <Content Include="Content\images\country-flag\Mauritius.png" />
+    <Content Include="Content\images\country-flag\Mexico.png" />
+    <Content Include="Content\images\country-flag\Micronesia.png" />
+    <Content Include="Content\images\country-flag\Moldova.png" />
+    <Content Include="Content\images\country-flag\Monaco.png" />
+    <Content Include="Content\images\country-flag\Mongolia.png" />
+    <Content Include="Content\images\country-flag\Montenegro.png" />
+    <Content Include="Content\images\country-flag\Montserrat.png" />
+    <Content Include="Content\images\country-flag\Morocco.png" />
+    <Content Include="Content\images\country-flag\Mozambique.png" />
+    <Content Include="Content\images\country-flag\Myanmar%28Burma%29.png" />
+    <Content Include="Content\images\country-flag\Namibia.png" />
+    <Content Include="Content\images\country-flag\NATO.png" />
+    <Content Include="Content\images\country-flag\Nauru.png" />
+    <Content Include="Content\images\country-flag\Nepal.png" />
+    <Content Include="Content\images\country-flag\Netherlands Antilles.png" />
+    <Content Include="Content\images\country-flag\Netherlands.png" />
+    <Content Include="Content\images\country-flag\New Caledonia.png" />
+    <Content Include="Content\images\country-flag\New Zealand.png" />
+    <Content Include="Content\images\country-flag\Nicaragua.png" />
+    <Content Include="Content\images\country-flag\Niger.png" />
+    <Content Include="Content\images\country-flag\Nigeria.png" />
+    <Content Include="Content\images\country-flag\North Korea.png" />
+    <Content Include="Content\images\country-flag\Northern Cyprus.png" />
+    <Content Include="Content\images\country-flag\Northern Ireland.png" />
+    <Content Include="Content\images\country-flag\Norway.png" />
+    <Content Include="Content\images\country-flag\Olimpic Movement.png" />
+    <Content Include="Content\images\country-flag\Oman.png" />
+    <Content Include="Content\images\country-flag\OPEC.png" />
+    <Content Include="Content\images\country-flag\Pakistan.png" />
+    <Content Include="Content\images\country-flag\Palau.png" />
+    <Content Include="Content\images\country-flag\Palestine.png" />
+    <Content Include="Content\images\country-flag\Panama.png" />
+    <Content Include="Content\images\country-flag\Papua New Guinea.png" />
+    <Content Include="Content\images\country-flag\Paraguay.png" />
+    <Content Include="Content\images\country-flag\Peru.png" />
+    <Content Include="Content\images\country-flag\Philippines.png" />
+    <Content Include="Content\images\country-flag\Poland.png" />
+    <Content Include="Content\images\country-flag\Portugal.png" />
+    <Content Include="Content\images\country-flag\Puerto Rico.png" />
+    <Content Include="Content\images\country-flag\Qatar.png" />
+    <Content Include="Content\images\country-flag\Red Cross.png" />
+    <Content Include="Content\images\country-flag\Reunion.png" />
+    <Content Include="Content\images\country-flag\Romania.png" />
+    <Content Include="Content\images\country-flag\Russian Federation.png" />
+    <Content Include="Content\images\country-flag\Rwanda.png" />
+    <Content Include="Content\images\country-flag\Saint Lucia.png" />
+    <Content Include="Content\images\country-flag\Samoa.png" />
+    <Content Include="Content\images\country-flag\San Marino.png" />
+    <Content Include="Content\images\country-flag\Sao Tome &amp; Principe.png" />
+    <Content Include="Content\images\country-flag\Saudi Arabia.png" />
+    <Content Include="Content\images\country-flag\Scotland.png" />
+    <Content Include="Content\images\country-flag\Senegal.png" />
+    <Content Include="Content\images\country-flag\Serbia%28Yugoslavia%29.png" />
+    <Content Include="Content\images\country-flag\Seyshelles.png" />
+    <Content Include="Content\images\country-flag\Sierra Leone.png" />
+    <Content Include="Content\images\country-flag\Singapore.png" />
+    <Content Include="Content\images\country-flag\Slovakia.png" />
+    <Content Include="Content\images\country-flag\Slovenia.png" />
+    <Content Include="Content\images\country-flag\Solomon Islands.png" />
+    <Content Include="Content\images\country-flag\Somalia.png" />
+    <Content Include="Content\images\country-flag\Somaliland.png" />
+    <Content Include="Content\images\country-flag\South Africa.png" />
+    <Content Include="Content\images\country-flag\South Korea.png" />
+    <Content Include="Content\images\country-flag\Spain.png" />
+    <Content Include="Content\images\country-flag\Sri Lanka.png" />
+    <Content Include="Content\images\country-flag\St Kitts &amp; Nevis.png" />
+    <Content Include="Content\images\country-flag\St Vincent &amp; the Grenadines.png" />
+    <Content Include="Content\images\country-flag\Sudan.png" />
+    <Content Include="Content\images\country-flag\Suriname.png" />
+    <Content Include="Content\images\country-flag\Swaziland.png" />
+    <Content Include="Content\images\country-flag\Sweden.png" />
+    <Content Include="Content\images\country-flag\Switzerland.png" />
+    <Content Include="Content\images\country-flag\Syria.png" />
+    <Content Include="Content\images\country-flag\Tahiti%28French Polinesia%29.png" />
+    <Content Include="Content\images\country-flag\Taiwan.png" />
+    <Content Include="Content\images\country-flag\Tajikistan.png" />
+    <Content Include="Content\images\country-flag\Tanzania.png" />
+    <Content Include="Content\images\country-flag\Thailand.png" />
+    <Content Include="Content\images\country-flag\Timor-Leste.png" />
+    <Content Include="Content\images\country-flag\Togo.png" />
+    <Content Include="Content\images\country-flag\Tonga.png" />
+    <Content Include="Content\images\country-flag\Trinidad &amp; Tobago.png" />
+    <Content Include="Content\images\country-flag\Tunisia.png" />
+    <Content Include="Content\images\country-flag\Turkey.png" />
+    <Content Include="Content\images\country-flag\Turkmenistan.png" />
+    <Content Include="Content\images\country-flag\Turks and Caicos Islands.png" />
+    <Content Include="Content\images\country-flag\Tuvalu.png" />
+    <Content Include="Content\images\country-flag\Uganda.png" />
+    <Content Include="Content\images\country-flag\Ukraine.png" />
+    <Content Include="Content\images\country-flag\United Arab Emirates.png" />
+    <Content Include="Content\images\country-flag\United Kingdom%28Great Britain%29.png" />
+    <Content Include="Content\images\country-flag\United Nations.png" />
+    <Content Include="Content\images\country-flag\United States of America%28USA%29.png" />
+    <Content Include="Content\images\country-flag\Uruguay.png" />
+    <Content Include="Content\images\country-flag\Uzbekistan.png" />
+    <Content Include="Content\images\country-flag\Vanuatu.png" />
+    <Content Include="Content\images\country-flag\Vatican City.png" />
+    <Content Include="Content\images\country-flag\Venezuela.png" />
+    <Content Include="Content\images\country-flag\Viet Nam.png" />
+    <Content Include="Content\images\country-flag\Virgin Islands British.png" />
+    <Content Include="Content\images\country-flag\Virgin Islands US.png" />
+    <Content Include="Content\images\country-flag\Wales.png" />
+    <Content Include="Content\images\country-flag\Western Sahara.png" />
+    <Content Include="Content\images\country-flag\Yemen.png" />
+    <Content Include="Content\images\country-flag\Zambia.png" />
+    <Content Include="Content\images\country-flag\Zimbabwe.png" />
+    <Content Include="Content\images\raster.png" />
+    <Content Include="Content\Logo\CSDlogo.png" />
+    <Content Include="favicon.ico" />
+    <Content Include="fonts\fontawesome-webfont.svg" />
+    <Content Include="fonts\glyphicons-halflings-regular.svg" />
+    <Content Include="fonts\Material-Design-Iconic-Font.svg" />
+    <Content Include="fonts\Material-Design-Icons.svg" />
+    <Content Include="Global.asax" />
+    <Content Include="Content\Site.css" />
+    <Content Include="Areas\BasicInfo\Views\Banks\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Banks\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Banks\Create.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Search.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Aggregation.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Banks\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Banks\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankCards\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankCards\List.cshtml" />
+    <Content Include="Areas\Management\Views\User\Register.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Location\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Location\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Location\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Location\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Location\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankCards\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankCards\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BankCards\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BranchInfo\ListTel.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Branch\BranchInformation.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BranchInfo\ListEmail.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BranchInfo\ListFax.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BranchInfo\CreateTel.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BranchInfo\TelIndex.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\CreateCountry.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\DeleteCountry.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\EditCountry.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\ListCountry.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\RefrenceType\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\RefrenceType\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\RefrenceType\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\RefrenceType\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\RefrenceType\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\ShowDeleteConfirm.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cashier\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CheckBook\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CheckBook\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\ListProvince.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\PettyCash\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\PettyCash\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\PettyCash\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\PettyCash\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\CreateCity.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\CreateProvince.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\EditCity.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\EditProvince.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Region\ListCity.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CheckBook\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\CheckBook\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\DetailsList.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\CreateDetails.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\EditDetails.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\BeneficiariesDetails.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\TelIndex.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\ListTel.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Beneficiaries\CreateTel.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cheque\Edit.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ChequeFormatType\GetChequeTypeByBankId.cshtml" />
+    <Content Include="Areas\Management\Views\User\Index.cshtml" />
+    <Content Include="Areas\Management\Views\User\List.cshtml" />
+    <Content Include="Areas\Management\Views\User\Edit.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\Pay\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\AggregationList.cshtml" />
+    <Content Include="Content\bootstrap.min.css.map" />
+    <Content Include="Content\bootstrap-theme.min.css.map" />
+    <Content Include="Areas\Payment\Views\Pay\pay.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Duplication.cshtml" />
+    <Content Include="Areas\Payment\Views\ChequePayment\Issuance.cshtml" />
+    <Content Include="Report\PaymentForm.mrt" />
+    <Content Include="Areas\Report\Views\RequestPayment\PaymentformReport.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\IndexAggregation.cshtml" />
+    <Content Include="Areas\Report\Views\RequestPayment\PaymentChequeReport.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\SavepermisiveForRequest.cshtml" />
+    <Content Include="Areas\BasicInfo\Resources\reference\LICENSE" />
+    <Content Include="Areas\Payment\Views\Pay\ShowChequeDetails.cshtml" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINHTML5MACTrialEdition.pkg" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINMacEdition.pkg" />
+    <Content Include="Areas\BasicInfo\Resources\DynamicWebTWAINPlugIn.msi" />
+    <Content Include="Areas\Payment\Views\PettyCash\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\PettyCash\getPettyCashUC.cshtml" />
+    <Content Include="Areas\Payment\Views\PettyCash\ListHeader.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\ChequeDueDateList.cshtml" />
+    <Content Include="Areas\Payment\Views\ChequePayment\ShowChequePrint.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Copy.cshtml" />
+    <Content Include="Report\PaymentCheque.mrt" />
+    <Content Include="Areas\BasicInfo\Views\Scan\SaveScanFileView.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\getDirectDebitUC.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\getDirectDebithUC.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\Cheque.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\Create.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\getReceiveCashUC.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\HeaderIndex.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\HeaderList.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\Search.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\_Index.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ShowReceiveDetails.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ReceiptPlaning.cshtml" />
+    <Content Include="Areas\Payment\Views\DirectDebit\Edit.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\GetCash.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\PromissoryNote.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\CashDeposit.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ATM.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Receipt\ReceiptList.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\PayDay.cshtml" />
+    <Content Include="Areas\Management\Views\DashBoard\FuturePaymentStatus.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Banks\Details.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\FromCreateRequest.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\DeleteDuplication.cshtml" />
+    <Content Include="fonts\IRANSans-Bold-web.eot" />
+    <Content Include="fonts\IRANSans-Bold-web.ttf" />
+    <Content Include="fonts\IRANSans-Bold-web.woff" />
+    <Content Include="fonts\IRANSans-Bold-web.woff2" />
+    <Content Include="fonts\IRANSans-Light-web.eot" />
+    <Content Include="fonts\IRANSans-Light-web.ttf" />
+    <Content Include="fonts\IRANSans-Light-web.woff" />
+    <Content Include="fonts\IRANSans-Light-web.woff2" />
+    <Content Include="fonts\IRANSans-Medium-web.eot" />
+    <Content Include="fonts\IRANSans-Medium-web.ttf" />
+    <Content Include="fonts\IRANSans-Medium-web.woff" />
+    <Content Include="fonts\IRANSans-Medium-web.woff2" />
+    <Content Include="fonts\IRANSans-UltraLight-web.eot" />
+    <Content Include="fonts\IRANSans-UltraLight-web.ttf" />
+    <Content Include="fonts\IRANSans-UltraLight-web.woff" />
+    <Content Include="fonts\IRANSans-UltraLight-web.woff2" />
+    <Content Include="fonts\IRANSans-web.eot" />
+    <Content Include="fonts\IRANSans-web.ttf" />
+    <Content Include="fonts\IRANSans-web.woff" />
+    <Content Include="fonts\IRANSans-web.woff2" />
+    <Content Include="fonts\IRANSBW.woff2" />
+    <Content Include="fonts\IRANSLW.woff2" />
+    <Content Include="fonts\IRANSW.woff2" />
+    <Content Include="Areas\Payment\Views\Receipt\PettyCash.cshtml" />
+    <None Include="Resources\addon\dynamsoft.webtwain.addon.barcode.intellisense.js" />
+    <Content Include="Report\Localization\ar.xml" />
+    <Content Include="Report\Localization\be.xml" />
+    <Content Include="Report\Localization\bg.xml" />
+    <Content Include="Report\Localization\ca-ES.xml" />
+    <Content Include="Report\Localization\cs.xml" />
+    <Content Include="Report\Localization\de.ext.xml" />
+    <Content Include="Report\Localization\de.xml" />
+    <Content Include="Report\Localization\el-GR.xml" />
+    <Content Include="Report\Localization\en-GB.xml" />
+    <Content Include="Report\Localization\en.ext.xml" />
+    <Content Include="Report\Localization\en.xml" />
+    <Content Include="Report\Localization\es.xml" />
+    <Content Include="Report\Localization\eu-ES.xml" />
+    <Content Include="Report\Localization\fa.xml" />
+    <Content Include="Report\Localization\fr.ext.xml" />
+    <Content Include="Report\Localization\fr.xml" />
+    <Content Include="Report\Localization\gl-ES.xml" />
+    <Content Include="Report\Localization\hr.xml" />
+    <Content Include="Report\Localization\hu.xml" />
+    <Content Include="Report\Localization\id.xml" />
+    <Content Include="Report\Localization\it.xml" />
+    <Content Include="Report\Localization\ka.xml" />
+    <Content Include="Report\Localization\Lt-sr-SP.xml" />
+    <Content Include="Report\Localization\lt.xml" />
+    <Content Include="Report\Localization\nb-NO.xml" />
+    <Content Include="Report\Localization\nl.xml" />
+    <Content Include="Report\Localization\pl.xml" />
+    <Content Include="Report\Localization\pt-BR.xml" />
+    <Content Include="Report\Localization\ro.xml" />
+    <Content Include="Report\Localization\ru.ext.xml" />
+    <Content Include="Report\Localization\ru.xml" />
+    <Content Include="Report\Localization\sk.xml" />
+    <Content Include="Report\Localization\sv.ext.xml" />
+    <Content Include="Report\Localization\sv.xml" />
+    <Content Include="Report\Localization\tr.xml" />
+    <Content Include="Report\Localization\uk.xml" />
+    <Content Include="Report\Localization\zh-CHS.xml" />
+    <Content Include="Report\Localization\zh-CHT.xml" />
+    <Content Include="Resources\addon\dynamsoft.webtwain.addon.barcode.intellisense.nonvs.js" />
+    <Content Include="Resources\addon\dynamsoft.webtwain.addon.barcode.js" />
+    <None Include="Resources\addon\dynamsoft.webtwain.addon.webcam.intellisense.js" />
+    <Content Include="Resources\addon\dynamsoft.webtwain.addon.webcam.intellisense.nonvs.js" />
+    <Content Include="Resources\addon\dynamsoft.webtwain.addon.webcam.js" />
+    <Content Include="Resources\DynamicWebTWAIN.cab" />
+    <Content Include="Resources\DynamicWebTWAINActiveX.exe" />
+    <Content Include="Resources\DynamicWebTWAINHTML5Edition.exe" />
+    <Content Include="Resources\DynamicWebTWAINx64.cab" />
+    <Content Include="Resources\dynamsoft.webtwain.config.js" />
+    <Content Include="Resources\dynamsoft.webtwain.initiate.js" />
+    <Content Include="Resources\dynamsoft.webtwain.install.js" />
+    <Content Include="Resources\DynamicWebTWAINHTML5MACTrialEdition.pkg" />
+    <Content Include="Resources\DynamicWebTWAINPlugIn.msi" />
+    <None Include="Resources\dynamsoft.webtwain.intellisense.js" />
+    <Content Include="Resources\dynamsoft.webtwain.intellisense.nonvs.js" />
+    <Content Include="Resources\reference\btn-down-install-plugin.gif" />
+    <Content Include="Resources\reference\btn-download.png" />
+    <Content Include="Resources\reference\hint.css" />
+    <Content Include="Resources\reference\html5_editor.css" />
+    <Content Include="Resources\reference\imgs\changeimagesize.png" />
+    <Content Include="Resources\reference\imgs\close.png" />
+    <Content Include="Resources\reference\imgs\crop.png" />
+    <Content Include="Resources\reference\imgs\crop_grey.png" />
+    <Content Include="Resources\reference\imgs\deskew.png" />
+    <Content Include="Resources\reference\imgs\fit.png" />
+    <Content Include="Resources\reference\imgs\fith.png" />
+    <Content Include="Resources\reference\imgs\fitw.png" />
+    <Content Include="Resources\reference\imgs\flip.png" />
+    <Content Include="Resources\reference\imgs\hand.png" />
+    <Content Include="Resources\reference\imgs\img.png" />
+    <Content Include="Resources\reference\imgs\mirror.png" />
+    <Content Include="Resources\reference\imgs\next.png" />
+    <Content Include="Resources\reference\imgs\next_grey.png" />
+    <Content Include="Resources\reference\imgs\originalsize.png" />
+    <Content Include="Resources\reference\imgs\plug-in-blocked.png" />
+    <Content Include="Resources\reference\imgs\previous.png" />
+    <Content Include="Resources\reference\imgs\previous_grey.png" />
+    <Content Include="Resources\reference\imgs\print.png" />
+    <Content Include="Resources\reference\imgs\rectselect.png" />
+    <Content Include="Resources\reference\imgs\restore.png" />
+    <Content Include="Resources\reference\imgs\rotate.png" />
+    <Content Include="Resources\reference\imgs\rotateleft.png" />
+    <Content Include="Resources\reference\imgs\rotateright.png" />
+    <Content Include="Resources\reference\imgs\save.png" />
+    <Content Include="Resources\reference\imgs\stretch.png" />
+    <Content Include="Resources\reference\imgs\zoomin.png" />
+    <Content Include="Resources\reference\imgs\zoomin_grey.png" />
+    <Content Include="Resources\reference\imgs\zoomout.png" />
+    <Content Include="Resources\reference\imgs\zoomout_grey.png" />
+    <Content Include="Resources\reference\loading.gif" />
+    <Content Include="Resources\reference\logo.gif" />
+    <Content Include="Scripts\alertify.min.js" />
+    <Content Include="Scripts\bootstrap-datepicker.fa.min.js" />
+    <Content Include="Scripts\bootstrap-datepicker.min.js" />
+    <Content Include="Scripts\bootstrap-rtl.js" />
+    <Content Include="Scripts\bootstrap-sortable.js" />
+    <Content Include="Scripts\bootstrap-timepicker.js" />
+    <Content Include="Scripts\bootstrap.js" />
+    <Content Include="Scripts\bootstrap.min.js" />
+    <Content Include="fonts\glyphicons-halflings-regular.eot" />
+    <Content Include="fonts\glyphicons-halflings-regular.ttf" />
+    <Content Include="fonts\glyphicons-halflings-regular.woff" />
+    <Content Include="fonts\glyphicons-halflings-regular.woff2" />
+    <Content Include="fonts\Material-Design-Iconic-Font.eot" />
+    <Content Include="fonts\Material-Design-Iconic-Font.ttf" />
+    <Content Include="fonts\Material-Design-Iconic-Font.woff" />
+    <Content Include="fonts\Material-Design-Iconic-Font.woff2" />
+    <Content Include="Areas\Management\Views\web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Areas\Report\Views\web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="fonts\Material-Design-Icons.eot" />
+    <Content Include="fonts\Material-Design-Icons.ttf" />
+    <Content Include="fonts\Material-Design-Icons.woff" />
+    <Content Include="fonts\RobotoDraftBold.woff" />
+    <Content Include="fonts\RobotoDraftBold.woff2" />
+    <Content Include="fonts\RobotoDraftItalic.woff" />
+    <Content Include="fonts\RobotoDraftItalic.woff2" />
+    <Content Include="fonts\RobotoDraftMedium.woff" />
+    <Content Include="fonts\RobotoDraftMedium.woff2" />
+    <Content Include="fonts\RobotoDraftRegular.woff" />
+    <Content Include="fonts\RobotoDraftRegular.woff2" />
+    <Content Include="Content\css\spinner.css" />
+    <Content Include="Areas\Payment\Views\_ViewStart.cshtml" />
+    <Content Include="Scripts\dom-to-image.js" />
+    <Content Include="Scripts\dragresize.js" />
+    <Content Include="Scripts\dragresize_commented.js" />
+    <Content Include="Scripts\DWTSample_ScanAndUpload.js" />
+    <Content Include="Scripts\jquery.dropdown.js" />
+    <Content Include="Scripts\material.js" />
+    <Content Include="Scripts\Resources\Controller\Aggregation\aggregationListController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\ShowAllReceiptListController.js" />
+    <Content Include="Scripts\Resources\Controller\vocherListReceiptController.js" />
+    <Content Include="Scripts\Resources\Controller\vocherListController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\receiptController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\pettyCashController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\receiptListPlanController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\cashDepositController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\getCashController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\promissoryNoteController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\atmController.js" />
+    <Content Include="Scripts\Resources\Controller\Receipt\chequeController.js" />
+    <Content Include="Scripts\Resources\Controller\ReceiptUC.js" />
+    <Content Include="Scripts\ripples.js" />
+    <Content Include="Scripts\dateP.js" />
+    <Content Include="Scripts\select2-angular.js" />
+    <Content Include="Scripts\templates\Date.html" />
+    <Content Include="Scripts\ui-bootstrap-tpls-0.11.0.js" />
+    <Content Include="Scripts\ui-bootstrap-tpls-2.4.0.min.js" />
+    <Content Include="Scripts\ui-bootstrap-tpls.min.js" />
+    <Content Include="Views\Shared\ChequePrint.html" />
+    <Content Include="Views\Shared\Layout\AdminOld.cshtml" />
+    <Content Include="fonts\fontawesome-webfont.eot" />
+    <Content Include="fonts\fontawesome-webfont.ttf" />
+    <Content Include="fonts\fontawesome-webfont.woff" />
+    <Content Include="fonts\FontAwesome.otf" />
+    <Content Include="Content\bootstrap.css.map" />
+    <Content Include="Content\bootstrap-theme.css.map" />
+    <Content Include="fonts\BYekan.woff" />
+    <Content Include="fonts\BYekan.eot" />
+    <Content Include="fonts\BYekan.ttf" />
+    <Content Include="Areas\Management\Views\_ViewStart.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Index.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\Edit.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\ShowDeleteConfirm.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\RequestPayment.cshtml" />
+    <Content Include="Areas\Payment\Views\Request\UniqueAccount.cshtml" />
+    <Content Include="Areas\Report\Views\RequestPayment\ShowPayment.cshtml" />
+    <Content Include="Areas\Payment\Views\Attachment\List.cshtml" />
+    <Content Include="Areas\Payment\Views\Attachment\ShowDeleteConfirm.cshtml" />
+    <Content Include="Areas\Payment\Views\Attachment\GetContentAttachedFile.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\web.config" />
+    <Content Include="Areas\BasicInfo\Views\_ViewStart.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\ExchangeType\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Behalf\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BehalfGroup\List.cshtml" />
+    <Content Include="Areas\Report\Views\RequestPayment\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BasicBank\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BasicBank\List.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BasicBank\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BasicBank\Edit.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\BasicBank\Delete.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cheque\Create.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cheque\Index.cshtml" />
+    <Content Include="Areas\BasicInfo\Views\Cheque\List.cshtml" />
+    <Content Include="fonts\web_Yekan.eot" />
+    <Content Include="fonts\web_Yekan.ttf" />
+    <Content Include="fonts\web_Yekan.woff" />
+    <Content Include="Areas\BasicInfo\Views\Scan\Index.cshtml" />
+    <None Include="Properties\PublishProfiles\TreasuryCSD.pubxml" />
+    <Content Include="Report\RequestReport1.mrt" />
+    <Content Include="Resources\addon\Barcode.zip" />
+    <Content Include="Resources\addon\Barcodex64.zip" />
+    <Content Include="Resources\addon\Webcam.zip" />
+    <Content Include="Resources\addon\Webcamx64.zip" />
+    <Content Include="Resources\DynamicWebTWAINMacEdition.pkg" />
+    <Content Include="Resources\reference\DynamicWebTWAINPlugIn.msi" />
+    <Content Include="Resources\reference\LICENSE" />
+    <None Include="Scripts\jquery.validate-vsdoc.js" />
+    <Content Include="Scripts\dropzone.js" />
+    <Content Include="Scripts\file-api.js" />
+    <Content Include="Scripts\jquery-2.0.3.js" />
+    <Content Include="Scripts\jquery.unobtrusive-ajax.js" />
+    <Content Include="Scripts\jquery.unobtrusive-ajax.min.js" />
+    <Content Include="Scripts\jquery.validate.js" />
+    <Content Include="Scripts\jquery.validate.min.js" />
+    <Content Include="Scripts\jquery.validate.unobtrusive.js" />
+    <Content Include="Scripts\jquery.validate.unobtrusive.min.js" />
+    <Content Include="Scripts\material.min.js" />
+    <Content Include="Scripts\metisMenu.js" />
+    <Content Include="Scripts\modernizr-2.6.2.js" />
+    <Content Include="Scripts\moment-jalaali.js" />
+    <Content Include="Scripts\moment-with-locales.js" />
+    <Content Include="Scripts\moment-with-locales.min.js" />
+    <Content Include="Scripts\moment.js" />
+    <Content Include="Scripts\moment.min.js" />
+    <Content Include="Scripts\morris-data.js" />
+    <Content Include="Scripts\npm.js" />
+    <Content Include="Scripts\raphael-min.js" />
+    <Content Include="Scripts\respond.js" />
+    <Content Include="Scripts\respond.min.js" />
+    <Content Include="Scripts\ripples.min.js" />
+    <Content Include="Scripts\sb-admin-2.js" />
+    <Content Include="Scripts\select2.full.min.js" />
+    <Content Include="Scripts\snackbar.min.js" />
+    <Content Include="Scripts\wordifyfa.js" />
+    <Content Include="Scripts\_references.js" />
+    <Content Include="Views\Web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Views\_ViewStart.cshtml" />
+    <Content Include="Views\Shared\Error.cshtml" />
+    <Content Include="Views\Shared\Layout\Main.cshtml" />
+    <Content Include="Views\Home\About.cshtml" />
+    <Content Include="Views\Home\Contact.cshtml" />
+    <Content Include="Views\Home\Index.cshtml" />
+    <Content Include="Views\Shared\Lockout.cshtml" />
+    <Content Include="Views\Shared\_LoginPartial.cshtml" />
+    <Content Include="Views\Shared\Partials\Component.cshtml" />
+    <Content Include="Views\Account\Login.cshtml" />
+    <Content Include="Views\Account\Register.cshtml" />
+    <Content Include="Views\Account\Register.cshtml" />
+    <Content Include="Views\Shared\Layout\Empty.cshtml" />
+    <Content Include="Views\Account\EditProfile.cshtml" />
+    <Content Include="Views\Account\ShowUser.cshtml" />
+    <Content Include="Views\Shared\Layout\Admin.cshtml" />
+    <Content Include="web.config" />
+    <None Include="web.Debug.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+    <None Include="web.Release.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="App_Data\" />
+    <Folder Include="Areas\Management\Models\" />
+    <Folder Include="Areas\Management\Views\Vocher_RowReceipt\" />
+    <Folder Include="Areas\Payment\Views\ComeBack\" />
+    <Folder Include="Areas\Payment\Views\Shared\" />
+    <Folder Include="Areas\Report\Views\Shared\" />
+    <Folder Include="UploadedImages\" />
+    <Folder Include="Views\Base\" />
+    <Folder Include="Views\BasicInfo\" />
+    <Folder Include="Views\Manage\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="packages.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <None Include="Project_Readme.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CSD.Frameworks.Common.Models\CSD.Treasury.Frameworks.Common.Models.csproj">
+      <Project>{001f0ce9-2305-40d2-b601-e04c5b3370db}</Project>
+      <Name>CSD.Treasury.Frameworks.Common.Models</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Frameworks.Common\CSD.Treasury.Frameworks.Common.csproj">
+      <Project>{2f9641bd-9320-4062-923b-a3f6d9dc98ce}</Project>
+      <Name>CSD.Treasury.Frameworks.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Treasury.DataModel\CSD.Treasury.DataModel.csproj">
+      <Project>{d0b18b98-d955-4de7-b579-9e789464483b}</Project>
+      <Name>CSD.Treasury.DataModel</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Treasury.Frameworks.MVCHelpers\CSD.Treasury.Frameworks.MVCHelpers.csproj">
+      <Project>{9b99e8a9-309e-482d-9bf0-36e484241f9c}</Project>
+      <Name>CSD.Treasury.Frameworks.MVCHelpers</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Treasury.Resourse\CSD.Treasury.Resourse.csproj">
+      <Project>{9ec83970-ad19-49dd-a8ea-3756a2063cd7}</Project>
+      <Name>CSD.Treasury.Resourse</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Treasury.Service\CSD.Treasury.Service.csproj">
+      <Project>{87ffb2e7-5bb9-45a2-b1fd-483c18ecda97}</Project>
+      <Name>CSD.Treasury.Service</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ApplicationIcon>
+    </ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
+  <Target Name="MvcBuildViews" AfterTargets="AfterBuild" Condition="'$(MvcBuildViews)'=='true'">
+    <AspNetCompiler VirtualPath="temp" PhysicalPath="$(WebProjectOutputDir)" />
+  </Target>
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <UseIIS>False</UseIIS>
+          <AutoAssignPort>True</AutoAssignPort>
+          <DevelopmentServerPort>4844</DevelopmentServerPort>
+          <DevelopmentServerVPath>/</DevelopmentServerVPath>
+          <IISUrl>http://localhost:4844/</IISUrl>
+          <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>False</UseCustomServer>
+          <CustomServerUrl>
+          </CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Net.Compilers.1.0.0\build\Microsoft.Net.Compilers.props'))" />
+    <Error Condition="!Exists('..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.1.0.0\build\Microsoft.CodeDom.Providers.DotNetCompilerPlatform.props'))" />
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+  </Target>
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target> -->
+</Project>

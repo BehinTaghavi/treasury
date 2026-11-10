@@ -1,0 +1,100 @@
+﻿@*@model List<CSD.Treasury.Service.ProceduresDB.f_SendVouchers_BetweenTwoDate_Result>
+    @{
+        Layout = null;
+        ViewBag.Title = "RegisterPaidVoucher";
+    }
+
+    <table class="table">
+        <thead>
+            <tr>
+                <th>شماره ارجاع</th>
+                <th>شماره سریال حسابداری</th>
+                <th>نوع تراکنش</th>
+                <th>وضعیت</th>
+                <th>شرح</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model)
+            {
+                string _class = "mdc-bg-red-50";
+                switch (item.SendResult)
+                {
+                    case "SEND_OK":
+                        _class = "mdc-bg-green-50";
+                        break;
+                }
+                <tr class="@_class">
+                    <td>@item.ReferenceId</td>
+                    <td>@item.AccVoucherNo</td>
+                    <td>@item.TransactionType</td>
+                    <td>@(item.SendResult == "SEND_OK" ? "موفقیت" : "خطا")</td>
+                    <td>@item.Description</td>
+                </tr>
+            }
+
+        </tbody>
+    </table>*@
+@model List<PostVoucher_Result>
+@{
+    Layout = null;
+    ViewBag.Title = "RegisterPaidVoucher";
+}
+@if (Model == null)
+{
+    if (ViewBag.Error != null)
+    {
+        <dive class="mdc-bg-red-50"><span>خطا :</span>@(ViewBag.Error)</dive>
+    }
+}
+else
+{
+    if (Model.Count == 0)
+    {
+        <div class="mdc-bg-green-50">اسناد با موفقیت ارسال شد</div>
+    }
+    else
+    {
+        <div class="mdc-bg-red-50"> خطاهای زیر را اصلاح کنید و مجدد اسناد را ارسال نمایید</div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>بستانکار</th>
+                    <th>بدهکار</th>
+                    <th>تفصیل </th>
+                    <th>معین</th>
+                    <th>شرح خطا</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@item.Credit</td>
+                        <td>@item.Debit</td>
+                        <td>@item.Unique_Account_No</td>
+                        <td>@item.Account_No</td>
+                        <td>@item.ErrorDesc</td>
+                        <td>@Ajax.ActionLink("نمایش", "ShowVoucherInfo", "Vocher_Row",
+                           new { Area = "Management",
+                               startDate = ViewBag.startDate,
+                               endDate = ViewBag.endDate,
+                               Credit = item.Credit,
+                               Debit = item.Debit,
+                               Unique_Account_No = item.Unique_Account_No,
+                               Account_No = item.Account_No },
+                           new AjaxOptions {
+
+                               HttpMethod = "Get",
+                               InsertionMode = InsertionMode.Replace,                               
+                               UpdateTargetId = "ShowErrorList" }, new { @class = "btn btn-material-green-600 btn-sm" })</td>
+                    </tr>
+                }
+
+            </tbody>
+        </table>
+
+    }
+
+}

@@ -1,0 +1,208 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+
+@using CSD.Treasury.MVCHelpers
+@{
+    ViewBag.Title = "ShowRequestsCanceled";
+}
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+}
+<table class="table sortable">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+            <th>#</th>
+            <th>@Resources.Number</th>
+            @*<th>@Resources.RequestDate</th>*@
+            <th>@Resources.DueDate</th>
+            <th>@Resources.PayAmount (ریال)</th>
+            <th>@Resources.Unique_Account_No/@Resources.Unique_Account_Code</th>
+            @if (Request.IsAuthenticated && (User.IsInRole("Admin")|| User.IsInRole("Manager")))
+            {
+                <th>@Resources.UserName</th>
+            }
+            <th>@Resources.Priority</th>
+            <th>@Resources.Status</th>
+            <th data-defaultsort='disabled'>@Resources.Behalf</th>
+
+            <th data-defaultsort='disabled'></th>
+         
+
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+            <tr>
+                <td>
+                    @{i++;}
+                    @i
+                </td>
+                <td data-lang-number="fa">@(item.RequestID)</td>
+                <td>
+                    <span data-lang-number="fa">
+                        @if (!string.IsNullOrEmpty(item.DueDate))
+                        {
+                            @(item.DueDate.Substring(0, 4) + "/" + item.DueDate.Substring(4, 2) + "/" + item.DueDate.Substring(6, 2))
+                        }
+                    </span>
+                </td>
+                <td>
+                    <b data-lang-number="fa" class="mdc-text-light-blue-900">
+                        @Math.Truncate(item.PayAmount).ToString("#,##0")
+                    </b>
+                </td>
+
+                <td>
+                    @Utility.GetUniqueAccount(item.Unique_Account_No)/@(item.Unique_Account_No)
+                </td>
+                @if (Request.IsAuthenticated && (User.IsInRole("Admin")|| User.IsInRole("Manager")))
+                {
+
+                    <td>
+                        @Utility.GetUserName(item.UserID)
+                    </td>
+                }
+                <td>
+                    @switch (item.Priority)
+                    {
+                        case (short)Priority.High:
+                            <i class='zmdi zmdi-alert-circle zmdi-hc-2x mdc-text-green-700' title="@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))"></i>
+                            break;
+                        case (short)Priority.Normal:
+                            <i class='zmdi zmdi-alert-circle zmdi-hc-2x mdc-text-lime-600' title="@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))"></i>
+                            break;
+                        case (short)Priority.Low:
+                            <i class='zmdi zmdi-alert-circle zmdi-hc-2x mdc-text-amber-600' title="@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))"></i>
+                            break;
+                    }
+                </td>
+                <td>
+                    @if (item.CancelCheque != null)
+                {
+                        @Resources.CancelCheque
+                    }
+                    else if (item.Cancellation != null)
+                    {
+                        @Resources.Cancel
+                    }
+
+                    else if (item.Delivered != null)
+                    {
+                        @Resources.Delivered
+                    }
+                    else if (item.Paid != null)
+                    {
+                        @Resources.Paid
+                    }
+                    else if (item.ConfirmPayment != null)
+                    {
+                        @Resources.ConfirmPayment
+                    }
+                    else if (item.Confirmed != null)
+                    {
+                        @Resources.Confirm
+                    }
+                    else if (item.Unknown != null)
+                    {
+                        <text>@Resources.Unknown</text>
+                    }
+                </td>
+                <td>
+                    @Utility.GetBehalf(item.BehalfID)
+                </td>
+                <td>
+                    @Ajax.IActionLink("", "RequestPayment", "Request", new { area = "Payment", requestId = item.RequestID, Type = 0 }, new AjaxOptions
+                 {
+                     OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+                 }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+                </td>
+            </tr>
+                        }
+    </tbody>
+</table>
+
+
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "ShowRequestsCanceled", "Request", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+  
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "ShowRequestsCanceled", "Request", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+        
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "ShowRequestsCanceled", "Request", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+    
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

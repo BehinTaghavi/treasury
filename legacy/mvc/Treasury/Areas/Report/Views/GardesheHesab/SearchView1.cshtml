@@ -1,0 +1,131 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.UI.Models;
+@{
+//var CustomBankLS = (List<BasicBankAndBank>)ViewBag.CustomBankLS;
+}
+@section PageHeader{
+    گردش حساب
+}
+@using CSD.Treasury.Resourse
+@using (Html.BeginForm("Index1", "GardesheHesab", new { Area = "Report" }, FormMethod.Post, new { id = "SearchForm" }))
+{
+
+
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                <select class="form-control floating-label" id="BankType" name="BankType">
+                    <option value="false">حسابهای جاری</option>
+                    <option value="True">سپرده های بانکی</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.BasicBank, new SelectList(ViewBag.BasicBank, "BasicBankId", "BasicBankDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank , @autocomplete = "off" })
+            </div>
+            <div class="form-group">
+                @Html.DropDownListFor(model => model.BankId, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber, @autocomplete = "off" })
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date, @autocomplete = "off",@readonly = "readonly" })
+                @Html.ValidationMessageFor(model => model.FromDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date, @autocomplete = "off", @readonly = "readonly" })
+                @Html.ValidationMessageFor(model => model.ToDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                <select  id="ShowSum" name="ShowSum" class = "form-control until floating-label datepicker" placeholder ="نمایش به صورت خلاصه" >
+                    <option value="false">
+                    ----
+                    </option>
+                    <option value="true">
+                        @Resources.ShowSum
+                    </option>
+                </select>
+                
+        
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+
+    //$(".until.datepicker").datepicker({
+    //    isRTL: true,
+    //    dateFormat: "yy/mm/dd",
+    //    maxDate: new Date()
+    //});
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+        $('#report').click(function () {
+
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+
+   $('#BasicBank').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val(), BankType: $('#BankType').val() }, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+
+    @* $("body").on("change", "#BasicBank", function () {
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+            $("#BankId").load(address, { id: $(this).val() }, function (data) {
+                $("#BankId").val($("#BankId option:first").val());
+            });
+        }
+        else {
+            $("#BankId").html("");
+        }
+    });*@
+
+
+    @*$(function () {
+        $('body').on("click", "#report", function () {
+
+            var data = $('#SearchForm').serializeArray();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            xhttp.open("POST", "@Url.Action("Index", "GardesheHesab", new { Area = "Report" })", true);
+            xhttp.send(new FormData(document.querySelector("#SearchForm")));
+        })
+    });*@
+
+
+
+</script>

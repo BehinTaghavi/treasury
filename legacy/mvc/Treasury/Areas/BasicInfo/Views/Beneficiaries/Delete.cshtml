@@ -1,0 +1,18 @@
+﻿@model CSD.Treasury.Service.BeneficiaryService.Beneficiary
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+
+    @using (Ajax.BeginForm("Delete", "Beneficiaries", new AjaxOptions
+    {
+        HttpMethod = "Post",
+        OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+    }, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+    {
+        @Html.AntiForgeryToken()
+
+        @Html.HiddenFor(model => model.BeneficiarID)
+        <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>

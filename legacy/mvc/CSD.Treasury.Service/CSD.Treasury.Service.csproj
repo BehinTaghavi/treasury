@@ -1,0 +1,2949 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{87FFB2E7-5BB9-45A2-B1FD-483C18ECDA97}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>CSD.Treasury.Service</RootNamespace>
+    <AssemblyName>CSD.Treasury.Service</AssemblyName>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data.Linq" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Mvc, Version=5.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.AspNet.Mvc.5.2.3\lib\net45\System.Web.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Annotation\Bank.cs" />
+    <Compile Include="Annotation\BankCard.cs" />
+    <Compile Include="Annotation\BasicBank.cs" />
+    <Compile Include="Annotation\Behalf.cs" />
+    <Compile Include="Annotation\BehalfGroup.cs" />
+    <Compile Include="Annotation\BeneficiariesDetailInfo.cs" />
+    <Compile Include="Annotation\Beneficiary.cs" />
+    <Compile Include="Annotation\Beneficiaries_TELS.cs" />
+    <Compile Include="Annotation\Cashier.cs" />
+    <Compile Include="Annotation\Cheque.cs" />
+    <Compile Include="Annotation\ChequeFormatType.cs" />
+    <Compile Include="Annotation\ChequeFormatType_Description.cs" />
+    <Compile Include="Annotation\City.cs" />
+    <Compile Include="Annotation\cmpBranch.cs" />
+    <Compile Include="Annotation\Country.cs" />
+    <Compile Include="Annotation\Create_Voucher_reciept_Result.cs" />
+    <Compile Include="Annotation\CREATE_VOUCHER_PAYMENTS_Result.cs" />
+    <Compile Include="Annotation\ExchangeType.cs" />
+    <Compile Include="Annotation\GetAllRequestStatus_Result.cs" />
+    <Compile Include="Annotation\Location.cs" />
+    <Compile Include="Annotation\PettyCash.cs" />
+    <Compile Include="Annotation\Province.cs" />
+    <Compile Include="Annotation\ReferenceType.cs" />
+    <Compile Include="Annotation\RequestPayment.cs" />
+    <Compile Include="Annotation\Request_Payment_GetAllInfo_ForSpecialRequestID_Result.cs" />
+    <Compile Include="Annotation\Voucher_Row.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Service References\AccountsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BankCardsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BankService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BasicBanksService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BasicChequeLablesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BehalfGroupService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BehalfsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BeneficiariesDetailInfoService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Beneficiaries_TELSService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\BeneficiaryService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\CashDeskService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\cashFlowGroupService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\CashiersService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequeFormatTypeDetailsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequeFormatTypesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequeFormatType_DescriptionService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequePrintService1\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequePrintService13991017\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequePrintService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ChequesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\CityService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\cmpBranchesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\cmpBranch_EmailAddressService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\cmpBranch_FAXService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\cmpBranch_TELSService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ConfigService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\CountryService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ExchangeTypesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\LocationByCostCenterService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\LocationsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PaymentService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Payment_ReferenceTypes_ValueService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PermissiveSignatureForChequeTypesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PermissiveSignatureForEachBankAccountService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PermissiveSignaturesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PermissiveSignature_CompleteProccessService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PettyCashService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PettyCash_BehalfGroupsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PettyCash_ReferenceTypes_ValueService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PettyCash_TransactionDetailService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PettyCash_TransactionHeaderService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\PlaningTypeService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ProceduresDB\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ProvinceService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Receipt_Detail_BreakPriceService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Receipt_Detail_PlanStateService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Receipt_Pay_TypeDetailService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Receipt_Pay_TypeService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Reciept_OtherProperyService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Reciept_OtherPropery_DetailService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Reciept_ReferenceTypes_ValueService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ReferenceTypeService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\ReferenceTypes_By_BehalfGroupService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Request_PaymentService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Request_Payment_BreakPriceService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Request_Payment_StatusDetailsService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Source_DestinationTypesService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\TransferFromBackupBankService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Vocher_RowService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\Voucher_Row_RecieptService\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="app.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectAll_t_AccountsResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectAll_t_Accounts_LISTResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectAll_t_unique_AccountsResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectAll_t_unique_account_typeResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectAll_t_unique_account_type_listResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectBy_t_Accounts_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.SelectBy_t_unique_Accounts_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.t_Accounts_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.t_unique_Accounts_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\CSD.Treasury.Service.AccountsService.t_unique_account_type_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\AccountsService\service.wsdl" />
+    <None Include="Service References\AccountsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\AccountsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\AccountsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.BankCard.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\CSD.Treasury.Service.BankCardsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankCardsService\service.wsdl" />
+    <None Include="Service References\BankCardsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankCardsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankCardsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.Bank.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\CSD.Treasury.Service.BankService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BankService\service.wsdl" />
+    <None Include="Service References\BankService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BankService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.BasicBank.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\CSD.Treasury.Service.BasicBanksService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicBanksService\service.wsdl" />
+    <None Include="Service References\BasicBanksService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicBanksService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicBanksService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.BasicChequeLable.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\CSD.Treasury.Service.BasicChequeLablesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\service.wsdl" />
+    <None Include="Service References\BasicChequeLablesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BasicChequeLablesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.BehalfGroup.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\CSD.Treasury.Service.BehalfGroupService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfGroupService\service.wsdl" />
+    <None Include="Service References\BehalfGroupService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfGroupService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfGroupService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.Behalf.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\CSD.Treasury.Service.BehalfsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BehalfsService\service.wsdl" />
+    <None Include="Service References\BehalfsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BehalfsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.BeneficiariesDetailInfo.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\CSD.Treasury.Service.BeneficiariesDetailInfoService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\service.wsdl" />
+    <None Include="Service References\BeneficiariesDetailInfoService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiariesDetailInfoService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.Beneficiaries_TELS.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\CSD.Treasury.Service.Beneficiaries_TELSService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\service.wsdl" />
+    <None Include="Service References\Beneficiaries_TELSService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Beneficiaries_TELSService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.Beneficiary.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\CSD.Treasury.Service.BeneficiaryService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\BeneficiaryService\service.wsdl" />
+    <None Include="Service References\BeneficiaryService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiaryService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\BeneficiaryService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.CashDesk.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\CSD.Treasury.Service.CashDeskService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashDeskService\service.wsdl" />
+    <None Include="Service References\CashDeskService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashDeskService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashDeskService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.cashFlowGroup.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\CSD.Treasury.Service.cashFlowGroupService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cashFlowGroupService\service.wsdl" />
+    <None Include="Service References\cashFlowGroupService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cashFlowGroupService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cashFlowGroupService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.Cashier.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\CSD.Treasury.Service.CashiersService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CashiersService\service.wsdl" />
+    <None Include="Service References\CashiersService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashiersService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CashiersService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.ChequeFormatTypeDetail.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\CSD.Treasury.Service.ChequeFormatTypeDetailsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\service.wsdl" />
+    <None Include="Service References\ChequeFormatTypeDetailsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypeDetailsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\CSD.Treasury.Service.ChequeFormatTypesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\service.wsdl" />
+    <None Include="Service References\ChequeFormatTypesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatTypesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.ChequeFormatType_Description.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\CSD.Treasury.Service.ChequeFormatType_DescriptionService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\service.wsdl" />
+    <None Include="Service References\ChequeFormatType_DescriptionService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequeFormatType_DescriptionService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService13991017\service.wsdl" />
+    <None Include="Service References\ChequePrintService13991017\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService13991017\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService13991017\TreasuryPrintService.Models.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService1\service.wsdl" />
+    <None Include="Service References\ChequePrintService1\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService1\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService1\TreasuryPrintService.Models.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService\service.wsdl" />
+    <None Include="Service References\ChequePrintService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequePrintService\TreasuryPrintService.Models.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.Cheque.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\CSD.Treasury.Service.ChequesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ChequesService\service.wsdl" />
+    <None Include="Service References\ChequesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ChequesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.City.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\CSD.Treasury.Service.CityService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CityService\service.wsdl" />
+    <None Include="Service References\CityService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CityService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CityService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.cmpBranch.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\CSD.Treasury.Service.cmpBranchesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranchesService\service.wsdl" />
+    <None Include="Service References\cmpBranchesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranchesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranchesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.cmpBranch_EmailAddress.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\CSD.Treasury.Service.cmpBranch_EmailAddressService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\service.wsdl" />
+    <None Include="Service References\cmpBranch_EmailAddressService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_EmailAddressService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.cmpBranch_FAX.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\CSD.Treasury.Service.cmpBranch_FAXService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\service.wsdl" />
+    <None Include="Service References\cmpBranch_FAXService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_FAXService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.cmpBranch_TELS.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\CSD.Treasury.Service.cmpBranch_TELSService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\service.wsdl" />
+    <None Include="Service References\cmpBranch_TELSService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\cmpBranch_TELSService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ConfigService\cls_Config.wsdl" />
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.Config.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\CSD.Treasury.Service.ConfigService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ConfigService\item.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ConfigService\item1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ConfigService\item2.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.Country.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\CSD.Treasury.Service.CountryService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\CountryService\service.wsdl" />
+    <None Include="Service References\CountryService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CountryService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\CountryService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.ExchangeType.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\CSD.Treasury.Service.ExchangeTypesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ExchangeTypesService\service.wsdl" />
+    <None Include="Service References\ExchangeTypesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ExchangeTypesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ExchangeTypesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.LocationByCostCenter.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\CSD.Treasury.Service.LocationByCostCenterService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\service.wsdl" />
+    <None Include="Service References\LocationByCostCenterService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationByCostCenterService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.Location.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\CSD.Treasury.Service.LocationsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\LocationsService\service.wsdl" />
+    <None Include="Service References\LocationsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\LocationsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.Payment.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\CSD.Treasury.Service.PaymentService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PaymentService\service.wsdl" />
+    <None Include="Service References\PaymentService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PaymentService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PaymentService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.Payment_ReferenceTypes_Value.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\CSD.Treasury.Service.Payment_ReferenceTypes_ValueService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\service.wsdl" />
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.PermissiveSignatureForChequeType.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\CSD.Treasury.Service.PermissiveSignatureForChequeTypesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\service.wsdl" />
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.PermissiveSignatureForEachBankAccount.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\service.wsdl" />
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.PermissiveSignature.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\CSD.Treasury.Service.PermissiveSignaturesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\service.wsdl" />
+    <None Include="Service References\PermissiveSignaturesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignaturesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.PermissiveSignature_CompleteProccess.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\CSD.Treasury.Service.PermissiveSignature_CompleteProccessService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\service.wsdl" />
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.PettyCash.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\CSD.Treasury.Service.PettyCashService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCashService\service.wsdl" />
+    <None Include="Service References\PettyCashService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCashService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCashService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.PettyCash_BehalfGroups.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\CSD.Treasury.Service.PettyCash_BehalfGroupsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\service.wsdl" />
+    <None Include="Service References\PettyCash_BehalfGroupsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_BehalfGroupsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.PettyCash_ReferenceTypes_Value.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\CSD.Treasury.Service.PettyCash_ReferenceTypes_ValueService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\service.wsdl" />
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.PettyCash_TransactionDetail.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\CSD.Treasury.Service.PettyCash_TransactionDetailService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\service.wsdl" />
+    <None Include="Service References\PettyCash_TransactionDetailService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionDetailService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.PettyCash_TransactionHeader.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\CSD.Treasury.Service.PettyCash_TransactionHeaderService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\service.wsdl" />
+    <None Include="Service References\PettyCash_TransactionHeaderService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PettyCash_TransactionHeaderService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.PlaningType.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\CSD.Treasury.Service.PlaningTypeService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\PlaningTypeService\service.wsdl" />
+    <None Include="Service References\PlaningTypeService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PlaningTypeService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\PlaningTypeService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.CREATE_VOUCHER_PAYMENTS_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.Create_Voucher_reciept_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.f_SendVouchers_BetweenTwoDate_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GardesheHesabBank_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetAllBankBalanceNaghdinegi_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetAllBankBalance_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetAllPaymentReceiptByBehalfGroup_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetAllPaymentReceiptByBehalf_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetBankBalance_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetCashDeskBalance_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetIntegratedRequest_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetPettyCashHeaderAndDetails_ByPettyCashId_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetRecieptHeaderAndDetail_ByReceiptId1_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetRecieptHeaderAndDetail_ByRecieptTypeIdsss_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetRecieptHeaderAndDetail_ByRecieptTypeId_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetRequestPayment_Payment_WithLastStates_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetRequstByRequestId_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetStatusOfPaybleCheques_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.GetStatusOfReceivableCheques_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.Get_Maturity_Cheques_Report_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.Get_Maturity_Cheques_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.Request_Payment_GetAllInfo_ForSpecialRequestID_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\CSD.Treasury.Service.ProceduresDB.Sp_PaymentChequeReport_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProceduresDB\service.wsdl" />
+    <None Include="Service References\ProceduresDB\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProceduresDB\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProceduresDB\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.Province.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\CSD.Treasury.Service.ProvinceService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ProvinceService\service.wsdl" />
+    <None Include="Service References\ProvinceService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProvinceService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ProvinceService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.Receipt_Detail_BreakPrice.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\CSD.Treasury.Service.Receipt_Detail_BreakPriceService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\service.wsdl" />
+    <None Include="Service References\Receipt_Detail_BreakPriceService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.Receipt_Detail_PlanState.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\CSD.Treasury.Service.Receipt_Detail_PlanStateService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\service.wsdl" />
+    <None Include="Service References\Receipt_Detail_PlanStateService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Detail_PlanStateService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.Receipt_Pay_TypeDetail.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Receipt_Pay_TypeDetailService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\service.wsdl" />
+    <None Include="Service References\Receipt_Pay_TypeDetailService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.Receipt_Pay_Type.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\CSD.Treasury.Service.Receipt_Pay_TypeService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\service.wsdl" />
+    <None Include="Service References\Receipt_Pay_TypeService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Receipt_Pay_TypeService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.Reciept_OtherPropery.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\CSD.Treasury.Service.Reciept_OtherProperyService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\service.wsdl" />
+    <None Include="Service References\Reciept_OtherProperyService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherProperyService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\CSD.Treasury.Service.Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\service.wsdl" />
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.Reciept_OtherPropery_Detail.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\CSD.Treasury.Service.Reciept_OtherPropery_DetailService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\service.wsdl" />
+    <None Include="Service References\Reciept_OtherPropery_DetailService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.Reciept_ReferenceTypes_Value.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\service.wsdl" />
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.ReferenceType.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\CSD.Treasury.Service.ReferenceTypeService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypeService\service.wsdl" />
+    <None Include="Service References\ReferenceTypeService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypeService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypeService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.ReferenceTypes_By_BehalfGroup.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\CSD.Treasury.Service.ReferenceTypes_By_BehalfGroupService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\service.wsdl" />
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.GetAllRequestStatus_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.GetAllRequestStatus_Result.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.Request_Payment.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\CSD.Treasury.Service.Request_PaymentService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_PaymentService\service.wsdl" />
+    <None Include="Service References\Request_PaymentService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_PaymentService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_PaymentService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.Request_Payment_BreakPrice.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\CSD.Treasury.Service.Request_Payment_BreakPriceService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\service.wsdl" />
+    <None Include="Service References\Request_Payment_BreakPriceService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_BreakPriceService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.Request_Payment_StatusDetails.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\CSD.Treasury.Service.Request_Payment_StatusDetailsService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\service.wsdl" />
+    <None Include="Service References\Request_Payment_StatusDetailsService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Request_Payment_StatusDetailsService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.Source_DestinationTypes.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\CSD.Treasury.Service.Source_DestinationTypesService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\service.wsdl" />
+    <None Include="Service References\Source_DestinationTypesService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Source_DestinationTypesService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.TransferFromBackupBank.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\CSD.Treasury.Service.TransferFromBackupBankService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\service.wsdl" />
+    <None Include="Service References\TransferFromBackupBankService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\TransferFromBackupBankService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\CSD.Treasury.Service.Vocher_RowService.Voucher_Row.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Vocher_RowService\service.wsdl" />
+    <None Include="Service References\Vocher_RowService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Vocher_RowService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Vocher_RowService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.DeleteResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.InsertResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.SelectAllResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.SelectBy_DynamicWhereClauseResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.UpdateResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\CSD.Treasury.Service.Voucher_Row_RecieptService.Voucher_Row_Reciept.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\service.wsdl" />
+    <None Include="Service References\Voucher_Row_RecieptService\service.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\service1.xsd">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="Service References\Voucher_Row_RecieptService\Tresury_wcfService.xsd">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadataStorage Include="Service References\AccountsService\" />
+    <WCFMetadataStorage Include="Service References\BankCardsService\" />
+    <WCFMetadataStorage Include="Service References\BankService\" />
+    <WCFMetadataStorage Include="Service References\BasicBanksService\" />
+    <WCFMetadataStorage Include="Service References\BasicChequeLablesService\" />
+    <WCFMetadataStorage Include="Service References\BehalfGroupService\" />
+    <WCFMetadataStorage Include="Service References\BehalfsService\" />
+    <WCFMetadataStorage Include="Service References\BeneficiariesDetailInfoService\" />
+    <WCFMetadataStorage Include="Service References\Beneficiaries_TELSService\" />
+    <WCFMetadataStorage Include="Service References\BeneficiaryService\" />
+    <WCFMetadataStorage Include="Service References\CashDeskService\" />
+    <WCFMetadataStorage Include="Service References\cashFlowGroupService\" />
+    <WCFMetadataStorage Include="Service References\CashiersService\" />
+    <WCFMetadataStorage Include="Service References\ChequeFormatTypeDetailsService\" />
+    <WCFMetadataStorage Include="Service References\ChequeFormatTypesService\" />
+    <WCFMetadataStorage Include="Service References\ChequeFormatType_DescriptionService\" />
+    <WCFMetadataStorage Include="Service References\ChequePrintService1\" />
+    <WCFMetadataStorage Include="Service References\ChequePrintService13991017\" />
+    <WCFMetadataStorage Include="Service References\ChequePrintService\" />
+    <WCFMetadataStorage Include="Service References\ChequesService\" />
+    <WCFMetadataStorage Include="Service References\CityService\" />
+    <WCFMetadataStorage Include="Service References\cmpBranchesService\" />
+    <WCFMetadataStorage Include="Service References\cmpBranch_EmailAddressService\" />
+    <WCFMetadataStorage Include="Service References\cmpBranch_FAXService\" />
+    <WCFMetadataStorage Include="Service References\cmpBranch_TELSService\" />
+    <WCFMetadataStorage Include="Service References\ConfigService\" />
+    <WCFMetadataStorage Include="Service References\CountryService\" />
+    <WCFMetadataStorage Include="Service References\ExchangeTypesService\" />
+    <WCFMetadataStorage Include="Service References\LocationByCostCenterService\" />
+    <WCFMetadataStorage Include="Service References\LocationsService\" />
+    <WCFMetadataStorage Include="Service References\PaymentService\" />
+    <WCFMetadataStorage Include="Service References\Payment_ReferenceTypes_ValueService\" />
+    <WCFMetadataStorage Include="Service References\PermissiveSignatureForChequeTypesService\" />
+    <WCFMetadataStorage Include="Service References\PermissiveSignatureForEachBankAccountService\" />
+    <WCFMetadataStorage Include="Service References\PermissiveSignaturesService\" />
+    <WCFMetadataStorage Include="Service References\PermissiveSignature_CompleteProccessService\" />
+    <WCFMetadataStorage Include="Service References\PettyCashService\" />
+    <WCFMetadataStorage Include="Service References\PettyCash_BehalfGroupsService\" />
+    <WCFMetadataStorage Include="Service References\PettyCash_ReferenceTypes_ValueService\" />
+    <WCFMetadataStorage Include="Service References\PettyCash_TransactionDetailService\" />
+    <WCFMetadataStorage Include="Service References\PettyCash_TransactionHeaderService\" />
+    <WCFMetadataStorage Include="Service References\PlaningTypeService\" />
+    <WCFMetadataStorage Include="Service References\ProceduresDB\" />
+    <WCFMetadataStorage Include="Service References\ProvinceService\" />
+    <WCFMetadataStorage Include="Service References\Receipt_Detail_BreakPriceService\" />
+    <WCFMetadataStorage Include="Service References\Receipt_Detail_PlanStateService\" />
+    <WCFMetadataStorage Include="Service References\Receipt_Pay_TypeDetailService\" />
+    <WCFMetadataStorage Include="Service References\Receipt_Pay_TypeService\" />
+    <WCFMetadataStorage Include="Service References\Reciept_OtherProperyService\" />
+    <WCFMetadataStorage Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\" />
+    <WCFMetadataStorage Include="Service References\Reciept_OtherPropery_DetailService\" />
+    <WCFMetadataStorage Include="Service References\Reciept_ReferenceTypes_ValueService\" />
+    <WCFMetadataStorage Include="Service References\ReferenceTypeService\" />
+    <WCFMetadataStorage Include="Service References\ReferenceTypes_By_BehalfGroupService\" />
+    <WCFMetadataStorage Include="Service References\Request_PaymentService\" />
+    <WCFMetadataStorage Include="Service References\Request_Payment_BreakPriceService\" />
+    <WCFMetadataStorage Include="Service References\Request_Payment_StatusDetailsService\" />
+    <WCFMetadataStorage Include="Service References\Source_DestinationTypesService\" />
+    <WCFMetadataStorage Include="Service References\TransferFromBackupBankService\" />
+    <WCFMetadataStorage Include="Service References\Vocher_RowService\" />
+    <WCFMetadataStorage Include="Service References\Voucher_Row_RecieptService\" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ExchangeTypesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ExchangeTypesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ExchangeTypesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeDetailService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypeService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypeService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypeService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Source_DestinationTypesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Source_DestinationTypesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Source_DestinationTypesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ConfigService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ConfigService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ConfigService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankCardsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankCardsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankCardsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\CSD.Frameworks.Common\CSD.Treasury.Frameworks.Common.csproj">
+      <Project>{2f9641bd-9320-4062-923b-a3f6d9dc98ce}</Project>
+      <Name>CSD.Treasury.Frameworks.Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\CSD.Treasury.Resourse\CSD.Treasury.Resourse.csproj">
+      <Project>{9ec83970-ad19-49dd-a8ea-3756a2063cd7}</Project>
+      <Name>CSD.Treasury.Resourse</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicBanksService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicBanksService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicBanksService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Pay_TypeService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranchesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranchesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranchesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_EmailAddressService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_EmailAddressService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_EmailAddressService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_FAXService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_FAXService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_FAXService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_TELSService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_TELSService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cmpBranch_TELSService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CountryService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CountryService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CountryService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProvinceService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProvinceService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProvinceService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CityService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CityService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CityService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiariesDetailInfoService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiariesDetailInfoService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiariesDetailInfoService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Beneficiaries_TELSService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Beneficiaries_TELSService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Beneficiaries_TELSService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatType_DescriptionService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatType_DescriptionService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatType_DescriptionService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicChequeLablesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicChequeLablesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BasicChequeLablesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_BehalfGroupsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_BehalfGroupsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_BehalfGroupsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationByCostCenterService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationByCostCenterService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\LocationByCostCenterService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_StatusDetailsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_StatusDetailsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_StatusDetailsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Payment_ReferenceTypes_ValueService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PaymentService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PaymentService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PaymentService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForChequeTypesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignaturesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignaturesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignaturesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignatureForEachBankAccountService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PermissiveSignature_CompleteProccessService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCashService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCashService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCashService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionDetailService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionDetailService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionDetailService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionHeaderService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionHeaderService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_TransactionHeaderService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfGroupService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfGroupService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BehalfGroupService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cashFlowGroupService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cashFlowGroupService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\cashFlowGroupService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherProperyService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherProperyService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherProperyService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PlaningTypeService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PlaningTypeService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PlaningTypeService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_ReferenceTypes_ValueService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_PlanStateService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_PlanStateService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_PlanStateService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_DetailService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\PettyCash_ReferenceTypes_ValueService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ReferenceTypes_By_BehalfGroupService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Reciept_OtherPropery_BY_Receipt_Pay_TypeDetailService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\TransferFromBackupBankService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\TransferFromBackupBankService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\TransferFromBackupBankService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Vocher_RowService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Vocher_RowService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Vocher_RowService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Receipt_Detail_BreakPriceService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_BreakPriceService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_BreakPriceService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_Payment_BreakPriceService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Voucher_Row_RecieptService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Voucher_Row_RecieptService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Voucher_Row_RecieptService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\AccountsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\AccountsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\AccountsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService1\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService1\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService1\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypesService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypesService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypesService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService13991017\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService13991017\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService13991017\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BankService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypeDetailsService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypeDetailsService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequeFormatTypeDetailsService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_PaymentService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_PaymentService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\Request_PaymentService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashDeskService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashDeskService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashDeskService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashiersService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashiersService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\CashiersService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiaryService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiaryService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\BeneficiaryService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ChequePrintService\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProceduresDB\configuration91.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProceduresDB\configuration.svcinfo" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Service References\ProceduresDB\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

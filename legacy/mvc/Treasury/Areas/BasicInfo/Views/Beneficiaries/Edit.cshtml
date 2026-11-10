@@ -1,0 +1,271 @@
+﻿@model CSD.Treasury.DataModel.Beneficiary
+
+@using (Ajax.BeginForm("Edit", "Beneficiaries", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();location.reload();"
+}, new { enctype = "multipart/form-data", id = "BeneficiariesEdit" }))
+{
+    @Html.AntiForgeryToken()
+
+<div class="form-horizontal">
+
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    @Html.HiddenFor(model => model.BeneficiarID)
+    @Html.Hidden("InitialLegalAccountName", Model.LegalAccountName)
+    @Html.HiddenFor(model => model.Unique_Account_No)
+    <div class="form-group">
+        <div class="clearfix">
+            @*<div class="col-sm-3">
+                    <label class="control-label">نوع ذینفع</label>
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                </div>*@
+            @*<div class="col-sm-3">
+                    <label class="control-label">نوع ذینفع</label>
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), "", new { data_lang_number = "fa", @class = "form-control", data_bind = "Unique_Account_No" })
+                </div>*@
+            <div class="col-sm-12">
+                <label class="control-label">شماره و عنوان ذینفع</label>
+                @*@Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { required = "required", data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.Unique_Account_No)*@
+                <p>@ViewBag.Slected</p>
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="clearfix">
+            <div class="col-md-6">
+                <label class="control-label">@Resources.LegalAccountName</label>
+                @Html.EditorFor(model => model.LegalAccountName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control" } })
+                @Html.ValidationMessageFor(model => model.LegalAccountName, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-6">
+                <label class="control-label">کدپستی</label>
+                @Html.EditorFor(model => model.CodePosti, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "کدپستی" } })
+                @Html.ValidationMessageFor(model => model.CodePosti, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="clearfix">
+            <div class="col-md-12">
+                <label class="control-label">آدرس</label>
+                @Html.EditorFor(model => model.AddressePosti, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "آدرس" } })
+                @Html.ValidationMessageFor(model => model.AddressePosti, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="clearfix">
+            <div class="col-md-12">
+                <input 
+                       name="LegalPerson"
+                       type="radio"
+                       value="false"
+                       @*@(Model.LegalPerson == true ? "hidden='hidden'"  : "" )*@ 
+                       @(Model.LegalPerson == false ? "checked" : "" )/>
+                <label>شخص حقیقی</label><br>
+
+                <input 
+                       name="LegalPerson"
+                       type="radio"
+                       value="true"
+                       @*@(Model.LegalPerson == false ? "hidden='hidden'"  : "" )*@ 
+                       @(Model.LegalPerson == true ? "checked" : "" )/>
+                <label>شخص حقوقی</label><br>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group" id="realpersonshow" @(Model.LegalPerson == true ? "hidden='hidden'"  : "" ) >
+        <div class="clearfix">
+            <div class="col-md-6">
+                <label class="control-label">کدملی</label>
+                @Html.EditorFor(model => model.CodeMeli, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "کد ملی" } })
+                @Html.ValidationMessageFor(model => model.CodeMeli, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </div>
+
+    <div class="form-group" id="Legalpersonshow" @(Model.LegalPerson == false ? "hidden='hidden'"  : "" ) >
+        <div class="clearfix">
+            <div class="col-md-4">
+                <label class="control-label">شناسه ملی</label>
+                @Html.EditorFor(model => model.ShenaseMelli, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "شناسه ملی" } })
+                @Html.ValidationMessageFor(model => model.ShenaseMelli, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                <label class="control-label">کداقتصادی</label>
+                @Html.EditorFor(model => model.CodeEghtesadi, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "کداقتصادی" } })
+                @Html.ValidationMessageFor(model => model.CodeEghtesadi, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                <label class="control-label">شماره ثبت</label>
+                @Html.EditorFor(model => model.ShomareyeSabt, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = "شماره ثبت" } })
+                @Html.ValidationMessageFor(model => model.ShomareyeSabt, "", new { @class = "text-danger" })
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script type="text/javascript">
+    function clearInput() {
+        var LegalPerson = $('#LegalPerson').val();
+        if (LegalPerson == true) {
+            $("#ShenaseMelli").val("");
+            $("#CodeEghtesadi").val("");
+            $("#ShomareyeSabt").val("");
+        }
+        else {
+            $("#CodeMeli").val("");
+            console.log($("#CodeMeli").val(""));
+        }
+    } $(document).ready(function () {
+
+        $('input[type=radio][name=LegalPerson]').change(function () {
+          
+            if (this.value == 'false') {
+                $("#realpersonshow").removeAttr('hidden');
+                $("#Legalpersonshow").attr("hidden", "hidden");
+                $("#ShenaseMelli").val("");
+                $("#CodeEghtesadi").val("");
+                $("#ShomareyeSabt").val("");
+            }
+            else if (this.value == 'true') {
+                $("#Legalpersonshow").removeAttr('hidden');
+                $("#realpersonshow").attr("hidden", "hidden");
+                $("#CodeMeli").val("");
+            }
+        });
+    }
+    );
+    //$(function () {
+    //    $.material.init();
+    //    $('#Unique_Account_No').val('');
+    //    $("#Unique_Account_No").select2();
+    //    $("#Unique_Account_No").select2('destroy');
+    //});
+    //$('#BeneficiariesCreate').keypress(function (e) {
+
+    //    if (e.which == 13) {
+
+    //        var $targ = $(e.target);
+
+    //        if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+    //            var focusNext = false;
+    //            $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+    //                if (this === e.target) {
+    //                    focusNext = true;
+    //                }
+    //                else if (focusNext) {
+    //                    $(this).focus();
+    //                    return false;
+    //                }
+    //            });
+
+    //            return false;
+    //        }
+    //    }
+
+    //});
+    //var pageSize = 20;
+    //$("#UniqueAccountType").change(function () {
+    //    $('#Unique_Account_No').val('');
+    //    var typeid = $(this).val();
+    //    $("#Unique_Account_No").select2({
+    //        dir: "rtl",
+    //        containerCssClass: "form-control",
+    //        ajax: {
+    //            url: "/Payment/Request/UniqueAccountLs",
+    //            dataType: 'json',
+    //            delay: 250,
+
+    //            data: function (params) {
+    //                params.page = params.page || 1;
+    //                return {
+    //                    pageSize: pageSize,
+    //                    page: params.page,
+    //                    pageLimit: 10,
+    //                    typeid: typeid,
+    //                    q: params.term, // search term
+    //                };
+    //            },
+    //            processResults: function (data, params) {
+
+    //                params.page = params.page || 1;
+    //                return {
+    //                    results: data.query,
+    //                    pagination: {
+    //                        more: (params.page * pageSize < data.total_count)
+    //                    }
+    //                };
+    //            },
+
+    //            cache: true
+    //        },
+    //        escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+    //        minimumInputLength: 1,
+    //        //templateResult: formatRepo, // omitted for brevity, see the source of this page
+    //        //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+    //    });
+    //});
+
+    @*$("body").on("change", "#UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+        if ($(this).val() != 0) {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind") });
+        }
+        else {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind") });
+        }
+    });
+    var formData = new FormData(document.getElementsByTagName("form")[0]);
+    var lookup = document.querySelectorAll("[lookup]");
+    for (var i = 0; i < lookup.length; i++) {
+        lookup[i].onkeyup = function () {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                }
+            }
+            var type = document.getElementById("UniqueAccountType");
+            var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+            xmlhttp.open("GET",
+                address
+                , true);
+            xmlhttp.send();
+        }
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+        }
+    }
+    $('.dropdown.keep-open').on({
+        "click": function () { this.classList.add("open"); this.closable = true; },
+        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    });*@
+</script>
+<style>
+    .modal.md {
+        z-index: 10 !important;
+    }
+</style>

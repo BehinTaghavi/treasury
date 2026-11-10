@@ -1,0 +1,66 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+@{ 
+    Layout = null;
+    var S = "LoadShowPayment";
+}
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+<div>
+   
+    @if (!string.IsNullOrEmpty(Model.FiscalYear))
+    {
+        S = S + "/?FiscalYear=" + Model.FiscalYear + "";
+    } 
+   
+    @if (!string.IsNullOrEmpty(Model.RequestDateFrom) && !string.IsNullOrEmpty(Model.RequestDateTo))
+    {
+        S = S + "&RequestDateFrom=" + Model.RequestDateFrom + "&RequestDateTo=" + Model.RequestDateTo + "";
+    }
+    @if (Model.ExchangeTypeID != 0)
+    {
+        S = S + "'&ExchangeTypeID=" + Model.ExchangeTypeID + "";
+    }
+    @if (Model.BehalfID != 0)
+    {
+        S = S + "&BehalfID=" + Model.BehalfID + "";
+    }
+    @if (Model.Pay_TypeDetailID_source != 0)
+    {
+        S = S + "&Pay_TypeDetailID_source=" + Model.Pay_TypeDetailID_source + "";
+    }
+    @if (Model.PayAmount != 0)
+    {
+        S = S + "&PayAmount=" + Model.PayAmount + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.Unique_Account_No))
+    {
+        S = S + "&Unique_Account_No='" + Model.Unique_Account_No + "'";
+    }
+   
+
+  @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+    Actions =
+    {
+          GetReportSnapshot = S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+    },
+    Toolbar =
+    {
+          BackgroundColor = System.Drawing.Color.Silver,
+        ShowPrintButton = true,
+         ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+
+    },
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+</div>

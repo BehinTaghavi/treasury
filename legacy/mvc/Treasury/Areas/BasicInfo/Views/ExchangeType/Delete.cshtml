@@ -1,0 +1,17 @@
+﻿@model CSD.Treasury.Service.ExchangeTypesService.ExchangeType
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+    @using (Ajax.BeginForm("Delete", "ExchangeType", new AjaxOptions
+    {
+        HttpMethod = "Post",
+        OnSuccess = "successMessage(data);closeModal('sm');updateTable();"
+    }, new { enctype = "multipart/form-data", @class="form-horizontal" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.ExchangeTypeID)
+
+        <button class="btn btn-primary btn-xs" type="submit">@Resources.Yes</button>
+        <button class="btn btn-material-grey btn-xs" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>

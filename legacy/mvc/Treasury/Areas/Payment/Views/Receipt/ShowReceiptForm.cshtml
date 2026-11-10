@@ -1,0 +1,811 @@
+﻿@{
+    ViewBag.Title = "Index";
+}
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/Receipt/receiptController.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/ReceiptUC.js")"></script>
+@section PageHeader{
+    @if (!string.IsNullOrEmpty(ViewBag.Info))
+    {
+        @ViewBag.Info
+    }
+    else
+    {
+        <p> @ViewBag.ReceiptPayTypeName</p>
+        <p class="field-validation-valid text-info">@(ViewBag.hasvoucher)</p>
+    }
+}
+@if (ViewBag.message != null)
+{
+    <div class="alert-material-red"> @(ViewBag.message)</div>
+}
+else
+{
+    <div ng-app="treasury" ng-controller="receiptController" ng-init="hasvoucher = '@(ViewBag.hasvoucher)';price = '@(ViewBag.Price)';lastStatedate = '@(ViewBag.lastStatedate)';DateNow = '@(ViewBag.DateNow)' ">
+        <div loading>
+            <form name="form" novalidate ng-submit="save()">
+                <div class="mdc-bg-blue-grey-50" style="
+    padding: 15px;
+    margin: -15px -15px 15px -15px;
+    border-bottom: 1px solid #f8f8f8;">
+                    <div class="clearfix">
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error': !form.ReceiptDate.$pristine && form.ReceiptDate.$invalid, 'has-success': form.ReceiptDate.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label" ng-if="model.Header.ReceiptPayTypeId==23">تاریخ ثبت</label>
+                                    <label class="control-label" ng-if="model.Header.ReceiptPayTypeId!=23">تاریخ دریافت</label>
+                                    @*<label class="control-label">@ViewBag.ReceiptDate</label>*@
+                                    <div ng-if="lastStatedate" class="input-append">
+
+                                        <input date-p
+                                               class="form-control Date"
+                                               type="text"
+                                               ng-
+                                               name="ReceiptDate"
+                                               ui-mask="9999/99/99"
+                                               ng-pattern="DatePattern"
+                                               required
+                                               placeholder="____/__/__" lang="en"
+                                               ng-model="model.Header.ReceiptDate"
+                                               ng-change="changePrice()"
+                                               min-Date="{{lastStatedate}}"
+                                               autocomplete="off">
+
+
+                                    </div>
+
+                                    <div ng-if="!lastStatedate" class="input-append">
+                                        
+                                        <input 
+                                               date-p
+                                               class="form-control Date"
+                                               type="text"
+                                               name="ReceiptDate"
+                                               ui-mask="9999/99/99"
+                                               ng-pattern="DatePattern"
+                                               required
+                                               placeholder="____/__/__" lang="en"
+                                               ng-model="model.Header.ReceiptDate"
+                                               ng-change="changePrice();changeText(DateNow);"
+                                               maxDate="{{DateNow}}"
+                                               autocomplete="off">
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                        @*<div class="col-sm-3">
+                                <div class="form-group">
+                                    <div class="clearfix custom-inline-control">
+                                        <label class="control-label">سریال</label>
+                                        <span>{{model.Header.serial}}</span>
+                                    </div>
+                                </div>
+                            </div>*@
+                    </div>
+                    <div class="clearfix">
+                        <div class="col-sm-3">
+                            <div class="form-group">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">نوع دریافت</label>
+                                    <label class="control-label">@ViewBag.ReceiptPayTypeName</label>
+                                    @*<select ng-if="model.Header.ReceiptPayTypeId==22" class="form-control" style="width: 300px" name="CashDeskID" ng-model="model.Header.CashDeskID" required ng-options="option.CashDeskID as option.CashDeskDescription for option in model.Cashdesk"></select>*@
+
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId == 18 && headerId == 0 || model.Header.ReceiptPayTypeId == 22 && headerId == 0">
+                            <div class="form-group">
+                                <label class="control-label"><input type="checkbox" ng-bind="model.Header.Arzi" ng-model="model.Header.Arzi" ng-change="CheckedArzi()" /> <span style="padding: 0 10px">ارزی</span></label>
+                            </div>
+                        </div>
+                        @*<div class="col-sm-2" ng-if="model.Header.ReceiptPayTypeId!=18">
+                                <div class="form-group">
+                                    <label class="control-label"><input type="checkbox" ng-model="model.chequeRoz" ng-click="setNowDate(model.chequeRoz, item)" /><span style="padding: 0 10px">چک روز</span></label>
+                                </div>
+                            </div>*@
+                    </div>
+
+                    <div class="clearfix" ng-if="model.Header.ReceiptPayTypeId==23 || model.Header.ReceiptPayTypeId==24">
+                        <div class="col-sm-3 col-md-2">
+                            <label class="control-label">بانک</label>
+                            <select class="form-control input-sm" required name="basicBank_ID"
+                                    ng-options="item.BasicBankId as item.BasicBankDescription for item in model.BankLs"
+                                    ng-model="model.Header.basicbank.BasicBankId"></select>
+                        </div>
+                        <div class="col-sm-3 col-md-2">
+                            <label class="control-label">شعبه</label>
+                            <select class="form-control input-sm" required name="bank_ID"
+                                    ng-options="item.BankID as item.Bank_AccountNumber for item in (model.Banks | filter:{'BasicBankID':model.Header.basicbank.BasicBankId})"
+                                    ng-model="model.Header.bank.BankID"></select>
+
+                            <span ng-if="model.Banks && !(model.Banks | filter:{'BasicBankID':BasicBankID}).length">شعبه ایی برای این بانک وجود ندارد</span>
+                        </div>
+                        @*<div class="col-sm-3 col-md-2" style="padding-top: 25px;">
+                                <label class="control-label">شهر: </label>
+                                <label class="control-label">{{model.Header.bank.CityName}}</label>
+                            </div>*@
+                    </div>
+                </div>
+                <div ng-repeat="item in model.detailsLs" ng-class="{'mdc-bg-grey-50' : $index % 2 != 0}" style="padding: 20px; margin: -15px -15px 10px -15px; position: relative;">
+                    <span ng-if="headerId == 0" class="mdc-bg-grey-300 mdc-text-grey-600"
+                          style="    line-height: 30px;
+                            text-align: center;
+                            position: absolute;
+                            right: 0;
+                            top: 0;
+                            bottom: 0;
+                            width: 15px;
+                            font-size: 20px;
+                            padding-top: 5px;">{{$index + 1}}</span>
+
+                                            <a ng-if="headerId == 0" class="btn btn-link mdc-text-red-A700"
+                                               style="line-height: 30px;
+                            text-align: center;
+                            position: absolute;
+                            left: 15px;
+                            top: 15px;
+                            width: 15px;
+                            cursor: pointer;
+                            font-size: 20px; z-index: 10" ng-click="removeItem(item)" tooltip-placement="top" uib-tooltip="حذف">
+                                                <i class="zmdi zmdi-close"></i>
+                                            </a>
+                                            <a ng-if="headerId == 0" class="btn btn-link mdc-text-blue-A700"
+                                               style="line-height: 30px;
+                            text-align: center;
+                            position: absolute;
+                            left: 45px;
+                            top: 15px;
+                            width: 15px;
+                            cursor: pointer;
+                            font-size: 20px; z-index: 10" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی">
+                        <i class="zmdi zmdi-copy"></i>
+                    </a>
+
+                    <div class="clearfix">
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21 || model.Header.ReceiptPayTypeId== 25">
+                            <div class="form-group" ng-class="{'has-error': !form.Cheque_Number_{{$index}}.$pristine && form.Cheque_Number_{{$index}}.$invalid, 'has-success': form.Cheque_Number_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label" ng-if="model.Header.ReceiptPayTypeId == 25">شماره سفته</label>
+                                    <label class="control-label" ng-if="model.Header.ReceiptPayTypeId != 25">شماره چک</label>
+                                    <input type="text" class="form-control" required name="Cheque_Number_{{$index}}" ng-model="item.Cheque_Number" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 ">
+                            <div class="form-group" ng-class="{'has-error': !form.DueDate_{{$index}}.$pristine && form.DueDate_{{$index}}.$invalid, 'has-success': form.DueDate_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label ng-if="model.Header.ReceiptPayTypeId != 23" class="control-label">سررسید</label>
+                                    <label ng-if="model.Header.ReceiptPayTypeId == 23" class="control-label"> تاریخ واریز</label>
+                                    <div class="input-append"
+                                         ng-init="maxDate = ((model.Header.ReceiptPayTypeId == 18) ? 'new Date()' : ''); minDate = ((model.Header.ReceiptPayTypeId == 19 || model.Header.ReceiptPayTypeId == 21) ? 'new Date() + 1' : '')">
+                                        <input date-p
+                                               class="form-control Date"
+                                               type="text"
+                                               name="DueDate_{{$index}}"
+                                               ui-mask="9999/99/99"
+                                               ng-pattern="DatePattern"
+                                               autocomplete="off"
+                                               required
+                                               placeholder="____/__/__" lang="en"
+                                               ng-model="item.DueDate"
+                                               @*maxdate="{{maxDate}}"
+                                           mindate="{{minDate}}"*@>
+                                    </div>
+                                    
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId == 25">
+                            <div class="form-group" ng-class="{'has-error': !form.DueDate_{{$index}}.$pristine && form.DueDate_{{$index}}.$invalid, 'has-success': form.DueDate_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">سررسید</label>                                    
+                                    <div class="input-append">
+                                        <input date-p
+                                               class="form-control Date"
+                                               type="text"
+                                               name="DueDate_{{$index}}"
+                                               ui-mask="9999/99/99"
+                                               ng-pattern="DatePattern"
+                                               autocomplete="off"                                              
+                                               placeholder="____/__/__" lang="en"
+                                               ng-model="item.DueDate">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-5">
+                            <div class="form-group">
+                                <div class="clearfix custom-inline-control">
+                                    <label ng-if="model.Header.ReceiptPayTypeId==23" class="control-label"> واریز کننده</label>
+                                    <label ng-if="model.Header.ReceiptPayTypeId!=23" class="control-label">پرداخت کننده</label>
+                                    @if (!string.IsNullOrEmpty(ViewBag.Unique_Account_No))
+                                    {
+                                        <label> @ViewBag.Unique_Account_No</label>
+
+
+                                    }
+                                    else
+                                    {
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount);"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount.Name != "" ? item.UniqueAccount.Name : "انتخاب"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount_{{$index}}" required ng-model="item.UniqueAccount.Code" />
+
+                                        @*<a class="btn btn-sm"
+                           ng-class="item.UniqueAccount2.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                           style="margin: 4px 0;"
+                           ng-bind-html='item.UniqueAccount2.Name!= ""  ? item.UniqueAccount2.Name : "انتخاب تفصیل دوم"'>
+                        </a>*@
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-model="item.UniqueAccount2.Code" />
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div ng-if="model.Header.ReceiptPayTypeId!=22 || (!model.Header.Arzi && model.Header.ReceiptPayTypeId==22)">
+                        <div class="clearfix">
+                            <div class="col-sm-3">
+                                <div class="form-group" ng-class="{'has-error': !form.ChequePrice_Rial_{{$index}}.$pristine && form.ChequePrice_Rial_{{$index}}.$invalid   , 'has-success': form.ChequePrice_Rial_{{$index}}.$valid}">
+                                    <div class="clearfix custom-inline-control">
+                                        <label class="control-label">مبلغ</label>
+                                        <input ng-if="!model.Header.Arzi" class="form-control" name="ChequePrice_Rial_{{$index}}" type="number" min="1" step="10000" required ng-model="item.ChequePrice_Rial" ng-change="loadCashInfo(item);" />
+                                        <label class="control-label" ng-if="model.Header.Arzi && item.ExchangeAmount!= null">{{item.ExchangeAmount * item.ExchangeRate}}</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-3" ng-if="model.Header.Arzi">
+                                <div class="form-group" ng-class="{'has-error': !form.ChequePrice_Rial_{{$index}}.$pristine && form.ChequePrice_Rial_{{$index}}.$invalid   , 'has-success': form.ChequePrice_Rial_{{$index}}.$valid}">
+                                    <div class="clearfix custom-inline-control">
+                                        <label class="control-label">مبلغ ارز</label>
+                                        <input class="form-control" name="ExchangeAmount_{{$index}}" type="number" min="1" required ng-model="item.ExchangeAmount" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-3" ng-if="(item.ChequePrice_Rial) > 0">
+                                <div class="form-group">
+                                    <div class="clearfix custom-inline-control">
+                                        @*<label class="control-label" style="font-size: 15px">{{item.ChequePrice_Rial | number}} {{item.ExchangeTypeID == 1 || model.Header.Arzi==0 ? "ریال" : (item.ExchangeTypeID == 2 ? "دلار" : (item.ExchangeTypeID == 28 ? "یورو" : ""))}}</label>*@
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="clearfix" ng-if="model.Header.Arzi">
+                            <div class="col-sm-3">
+                                <div class="form-group" ng-class="{'has-error': !form.ExchangeType_{{$index}}.$pristine && form.ExchangeType_{{$index}}.$invalid, 'has-success': form.ExchangeType_{{$index}}.$valid}">
+                                    <div class="clearfix custom-inline-control">
+                                        <label class="control-label">صندوق</label>
+                                        <select class="form-control" name="CashDeskID_{{$index}}" ng-model="item.CashDeskID" required ng-options="option.CashDeskID as option.CashDeskDescription for option in model.Cashdesk" ng-change="loadCashInfo(item)"></select>
+                                    </div>
+                                </div>
+                            </div>
+                            @*<div class="col-sm-3">
+                                    <div class="form-group" ng-class="{'has-error': !form.ExchangeRate_{{$index}}.$pristine && form.ExchangeRate_{{$index}}.$invalid, 'has-success': form.ExchangeRate_{{$index}}.$valid}">
+                                        <input type="hidden" name="ExchangeRate_{{$index}}" ng-value="item.ExchangeRate" ng-if="item.ExchangeTypeValueId != 4" />
+                                        <div class="clearfix custom-inline-control">
+                                            <label class='control-label'>نرخ ارز</label>
+                                            <input class='form-control' name='ExchangeRate_{{$index}}' type='number' required ng-model='item.ExchangeRate' />
+                                        </div>
+
+                                    </div>
+                                </div>*@
+                            <div class="col-sm-3">
+                                <div class="form-group">
+                                    <div class="clearfix custom-inline-control">
+                                        <label class='control-label'> نرخ ارز</label>
+                                        <input class='form-control' ng-disabled="item.ExchangeTypeValueId !=4" name='ExchangeRate{{$index}}' min="1" type='number' ng-model='item.ExchangeRate' />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-3">
+                                <div class="form-group">
+                                    <div id="ShowExchangeOfCashDesk" class="clearfix custom-inline-control">
+
+                                    </div>
+                                </div>
+                            </div>
+                            @*<div class="col-sm-3">
+                                        <div class="form-group" ng-class="{'has-error': !form.ExchangeTypeID_{{$index}}.$pristine && form.ExchangeTypeID_{{$index}}.$invalid, 'has-success': form.ExchangeTypeID_{{$index}}.$valid}">
+                                            <div class="clearfix custom-inline-control">
+                                                <label class="control-label">نوع ارز</label>
+                                                <select class="form-control" name="ExchangeTypeID_{{$index}}" ng-model="item.ExchangeTypeID" required ng-options="option.ExchangeTypeID as option.ExchangeTypeDescription for option in model.ExchangeTypeList"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-sm-3">
+                                    <div class="form-group">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">مبلغ هم ارزی</label>
+                                            <label ng-if="(item.ChequePrice_Rial * item.ExchangeRate) > 0" class="control-label" style="font-size: 15px">{{item.ChequePrice_Rial * item.ExchangeRate | number}} ریال</label>
+                                        </div>
+                                    </div>
+                                </div>*@
+                        </div>
+                        <div class="clearfix" ng-if="model.Header.Arzi">
+                            <div class="col-xs-12">
+                                <label class="control-label">مبلغ به حروف:</label>
+                                <span style="padding: 0 20px">{{wordifyRialsInTomans(item.ExchangeAmount * item.ExchangeRate)}} ریال</span>
+                            </div>
+                        </div>
+                        <div class="clearfix" ng-if="!model.Header.Arzi">
+                            <div class="col-xs-12">
+                                <label class="control-label">مبلغ به حروف:</label>
+
+                                <span ng-if="item.ChequePrice_Rial != 0" style="padding: 0 20px">{{wordifyRialsInTomans(item.ChequePrice_Rial)}} ریال</span>
+                            </div>
+                        </div>
+                    </div>
+                    <hr ng-if="model.Header.Arzi && model.Header.ReceiptPayTypeId==22" />
+                    <div class="container-fluid" ng-if="model.Header.Arzi && model.Header.ReceiptPayTypeId==22">
+                        <button type="button" ng-click="addPriceDetails(item)" class="btn btn-material-grey-600 btn-sm">اضافه کردن جزییات مبلغ</button>
+                        @*<p>{{item.BreakPriceLs[0].CashDeskId}}</p>*@
+                        @*<button ng-if="item.BreakPriceLs.length > 1" type="button" ng-click="removePriceDetailsItems(item)" class="btn btn-material-red-600 btn-sm">حذف جزییات مبلغ</button>*@
+                        <div ng-repeat="ex in item.BreakPriceLs" class="mdc-bg-lime-50" style="padding: 15px; margin-bottom: 15px; position: relative;">
+                            
+
+                            <span ng-if="headerId == 0" class="mdc-bg-lime-200 mdc-text-grey-600" style="line-height: 30px; text-align: center; position: absolute; right: 0; top: 0; bottom: 0; width: 15px; font-size: 20px; padding-top: 5px;">{{$index + 1}}</span>
+                            <a class="btn btn-link mdc-text-red-A700 ng-scope" style="line-height: 30px;
+                                text-align: center;
+                                position: absolute;
+                                left: 15px;
+                                top: 15px;
+                                width: 15px;
+                                cursor: pointer;
+                                font-size: 20px; z-index: 10" ng-click="removePriceDetails(item.BreakPriceLs, ex)" tooltip-placement="top" uib-tooltip="حذف">
+                                <i class="zmdi zmdi-close"></i>
+                            </a>
+                            <div>
+                                <div class="clearfix">
+                                    <div class="col-sm-3">
+                                        <div class="form-group" ng-class="{'has-error': !form.Exchange_Amount_{{$index}}.$pristine && form.Exchange_Amount_{{$index}}.$invalid, 'has-success': form.Exchange_Amount_{{$index}}.$valid}">
+                                            <div class="clearfix custom-inline-control">
+                                                <label class="control-label">مبلغ</label>
+                                                <input class="form-control" name="Exchange_Amount_{{$index}}" type="number" min="1" step="10000" required ng-model="ex.Exchange_Amount" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-3" ng-if="(ex.Exchange_Amount) > 0">
+                                        <div class="form-group">
+                                            <div class="clearfix custom-inline-control">
+                                                <label class="control-label" style="font-size: 15px">{{ex.Exchange_Amount | number}} {{ex.ExchangeTypeID == 1 || model.Header.Arzi==0 ? "ریال" : (ex.ExchangeTypeID == 2 ? "دلار" : (ex.ExchangeTypeID == 28 ? "یورو" : ""))}}</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="clearfix" ng-if="model.Header.Arzi">
+                                    <div class="col-sm-3">
+                                        <div class="form-group" ng-class="{'has-error': !form.ExchangeType_{{$index}}.$pristine && form.ExchangeType_{{$index}}.$invalid, 'has-success': form.ExchangeType_{{$index}}.$valid}">
+                                            <div class="clearfix custom-inline-control">
+                                                <label class="control-label">صندوق</label>
+                                                <select class="form-control" name="CashDeskID_{{$index}}" ng-model="ex.CashDeskId" required ng-options="option.CashDeskID as option.CashDeskDescription for option in model.Cashdesk" ng-change="loadCashInfo2(ex)"></select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @*<div class="col-sm-3">
+                        <div class="form-group" ng-class="{'has-error': !form.ExchangeType_{{$index}}.$pristine && form.ExchangeType_{{$index}}.$invalid, 'has-success': form.ExchangeType_{{$index}}.$valid}">
+                            <div class="clearfix custom-inline-control">
+                                <label class="control-label">صندوق</label>
+                                <select class="form-control" name="CashDeskID_{{$index}}" ng-model="ex.CashDeskID" required ng-options="option.CashDeskID as option.CashDeskDescription for option in model.Cashdesk" ng-change="loadCashInfo(ex)"></select>
+                            </div>
+                        </div>
+                    </div>*@
+                                    @***************************************@
+                                    @*<div class="col-sm-3">
+                        <div class="form-group" ng-class="{'has-error': !form.ExchangeTypeID_{{$index}}.$pristine && form.ExchangeTypeID_{{$index}}.$invalid, 'has-success': form.ExchangeTypeID_{{$index}}.$valid}">
+                               <div class="clearfix custom-inline-control">
+                                   <label class="control-label">نوع ارز</label>
+                                   <select class="form-control" ng-disabled="model.Header.Arzi" name="ExchangeTypeID_{{$index}}" ng-model="ex.ExchangeTypeID" required ng-options="option.ExchangeTypeID as option.ExchangeTypeDescription for option in model.ExchangeTypeList"></select>
+                               </div>
+                           </div>
+                    </div>*@
+                                    @*<div class="col-sm-3">
+                        <div class="form-group" ng-class="{'has-error': !form.Exchange_Rate_{{$index}}.$pristine && form.Exchange_Rate_{{$index}}.$invalid, 'has-success': form.Exchange_Rate_{{$index}}.$valid}">
+                            <div class="clearfix custom-inline-control">
+                                <label class="control-label">نرخ ارز</label>
+                                <input class="form-control" ng-disabled="ex.ExchangeTypeValueId !=4" name="Exchange_Rate_{{$index}}" required type="number" ng-model="ex.Exchange_Rate" />
+                            </div>
+                        </div>
+                    </div>*@
+                                    <div class="col-sm-3">
+                                        <div class="form-group">
+                                            <div class="clearfix custom-inline-control">
+                                                <label class='control-label'> نرخ ارز</label>
+                                                <input class='form-control' ng-disabled="ex.ExchangeTypeValueId !=4" name='ExchangeRate{{$index}}' min="1" type='number' ng-model='ex.Exchange_Rate' />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-sm-3">
+                                        <div class="form-group">
+                                            <div id="ShowExchangeOfCashDesk" class="clearfix custom-inline-control">
+
+                                            </div>
+                                        </div>
+                                    </div>
+                                    @** <div class="col-sm-3">
+                           <div class="form-group">
+                               <div class="clearfix custom-inline-control">
+                                   <label class="control-label">مبلغ هم ارزی</label>
+                                   <label ng-if="(ex.Exchange_Amount * ex.Exchange_Rate) > 0" class="control-label" style="font-size: 15px">{{ex.Exchange_Amount * ex.Exchange_Rate | number}} ریال</label>
+                               </div>
+                           </div>
+                       </div>
+                    @***************************************@
+                                </div>
+                                <div class="clearfix" ng-if="model.Header.Arzi">
+                                    <div class="col-xs-12">
+                                        <label class="control-label">مبلغ به حروف:</label>
+                                        <span style="padding: 0 20px">{{wordifyRialsInTomans(ex.Exchange_Amount * ex.Exchange_Rate)}} ریال</span>
+                                    </div>
+                                </div>
+                                <div class="clearfix" ng-if="!model.Header.Arzi">
+                                    <div class="col-xs-12">
+                                        <label class="control-label">مبلغ به حروف:</label>
+                                        <span style="padding: 0 20px">{{wordifyRialsInTomans(ex.ch)}} ریال</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4 ng-if="sumBreakPricels(item.BreakPriceLs) > 0" style="margin: 15px 0;">مجموع مبالغ: {{sumBreakPricels(item.BreakPriceLs) | number}} ریال</h4>
+                        <h4 ng-if="sumBreakPricels(item.BreakPriceLs) > 0" style="margin: 15px 0;">مجموع مبالغ به حروف: {{wordifyRialsInTomans(sumBreakPricels(item.BreakPriceLs))}} ریال</h4>
+                        @*<p ng-if="item.BreakPriceLs.length > 0 && (sumBreakPricels(item.BreakPriceLs) > (item.ChequePrice_Rial * item.ExchangeRate))" class="alert alert-material-yellow-700">مجموع مبالغ از مبلغ اصلی بیشتر است</p>
+        <p ng-if="item.BreakPriceLs.length > 0 && (sumBreakPricels(item.BreakPriceLs) < (item.ChequePrice_Rial * item.ExchangeRate))" class="alert alert-material-yellow-600">مجموع مبالغ از مبلغ اصلی کمتر است</p>*@
+                    </div>
+
+                    <hr />
+                    <div style="padding: 0 9px" ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21  || model.Header.ReceiptPayTypeId==23 || model.Header.ReceiptPayTypeId==24">
+                        <div ng-if="model.Header.ReceiptPayTypeId!=23 && model.Header.ReceiptPayTypeId!=24">
+                            <div class="form-group" ng-class="{'has-error': !form.Cheque_OwnerName_{{$index}}.$pristine && form.Cheque_OwnerName_{{$index}}.$invalid, 'has-success': form.Cheque_OwnerName_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">نام دارنده حساب: </label>
+                                    @*<input class="form-control" name="Cheque_OwnerName_{{$index}}" required type="text" ng-model="item.UniqueAccount.Name" />*@
+                                    <input class="form-control" name="Cheque_OwnerName_{{$index}}" required type="text" ng-model="item.Cheque_OwnerName" />
+                                    @*<label class="control-label" ng-bind-html='item.UniqueAccount.Name != "" ? item.UniqueAccount.Name : ""'>
+                                        </label>*@
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="clearfix" ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21">
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error': !form.Bank_AccountNo_{{$index}}.$pristine && form.Bank_AccountNo_{{$index}}.$invalid, 'has-success': form.Bank_AccountNo_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">شماره حساب</label>
+                                    <input class="form-control" name="Bank_AccountNo_{{$index}}" required type="text" ng-model="item.Bank_AccountNo" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-group">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">بانک</label>
+                                    <select class="form-control" ng-model="item.BankID" required ng-options="option.BasicBankId as option.BasicBankDescription for option in model.BankLs"></select>
+                                    @*<select class="form-control" ng-model="item.BankID">
+                                            <option ng-repeat="i in model.BankLs" value="{{i.BasicBankId}}">{{i.BasicBankDescription}}</option>
+                                        </select>*@
+                                    @*<input class="form-control" type="number" ng-model="item.BankID" />*@
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error': !form.Bank_BranchDesc_{{$index}}.$pristine && form.Bank_BranchDesc_{{$index}}.$invalid, 'has-success': form.Bank_BranchDesc_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">شعبه</label>
+                                    <input class="form-control" name="Bank_BranchDesc_{{$index}}" required type="text" ng-model="item.Bank_BranchDesc" />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-group">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">کد شعبه</label>
+                                    <input class="form-control" type="text" ng-model="item.Bank_BranchCode" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="clearfix" ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21  || model.Header.ReceiptPayTypeId==23 || model.Header.ReceiptPayTypeId==24">
+
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId!=23 && model.Header.ReceiptPayTypeId!=24">
+                            <div class="form-group" ng-class="{'has-error': !form.provinceID_{{$index}}.$pristine && form.provinceID_{{$index}}.$invalid, 'has-success': form.provinceID_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">استان</label>
+                                    <select class="form-control" name="provinceID_{{$index}}" ng-model="item.ProvinceID" required ng-options="option.provinceID as option.ProvinceDescription for option in model.ProvinceLs" ng-change="loadCity(item)"></select>
+
+                                    @*<select class="form-control" name="provinceID_{{$index}}" required ng-model="item.provinceID" ng-change="loadCity(item)">
+                                            <option ng-repeat="i in model.ProvinceLs" value="{{i.provinceID}}">{{i.ProvinceDescription}}</option>
+                                        </select>*@
+                                    @*<input class="form-control" type="number" ng-model="item.CityID" />*@
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3" ng-if="model.Header.ReceiptPayTypeId!=23 && model.Header.ReceiptPayTypeId!=24">
+                            <div class="form-group" ng-class="{'has-error': !form.CityID_{{$index}}.$pristine && form.CityID_{{$index}}.$invalid, 'has-success': form.CityID_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">شهر</label>
+                                    <select class="form-control" name="CityID_{{$index}}" ng-model="item.CityID" required ng-options="option.CityID as option.CityDescription for option in item.CityLs"></select>
+                                    @*<select class="form-control" name="CityID_{{$index}}" ng-required="" required ng-model="item.CityID">
+                                            <option ng-repeat="i in item.CityLs" ng-if="i.ProvinceID == item.provinceID" value="{{i.CityID}}">{{i.CityDescription}}</option>
+                                        </select>*@
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr ng-if="model.Header.ReceiptPayTypeId==18 || model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21" />
+                    <div class="clearfix">
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error': !form.BehalfGroupId_{{$index}}.$pristine && form.BehalfGroupId_{{$index}}.$invalid, 'has-success': form.BehalfGroupId_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">گروه بابت</label>
+                                    <select class="form-control" style="width: 300px" name="BehalfGroupId_{{$index}}" ng-model="item.BehalfGroupId" required ng-options="option.BehalfGroupID as option.BehalfGroupDescription for option in  BehalfGroupLs" ng-change="loadBehalf(item); item.references = []"></select>
+
+                                    @*<select class="form-control" name="BehalfGroupId_{{$index}}" required ng-model="item.BehalfGroupId" ng-change="loadBehalf(item); item.references = []">
+                                            <option ng-repeat="i in model.BehalfGroupLs" value="{{i.BehalfGroupID}}">{{i.BehalfGroupDescription}}</option>
+                                        </select>*@
+                                    @*<input class="form-control" type="number" ng-model="item.CityID" />*@
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error': !form.BehalfID_{{$index}}.$pristine && form.BehalfID_{{$index}}.$invalid, 'has-success': form.BehalfID_{{$index}}.$valid}">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">بابت</label>
+                                    <select class="form-control" style="width: 300px" name="BehalfID_{{$index}}" ng-model="item.BehalfID" required ng-options="option.BehalfID as option.BehalfDescription for option in item.BehalfLs"></select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-3" style="padding-top: 35px">
+                            <button style="margin: 4px 0;" ng-if="item.BehalfGroupId" class="btn btn-sm btn-material-green-600" type="button" ng-click="showBehalfDialog(item, $index)">اضافه کردن بابت</button>
+                            <button style="margin: 4px 0;" class="btn btn-sm btn-material-green-600" type="button" ng-click="showBehalfGroupDialog(item, $index)">اضافه کردن گروه بابت</button>
+                        </div>
+                    </div>
+                    <div class="clearfix">
+                        <div class="col-xs-6 col-sm-3" ng-repeat="i in item.Refrences">
+                            <div ng-init="id = guid()" class="form-group">
+                                <div class="clearfix custom-inline-control">
+                                    <label class="control-label">{{i.Title}}</label>
+                                    <input type="text" class="form-control" required name="Refrences_{{id}}{{$index}}" ng-model="i.Value" placeholder="لطفا وارد نمایید" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div ng-repeat="i in model.OtherProperty">
+                        <label class="control-label"><input type="checkbox" checklist-model="item.OtherProperyLS" checklist-value="i.Reciept_OtherProperyID" /> <span style="padding: 0 10px">{{i.Reciept_OtherProperyDescription}}</span></label>
+                        <div ng-if="(item.OtherProperyLS.indexOf(i.Reciept_OtherProperyID) > -1) && i.Reciept_OtherProperyID != 1 && i.Reciept_OtherProperyID != 2" ng-repeat="opdl in item.OtherPropertyDetailsList | filter:{Reciept_OtherProperyID:i.Reciept_OtherProperyID}">
+                            <div class="container-fluid">
+                                <div class="clearfix">
+                                    <div class="pull-right">
+                                        <span style="font-size: 17px;padding: 7px 0 0 10px;display: block;">{{$index + 1}}</span>
+                                    </div>
+                                    <div class="pull-right">
+                                        <a ng-if="$index != 0"
+                                           class="btn btn-link mdc-text-red-A700"
+                                           style="padding: 0 5px"
+                                           ng-click="removeOtherPropertyDetails(item, opdl)"
+                                           tooltip-placement="top"
+                                           uib-tooltip="حذف">
+                                            <i class="zmdi zmdi-close"></i>
+                                        </a>
+                                        <a ng-if="$index == 0"
+                                           class="btn btn-link mdc-text-blue-A700"
+                                           style="padding: 0 5px"
+                                           ng-click="copyOtherPropertyDetails(item, opdl)"
+                                           tooltip-placement="top"
+                                           uib-tooltip="کپی">
+                                            <i class="zmdi zmdi-copy"></i>
+                                        </a>
+                                    </div>
+                                    <div class="col-xs-10">
+                                        <div class="clearfix">
+                                            <div class="col-xs-6 col-sm-4">
+                                                <div ng-init="id = guid()" class="form-group">
+                                                    <label class="control-label">{{opdl.Description1_Lable}}</label>
+                                                    <div>
+                                                        <input type="text" ng-model="opdl.Description1_Value" class="form-control" placeholder="لطفا وارد نمایید" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-xs-6 col-sm-4">
+                                                <div ng-init="id = guid()" class="form-group">
+                                                    <label class="control-label">{{opdl.Description2_Lable}}</label>
+                                                    <div>
+                                                        <input type="text" ng-model="opdl.Description2_Value" class="form-control" placeholder="لطفا وارد نمایید" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-xs-6 col-sm-4">
+                                                <div ng-init="id = guid()" class="form-group">
+                                                    <label class="control-label">{{opdl.Description3_Lable}}</label>
+                                                    <div>
+                                                        <input type="text" ng-model="opdl.Description3_Value" class="form-control" placeholder="لطفا وارد نمایید" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-xs-6 col-sm-4">
+                                                <div ng-init="id = guid()" class="form-group">
+                                                    <label class="control-label">{{opdl.Description4_Lable}}</label>
+                                                    <div>
+                                                        <input type="text" ng-model="opdl.Description4_Value" class="form-control" placeholder="لطفا وارد نمایید" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-xs-6 col-sm-4">
+                                                <div ng-init="id = guid()" class="form-group">
+                                                    <label class="control-label">{{opdl.Description5_Lable}}</label>
+                                                    <div>
+                                                        <input type="text" ng-model="opdl.Description5_Value" class="form-control" placeholder="لطفا وارد نمایید" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <hr />
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+                <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+                <div class="modal md ang acc fade" role="dialog" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                                <h4 class="modal-title"></h4>
+                            </div>
+
+                            <div class="modal-body">
+                                <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <div class="clearfix">
+                    <div class="pull-right" ng-if="headerId == 0">
+                        <a ng-if="model.Header.ReceiptPayTypeId!=23 && model.Header.ReceiptPayTypeId!=24" class="btn btn-material-grey-600" ng-click="addCheque()">ایجاد دریافت بعدی</a>
+                        <a ng-if="model.Header.ReceiptPayTypeId==23 || model.Header.ReceiptPayTypeId==24" ng-disabled="!model.Header.bank" class="btn btn-material-grey-600" ng-click="addCheque()">ایجاد دریافت بعدی</a>
+                    </div>
+                    <div class="pull-left">
+                        @*<span class="mdc-text-red-A700" ng-if="!form.$dirty">مقادیر فرم تغییر نکرده است</span>*@
+                        <span class="mdc-text-red-A700" ng-if="form.$invalid">لطفا موارد فرم را به صورت کامل تکمیل نمایید</span>
+                        @if (ViewBag.Price != 0)
+                        {
+                            <span class="mdc-text-red-A700" ng-if="@(ViewBag.Price) !=sumprice()">مبلغ باید با مبلغ چک قبلی برابر باشد</span>
+                        }
+                        <span class="mdc-text-red-A700" ng-if="hasDateError"> تاریخ دریافت را کوچکتر مساوی تاریخ امروز انتخاب نمایید</span>
+                        <span class="mdc-text-red-A700" ng-if="!(!form.$dirty && form.$invalid) && model.detailsLs.length == 0">حداقل یک چک دریافتی وارد نمایید</span>
+                        <span>جمع:{{sumprice() | number}}</span>
+                        @*@if (ViewBag.Price != 0)
+            {@(ViewBag.Price)
+            <button type="submit" class="btn btn-material-green-600" ng-class="{'btn-success': !(form.$invalid || model.detailsLs.length == 0   ), 'btn-material-red-600': form.$invalid || model.detailsLs.length == 0}" ng-disabled="(form.$invalid || model.detailsLs.length == 0) || isDisable )">11ثبت دریافت ها</button>
+            <button type="submit" class="btn btn-material-green-600" ng-class="{'btn-success': !(form.$invalid || model.detailsLs.length == 0   ), 'btn-material-red-600': form.$invalid || model.detailsLs.length == 0}" ng-disabled="(form.$invalid || model.detailsLs.length == 0) || isDisable">ثبت دریافت ها</button>
+        }
+        else
+        {*@
+
+                        <button type="submit" class="btn btn-material-green-600" ng-class="{'btn-success': !(form.$invalid || model.detailsLs.length == 0   ), 'btn-material-red-600': form.$invalid || model.detailsLs.length == 0}" ng-disabled="(form.$invalid || model.detailsLs.length == 0) || isDisable || isDisableBtn || hasDateError">ثبت دریافت ها</button>
+                        @* } *@
+                    </div>
+                </div>
+            </form>
+            <div class="modal md al ang fade" id="BehalfForm" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md">
+                    <div class="modal-content" style="margin: auto 15px">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                            <h4 class="modal-title">اضافه کردن بابت</h4>
+                        </div>
+                        <div class="modal-body">
+                            <form ng-submit="addBehalf()">
+                                <div class="form-horizontal">
+                                    <div class="form-group" ng-class="{'has-error': !form.BehalfDescription.$pristine && form.BehalfDescription.$invalid, 'has-success': form.BehalfDescription.$valid}">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">بابت به فارسی</label>
+                                            <input class="form-control" style="width: 300px" name="BehalfDescription" required type="text" ng-model="BehalfDescription" />
+                                        </div>
+                                    </div>
+
+                                    <div class="form-group" ng-if="@(System.Configuration.ConfigurationManager.AppSettings["bilingual"]) == true" ng-class="{'has-error': !form.BehalfDescription2.$pristine && form.BehalfDescription2.$invalid, 'has-success': form.BehalfDescription2.$valid}">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">بابت به انگلیسی</label>
+                                            <input class="form-control" name="BehalfDescription2" required type="text" ng-model="BehalfDescription2" />
+                                        </div>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-material-green-600">ذخیره</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal md al ang fade" id="BehalfGroupForm" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-md">
+                    <div class="modal-content" style="margin: auto 15px">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                            <h4 class="modal-title">اضافه کردن گروه بابت</h4>
+                        </div>
+                        <div class="modal-body">
+                            <form ng-submit="addBehalfGroup()">
+                                <div class="form-horizontal">
+                                    <div class="form-group" ng-class="{'has-error': !form.BehalfGroupDescription.$pristine && form.BehalfGroupDescription.$invalid, 'has-success': form.BehalfGroupDescription.$valid}">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">عنوان گروه بابت</label>
+                                            <input class="form-control" style="width: 300px" name="BehalfGroupDescription" required type="text" ng-model="BehalfGroupDescription" />
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                                <div class="form-horizontal">
+                                    <div class="form-group" ng-class="{'has-error': !form.account_code.$pristine && form.account_code.$invalid, 'has-success': form.account_code.$valid}">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">معین</label>
+                                            <select class="form-control input-sm" style="width: 300px" required name="account_code"
+                                                    ng-options="item.account_code as item.Account_Name for item in model.Accountls" ng-model="account_code"></select>
+                                        </div>
+                                    </div>
+
+
+                                </div>
+                                <div class="form-horizontal">
+                                    <div class="form-group" ng-class="{'has-error': !form.referenceTypeID.$pristine && form.referenceTypeID.$invalid, 'has-success': form.referenceTypeID.$valid}">
+                                        <div class="clearfix custom-inline-control">
+                                            <label class="control-label">عطف</label>
+                                            <select class="form-control input-sm" style="width: 300px" required name="basicBank_ID"
+                                                    ng-options="item.referenceTypeID as item.referenceTypeDescription for item in model.ReferenceTypeLs"
+                                                    ng-model="referenceTypeID"></select>
+                                        </div>
+                                    </div>
+
+
+                                </div>
+
+                                <button type="submit" class="btn btn-material-green-600">ذخیره</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+            jQuery(function ($) {
+                $(".Date").mask("9999/99/99");
+            });
+        });
+    </script>

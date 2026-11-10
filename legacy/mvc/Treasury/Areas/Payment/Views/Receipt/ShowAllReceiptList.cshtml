@@ -1,0 +1,462 @@
+﻿<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/Receipt/ShowAllReceiptListController.js")"></script>
+
+<div ng-app="treasury" ng-controller="showAllReceiptListController">
+
+
+    <div loading class="mdc-bg-blue-grey-50" style="
+    padding: 15px;
+    margin: -15px -15px 15px -15px;
+    border-bottom: 1px solid #f8f8f8;">
+        <form ng-submit="ShowReceipt(0)">
+            <div class="clearfix">
+                <div class="col-sm-3" ng-if="(ReceiptPayTypeDetailLs | receiptPayTypeDetailsFilter:State).length > 0">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">نوع دریافت</label>
+                            <select class="form-control"
+                                    style="max-width: 150px"
+                                    ng-model="searchModel.RecieptType.Receipt_Pay_TypeDetailID"
+                                    ng-options="option.Receipt_Pay_TypeDetailID as option.Receipt_Pay_TypeDetailDescription for option in (ReceiptPayTypeDetailLs | receiptPayTypeDetailsFilter:State)"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تاریخ دریافت از</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control"
+                                       type="text"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.RecieptDateFrom">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تا</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control"
+                                       type="text"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.RecieptDateTo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">@Resources.ReceiptDetailId</label>
+                            <div class="input-append">
+                                <input class="form-control"
+                                       type="text"
+                                       ng-model="searchModel.ReceiptDetailId">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">شماره چک</label>
+                            <div class="input-append">
+                                <input class="form-control"
+                                       type="text"
+                                       ng-model="searchModel.ChequeNo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تاریخ سررسید از</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control"
+                                       type="text"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.DueDateFrom">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تا</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control"
+                                       type="text"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.DueDateTo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">پرداخت کننده</label>
+                            <div class="input-append">
+                                @*<a class="btn btn-sm"
+                                       ng-class="searchModel.UniqueAccount.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                       ng-click="changeUniqueAccount(searchModel.UniqueAccount)"
+                                       style="margin: 4px 0;"
+                                       ng-bind-html='searchModel.UniqueAccount.Name != null ? searchModel.UniqueAccount.Name : "پرداخت کننده / صادر کننده چک"'>
+                                    </a>*@
+
+
+                                <a class="btn btn-sm"
+                                   ng-class="searchModel.UniqueAccount.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(searchModel.UniqueAccount)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='searchModel.UniqueAccount.Name != "" ? searchModel.UniqueAccount.Name : "انتخاب"'>
+                                </a>
+                                <a class="btn btn-sm btn-material-grey-500"
+                                   ng-click="searchModel.UniqueAccount = { Name: '', Code: '' }"
+                                   style="margin: 4px 0;">
+                                    <i class="zmdi zmdi-delete"></i>
+                                </a>
+                                <input type="hidden" name="UniqueAccount" required ng-model="searchModel.UniqueAccount.Code" />
+
+
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">سال مالی</label>
+                            <div class="input-append">
+                                <input class="form-control" type="number" id="FiscalYear" ng-model="searchModel.FiscalYear" />
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">مبلغ</label>
+                            <div class="input-append">
+                                <input class="form-control" type="text" id="Price" ng-model="searchModel.Price" />
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">عطف</label>
+                            <div class="input-append">
+                                <input class="form-control" type="text" id="ReferenceValue" ng-model="searchModel.ReferenceValue" />
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3" ng-if="State == -2">
+                    <div class="clearfix custom-inline-control">
+                        <label class="control-label">شماره حساب واگذاری</label>
+                        <select ng-required="item.checked" name="BankAccountLs_{{$index}}" class="form-control" ng-model="searchModel.RecieptType.PlaningTypeReferenceID">
+                            <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            @*<div class="clearfix">
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <div class="clearfix custom-inline-control">
+                                <label class="control-label">گروه بابت</label>
+                                <div class="input-append">
+                                    <select class="form-control" name="BehalfGroupID_{{$index}}" ng-model="searchModel.BehalfGroupID" ng-options="option.BehalfGroupID as option.BehalfGroupDescription for option in BehalfGroupLs" ng-change="console.log(item);loadBehalf(searchModel.BehalfGroupID); item.references = []"></select>
+
+
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <div class="clearfix custom-inline-control">
+                                <label class="control-label"> بابت</label>
+                                <div class="input-append">
+                                    <select class="form-control" name="BehalfID_{{$index}}" ng-model="searchModel.BehalfID"  ng-options="option.BehalfID as option.BehalfDescription for option in BehalfList"></select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            <div class="clearfix custom-inline-control">
+                                <label class="control-label">عطف</label>
+                                <div class="input-append">
+                                    <input class="form-control" type="text" id="Refrence" ng-model="searchModel.Refrence" />
+
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>*@
+            <div class="text-left">
+                <button id="searchFormButton" type="submit" class="btn btn-material-blue-500">جستجو</button>
+            </div>
+        </form>
+    </div>
+    <div class="btn-group">
+        <button type="button" class="btn btn-material-green-600 dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            ثبت دریافت &nbsp;&nbsp;&nbsp;&nbsp;<span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu">
+            <li>
+                @Html.ActionLink("دریافت چک روز", "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 18 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receive + " " + Resources.Cheque + " " + Resources.Deferred, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 19 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receive + " " + Resources.Cheque + " " + Resources.Disciplinary, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 21 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receipt + " " + Resources.GetCash, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 22 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receipt + " " + Resources.CashDeposit, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 23 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receipt + " " + Resources.ATM, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 24 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receive + " " + Resources.PromissoryNote, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 25 }, null)
+            </li>
+            <li>
+                @Html.ActionLink(Resources.Receive + " " + Resources.PromissoryNote + " " + Resources.Disciplinary, "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 28 }, null)
+            </li>
+            @*<li>
+                    @Html.ActionLink("واریزبین بانکی", "ShowReceiptForm", "Receipt", new { Area = "Payment", headerId = 0, ReceiptPayTypeId = 33 }, null)
+                </li>*@
+
+        </ul>
+    </div>
+    <div class="btn-group">
+        <button type="button" class="btn btn-material-blue-700 dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            اعمال برنامه ریزی &nbsp;&nbsp;&nbsp;&nbsp;<span class="caret"></span>
+        </button>
+        <ul class="dropdown-menu" style="overflow:hidden; overflow-y:scroll;height:300px; ">
+            <li>@Html.ActionLink("واگذاری چک های دریافتی به حساب بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -1 }, null)</li>
+            <li>@Html.ActionLink(" وصول / برگشت چک های واگذاری", "ReceiptList", "Receipt", new { Area = "Payment", State = -2 }, null)</li>
+            <li>@Html.ActionLink("عودت چک های واگذاری", "ReceiptList", "Receipt", new { Area = "Payment", State = -2000 }, null)</li>
+            <li>@Html.ActionLink("وصول مستقیم - واریز به بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -4 }, null)</li>
+            @*<li>@Html.ActionLink("واگذاری چک های برگشتی به حساب بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -24 }, null)</li>*@
+            @*<li>@Html.ActionLink("ابطال چک های برگشتی/اقدام حقوقي شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -25 }, null)</li>*@
+            <li>@Html.ActionLink("حقوقی کردن چک های برگشتی", "ReceiptList", "Receipt", new { Area = "Payment", State = -8 }, null)</li>
+            @*<li>@Html.ActionLink("واگذاري مجدد به بانک-چک برگشتي-اقدام حقوقي شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -26 }, null)</li>*@
+            @*<li>@Html.ActionLink("ابطال-چک برگشتي-اقدام حقوقي شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -27 }, null)</li>*@
+            @*<li>@Html.ActionLink("وصول مستقیم-چک برگشتي", "ReceiptList", "Receipt", new { Area = "Payment", State = -28 }, null)</li>*@
+            @*<li>@Html.ActionLink("عودت-چک برگشتي", "ReceiptList", "Receipt", new { Area = "Payment", State = -29 }, null)</li>*@
+            <li>@Html.ActionLink("ابطال چک های نزد صندوق", "ReceiptList", "Receipt", new { Area = "Payment", State = -10 }, null)</li>
+            <li>@Html.ActionLink("عودت چک نزدصندوق", "ReceiptList", "Receipt", new { Area = "Payment", State = -6 }, null)</li>
+
+            @*<li>@Html.ActionLink("وصول مستقیم - نقد", "ReceiptList", "Receipt", new { Area = "Payment", State = -3 }, null)</li>*@
+
+            <li>@Html.ActionLink("خرج چک", "ReceiptList", "Receipt", new { Area = "Payment", State = -5 }, null)</li>
+            <li>@Html.ActionLink("عودت چک های خرج شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -16 }, null)</li>
+           @* <li>@Html.ActionLink("برگشت چک خرج شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -23 }, null)</li>*@
+            @*<li>@Html.ActionLink("خرج چک -مشتری", "ReceiptList", "Receipt", new { Area = "Payment", State = -18 }, null)</li>*@
+
+            <li>@Html.ActionLink("تبدیل چک انتظامی به چک دریافتنی", "ReceiptList", "Receipt", new { Area = "Payment", State = -7 }, null)</li>
+            <li>@Html.ActionLink("تحویل لاشه چک انتظامی", "ReceiptList", "Receipt", new { Area = "Payment", State = -15 }, null)</li>
+            @*<li>@Html.ActionLink("عودت چک پس از برگشت از بانک ", "ReceiptList", "Receipt", new { Area = "Payment", State = -9 }, null)</li>*@
+
+
+
+            <li>@*@Html.ActionLink("ثبت وصول چک های برگشتی", "ReceiptList", "Receipt", new { Area = "Payment", State = -17 }, null)*@</li>
+            <li>@Html.ActionLink("تمدید چک دریافتنی سررسیدشده", "ReceiptList", "Receipt", new { Area = "Payment", State = -20 }, null)</li>
+            <li>@Html.ActionLink("تعویض چک دریافتنی سررسیدشده", "ReceiptList", "Receipt", new { Area = "Payment", State = -21 }, null)</li>
+            <li>@Html.ActionLink("تنزیل اسناد دریافتنی واگذارشده به بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -22 }, null)</li>
+
+        </ul>
+    </div>
+    <div style="padding: 20px; margin: -15px -15px 10px -15px; position: relative;">
+        <ul uib-pagination total-items="bigTotalItems" items-per-page="maxSize" ng-change="pageChanged()" ng-model="currentPage" previous-text="قبل" next-text="بعد" max-size="maxSize" class="pagination-sm" boundary-link-numbers="true" rotate="false"></ul>
+        <div class="table-responsive">
+            <table class="table" style="font-size: 12px">
+                <thead>
+                    <tr>
+                        <th>ش.د</th>
+                        <th>نوع دریافت</th>
+                        <th>تاریخ</th>
+                        <th>پرداخت کننده</th>
+                        <th>بابت</th>
+                        <th>بانک</th>
+                        <th>مبلغ </th>
+                        <th>سررسید</th>
+                        <th>ش چک</th>
+                        <th></th>
+                        <th></th>
+
+                    </tr>
+                </thead>
+                <tbody ng-repeat="item in receiptList">
+                    <tr ng-class="{'mdc-bg-yellow-50':item.showReceiptPlanList}">
+                        <td data-lang-number="fa">{{item.ReceiptDetailId}}</td>
+                        <td>{{item.Receipt_Pay_TypeDetailDescription}}</td>
+                        <td data-lang-number="fa">{{item.Date}}</td>
+                        <td>{{item.Unique_Account}}</td>
+                        <td>{{item.Behalf}}</td>
+                        <td data-lang-number="fa">{{item.Bank ? item.Bank : '-'}}</td>
+                        <td data-lang-number="fa"><b>{{item.Price | number}}</b></td>
+                        <td data-lang-number="fa">{{item.DueDate}}</td>
+                        <td data-lang-number="fa">{{item.Cheque_Number ? item.Cheque_Number : '-'}}</td>
+                        <td>
+                            <div class="dropdown">
+                                <button ng-click="checkAccess(item.ReceiptDetailId)" class="btn btn-material-light-blue-A700 btn-xs dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                   عملیات
+                                    &nbsp;&nbsp;<span class="caret"></span>
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                    <li>
+                                        <a ng-href="/Payment/Receipt/ReceiptReport?ReceiptDetailId={{item.ReceiptDetailId}} &ReceiptPayTypeId={{item.RecieptTypeId}}&headerId={{item.headerId}}">گزارش</a>
+                                    </li>
+                                    <li>
+                                        <a ng-href="/Payment/Receipt/ReceiptReportdelivey?ReceiptDetailId={{item.ReceiptDetailId}} &ReceiptPayTypeId={{item.RecieptTypeId}}&headerId={{item.headerId}}">فرم رسید دریافت اسناد بهادار</a>
+                                    </li>
+                                    <li>
+                                        <a ng-if="item.RecieptTypeId==21 ||item.RecieptTypeId==25" ng-href="/Payment/Receipt/CheckdeliveyReport?ReceiptDetailId={{item.ReceiptDetailId}} &ReceiptPayTypeId={{item.RecieptTypeId}}&headerId={{item.headerId}}">فرم تحویل لاشه</a>
+                                    </li>
+                                    <li>
+                                        <a ng-click="ShowReceiptDetails(item.ReceiptDetailId)">مشاهده</a>
+                                    </li>
+                                    <li>
+                                        <a  ng-if="CanEditReceiptDetail" ng-href="/Payment/Receipt/ShowReceiptForm?ReceiptDetailId={{item.ReceiptDetailId}} &ReceiptPayTypeId={{item.RecieptTypeId}}&headerId={{item.headerId}}">ویرایش</a>
+                                    </li>
+                                    <li>
+                                        <a  ng-if="CanDeleteReceiptDetail" ng-href="#" ng-click="DeleteReceiptDetails(item.ReceiptDetailId,item.ReferenceReceiptId)">حذف</a>
+                                    </li>
+                                    <li>
+                                        <a ng-if="CanDeleteReceiptDetailStates" ng-href="#" ng-click="DeleteALLReceiptDetailsPlanState(item.ReceiptDetailId , item.hasVoucher)"> حذف همه وضعیت ها</a>
+                                    </li>
+                                </ul>
+                            </div>
+                            @*ng-click="Edit(item)"*@
+                            @*<a ng-click="showVocherList(item.ReceiptDetailId,0)" class="btn btn-info btn-xs">نمایش سند</a>*@
+                        </td>
+                        <td>
+                            <button class="btn btn-xs btn-material-red-900" ng-click="GetReceiptPlanList(item)">نمایش-ویرایش-ارسال اسناد</button>
+                        </td>
+                        <td class="text-left">
+                            <a ng-if="item.showReceiptPlanList" ng-click="item.showReceiptPlanList = false" style="cursor: pointer"><i class="zmdi zmdi-hc-2x zmdi-chevron-up"></i></a>
+                            <a ng-if="!item.showReceiptPlanList && item.receiptPlanList" ng-click="item.showReceiptPlanList = true" style="cursor: pointer"><i class="zmdi zmdi-hc-2x zmdi-chevron-down"></i></a>
+                        </td>
+                    </tr>
+                    <tr ng-if="item.showReceiptPlanList">
+                        <td colspan="15" style="padding   : 0 0 5px 0;">
+                            <div class="mdc-bg-grey-300" style="border-radius: 0 0 4px 4px;padding: 2px;">
+                                <table class="table" style="background-color: transparent; margin: 0">
+                                    <thead>
+                                        <tr>
+                                            <th>نوع برنامه ریزی</th>
+                                            <th>تاریخ</th>
+                                            <th>معین / معین در معین</th>
+                                            <th>تفصیل اول</th>
+                                            <th>تفصیل دوم</th>
+                                            <th>  </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr ng-repeat="plan in item.receiptPlanList" class="mdc-bg-grey-50">
+                                            <td>{{plan.PlaningTypeID}}</td>
+                                            <td>{{plan.Date}}</td>
+                                            <td>{{plan.Account_code}}</td>
+                                            <td>{{plan.Unique_Account_No}}</td>
+                                            <td>{{plan.Unique_Account_No_Two}}</td>
+                                            <td>
+                                                <a ng-click="showVocherList(item.ReceiptDetailId,plan.StateID,plan.PlaningID)" class="btn btn-material-blue-grey-600 btn-xs">نمایش سند</a>
+                                                <a ng-if="plan.IsLastStateId && plan.PlaningID!= 21 && plan.PlaningID!= 1 && plan.PlaningID!=17 && plan.PlaningID!=19  && plan.PlaningID!=18 " ng-click="DeleteReceiptDetailsPlanState(plan.StateID, plan.hasVoucher)" class="btn btn-material-blue-grey-600 btn-xs">حذف وضعیت</a>
+                                                @*&& plan.PlaningID!= 1 && plan.PlaningID!=17 && plan.PlaningID!=19  && plan.PlaningID!=18 && plan.PlaningID!=4*@
+                                                @*<a ng-if="plan.PlaningTypeID!= 1" ng-click="DeleteALLReceiptDetailsPlanState(plan.ReceiptDetailId)" class="btn btn-material-blue-grey-600 btn-xs">حذف تمام وضعیت ها</a>*@
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <ul uib-pagination total-items="bigTotalItems" items-per-page="maxSize" ng-change="pageChanged()" ng-model="currentPage" previous-text="قبل" next-text="بعد" max-size="maxSize" class="pagination-sm" boundary-link-numbers="true" rotate="false"></ul>
+
+    </div>
+    <div class="modal lg xlg al ang fade" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg lg-100p">
+            <div class="modal-content" style="margin: auto 15px">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title">نمایش سند</h4>
+                </div>
+
+                <div class="modal-body">
+                    <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+    <div class="modal md ang acc fade" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+
+                <div class="modal-body">
+                    <div ng-bind-html="thisCanBeusedInsideNgBindHtml_acc"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table tr th, .table tr td {
+        white-space: nowrap;
+    }
+</style>
+

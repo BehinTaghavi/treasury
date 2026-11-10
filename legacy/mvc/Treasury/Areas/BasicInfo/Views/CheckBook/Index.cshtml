@@ -1,0 +1,46 @@
+﻿@{
+    var Bank = Utility.GetBasicBankInfo(ViewBag.BasicBankID);
+    var BranchName = Utility.GetBankInfoBankId(ViewBag.BankID).BranchName;
+}
+@section PageHeader{
+
+    @(Resources.List + " " + Resources.CheckBook + "-" + Resources.BasicBank + " " + Bank + " " + BranchName)
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    @Ajax.ActionLink(Resources.Create + " " + Resources.CheckBook, "Create", "CheckBook", new { Area = "BasicInfo", BasicBankID = ViewBag.BasicBankID, BankID = ViewBag.BankID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + @Resources.Create + "/" + @Resources.CheckBook + "/" + Bank + "/" + BranchName + "', 'md')"
+               }, new { @class = "btn btn-material-green-600  btn-sm" })
+                </div>
+                <div class="pull-left">
+                    @Html.ActionLink(Resources.Back, "Index", "Banks", new { Area = "BasicInfo", BankId = ViewBag.BankID, BasicBankID = ViewBag.BasicBankID }, new { @class = "btn btn-default btn-sm" })
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@section list{
+    <div id="Result">
+          @Html.Action("List", "CheckBook", new { Area = "BasicInfo", BankID = ViewBag.BankID, BasicBankID = ViewBag.BasicBankID })
+    </div>
+}
+<script type="text/javascript">
+
+    function updateTableChequeLs(BankId, BasicBankID) {
+        var url = '@(Url.Action("List", "CheckBook", new { area = "BasicInfo" }))';
+
+        $.ajax({
+            url: url, type: 'get',
+            data: { BankId: BankId, BasicBankID: BasicBankID },
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }
+
+
+</script>

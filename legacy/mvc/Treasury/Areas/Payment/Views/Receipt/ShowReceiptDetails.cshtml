@@ -1,0 +1,143 @@
+﻿@model CSD.Treasury.DataModel.Receipt_Detail
+    @{
+    ViewBag.Title = "ShowReceiptDetails";
+    var refrenceValue = (CSD.Treasury.Service.Reciept_ReferenceTypes_ValueService.Reciept_ReferenceTypes_Value)ViewBag.RefrenceValue;
+}
+<div class="row">
+    <div class="col-sm-12">
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.ReceiptDetailId
+                </label>
+                <span data-lang-number="fa">  @(Model.ReceiptDetailId)</span>
+            </p>
+        </div>
+        @if (ViewBag.RecieptTypeId == 18 || ViewBag.RecieptTypeId == 19 || ViewBag.RecieptTypeId == 21)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Bank
+                    </label>
+                    @if (Model.BankID.HasValue)
+                    {
+                        @Utility.GetBasicBankInfo(Model.BankID.Value)
+                    }
+
+                </p>
+            </div>
+        }
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Price
+                </label>
+                <span data-lang-number="fa">
+                    @Math.Truncate(Model.ChequePrice_Rial).ToString("#,##0")@Resources.Rial
+                </span>
+            </p>
+        </div>
+        @*@if (Model.ExchangeTypeID != 1)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Price
+
+                    </label>
+                    <span data-lang-number="fa">
+                        @Math.Truncate(Model.ChequePrice_Rial).ToString("#,##0")
+                    </span>
+                    @if (Model.ExchangeTypeID == 1)
+                    {
+                        <span>@Resources.Rial</span>}
+                    else
+                    {
+                        <span>دلار</span>}
+                </p>
+            </div>
+        }*@
+        @if (ViewBag.RecieptTypeId == 18 || ViewBag.RecieptTypeId == 19 || ViewBag.RecieptTypeId == 21)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.ChequeNo
+                    </label>
+                    <span data-lang-number="fa">
+                        @(Model.Cheque_Number)
+                    </span>
+                </p>
+            </div>
+
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.ExchangeRate
+                    </label>
+                    <span data-lang-number="fa">
+                        @(Model.ExchangeRate.ToString("#,##0")) @Resources.Rial
+                    </span>
+                </p>
+            </div>
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.DueDate
+                    </label>
+                    <span data-lang-number="fa">
+                        @Utility.GetPersianDate(Model.DueDate)
+                    </span>
+
+                </p>
+            </div>
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.BankAccountNumber
+                    </label>
+                    <span data-lang-number="fa">
+                        @Model.Bank_AccountNo
+                    </span>
+                </p>
+            </div>
+        }
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Unique_Account_No
+                </label>
+                @Utility.GetUniqueAccount(Model.Unique_Account_No) / @(Model.Unique_Account_No)
+            </p>
+        </div>
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.Reference
+                </label>
+                @if (refrenceValue != null)
+                {
+                    @(refrenceValue.ReferenceValue)
+                }
+
+            </p>
+        </div>
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.ChequeExporter
+                </label>
+                @Utility.GetUniqueAccount(Model.Unique_Account_No)
+            </p>
+        </div>
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.Behalf
+                </label>
+                @Utility.GetBehalf(Model.BehalfID)
+            </p>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,26 @@
+﻿@model CSD.Treasury.Service.cmpBranch_FAXService.cmpBranch_FAX
+
+@using (Ajax.BeginForm("CreateFax", "BranchInfo", new { area = "BasicInfo" }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "updateTable('faxList'); successMessage(data)"
+}, null))
+{
+    @Html.Hidden("cmpBranchID", (int)ViewBag.BranchId)
+    <div class="row"> 
+        <div class="col-xs-2 col-sm-1">
+            <button type="submit" class="btn btn-success btn-flat btn-xs"><i class="zmdi zmdi-plus"></i></button>
+        </div>
+        <div class="col-xs-10 col-sm-6">
+            @Html.TextBoxFor(model => model.cmpBranchFax, new { @class = "form-control floating-label", placeholder = "شماره فاکس" })
+        </div>
+    </div>
+}
+
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>

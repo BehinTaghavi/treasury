@@ -1,0 +1,629 @@
+﻿@model List<CSD.Treasury.Service.ChequeFormatTypeDetailsService.ChequeFormatTypeDetail>
+@{
+    ViewBag.Title = "Create";
+    var Bank = Utility.GetBankInfoBankId(ViewBag.BankId).BranchName;
+    var BasicBank = Utility.GetBasicBankInfo(ViewBag.BasicBankID);
+}
+<link href="@Url.Content("~/Content/css/select2.min.css")" rel="stylesheet" />
+
+<div class="page-toolbar mdc-bg-grey-100">
+
+    <div class="btn-toolbar">
+        <div class="clearfix">
+            <div class="pull-right">
+                <div>
+                    <label>
+                        @Resources.Bank -  @(BasicBank)/@Resources.BranchName : @(Bank)
+                    </label>
+
+                </div>
+                <div class="dropdown">
+                    <button type="button" class="btn btn-material-grey-600 dropdown-toggle btn-sm" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        اضافه کردن ورودی <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu">
+                        @foreach (var item in ViewBag.BasicChequeLables)
+                        {
+                            <li><a class="input-item" href="#" data-label-name="@item.ChequeLableID">@item.ChequeLableDescription</a></li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<form id="chequeDesign">
+    <button type="submit" class="btn btn-success">@Resources.Save</button>
+    @*<div class="row">
+            <div class="col-sm-2">
+                @Html.DropDownList("BasicBank", new SelectList(ViewBag.BasicBanks, "BasicBankId", "BasicBankDescription", ViewBag.BasicBankID), new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.BasicBank })
+            </div>
+            <div class="col-sm-2">
+                @Html.DropDownList("ChequeFormatID", new SelectList(ViewBag.ChequeFormatTypes, "ChequeFormatID", "FormatDescription", ViewBag.ChequeFormatID), new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.CheckBook })
+            </div>
+        </div>*@
+    <input type="hidden" id="ChequeFormatID" value="@(ViewBag.ChequeFormatID)" />
+    <div class="row">
+        <div class="col-sm-3 col-md-2">
+            <input type="hidden" id="name" />
+            <div class="form-group">
+                <input type="number" id="width" class="form-control floating-label" placeholder="عرض" />
+            </div>
+            <div class="form-group">
+                <input type="number" id="height" class="form-control floating-label" placeholder="ارتفاع" />
+            </div>
+            <div class="form-group">
+                <input type="number" id="top" class="form-control floating-label" placeholder="فاصله از بالا" />
+            </div>
+            <div class="form-group">
+                <input type="number" id="left" class="form-control floating-label" placeholder="فاصله از چپ" />
+            </div>
+            <div class="form-group">
+                <select id="fontFamily" class="form-control floating-label" placeholder="نوع فونت">
+                    <option selected value="B Yekan">B Yekan</option>
+                    <option value="B Nazanin">B Nazanin</option>
+                    <option value="B Mitra">B Mitra</option>
+                    <option value="Tahoma">Tahoma</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input id="fontSize" type="number" class="form-control floating-label" placeholder="سایز فونت" />
+            </div>
+            <div class="form-group">
+                <select id="fontWeight" class="form-control floating-label" placeholder="وزن فونت">
+                    <option selected value="normal">normal</option>
+                    <option value="100">100</option>
+                    <option value="200">200</option>
+                    <option value="300">300</option>
+                    <option value="400">400</option>
+                    <option value="500">500</option>
+                    <option value="600">600</option>
+                    <option value="700">700</option>
+                    <option value="800">800</option>
+                    <option value="900">900</option>
+                    <option value="bold">bold</option>
+                    <option value="bolder">bolder</option>
+                    <option value="lighter">lighter</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <select id="textAlign" class="form-control floating-label" placeholder="چیدمان متن">
+                    <option selected value="right">راست</option>
+                    <option value="center">وسط</option>
+                    <option value="left">چپ</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <select id="direction" class="form-control floating-label" placeholder="جهت">
+                    <option selected value="rtl">راست به چپ</option>
+                    <option value="ltr">چپ به راست</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-sm-9 col-md-10">
+            <div id="chequePanel" style="margin: 0 auto; width: @(ViewBag.Width)px; height: @(ViewBag.Height)px; position: relative; background-image: url(data:image/@(ViewBag.Extension);base64,@(ViewBag.Image)); background-position: center; background-repeat: no-repeat;">
+                @foreach (var item in Model)
+                {
+                    <div class="form-control cheque-control drsElement drsMoveHandle"
+                         data-name="@item.ChequeLableID"
+                         style="position: absolute;
+                                    top: @(Convert.ToInt32(item.m_TOP))px;
+                                    left: @(Convert.ToInt32(item.m_Left))px;
+                                    font-family: @(item.m_FontName);
+                                    font-size: @(item.m_FontSize)px;
+                                    text-align: @(item.m_TextAlign);
+                                    font-weight: @(item.m_fontweight);
+                                    width: @(Convert.ToInt32(item.m_Width))px;
+                                    height: @(Convert.ToInt32(item.m_height))px;
+                                    direction: @(item.m_Direction);
+                                    z-index: 2;">
+                        @Utility.GetLable(item.ChequeLableID).ChequeLableDescription
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <hr />
+    <button type="submit" class="btn btn-success">@Resources.Save</button>
+</form>
+<style>
+    .form-control.cheque-control {
+        background-color: rgba(255, 255, 255, 0.8);
+        background-image: none;
+        border: 1px dashed #03a9f4;
+        color: #a6a6a6;
+        font-size: 11px;
+        padding: 2px 5px;
+        width: 150px;
+        margin: 0;
+        direction: rtl;
+        font-weight: normal;
+        text-align: right;
+    }
+    /*p { background: lime; height: 200px; width: 300px; }*/
+    div .resizable {
+        background: cyan;
+        position: relative;
+    }
+
+    div .resizer {
+        width: 10px;
+        height: 10px;
+        background: blue;
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        cursor: se-resize;
+    }
+
+    #inputcontextmenu {
+        position: absolute;
+        width: 100px;
+    }
+
+    .cheque-control .remove {
+        border-radius: 0;
+        height: 100%;
+        left: 0;
+        margin: 0;
+        padding: 0 5px;
+        position: absolute;
+        top: 0;
+        width: 20px;
+    }
+
+        .cheque-control .remove .zmdi {
+            vertical-align: sub;
+        }
+
+    /* Required CSS classes: must be included in all pages using this script */
+
+    /* Apply the element you want to drag/resize */
+    .drsElement {
+        position: absolute;
+        border: 1px solid #333;
+    }
+
+    /*
+         The main mouse handle that moves the whole element.
+         You can apply to the same tag as drsElement if you want.
+        */
+    .drsMoveHandle {
+        height: 20px;
+        background-color: #CCC;
+        border-bottom: 1px solid #666;
+        cursor: move;
+    }
+
+    /*
+         The DragResize object name is automatically applied to all generated
+         corner resize handles, as well as one of the individual classes below.
+        */
+    .dragresize {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        font-size: 1px;
+        background: #EEE;
+        border: 1px solid #333;
+    }
+
+    /*
+         Individual corner classes - required for resize support.
+         These are based on the object name plus the handle ID.
+        */
+    .dragresize-tl {
+        top: -8px;
+        left: -8px;
+        cursor: nw-resize;
+    }
+
+    .dragresize-tm {
+        top: -8px;
+        left: 50%;
+        margin-left: -4px;
+        cursor: n-resize;
+    }
+
+    .dragresize-tr {
+        top: -8px;
+        right: -8px;
+        cursor: ne-resize;
+    }
+
+    .dragresize-ml {
+        top: 50%;
+        margin-top: -4px;
+        left: -8px;
+        cursor: w-resize;
+    }
+
+    .dragresize-mr {
+        top: 50%;
+        margin-top: -4px;
+        right: -8px;
+        cursor: e-resize;
+    }
+
+    .dragresize-bl {
+        bottom: -8px;
+        left: -8px;
+        cursor: sw-resize;
+    }
+
+    .dragresize-bm {
+        bottom: -8px;
+        left: 50%;
+        margin-left: -4px;
+        cursor: s-resize;
+    }
+
+    .dragresize-br {
+        bottom: -8px;
+        right: -8px;
+        cursor: se-resize;
+    }
+</style>
+
+<script src="~/Scripts/select2.full.min.js"></script>
+<script src="~/Scripts/dragresize.js"></script>
+<script>
+    //updateChequeImage("@(ViewBag.ChequeFormatID)");
+    var chequeFormatList = [];
+    var addInput = document.getElementsByClassName("input-item"),
+        chequePanel = document.getElementById("chequePanel"),
+        inputWidth = document.getElementById("width"),
+        inputHeight = document.getElementById("height"),
+        inputTop = document.getElementById("top"),
+        inputLeft = document.getElementById("left"),
+        inputFontFamily = document.getElementById("fontFamily"),
+        inputFontSize = document.getElementById("fontSize"),
+        inputName = document.getElementById("name"),
+        inputFontWeight = document.getElementById("fontWeight"),
+        inputTextAlign = document.getElementById("textAlign"),
+        inputDirection = document.getElementById("direction"),
+        drsElement = document.querySelectorAll(".drsElement");
+
+    inputWidth.addEventListener("change", changeWidth);
+    inputHeight.addEventListener("change", changeHeight);
+    inputTop.addEventListener("change", changeTop);
+    inputLeft.addEventListener("change", changeLeft);
+    inputFontFamily.addEventListener("change", changeFontFamily);
+    inputFontSize.addEventListener("change", changeFontSize);
+    inputFontWeight.addEventListener("change", changeFontWeight);
+    inputTextAlign.addEventListener("change", changeTextAlign);
+    inputDirection.addEventListener("change", changeDirection);
+
+    for (var i = 0; i < addInput.length; i++) {
+        addInput[i].addEventListener("click", addInputAction);
+    }
+
+    var dragresize = new DragResize('dragresize', { minWidth: 0, minHeight: 0, minLeft: 0, minTop: 0, maxLeft: @(ViewBag.Width), maxTop: @(ViewBag.Height) });
+    function addInputAction() {
+        var element = document.querySelector(".cheque-control[data-name='" + this.getAttribute("data-label-name") + "']");
+        if (!element) {
+            var input = document.createElement("div"),
+                remove = document.createElement("button"),
+                removeIcon = document.createElement("i"),
+                text = document.createElement("span");
+            remove.classList.add("remove");
+            remove.classList.add("btn");
+            remove.classList.add("btn-danger");
+            remove.classList.add("btn-xs");
+            remove.classList.add("btn-flat");
+            removeIcon.classList.add("zmdi");
+            removeIcon.classList.add("zmdi-close");
+            input.innerHTML = this.innerHTML;
+            remove.onclick = function () { input.remove(); }
+            input.classList.add("form-control");
+            input.classList.add("cheque-control");
+            input.classList.add("drsElement");
+            input.classList.add("drsMoveHandle");
+            input.style.position = "absolute";
+            input.style.top = "20px";
+            input.style.left = "20px";
+            input.style.fontFamily = "B Yekan";
+            input.style.fontSize = "11px";
+            input.style.textAlign = "right";
+            input.style.fontWeight = "normal";
+            input.style.width = "150px";
+            input.style.height = "20px";
+            input.style.direction = "rtl";
+            input.setAttribute("data-name", this.getAttribute("data-label-name"));
+            remove.appendChild(removeIcon);
+            input.appendChild(remove);
+            dragresize.isElement = function (input) {
+                if (input.className && input.className.indexOf('drsElement') > -1) return true;
+            };
+            dragresize.isHandle = function (input) {
+                if (input.className && input.className.indexOf('drsMoveHandle') > -1) return true;
+            };
+            dragresize.ondragfocus = function () {
+                inputWidth.value = this.elmW;
+                inputHeight.value = this.elmH;
+                inputTop.value = this.elmY;
+                inputLeft.value = this.elmX;
+                inputFontFamily.value = this.fontFamily;
+                inputFontSize.value = this.fontSize;
+                inputName.value = this.name;
+                inputDirection.value = this.direction;
+                inputTextAlign.value = this.textAlign;
+                inputFontWeight.value = this.fontWeight;
+
+                inputWidth.classList.remove("empty");
+                inputHeight.classList.remove("empty");
+                inputTop.classList.remove("empty");
+                inputLeft.classList.remove("empty");
+                //inputFontFamily.classList.remove("empty");
+                //inputFontSize.classList.remove("empty");
+            };
+            dragresize.ondragstart = function (isResize) { };
+            dragresize.ondragmove = function (isResize) {
+                inputWidth.value = this.elmW;
+                inputHeight.value = this.elmH;
+                inputTop.value = this.elmY;
+                inputLeft.value = this.elmX;
+
+                inputWidth.classList.remove("empty");
+                inputHeight.classList.remove("empty");
+                inputTop.classList.remove("empty");
+                inputLeft.classList.remove("empty");
+            };
+            dragresize.ondragend = function (isResize) {
+                updateChequeFormatObject(this.element);
+            };
+            dragresize.ondragblur = function () { };
+            dragresize.apply(document);
+            chequePanel.appendChild(input);
+            var ripple = document.querySelectorAll('.cheque-control .ripple-wrapper');
+            for (var i = 0; i < ripple.length; i++) {
+                ripple[i].parentElement.removeChild(ripple[i]);
+            }
+            var chequeFormat = {
+                ChequeFormatID: parseInt(document.getElementById("ChequeFormatID").value),
+                ChequeLableID: parseInt(input.getAttribute("data-name")),
+                m_Left: parseFloat(input.style.left.replace("px", '')),
+                m_TOP: parseFloat(input.style.top.replace("px", '')),
+                m_FontName: input.style.fontFamily,
+                m_FontSize: parseInt(input.style.fontSize.replace("px", '')),
+                m_fontweight: input.style.fontWeight,
+                m_Height: parseFloat(input.style.height.replace("px", '')),
+                m_Width: parseFloat(input.style.width.replace("px", '')),
+                m_TextAlign: input.style.textAlign,
+                m_Direction: input.style.direction
+            }
+            chequeFormatList.push(chequeFormat);
+        }
+        else {
+            alertify.error("این فیلد قبلا انتخاب شده است!");
+        }
+    }
+    function setElementDragable(element, dragresize) {
+
+        var remove = document.createElement("button"),
+             removeIcon = document.createElement("i"),
+             text = document.createElement("span");
+        remove.classList.add("remove");
+        remove.classList.add("btn");
+        remove.classList.add("btn-danger");
+        remove.classList.add("btn-xs");
+        remove.classList.add("btn-flat");
+        removeIcon.classList.add("zmdi");
+        removeIcon.classList.add("zmdi-close");
+        remove.onclick = function () { element.remove(); }
+        remove.appendChild(removeIcon);
+        element.appendChild(remove);
+        dragresize.isElement = function (element) {
+            if (element.className && element.className.indexOf('drsElement') > -1) return true;
+        };
+        dragresize.isHandle = function (element) {
+            if (element.className && element.className.indexOf('drsMoveHandle') > -1) return true;
+        };
+        dragresize.ondragfocus = function () {
+            inputWidth.value = this.elmW;
+            inputHeight.value = this.elmH;
+            inputTop.value = this.elmY;
+            inputLeft.value = this.elmX;
+            inputFontFamily.value = this.fontFamily;
+            inputFontSize.value = this.fontSize;
+            inputName.value = this.name;
+            inputDirection.value = this.direction;
+            inputTextAlign.value = this.textAlign;
+            inputFontWeight.value = this.fontWeight;
+
+            inputWidth.classList.remove("empty");
+            inputHeight.classList.remove("empty");
+            inputTop.classList.remove("empty");
+            inputLeft.classList.remove("empty");
+            //inputFontFamily.classList.remove("empty");
+            //inputFontSize.classList.remove("empty");
+        };
+        dragresize.ondragstart = function (isResize) { };
+        dragresize.ondragmove = function (isResize) {
+            inputWidth.value = this.elmW;
+            inputHeight.value = this.elmH;
+            inputTop.value = this.elmY;
+            inputLeft.value = this.elmX;
+
+            inputWidth.classList.remove("empty");
+            inputHeight.classList.remove("empty");
+            inputTop.classList.remove("empty");
+            inputLeft.classList.remove("empty");
+        };
+        dragresize.ondragend = function (isResize) {
+            updateChequeFormatObject(this.element);
+        };
+        dragresize.ondragblur = function () { };
+        dragresize.apply(document);
+        chequePanel.appendChild(element);
+        //var ripple = document.querySelectorAll('.cheque-control .ripple-wrapper');
+        //for (var i = 0; i < ripple.length; i++) {
+        //    ripple[i].parentElement.removeChild(ripple[i]);
+        //}
+        var chequeFormat = {
+            ChequeFormatID: parseInt(document.getElementById("ChequeFormatID").value),
+            ChequeLableID: parseInt(element.getAttribute("data-name")),
+            m_Left: parseFloat(element.style.left.replace("px", '')),
+            m_TOP: parseFloat(element.style.top.replace("px", '')),
+            m_FontName: element.style.fontFamily,
+            m_FontSize: parseInt(element.style.fontSize.replace("px", '')),
+            m_fontweight: element.style.fontWeight,
+            m_Height: parseFloat(element.style.height.replace("px", '')),
+            m_Width: parseFloat(element.style.width.replace("px", '')),
+            m_TextAlign: element.style.textAlign,
+            m_Direction: element.style.direction
+        }
+        chequeFormatList.push(chequeFormat);
+    }
+    function removeInput(input) {
+        input.remove();
+    }
+    //prop change event
+    function changeWidth() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.width = this.value + "px";
+        updateChequeFormatObject(element);
+    }
+    function changeHeight() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.height = this.value + "px";
+        updateChequeFormatObject(element);
+    }
+    function changeTop() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.top = this.value + "px";
+        updateChequeFormatObject(element);
+    }
+    function changeLeft() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.left = this.value + "px";
+        updateChequeFormatObject(element);
+    }
+    function changeFontFamily() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.fontFamily = this.value;
+        updateChequeFormatObject(element);
+    }
+    function changeFontSize() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.fontSize = this.value + "px";
+        updateChequeFormatObject(element);
+    }
+    function changeDirection() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.direction = this.value;
+        updateChequeFormatObject(element);
+    }
+    function changeTextAlign() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.textAlign = this.value;
+        updateChequeFormatObject(element);
+    }
+    function changeFontWeight() {
+        var element = document.querySelector("div[data-name='" + inputName.value + "']");
+        element.style.fontWeight = this.value;
+        updateChequeFormatObject(element);
+    }
+
+    function updateChequeFormatObject(element) {
+        var object = chequeFormatList.filter(function (obj) {
+            return obj.ChequeLableID == element.getAttribute("data-name");
+        });
+        object[0].m_Left = element.style.left.replace("px", ''),
+        object[0].m_TOP = parseFloat(element.style.top.replace("px", '')),
+        object[0].m_FontName = element.style.fontFamily,
+        object[0].m_FontSize = parseInt(element.style.fontSize.replace("px", '')),
+        object[0].m_fontweight = element.style.fontWeight,
+        object[0].m_Height = parseFloat(element.style.height.replace("px", '')),
+        object[0].m_Width = parseFloat(element.style.width.replace("px", '')),
+        object[0].m_TextAlign = element.style.textAlign,
+        object[0].m_Direction = element.style.direction
+    }
+    var chequeDesign = document.getElementById("chequeDesign");
+    chequeDesign.onsubmit = function (e) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        var xhttp = new XMLHttpRequest();
+        chequeFormatList = [];
+        drsElement = document.querySelectorAll(".drsElement");
+        for (var i = 0; i < drsElement.length; i++) {
+            setElementDragable(drsElement.item(i), dragresize);
+        }
+        var formData = new FormData();
+        formData.append("CheckFormatType", JSON.stringify(chequeFormatList));
+        xhttp.onreadystatechange = function () {
+            if (xhttp.readyState == 4 && xhttp.status == 200) {
+                window.document.location.href = window.document.location.href = "/BasicInfo/CheckBook/Index?BasicBankID=@(ViewBag.BasicBankID)&BankId=@(ViewBag.BankId)";
+                @*"@Url.Action("Index", "CheckBook", new {  BankId = ViewBag.BankId, BasicBankID = ViewBag.BasicBankID,Area = "BasicInfo"   })";*@
+            }
+        };
+        xhttp.open("POST", "@Url.Action("Edit", "Cheque", new { area = "BasicInfo" })", true);
+        xhttp.send(formData);
+    }
+
+
+    @*$("body").on("change", "#BasicBank", function () {
+        var addressBankList = "@(Url.Action("GetChequeFormatType", "Cheque", new { Area= "BasicInfo" }))";
+        $("#ChequeFormatID").load(addressBankList, { id: $(this).val() }, function (data) {
+            $("#ChequeFormatID").val($("#ChequeFormatID option:first").val()).removeClass("empty");
+            updateChequeImage($("#ChequeFormatID").val());
+        });
+    });*@
+
+    $("body").on("change", "#ChequeFormatID", function () {
+        updateChequeImage($(this).val());
+    });
+    function updateChequeImage(relatedID) {
+        dragresize = new DragResize('dragresize', { minWidth: 0, minHeight: 0, minLeft: 0, minTop: 0, maxLeft: @(ViewBag.Width), maxTop: @(ViewBag.Height) });
+        for (var i = 0; i < drsElement.length; i++) {
+            setElementDragable(drsElement.item(i), dragresize);
+        }
+        @*console.log(relatedID);
+        if (relatedID != null) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    if (xhttp.responseText) {
+                        console.log(JSON.parse(xhttp.responseText));
+                        var file = JSON.parse(xhttp.responseText);
+                        var chequePanel = document.getElementById("chequePanel");
+                        console.log(chequePanel);
+                        console.log("url(data:image/" + file.Extension + ";base64," + file.Image + ")");
+                        $("#chequePanel")
+                            //.css("background-image", "url(data:image/" + file.Extension + ";base64," + file.Image + ")")
+                        .css("height", file.Height + "px")
+                        .css("width", file.Width + "px")
+                        .css("background-image", "url(data:image/" + file.Extension + ";base64," + file.Image + ")");
+                        dragresize = new DragResize('dragresize', { minWidth: 0, minHeight: 0, minLeft: 0, minTop: 0, maxLeft: file.Width, maxTop: file.Height });
+                        for (var i = 0; i < drsElement.length; i++) {
+                            setElementDragable(drsElement.item(i), dragresize);
+                        }
+                    }
+                }
+            };
+            xhttp.open("GET", "@Url.Action("GetChequeFormatTypeImage", "Cheque", new { Area= "BasicInfo" })" + "?tableName=ChequeFormatTypes&relatedID=" + relatedID, true);
+            xhttp.send();
+        }*@
+    }
+    updateChequeImage("@(ViewBag.ChequeFormatID)");
+
+
+
+
+
+</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

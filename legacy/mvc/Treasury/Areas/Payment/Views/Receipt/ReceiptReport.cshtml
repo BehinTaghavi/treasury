@@ -1,0 +1,41 @@
+﻿@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+@using CSD.Treasury.Resourse
+@{
+    Layout = null;
+}
+
+<div>
+
+@Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+    Actions =
+    {
+        GetReportSnapshot = "LoadReceiptReport",
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+    },
+    Toolbar =
+    {
+        ShowPrintButton=true,
+        BackgroundColor = System.Drawing.Color.Silver,
+        ShowFindButton=true,
+        ShowAboutButton=false,
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+    },
+
+    Height = Unit.Percentage(100),
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+</div>
+
+
+
+

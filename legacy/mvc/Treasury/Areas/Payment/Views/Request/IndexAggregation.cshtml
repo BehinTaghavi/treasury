@@ -1,0 +1,21 @@
+﻿
+@{
+    ViewBag.Title = "IndexAggregation";
+}
+@section list{
+    <div id="Result">
+        @Html.Action("AggregationList", "Request", new { Area = "Payment" })
+    </div>
+}
+<script type="text/javascript">
+    @*function updateTable() {
+     
+        var url = '@(Url.Action("AggregationList", "Request", new { area = "Payment" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }*@
+</script>

@@ -1,0 +1,244 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelExpiredReceivableCheque
+@using CSD.Treasury.Resourse
+
+@using (Ajax.BeginForm("ShowALLExpired", "ExpiredCheckReceivable", new { Area = "Report" },
+                                                                            new AjaxOptions()
+                                                                            {
+                                                                                UpdateTargetId = "Result",
+                                                                                InsertionMode = InsertionMode.Replace,
+                                                                            }, new { id = "SearchForm" }))
+{
+
+    <div class="clearfix">
+        <div class="col-sm-4">
+            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+        </div>
+        <div class="col-md-8">
+            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+        </div>
+      
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ReceiptDetailId, new { data_lang_number = "fa", @class = "form-control until floating-label", @placeholder = Resources.ReceiptDetailId })
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ReceiptDateFrom, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date })
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ReceeiptDateTo, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date })
+            </div>
+        </div>
+
+    </div>
+
+    <div class="clearfix">
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.DropDownListFor(d=>d.BehalfGroupID, new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = @CSD.Treasury.Resourse.Resources.BehalfGroupID })
+            </div>
+        </div>
+        @*<div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d=>d.BehalfID, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Behalf })
+            </div>
+        </div>*@
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.exchangeTypeId, new SelectList(ViewBag.ExchangeLs, "ExchangeTypeID", "ExchangeTypeDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.ExchangeType })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(model => model.PayAmount, new { @type = "number", data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Price, @Min = 0 })
+            </div>
+        </div>
+    </div>
+  
+    
+    <div class="clearfix">      
+        
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.From + " " + Resources.DueDate })
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DueDateTo, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.DueDate })
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-6">
+            <div class="form-group">
+                <div class="form-group">
+                    @Html.DropDownListFor(d => d.StatusUnique_Account_No_One, new SelectList(ViewBag.BankLS, "UniqueAccountNo", "Bank_AccountNumber"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.BankAccountNumber })
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ChequeNo, new { data_lang_number = "fa", @class = "form-control until floating-label", @placeholder = Resources.ChequeNo })
+            </div>
+        </div>
+    </div>
+   
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')" >@Resources.Search</button>
+                <button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')" >@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+    
+
+}
+
+<script>
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, //     term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $(function () {
+        $.material.init();
+    });
+    //$('select').select2({
+    //    containerCssClass: "form-control",
+    //    dir: "rtl"
+    //});
+    //today
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+
+    //last month
+    var lstmonth = new Date();
+    var day = lstmonth.getDate();
+    var month = lstmonth.getMonth(); //January is 0!
+    var year = lstmonth.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    lstmonth = year + '-' + month + '-' + day;
+
+    function toGargDate(date) {
+        var day = date.getDate();
+        var month = date.getMonth() + 1; //January is 0!
+        var year = date.getFullYear();
+        if (day < 10) day = '0' + day;
+        if (month < 10) month = '0' + month;
+        date = year + '-' + month + '-' + day;
+        return moment(date, 'jYYYY/jM/jD').format('YYYY/M/D');
+    }
+
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+    //val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD'))
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+       // maxDate: new Date()
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        //maxDate: new Date()
+    });
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+    $(function () {  
+        $('body').on("click", "#report", function () {
+            var data = $('#SearchForm').serializeArray();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            xhttp.open("POST", "@Url.Action("ExpiredCheckListReport", "ExpiredCheckReceivable", new { Area = "Report" })", true);
+            xhttp.send(new FormData(document.querySelector("#SearchForm")));
+         
+        })
+    });
+    $("body").on("change", "#BehalfGropId", function () {
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBehalfs", "Request", new { Area = "Payment" }))";
+            $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                $("#BehalfID").val($("#BehalfID option:first").val());
+            });
+        }
+        else {
+            $("#BehalfID").html("");
+         
+        }
+    })
+    
+</script>

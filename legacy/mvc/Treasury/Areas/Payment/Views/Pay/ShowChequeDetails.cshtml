@@ -1,0 +1,370 @@
+﻿@model CSD.Treasury.UI.Areas.Payment.Models.ChequeDetails
+@using CSD.Treasury.Service.ChequeFormatTypesService
+@using (Ajax.BeginForm("Issuance", "ChequePayment", new { area = "Payment", TableName = "ChequeFormatTypes" }, new AjaxOptions
+{
+    OnSuccess = "modalCheque(data)"
+}))
+{
+    @(Model.behalfValue)
+    @Html.HiddenFor(model => model.RequestId)
+    <div class="form-group">
+        <div class='clearfix'>
+            <div class='col-sm-3'>
+                <label for='ChequeFormatID' class='control-label'>قطع چک</label>
+            </div>
+            <div class='col-sm-5'>
+                <div class='form-group-material-grey-100'>
+                    <select name='ChequeFormatID' id="ChequeFormatID" class='form-control'>
+                        @if (ViewBag.ChequeFormatTypeLs != null)
+                        {
+                            foreach (var item in (List<CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType>)ViewBag.ChequeFormatTypeLs)
+                            {
+                                <option value='@item.ChequeFormatID'>@Utility.GetChequeDesc(item.FormatDescriptionID_Main)</option>
+                            }
+                        }
+                        else
+                        {
+                            <option value='@Resources.PleaseCreateCheckBook'></option>
+                        }
+
+                    </select>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    @*<div class="form-group">
+            <div class='clearfix'>
+                <div class='col-sm-3'>
+                    <label class='control-label'>دروجه</label>
+                </div>
+                <div class='col-sm-3'>
+                    @Html.TextBoxFor(d => d.PayTo)
+                </div>
+            </div>
+        </div>*@
+    <div class="form-group">
+        <div class='clearfix'>
+            <div class='col-sm-3'>
+                <label class='control-label'>شماره چک</label>
+            </div>
+            <div class='col-sm-3'>
+                <label class='control-label' id="chequeNumber"></label>
+            </div>
+        </div>
+    </div>
+    if (!ViewBag.ISEntezami)
+    {
+        <div class="form-group">
+            <div class='clearfix'>
+                <div class='col-sm-3'>
+                    <label for='DueDate' class='control-label'>تاریخ سررسید</label>
+                </div>
+                <div class='col-sm-5'>
+
+                    @if ((int)ViewBag.Pay_Type == 1 || (int)ViewBag.Pay_Type == 5)
+                    {
+                        <label class="moment-date mdc-text-grey-600 control-label" data-lang-number="fa">@Utility.DateStructure(Utility.ToPersianDate(DateTime.Now))</label>
+                        <input type="hidden" value="@Utility.ToPersianDate(DateTime.Now).Replace("/" , "")"   name="DueDate" id="DueDate"/>
+                    }
+                    else
+                    {
+                        <div class='form-group-material-grey-100'>
+                            @Html.TextBoxFor(model => model.DueDate, new { data_lang_number = "fa", @class = "form-control datepicker", @autocomplete = "off", placeholder = "____/__/__",@readonly= "readonly" })
+                            @Html.ValidationMessageFor(model => model.DueDate)
+                        </div>
+                    }
+
+                </div>
+            </div>
+        </div>
+    }
+    if (ViewBag.IzArzi)
+    {
+        <div class="form-group">
+            <div class='clearfix'>
+                <div class='col-sm-3'>
+                    <label for='ExchangeRate' class='control-label'>نرخ ارز</label>
+                </div>
+                <div class='col-sm-5'>
+                    <div class='form-group-material-grey-100'>
+                        <input id="ExchangeRate" name="ExchangeRate" required oninput="this.setCustomValidity('')" oninvalid="this.setCustomValidity('لطفا نرخ ارز را وارد نمایید')" readonly="readonly" type="text" value="@(ViewBag.ExchangeRate)" data_lang_number="fa" class="form-control" autocomplete="off" min="1" />
+                        @*@Html.TextBoxFor(model => model.ExchangeRate, new { data_lang_number = "fa", @value = ViewBag.ExchangeRate, @class = "form-control", @autocomplete = "off" , @readonly = "readonly"})*@
+                        @Html.ValidationMessageFor(model => model.ExchangeRate)
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+    <div class="mdc-bg-grey-50" style="padding: 15px; margin-top: 15px">
+        <div class="form-group">
+            <div>
+                <label><input type="checkbox" id="CheckDefaultValue" data-ralated-input="@((string)ViewBag.DefaultValue)" />&nbsp;&nbsp; اعمال مقادیر پیش فرض</label>
+            </div>
+        </div>
+        <hr />
+        <div class="container-fluid">
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.RemoveRemit, new { @class = "relate", data_related = "Bearer" })&nbsp;&nbsp; حذف حواله کرد</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.RemoveOrdersFor)&nbsp;&nbsp; حذف حواله "بابت"</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.ShowDescription)&nbsp;&nbsp; نمایش شرح درخواست</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.WithoutCrossing)&nbsp;&nbsp; چک فاقد هر گونه قلم خوردگی است</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.checkIsUnderwritten)&nbsp;&nbsp;چک فاقد ظهرنویسی است </label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.NonTransferable)&nbsp;&nbsp;چک غیر قابل انتقال می باشد</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.Bearer, new { @class = "relate", data_related = "RemoveRemit,CurrentAccount,ShebaAccount,NonTransferable,BranchExporterReceivable" })&nbsp;&nbsp; در وجه حامل</label>
+                </div>
+            </div>
+            @if (ViewBag.hasMain_Unique_Account_No)
+            {
+                <div class="form-group">
+                    <div>
+                        <label>@Html.CheckBoxFor(model => model.Unique_Account_No2, new { @class = "relate", data_related = "RemoveRemit,NonTransferable,BranchExporterReceivable,Bearer" })&nbsp;&nbsp; در وجه ذینفع اصلی</label>
+                    </div>
+                </div>
+            }
+            <div class="form-group">
+                <div class="clearfix">
+                    <div class="pull-right">
+                        <label>@Html.CheckBoxFor(model => model.CurrentAccount, new { @class = "relate", data_related = "RemoveRemit,Bearer,ShebaAccount" })&nbsp;&nbsp; چک در وجه حساب جاری</label>
+                    </div>
+                    <div class="pull-right" style="padding: 0 20px">
+                        <select id="accountList" class="form-control" name="CurrentAccountId" style="display: none; width: 200px; margin-top: -9px"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="clearfix">
+                    <div class="pull-right">
+                        <label>@Html.CheckBoxFor(model => model.ShebaAccount, new { @class = "relate", data_related = "RemoveRemit,Bearer,CurrentAccount" })&nbsp;&nbsp; چک در وجه حساب شبا</label>
+                    </div>
+                    <div class="pull-right" style="padding: 0 20px">
+                        <select id="ShebaAccountList" class="form-control" name="ShebaAccountId" style="display: none; width: 250px; margin-top: -9px"></select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.BranchExporterReceivable)&nbsp;&nbsp; در شعبه صادر کننده قابل وصول است</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <div>
+                    <label>@Html.CheckBoxFor(model => model.ApproveIssuance)&nbsp;&nbsp; تایید صدور چک</label>
+                </div>
+            </div>
+        </div>
+        <button type='submit' id="submitBtn" class='btn btn-sm btn-info'>صدورچک</button>
+
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script src="@Url.Content("~/Scripts/wordifyfa.js")"></script>
+<script>
+    $(document).ready(function () {
+        if (@(ViewBag.ExchangeType) != 0) {
+            if (@(ViewBag.ExchangeType) == 4) {
+            $('#ExchangeRate').removeAttr('readonly');
+        }
+        }
+   
+    });
+    $(function () {
+        $.material.init();
+        //debugger;
+        console.log("test")
+        console.log($("#ChequeFormatID").val());
+        getLastChequeNumber($("#ChequeFormatID").val(), "@Model.RequestId")
+        $("body").on("change", "#ChequeFormatID", function () {
+            getLastChequeNumber($(this).val(), "@Model.RequestId")
+        });
+     
+    });
+    function getLastChequeNumber(value, id) {
+        //debugger;
+        $.ajax({
+            url: "/Payment/ChequePayment/GetLastChequeNo",
+            data: { RequestId: id, ChequeFormatID: value },
+            success: function (result) {
+                console.log(result)
+                if (!result.Nosheet) {
+                    $("#chequeNumber").text(result.LastChequeNo);
+
+                    if (!result.NoPrint) {
+
+                        if (result.BardashtAzGari)
+                        {
+                            alert(result.Message);
+                            if (confirm("آیا انتقال از حساب جاری انجام شود؟"))
+                                $("#submitBtn").show();
+                            else
+                                $("#submitBtn").hide();
+                        }
+                        else
+                        {
+                            $("#submitBtn").show();
+                        }
+
+                    }
+                    else if (result.NoPrint) {
+
+                        alert(result.Message);
+                        $("#submitBtn").hide();
+                    }
+
+
+                }
+                else {
+                    alertify.error("برگه چک به اتمام رسیده است.");
+                    $("#chequeNumber").text("---");
+                    $("#submitBtn").hide();
+
+                }
+            }
+        });
+    }
+
+    $.each($(".datepicker"), function (i, e) {
+        $(e)
+            //.after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val()))
+            .removeAttr("id");
+
+    });
+
+    //$("body").on("change", ".datepicker", function () {
+    //    var date = $(this);
+    //    $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+    //    //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    //});
+    //val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD'))
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        minDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000)
+    });
+
+
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+
+
+    var _accList = [];
+    $.ajax({
+        url: "Pay/AccountNumLs?RequestId=" + "@ViewBag.RequestId",
+        success: function (response) {
+            _accList = response;
+
+            if (response.length > 0) {
+                var accList = "";
+                var shebaList = "";
+                for (var i = 0; i < response.length; i++) {
+                    if (response[i].Bank_AccountNumber != null) {
+                        accList += "<option value='" + response[i].BeneficiarDetailID + "'>" + response[i].Bank_AccountNumber + "</option>"
+                    }
+
+                }
+                for (var i = 0; i < response.length; i++) {
+                    if (response[i].Bank_ShebaNo != null) {
+                        shebaList += "<option value='" + response[i].BeneficiarDetailID + "'>" + response[i].Bank_ShebaNo + "</option>"
+                    }
+
+                }
+                $("#accountList").html(accList);
+                $("#ShebaAccountList").html(shebaList);
+            }
+        }
+    });
+    $("body").on("change", "#CheckDefaultValue", function () {
+        var _this = $(this);
+        if ($(this).is(':checked')) {
+            console.log("a");
+            var _i = _this.attr("data-ralated-input").split(',');
+            for (var i = 0; i < _i.length; i++) {
+                $("#" + _i[i]).prop('checked', true).trigger("change");
+            }
+        }
+        else {
+            console.log("b");
+            var _i = _this.attr("data-ralated-input").split(',');
+            for (var i = 0; i < _i.length; i++) {
+                $("#" + _i[i]).prop('checked', false).trigger("change");
+            }
+        }
+    })
+    $("body").on("change", ".relate", function () {
+        var _this = $(this);
+        var relatedName = _this.attr("data-related").split(',');
+        if (_this.is(':checked')) {
+            if (_this.attr("id") == "CurrentAccount") {
+                if (!_accList.length > 0) {
+                    $('#CurrentAccount').attr('checked', false);
+                    alertify.error("لیست حساب های جاری خالی میباشد");
+                    return;
+                }
+                else {
+                    $("#accountList").show();
+                }
+            }
+            if (_this.attr("id") == "ShebaAccount") {
+                if (!_accList.length > 0) {
+                    $('#ShebaAccount').attr('checked', false);
+                    alertify.error("لیست حساب های شبا خالی میباشد");
+                    return;
+                }
+                else {
+                    $("#ShebaAccountList").show();
+                }
+            }
+
+            for (var i = 0; i < relatedName.length; i++) {
+                document.getElementById(relatedName[i]).disabled = true;
+                $('#' + relatedName[i]).attr('checked', false);
+            }
+        }
+        else {
+
+            if (_this.attr("id") == "CurrentAccount") {
+                $("#accountList").hide();
+            }
+            if (_this.attr("id") == "ShebaAccount") {
+                $("#ShebaAccountList").hide();
+            }
+
+
+            for (var i = 0; i < relatedName.length; i++) {
+                document.getElementById(relatedName[i]).disabled = false;
+                $('#' + relatedName[i]).attr('checked', false);
+            }
+        }
+    })
+</script>

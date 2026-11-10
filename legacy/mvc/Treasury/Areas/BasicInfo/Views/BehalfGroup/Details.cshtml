@@ -1,0 +1,45 @@
+﻿@model CSD.Treasury.Service.BehalfGroupService.BehalfGroup
+@{
+    ViewBag.Title = "Details";
+}
+
+<div class="row">
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.Title
+            </label>
+            @(Model.BehalfGroupDescription)
+        </p>
+    </div>
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.account_code /@Resources.Code
+            </label>
+            @Utility.Getaccounts(Model.BehalfGroup_Account)/@(Model.BehalfGroup_Account)
+        </p>
+    </div>
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.Type
+            </label>
+            @Utility.GetReceipt_Pay_Type(Model.Receipt_Pay_TypeID)
+        </p>
+    </div>
+    <div class="col-sm-6">
+        <p class="pardes">
+            <label>
+                @Resources.Reference
+            </label>
+            @{ 
+                foreach(var item in Utility.GetReferenceTypeByBehalfGroup(Model.BehalfGroupID).ToList())
+                {
+                  <span>@Utility.GetReferenceTitle(item)</span><span>-</span>
+                }
+            }
+         
+        </p>
+    </div>
+</div>

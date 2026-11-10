@@ -1,0 +1,248 @@
+﻿@model CSD.Treasury.UI.Models.DaryaftaniPardakhtaniAti
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+
+@using CSD.Treasury.Resourse
+@{
+
+    ViewBag.Title = "DaryaftaniPardakhtaniAtiPerZinaf";
+    <table class="table table-striped sortable">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th>@Resources.FiscalYear</th>
+                <th>@Resources.Description</th>
+                <th>@Resources.Unique_Account_No</th>
+                <th>فروردین</th>
+                <th>اردیبهشت</th>
+                <th>خرداد</th>
+                <th>تیر</th>
+                <th>مرداد</th>
+                <th>شهریور</th>
+                <th>مهر</th>
+                <th>آبان</th>
+                <th>آذر</th>
+                <th>دی</th>
+                <th>بهمن</th>
+                <th>اسفند</th>
+
+            </tr>
+        </thead>
+        @foreach (var item in Model.ListPerZinaf)
+        {
+            <tr>
+                <td>@item.FiscalYear</td>
+                <td>@item.PlaningTypeDesc</td>
+                <td>@item.Account_Name</td>
+                <td>
+                    @if (item.Mon == "01")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "02")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "03")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "04")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "05")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "06")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "07")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "08")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "09")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "10")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "11")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+                <td>
+                    @if (item.Mon == "11")
+                    {
+                        @(item.Total)
+                    }
+                    else
+                    {
+                        @(0)
+                    }
+                </td>
+
+            </tr>
+        }
+    </table>
+    <div class="container-fluid">
+        <div class="clearfix">
+            <div class="pull-right">
+                <span class="pagination pagination-total">
+                    @Resources.Total : @Model.TotalItemCount
+                    @Resources.Page @(ix + 1)
+                    @Resources.From @Model.TotalPageCount
+                </span>
+            </div>
+            <div class="pull-left">
+                <nav class="text-center">
+                    <ul class="pagination  pagination-sm">
+                        @{
+                            var start = ix;
+                            if (start > 0)
+                            {
+                                int c = 0;
+                                while (start > 0 && c < 4)
+                                {
+                                    c++;
+                                    start--;
+                                }
+                            }
+                            if (ix != 0)
+                            {
+                                Model.PageIndex = 0;
+                                <li>
+                                    @Ajax.ActionLink("<<", "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+InsertionMode = InsertionMode.Replace,
+HttpMethod = "post",
+
+})
+
+                                </li>
+                            }
+                            for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                            {
+                                if (ix != j)
+                                {
+                                    Model.PageIndex = j;
+                                    <li>
+                                        @Ajax.ActionLink((j + 1).ToString(), "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+HttpMethod = "post",
+InsertionMode = InsertionMode.Replace,
+
+})
+                                    </li>
+                                }
+                                else
+                                {
+                                    <li class="active">
+                                        <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                    </li>
+                                }
+                            }
+                            if (start + 9 < Model.TotalPageCount)
+                            {
+                                <li>
+                                    @Ajax.ActionLink(">>", "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+HttpMethod = "post",
+InsertionMode = InsertionMode.Replace,
+
+})
+                                </li>
+                            }
+                        }
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+    </div>
+
+
+}
+
+

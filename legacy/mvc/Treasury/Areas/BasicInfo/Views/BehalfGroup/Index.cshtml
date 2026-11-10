@@ -1,0 +1,85 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelBehalfGroup
+@{
+    ViewBag.Title = Resources.ExchangeType;
+    var tableId = Guid.NewGuid().ToString("N");
+}
+@section PageHeader{
+    @Resources.List @Resources.BehalfGroup
+    <a href="@Url.Content("~/Content/HelpFile/99-182.docx")" target="_blank" class="btn btn-default btn-sm"> راهنما</a>
+}
+@section btnToolbar{
+<div class="mdc-bg-grey-50">
+    <div class="btn-toolbar">
+        <div class="clearfix">
+            <div>
+                @Ajax.ActionLink(Resources.Create, "Create", "BehalfGroup", new
+           {
+               Area = "BasicInfo",
+           }, new AjaxOptions
+           {
+               OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.BehalfGroup + "', 'md')"
+           }, new { @class = "btn 	btn-material-green-600 btn-sm" })
+                @Html.ActionLink(Resources.ReferenceType, "Index", "RefrenceType", new { area = "BasicInfo" }, new { @class = "btn btn-material-grey-600 btn-sm" })
+                @Html.ActionLink("چاپ گروه بابتها", "BehalfGroupIndex", "behalfgroupreport", new {Area= "report" },new { @class = "btn btn-material-grey-600 btn-sm" })
+            </div>
+        
+            <div>
+                @using (Ajax.BeginForm("List", "BehalfGroup", new { Area = "BasicInfo" },
+                    new AjaxOptions()
+                    {
+                        UpdateTargetId = "Result",
+                        InsertionMode = InsertionMode.Replace,
+                    }, null))
+                {
+                    <div class="col-sm-4">
+                        <div class="form-group">
+                          <select id="Receipt_Pay_TypeID" name="Receipt_Pay_TypeID" class = "form-control" >
+                              <option value="0">-----</option>
+                              <option value="1">@Resources.Paid</option>
+                              <option value="2">@Resources.Receive</option>
+                              <option value="3">@Resources.Public</option>
+                              <option value="4">@Resources.PickUp</option>
+                          </select>
+                        </div>
+                    </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                @Html.TextBoxFor(d => d.BehalfGroupDescription, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.BehalfGroup + "-" + Resources.Title })
+                            </div>
+                        </div>
+                        <div class="pull-right">
+                            <div class="col-sm-12">
+                                <div class="text-left">
+                                    <button type="submit" class="btn btn-info btn-sm">@Resources.Search</button>
+                                </div>
+                            </div>
+                        </div>
+                }
+            </div>
+
+        </div>
+    </div>
+</div>
+}
+@*id="@tableId"*@
+@section list{
+<div id="Result">
+    @Html.Action("List", "BehalfGroup", new { Area = "BasicInfo" })
+</div>
+}
+
+@section scripts{
+    <script type="text/javascript">
+        function updateTable() {
+            var url = '@(Url.Action("List", "BehalfGroup", new { area = "BasicInfo" }))';
+            $.ajax({
+                url: url, type: 'get',
+                success: function (data, status) {
+                    $("#Result").html(data);
+                }
+            });
+
+        }
+    </script>
+}
+

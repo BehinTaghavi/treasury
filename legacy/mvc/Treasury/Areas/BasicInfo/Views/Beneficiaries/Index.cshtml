@@ -1,0 +1,75 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelBeneficiaries
+@{
+    ViewBag.Title = Resources.List + " " + Resources.Beneficiaries;
+}
+
+@section PageHeader{
+    @Resources.List @Resources.Beneficiaries
+}
+
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    @Ajax.ActionLink(Resources.Create, "Create", "Beneficiaries", new { Area = "BasicInfo" }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.Beneficiaries + "', 'md')"
+               }, new { @class = "btn btn-material-green-600 btn-sm" })
+                    @Html.ActionLink("چاپ ذینفعان", "Index", "BeneficiariesReport", new { Area = "report" }, new { @class = "btn btn-material-grey-600 btn-sm" })
+                </div>
+                  
+                <div>
+                    @using (Ajax.BeginForm("List", "Beneficiaries", new { Area = "BasicInfo" },
+                                new AjaxOptions()
+                                {
+                                    UpdateTargetId = "Result",
+                                    InsertionMode = InsertionMode.Replace,
+                                }, null))
+                    {
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                @Html.TextBoxFor(d => d.LegalAccountName1, new { data_lang_number = "fa", @class = "form-control until floating-label", @placeholder = Resources.LegalAccountName })
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                @Html.TextBoxFor(d => d.Unique_Account_No1, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.Unique_Account_Code })
+                            </div>
+                        </div>
+                        <div class="clearfix">
+                            <div class="col-sm-12">
+                                <div class="text-left">
+                                    <button type="submit" class="btn btn-info btn-sm">@Resources.Search</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+               
+            </div>
+
+        </div>
+    </div>
+}
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Beneficiaries", new { Area = "BasicInfo", Model })
+    </div>
+}
+
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("List", "Beneficiaries", new { area = "BasicInfo" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+</script>
+
+

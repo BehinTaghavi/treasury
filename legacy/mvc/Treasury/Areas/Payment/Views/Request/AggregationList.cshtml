@@ -1,0 +1,170 @@
+﻿@model List<CSD.Treasury.DataModel.GetAllRequestStatus_Result>
+@using CSD.Treasury.MVCHelpers
+@{
+    var ls = Model.GroupBy(x => new { x.BehalfID, x.Unique_Account_No }).Where(x => x.Count() > 1);
+    int i = 0;
+}
+
+@section PageHeader{
+    @Resources.List @Resources.Aggregation
+
+}
+
+@if (ls.Count() != 0)
+{
+    using (Html.BeginForm("Aggregation", "Request", FormMethod.Post, new { id = "AggregationForm" }))
+    {
+
+        <button type="submit" class="btn btn-primary">@Resources.Save</button>
+        <div class="container" id="listResult">
+            @foreach (var item in ls)
+            {
+                i = i + 1;
+                <div class="panel-group" id="accordion">
+                    <div class="panel panel-default">
+
+
+                        <div class="panel-heading">
+                            <h4 class="panel-title">
+                                <a data-toggle="collapse" data-parent="#accordion" href="#collapse@(i)">
+                                    @Resources.Behalf: @Utility.GetBehalf(item.FirstOrDefault().BehalfID) /
+                                    @Resources.Unique_Account_No: @Utility.GetUniqueAccount(item.FirstOrDefault().Unique_Account_No.Trim())/@(item.FirstOrDefault().Unique_Account_No)
+                                    @* @(i) گروه*@
+                                </a>
+                            </h4>
+                        </div>
+                        <div id="collapse@(i)" class="panel-collapse collapse ">
+                            <div class="panel-body">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th></th>
+                                            <th>@Resources.RequestId</th>
+                                            <th>@Resources.PayAmount</th>
+                                            <th>@Resources.Behalf</th>
+                                            <th>@Resources.UserName</th>
+                                            <th>@Resources.Unique_Account_No</th>
+                                            <th>@Resources.ReceiptPayType</th>
+                                            <th>@Resources.From</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    @foreach (var item1 in item)
+                                    {
+                                        <tr>
+                                            <td class="text-center">
+                                                <div class="checkbox">
+                                                    <label>
+                                                        <input type="checkbox" class="dataprop" value="@item1.RequestID" />
+                                                    </label>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @(item1.RequestID)
+                                            </td>
+                                            <td>
+                                                @(item1.PayAmount)
+                                            </td>
+                                            <td>
+                                                @Utility.GetBehalf(item1.BehalfID)
+                                            </td>
+                                            <td>
+                                                @Utility.GetUserName(item1.UserID)
+                                            </td>
+                                            <td>
+                                                @Utility.GetUniqueAccount(item1.Unique_Account_No.Trim())
+                                            </td>
+                                            <td>
+
+                                                @if (item1.Pay_TypeDetailID_source != null)
+                                                {
+                                                    @Utility.GetReceipt_Pay_TypeDetailTitle(item1.Pay_TypeDetailID_source.Value)
+                                                }
+                                                else
+                                                {
+                                                    @Resources.Unknown
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (item1.Source_PaymentValue != null)
+                                                {
+                                                    @Utility.GetBasicBankInfoWithBankId(int.Parse(item1.Source_PaymentValue))
+                                                    <span></span>
+                                                    @Utility.GetBankInfoBankId(int.Parse(item1.Source_PaymentValue)).BranchName
+                                                    <span></span>
+                                                    @Utility.GetBankInfoBankId(int.Parse(item1.Source_PaymentValue)).Bank_AccountNumber
+                                                }
+                                                else
+                                                {
+                                                    @Resources.Unknown
+                                                }
+
+                                            </td>
+                                            <td>
+                                                @Ajax.IActionLink("", "RequestPayment", "Request", new { area = "Payment", requestId = item1.RequestID, Type = 0 }, new AjaxOptions
+                                           {
+                                               OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+                                           }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+
+                                            </td>
+                                        </tr>
+
+                                    }
+
+                                </table>
+
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            }
+        </div>
+        <button type="submit" class="btn btn-primary">@Resources.Save</button>
+    }
+
+    <script type="text/javascript">
+        document.getElementById("AggregationForm").onsubmit = function (e) {
+            e.preventDefault();
+
+            alertify.confirm('آیا مطمين هستید',
+                function () {
+                    var deletedList = [];
+                    $.each($(".dataprop"), function (i, element) {
+                        if ($(this).is(':checked')) {
+                            deletedList.push($(this).val());
+                        }
+                    });
+                    $.ajax({
+                        type: "POST",
+                        url: '@Url.Action("Aggregation", "Request", new { area = "Payment" })',
+                        data: $.param({ requestIds: deletedList }, true),
+                        success: function (data) {
+
+                            var rowChecked = document.getElementsByClassName("rowchecked");
+                            for (var i = 0; i < rowChecked.length; i++) {
+                                deleteRow(rowChecked[i].getAttribute("id"));
+                            }
+
+                            successMessage(data);
+                            location.reload();
+
+                        },
+                        datatype: "json",
+                        traditional: true,
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            alertify.error(xhr.status);
+                            alertify.error(thrownError);
+                        }
+                    })
+                })
+
+        }
+
+    </script>
+}
+else
+{
+    <span>موردی برای تجمیع یافت نشد</span>
+}

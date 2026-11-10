@@ -1,0 +1,98 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "SearchView";
+}
+@using (Ajax.BeginForm("listburse", "Naghdinegi", new { Area = "Report" },
+                                        new AjaxOptions()
+                                        {
+                                            UpdateTargetId = "Result",
+                                            InsertionMode = InsertionMode.Replace,
+                                        }, new { id = "SearchForm" }))
+{
+    @*@using (Html.BeginForm("List", "Naghdinegi", new { Area = "Report" }, FormMethod.Get, new { id = "SearchForm" }))
+        {*@
+<div class="clearfix">
+    <div class="col-sm-3">
+        <div class="form-group">
+    
+                @Html.DropDownListFor(d => d.BasicBank, new SelectList(ViewBag.Banks, "BasicBankId", "BasicBankDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank })
+           
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+       
+                @Html.DropDownListFor(model => model.BankId, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber })
+           
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date, @readonly = "readonly", @autocomplete = "off" })
+            @Html.ValidationMessageFor(model => model.FromDate)
+        </div>
+    </div>
+    <div class="col-sm-3">
+        <div class="form-group">
+            @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date, @readonly = "readonly", @autocomplete = "off" })
+            @Html.ValidationMessageFor(model => model.ToDate)
+        </div>
+    </div>
+</div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+<div id="Result"></div>
+<script>
+
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+     $('#BasicBank').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val() }, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+    @*$(function () {
+        $("body").on("change", "#basicBankList", function () {
+            $.ajax({
+                url: "@Url.Action("GetBanks", "BankBalance", new { area = "BasicInfo" })",
+                data: {
+                    BasicBankId: $(this).val()
+                },
+                success: function (result) {
+                    console.log(result);
+                    var str = "";
+                    for (var i = 0; i < result.length; i++) {
+                        str += "<option value='" + result[i].BankID + "'>" + result[i].Bank_AccountNumber + " - " + result[i].BranchName + "</option>"
+                    }
+                    $("#BankId").html("<option>انتخاب شعبه</option>" + str);
+                }
+            })
+        });
+
+
+
+
+
+    })*@
+
+</script>
+

@@ -1,0 +1,4 @@
+# Migration tool (runs on the migration machine, not part of the Treasury runtime)
+pymssql>=2.3        # reads the old SQL Server databases (Cashnajoo..)
+psycopg[binary]>=3.2
+pytest>=8

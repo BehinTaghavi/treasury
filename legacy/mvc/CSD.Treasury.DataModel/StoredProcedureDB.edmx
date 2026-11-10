@@ -1,0 +1,77 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<edmx:Edmx Version="3.0" xmlns:edmx="http://schemas.microsoft.com/ado/2009/11/edmx">
+  <!-- EF Runtime content -->
+  <edmx:Runtime>
+    <!-- SSDL content -->
+    <edmx:StorageModels>
+      <Schema Namespace="TreasuryModel1.Store" Provider="System.Data.SqlClient" ProviderManifestToken="2008" Alias="Self" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm/ssdl">
+        <Function Name="GetAllBankBalance" Aggregate="false" BuiltIn="false" NiladicFunction="false" IsComposable="false" ParameterTypeSemantics="AllowImplicitConversion" Schema="dbo">
+          <Parameter Name="FromDate" Type="char" Mode="In" />
+          <Parameter Name="ToDate" Type="char" Mode="In" />
+        </Function>
+        <EntityContainer Name="TreasuryModel1StoreContainer" />
+      </Schema>
+    </edmx:StorageModels>
+    <!-- CSDL content -->
+    <edmx:ConceptualModels>
+      <Schema Namespace="TreasuryModel1" Alias="Self" annotation:UseStrongSpatialTypes="false" xmlns:annotation="http://schemas.microsoft.com/ado/2009/02/edm/annotation" xmlns:customannotation="http://schemas.microsoft.com/ado/2013/11/edm/customannotation" xmlns="http://schemas.microsoft.com/ado/2009/11/edm">
+        <EntityContainer Name="StoredProcedureDB" annotation:LazyLoadingEnabled="true" >
+          <FunctionImport Name="GetAllBankBalance" ReturnType="Collection(TreasuryModel1.GetAllBankBalance_Result)">
+            <Parameter Name="FromDate" Mode="In" Type="String" />
+            <Parameter Name="ToDate" Mode="In" Type="String" />
+          </FunctionImport>
+        </EntityContainer>
+        <ComplexType Name="GetAllBankBalance_Result">
+          <Property Type="Int32" Name="BankID" Nullable="false" />
+          <Property Type="Decimal" Name="MogodiAvalie" Nullable="true" Precision="38" Scale="2" />
+          <Property Type="Decimal" Name="Daryaft" Nullable="true" Precision="38" Scale="2" />
+          <Property Type="Decimal" Name="Pardakht" Nullable="true" Precision="38" Scale="2" />
+          <Property Type="Decimal" Name="balance" Nullable="true" Precision="38" Scale="2" />
+          <Property Type="String" Name="BasicBankDescription" Nullable="true" MaxLength="50" />
+          <Property Type="String" Name="BranchName" Nullable="true" MaxLength="50" />
+          <Property Type="String" Name="Bank_AccountNumber" Nullable="true" MaxLength="50" />
+        </ComplexType>
+      </Schema>
+    </edmx:ConceptualModels>
+    <!-- C-S mapping content -->
+    <edmx:Mappings>
+      <Mapping Space="C-S" xmlns="http://schemas.microsoft.com/ado/2009/11/mapping/cs">
+        <EntityContainerMapping StorageEntityContainer="TreasuryModel1StoreContainer" CdmEntityContainer="StoredProcedureDB" >
+          <FunctionImportMapping FunctionImportName="GetAllBankBalance" FunctionName="TreasuryModel1.Store.GetAllBankBalance">
+            <ResultMapping>
+              <ComplexTypeMapping TypeName="TreasuryModel1.GetAllBankBalance_Result">
+                <ScalarProperty Name="BankID" ColumnName="BankID" />
+                <ScalarProperty Name="MogodiAvalie" ColumnName="MogodiAvalie" />
+                <ScalarProperty Name="Daryaft" ColumnName="Daryaft" />
+                <ScalarProperty Name="Pardakht" ColumnName="Pardakht" />
+                <ScalarProperty Name="balance" ColumnName="balance" />
+                <ScalarProperty Name="BasicBankDescription" ColumnName="BasicBankDescription" />
+                <ScalarProperty Name="BranchName" ColumnName="BranchName" />
+                <ScalarProperty Name="Bank_AccountNumber" ColumnName="Bank_AccountNumber" />
+              </ComplexTypeMapping>
+            </ResultMapping>
+          </FunctionImportMapping>
+        </EntityContainerMapping>
+      </Mapping>
+    </edmx:Mappings>
+  </edmx:Runtime>
+  <!-- EF Designer content (DO NOT EDIT MANUALLY BELOW HERE) -->
+  <Designer xmlns="http://schemas.microsoft.com/ado/2009/11/edmx">
+    <Connection>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="MetadataArtifactProcessing" Value="EmbedInOutputAssembly" />
+      </DesignerInfoPropertySet>
+    </Connection>
+    <Options>
+      <DesignerInfoPropertySet>
+        <DesignerProperty Name="ValidateOnBuild" Value="true" />
+        <DesignerProperty Name="EnablePluralization" Value="true" />
+        <DesignerProperty Name="IncludeForeignKeysInModel" Value="true" />
+        <DesignerProperty Name="UseLegacyProvider" Value="false" />
+        <DesignerProperty Name="CodeGenerationStrategy" Value="None" />
+      </DesignerInfoPropertySet>
+    </Options>
+    <!-- Diagram content (shape and connector positions) -->
+    <Diagrams></Diagrams>
+  </Designer>
+</edmx:Edmx>

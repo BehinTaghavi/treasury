@@ -1,0 +1,58 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.Resourse
+@using CSD.Treasury.UI.Models
+@section PageHeader{
+    گزارش خلاصه وضعیت نقدینگی
+}
+@{
+    ViewBag.Title = "SearchView";
+}
+@using (Ajax.BeginForm("listStatus", "Naghdinegi", new { Area = "Report" },
+                                        new AjaxOptions()
+                                        {
+                                            UpdateTargetId = "Result",
+                                            InsertionMode = InsertionMode.Replace,
+                                        }, new { id = "SearchForm" }))
+{
+
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.FromDate, new { data_lang_number = "fa", @Value = Utility.ToPersianDate(DateTime.Now), @class = "form-control until floating-label datepicker", @placeholder = Resources.Date, @readonly = "readonly", @autocomplete = "off" })
+                @Html.ValidationMessageFor(model => model.FromDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.FutureDate, @readonly = "readonly", @autocomplete = "off" })
+                @Html.ValidationMessageFor(model => model.ToDate)
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+<div id="Result"></div>
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+
+</script>
+

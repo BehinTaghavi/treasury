@@ -1,0 +1,329 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+
+@{
+    ViewBag.Title = "ResultOfIntegrationRequest";
+}
+
+
+@foreach (var child in Model.List.OrderBy(q => q.RequestID))
+{
+    string options = "";
+    if (child.Pay_TypeDetailID_source != null && child.Pay_TypeDetailID_source != 6 && child.Pay_TypeDetailID_source != 7 && child.Source_PaymentValue != null && child.Source_TypeID != 3)
+    {
+
+        List<CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType> chequeFormatTypeLs = Utility.GetChequeFormatTypeLs(int.Parse(child.Source_PaymentValue), true);
+        foreach (var lb in chequeFormatTypeLs)
+        {
+            options += "<option value='" + lb.ChequeFormatID + "'>" + Utility.GetChequeDesc(lb.FormatDescriptionID_Main) + "</option>";
+        }
+    }
+
+<tr class="@(child.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfDuplication ? "mdc-bg-grey-100" : "")@((child.AggrigateOrDuplicationStatusID == (int)RequestDescription.Integration || child.AggrigateOrDuplicationStatusID == (int)RequestDescription.IntegrationRequest) ? "mdc-bg-green-50" : "")" style="@(child.AggrigateOrDuplicationStatusID == (int)RequestDescription.Integration ? "opacity: .5" : "")">
+    <td class="text-center"></td>
+    <td></td>
+
+    <td>@(child.RequestID)</td>
+    <td>
+        <span data-lang-number="fa">
+            @(child.RequestDate.Substring(0, 4) + "/" + child.RequestDate.Substring(4, 2) + "/" + child.RequestDate.Substring(6, 2))
+        </span>
+    </td>
+
+    <td>
+        <b data-lang-number="fa" style="font-size: 15px" class="mdc-text-light-blue-900">
+            @Math.Truncate(child.PayAmount).ToString("#,##0")
+        </b>
+    </td>
+
+    <td>@Utility.GetUniqueAccount(child.Unique_Account_No)</td>
+
+    @*<td>
+            @switch (child.Priority)
+            {
+                case (short)Priority.High:
+                    <b class='mdc-text-green-700'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+                case (short)Priority.Normal:
+                    <b class='mdc-text-lime-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+                case (short)Priority.Low:
+                    <b class='mdc-text-amber-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), child.Priority))</b>
+                    break;
+            }
+        </td>*@
+    <td>
+        @*@if (child.Cancellation != null)
+        {
+            <text>@Resources.Cancel</text>
+        }
+        else if (child.Delivered != null)
+        {
+            <text>@Resources.Delivered</text>
+        }
+        else if (child.Paid != null)
+        {
+            <text>@Resources.Paid</text>
+        }
+        else if (child.ConfirmPayment != null)
+        {
+            <text>@Resources.ConfirmPayment</text>
+        }
+        else if (child.Confirmed != null)
+        {
+            <text>@Resources.Confirm</text>
+        }
+
+        else if (child.Unknown != null)
+        {
+            <text>@Resources.Unknown</text>
+        }*@
+    </td>
+
+    <td>
+        <span data-lang-number="fa">
+            @if (!string.IsNullOrEmpty(child.DueDate))
+            {
+                @(child.DueDate.Substring(0, 4) + "/" + child.DueDate.Substring(4, 2) + "/" + child.DueDate.Substring(6, 2))
+            }
+        </span>
+    </td>
+    <td>
+        <b>
+            @{
+                var BehalfDesc = Utility.GetBehalf(child.BehalfID);
+                if (BehalfDesc.Count() >= 15)
+                {
+                    @(BehalfDesc.Substring(0, 15) + "...")
+                }
+                else
+                {
+                    @BehalfDesc
+                }
+            }
+
+        </b>
+    </td>
+    <td>
+        @if (child.Pay_TypeDetailID_source == 1)
+        {
+            <text>چک روز</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 2)
+        {
+            <text>چک انتظامی</text>
+        }
+
+        else if (child.Pay_TypeDetailID_source == 4)
+        {
+            <text>چک مدت دار</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 5)
+        {
+            <text>چک نقل و انتقال</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 6)
+        {
+            <text>سفته</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 7)
+        {
+            <text>پرداخت نقدی</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 8)
+        {
+            <text>پرداخت کارت</text>
+        }
+        else if (child.Pay_TypeDetailID_source == 32)
+        {
+            <text>پرداخت اینترنتی</text>
+        }
+
+    </td>
+    <td></td>
+    <td>
+
+        @*@if (child.Cancellation == null && child.CancelCheque == null)
+        {*@
+        <div class="dropdown">
+            <button class="btn btn-material-light-blue-A700 btn-sm dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                عملیات
+                &nbsp;&nbsp;<span class="caret"></span>
+            </button>
+            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                @if (Model.Status == "ChequeReadyToDelivery" || Model.Status == "DeliveredPayment")
+                {
+                    <li>
+                        @Ajax.ActionLink(Resources.AccountNo + "/" + Resources.Sheba, "SaveAccountSheba", "Request", new { area = "Payment", requestId = child.RequestID, Status = Model.Status }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.AccountNo + " " + Resources.Sheba + "', 'md');"
+                   }, null)
+                    </li>
+                }
+
+                <li>
+                    @Ajax.ActionLink("نمایش", "RequestPayment", "Request", new { area = "Payment", requestId = child.RequestID, Type = 0 }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+               }, null)
+                </li>
+
+                @if (Request.IsAuthenticated && (User.IsInRole("Admin") || User.IsInRole("Manager")) && child.Pay_TypeDetailID_source != 7)
+                {
+                    <li>
+                        @Ajax.ActionLink(Resources.BankBalance, "Index", "BankBalance", new { Area = "BasicInfo", Date = Utility.ToPersianDate(DateTime.Now), BankID = child.Source_PaymentValue, showSum = true }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.BankBalance + "', 'lg:not(.xlg)');"
+                   }
+, null)
+                    </li>
+                }
+                @if (child.ConfirmPayment != null)
+                {
+                    if (child.Pay_TypeDetailID_source != null && child.Pay_TypeDetailID_source != 6 && child.Pay_TypeDetailID_source != 7 && child.Pay_TypeDetailID_source != 8 && child.Pay_TypeDetailID_source != 32)
+                    {
+
+                        if (child.ChequeNo == null && Model.Status == "DuringPayment" && child.AggrigateOrDuplicationStatusID != (int)RequestDescription.IntegrationRequest)
+                        {
+
+
+                            if (!string.IsNullOrEmpty(options) && Utility.CheckIfHasCheques(int.Parse(child.Source_PaymentValue))
+                                //  && child.MozavezeChapeChequeDarad == 1
+                                )
+                            {
+
+                                <li>
+
+                                    @Ajax.ActionLink(Resources.CheckIssuance, "ShowChequeDetails", "Pay", child, new AjaxOptions
+                               {
+                                   OnSuccess = "modal(data, '" + Resources.CheckIssuance + "', 'md')"
+                               }, null)
+                                </li>
+                            }
+                            else
+                            {
+                                <li role="separator" class="divider"></li>
+                                <li>
+                                    <a class="issuance disabled" data-html="true" data-container="body" data-toggle="popover" data-placement="right" data-trigger="hover" data-content='برای بانک @Utility.GetBasicBankInfoWithBankId(int.Parse(child.Source_PaymentValue)) طراحی چک انجام نشده است! یا اینکه دسته چکی تعریف نشده است!'>
+                                        @Resources.CheckIssuance
+                                    </a>
+                                </li>
+                            }
+                        }
+                        else
+                        {
+                            var HasPAyment = Utility.IfHasPayment(child.RequestID);
+                            if (!Utility.IfSavepermisiveForRequestIsTrue(child.RequestID) && child.AggrigateOrDuplicationStatusID != (int)RequestDescription.IntegrationRequest)
+                            {
+                                <li>
+                                    @Ajax.ActionLink(Resources.PermissiveSignature, "SavepermisiveForRequest", "Request", new { Area = "Payment", RequestId = child.RequestID }, new AjaxOptions
+                               {
+                                   OnSuccess = "modal(data,'" + @Resources.PermissiveSignature + "', 'md')"
+                               }, null)
+                                </li>
+                            }
+
+                            else if (HasPAyment && Model.Status != "DuringPayment")
+                            {
+                                <li>
+                                    @Html.ActionLink(Resources.PaymentForm, "PaymentChequeReport", "RequestPayment", new { Area = "Report", RequestId = child.RequestID }, null)
+                                </li>
+
+                            }
+                            if (!string.IsNullOrEmpty(child.ChequeElements_PrintLayout) && (User.IsInRole("ChequePrint")))
+                            {
+                                var elem = child.ChequeElements_PrintLayout.Split(',');
+                                <li>
+                                    @Ajax.ActionLink(Resources.Show + " " + Resources.Cheque, "ShowChequePrint", "ChequePayment", new
+                               {
+
+                                   ApproveIssuance = elem.Contains("ApproveIssuance"),
+                                   Bearer = elem.Contains("Bearer"),
+                                   BranchExporterReceivable = elem.Contains("BranchExporterReceivable"),
+                                   ChequeFormatID = elem[0],
+                                   CurrentAccount = elem.Contains("CurrentAccount"),
+                                   DueDate = elem[1],
+                                   NonTransferable = elem.Contains("NonTransferable"),
+                                   RemoveOrdersFor = elem.Contains("RemoveOrdersFor"),
+                                   RemoveRemit = elem.Contains("RemoveRemit"),
+                                   RequestId = child.RequestID.ToString(),
+                                   ShebaAccount = elem.Contains("ShebaAccount"),
+                                   TableName = elem[2],
+                                   WithoutCrossing = elem.Contains("WithoutCrossing"),
+                                   checkIsUnderwritten = elem.Contains("checkIsUnderwritten")
+
+                               }, new AjaxOptions
+                               {
+                                   OnSuccess = "modal(data, '" + Resources.CheckIssuance + "', 'lg:not(.xlg)')"
+                               }, null)
+                                </li>
+                            }
+
+                        }
+
+                    }
+                    if (child.Pay_TypeDetailID_source == 7 && child.Paid != null)
+                    {
+                        <li>
+                            @Html.ActionLink(Resources.PaymentForm, "PaymentformReport", "RequestPayment", new { Area = "Report", RequestId = child.RequestID }, null)
+                        </li>
+                    }
+                }
+                @if (child.Pay_TypeDetailID_source == 2 && Model.Status == "DeliveredPayment")
+                {
+                    <li>
+                        @Ajax.ActionLink("تبدیل به چک روز/مدت دار", "ShowModalDatetime", "Pay", new { Area = "Payment", RequestId = child.RequestID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data, 'تبدیل به چک روز/مدت دار', 'sm')"
+                   })
+                    </li>
+                    <li>
+                        @Ajax.ActionLink("تحویل لاشه چک", "ConvertOrDeleiverdLasheCheque", "Pay", new { Area = "Payment", RequestId = child.RequestID, IsConvert = false }, new AjaxOptions
+                   {
+                       Confirm = "آیا از تحویل لاشه چک مطمئن هستید؟",
+                       OnSuccess = "location.reload();"
+                   })
+                    </li>
+
+                }
+
+                @*@if (Model.Status == "DeliveredPayment" && child.CancelCheque == null && child.Cancellation == null)
+        {*@
+                @* <li>
+             @Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row", new { Area = "Management", IsPayment = false, requestId = child.RequestID, IsReturend = false, Receipt_Pay_TypeID = 1, BehalfGroupID = Utility.GetBehalfGroupBybehalfId(child.BehalfID).BehalfGroupID, StatusID = 4, ReferenceId = child.RequestID }, new AjaxOptions
+        {
+            OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+        })
+         </li>
+          }*@
+                @if ((Model.Status == "GetCash" || Model.Status == "ATM" || Model.Status == "InternetPay") && child.Paid != null && child.CancelCheque == null && child.Cancellation == null)
+                {
+                    <li>
+                        @Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row", new { Area = "Management", IsPayment = false, requestId = child.RequestID, IsReturend = false, Receipt_Pay_TypeID = 1, BehalfGroupID = Utility.GetBehalfGroupBybehalfId(child.BehalfID).BehalfGroupID, StatusID = 3, ReferenceId = child.RequestID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+                   })
+                    </li>
+                }
+                @if (child.ChequeNo > 0 && child.CancelCheque == null && child.Cancellation == null)
+                {
+                    <li>
+                        @Html.ActionLink("سند چک", "ChequeReport", "RequestPayment", new { Area = "Report", RequestId = child.RequestID }, null)
+                    </li>
+                }
+                @*<li>
+                @Ajax.ActionLink("کنسل / عودت چک", "RequestPayment", "Request", new { area = "Payment", requestId = child.RequestID, Type = 0,CancelCheque=true }, new AjaxOptions
+        {
+            OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+        }, null)
+            </li>*@
+            </ul>
+        </div>
+        @*  }*@
+    </td>
+
+
+
+</tr>
+
+    }
+

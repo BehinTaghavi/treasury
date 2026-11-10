@@ -1,0 +1,69 @@
+﻿@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@using System.Configuration
+
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+
+
+@using (Ajax.BeginForm("ExtendDueDate", "Pay", new { area = "Payment", id = "ExtendDateForm" }, new AjaxOptions
+{
+    //OnSucceszs = "successMessage(data);reload();"
+    HttpMethod = "POST",
+    OnBegin= "$('#btnSubmit').attr('disabled', 'disabled')",
+    OnSuccess = "successMessage(data);location.reload();",
+}))
+{
+    @Html.HiddenFor(model => model.RequestID)
+    <div>
+        <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">مبلغ :  @Math.Truncate(Model.PayAmount).ToString("N0")</label></div>
+        <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">تاریخ سررسید:@(Utility.DateStructure(Model.DueDate))</label></div>
+        <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">شماره چک: @Model.ChequeNo</label></div>
+        <div class="form-group">
+            <label class="control-label" style="padding: 0; margin: 0">تاریخ سررسید جدید: </label>
+            <div style="max-width: 300px">
+                <div class="form-group">
+                    <input class="form-control datepicker" data-lang-number="fa" data-val="true" data-val-required="The DueDate field is required." id="DueDate" name="DueDate" placeholder="تاریخ سررسید جدید " readonly="readonly">
+                </div>
+            </div>
+            @Html.ValidationMessageFor(model => model.DueDate)
+           
+        </div>
+        <div class="form-group">
+            <label class="control-label" for="Pay_TypeDetailID_source">@Resources.PayType</label>
+            <div class="row">
+                <div class="col-sm-6 col-md-3">
+                    <select id="Pay_TypeDetailID_source" name="Pay_TypeDetailID_source" class="form-control">
+                        <option>لطفا انتخاب نمایید</option>
+                        <option value="1">چک روز</option>
+                        <option value="4">چک مدت دار</option>
+                    </select>
+                    @Html.ValidationMessageFor(model => model.Pay_TypeDetailID_source)
+                </div>
+            </div>
+        </div>
+
+
+        <button id="btnSubmit" type="submit" onsubmit="$(this).prop('disabled', true);" class="btn btn-sm btn-success">ذخیره</button>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        minDate: new Date('@ViewBag.MinDate')
+    });
+    function reload() {
+        setTimeout(function () {
+            location.reload();
+        }, 1000)
+    }
+  
+
+
+</script>

@@ -1,0 +1,21 @@
+<publishData>
+  <publishTarget publishUrl="D:\1\11\ServicqPublish\">
+    <file relUrl="TreasuryPrintService.csproj.user" publishTime="12/26/2018 10:57:00" />
+    <file relUrl="App-.config-" publishTime="12/15/2018 10:40:52" />
+    <file relUrl="bin/TreasuryPrintService.dll" publishTime="10/13/2024 12:53:55" />
+    <file relUrl="bin/TreasuryPrintService.pdb" publishTime="10/13/2024 12:53:55" />
+    <file relUrl="Properties/AssemblyInfo.cs" publishTime="12/08/2017 22:19:54" />
+    <file relUrl="Services/IPrintService.cs" publishTime="09/08/2018 15:06:55" />
+    <file relUrl="TreasuryPrintService.csproj" publishTime="12/26/2018 10:57:00" />
+    <file relUrl="Models/Cheque.cs" publishTime="01/02/2019 16:17:32" />
+    <file relUrl="Services/PrintService.cs" publishTime="10/13/2024 12:51:50" />
+  </publishTarget>
+  <publishTarget publishUrl="D:\1\ServicqPublish\">
+    <file relUrl="bin/TreasuryPrintService.pdb" publishTime="10/13/2024 10:33:29" />
+    <file relUrl="bin/TreasuryPrintService.dll" publishTime="10/13/2024 10:33:29" />
+  </publishTarget>
+  <publishTarget publishUrl="D:\Documents\Projects\TreasuryPrintServicePublish\">
+    <file relUrl="bin/TreasuryPrintService.pdb" publishTime="10/07/2018 09:22:52" />
+    <file relUrl="bin/TreasuryPrintService.dll" publishTime="10/07/2018 09:22:52" />
+  </publishTarget>
+</publishData>

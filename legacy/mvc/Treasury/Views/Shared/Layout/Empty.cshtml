@@ -1,0 +1,341 @@
+﻿@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Resourse
+@{
+    var culture = System.Threading.Thread.CurrentThread.CurrentUICulture.Name.ToLowerInvariant();
+}
+@helper selected(string c, string culture)
+{
+if (c == culture)
+{
+        @:class="active"
+}
+}
+<!DOCTYPE html>
+<html lang="@CultureHelper.GetCurrentNeutralCulture()">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>@Resources.Treasury @System.Configuration.ConfigurationManager.AppSettings["CompanyName"]</title>
+
+    @*@Styles.Render("~/Content/css")*@
+
+    <link href="@Url.Content("~/Content/css/spinner.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-datepicker.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-timepicker.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-fullpalette.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/ripples.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/roboto.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/snackbar.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/custom-bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-iconic-font.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/animate.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-color-palette.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.rtl.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/style.css")" rel="stylesheet" />
+
+
+    @Styles.Render("~/Content/admin")
+    <link href="@Url.Content("~/Content/css/select2.min.css")" rel="stylesheet" />
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    @Scripts.Render("~/bundles/jquery")
+    @Scripts.Render("~/bundles/bootstrap")
+    <link href="@Url.Content("~/Content/css/normalize.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/icons.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/component.css")" rel="stylesheet" />
+    <script src="@Url.Content("~/Scripts/modernizr.custom.js")"></script>
+    @Scripts.Render("~/bundles/admin")
+
+    <script src="@Url.Content("~/Scripts/select2.full.min.js")"></script>
+
+
+    @*<script src="~/Scripts/dateparser.js"></script>
+        <script src="~/Scripts/position.js"></script>
+        <script src="~/Scripts/persian-datepicker-tpls.js"></script>
+        <script src="~/Scripts/datepicker-tpls.js"></script>
+        <script src="~/Scripts/Resources/app.js"></script>
+        <script src="~/Scripts/Resources/Controller/pettyCash.js"></script>
+        <script src="~/Scripts/Resources/Controller/pettyCashUC.js"></script>*@
+    <script>
+        var _d = [];
+        var _c = [];
+        $(document).ajaxStart(function () {
+
+            startLloadingAjax();
+        });
+        $(document).ajaxStop(function () {
+            endLloadingAjax();
+        });
+        function startLloadingAjax() {
+            $("#ajaxSpinner").fadeIn();
+            //_c = document.querySelectorAll(".btn:not(.disabled)");
+            //_d = document.querySelectorAll(".btn:not([disabled]):not([ng-disabled])");
+            //for (var i = 0; i < _d.length; i++) {
+            //    _d[i].setAttribute("disabled", "disabled")
+            //}
+            //for (var i = 0; i < _c.length; i++) {
+            //    _c[i].setAttribute("disabled", "disabled")
+            //}
+        }
+        function endLloadingAjax() {
+            $("#ajaxSpinner").fadeOut();
+            //$(".btn").removeAttr("disabled");
+
+            //for (var i = 0; i < _d.length; i++) {
+            //    _d[i].removeAttribute("disabled");
+            //}
+            //for (var i = 0; i < _c.length; i++) {
+            //    _c[i].removeAttribute("disabled");
+            //}
+        }
+        (function () {
+
+            var $button = $("<div id='source-button' class='btn btn-primary btn-xs'>&lt; &gt;</div>").click(function () {
+                var index = $('.bs-component').index($(this).parent());
+                $.get(window.location.href, function (data) {
+                    var html = $(data).find('.bs-component').eq(index).html();
+                    html = cleanSource(html);
+                    $("#source-modal pre").text(html);
+                    $("#source-modal").modal();
+                })
+
+            });
+
+            $('.bs-component [data-toggle="popover"]').popover();
+            $('[data-toggle="tooltip"]').tooltip();
+
+            $(".bs-component").hover(function () {
+                $(this).append($button);
+                $button.show();
+            }, function () {
+                $button.hide();
+            });
+
+            function cleanSource(html) {
+                var lines = html.split(/\n/);
+
+                lines.shift();
+                lines.splice(-1, 1);
+
+                var indentSize = lines[0].length - lines[0].trim().length,
+                    re = new RegExp(" {" + indentSize + "}");
+
+                lines = lines.map(function (line) {
+                    if (line.match(re)) {
+                        line = line.substring(indentSize);
+                    }
+
+                    return line;
+                });
+
+                lines = lines.join("\n");
+
+                return lines;
+            }
+
+            $(".icons-material .icon").each(function () {
+                $(this).after("<br><br><code>" + $(this).attr("class").replace("icon ", "") + "</code>");
+            });
+        })();
+    </script>
+    <script>
+        $(function () {
+            $.material.init();
+        });
+    </script>
+    <script>
+        $(function () {
+            var setTimeOut = setTimeout(function () {
+                //$("html, body").css("height", "100%")
+                $(".startpage.spinner").fadeOut();
+                $("#wrapper").fadeIn('slow');
+            }, 1000);
+        })
+        function successMessage(data) {
+            if (data.result) {
+                alertify.success(data.message);
+            }
+            else {
+                alertify.error(data.message);
+            }
+        }
+        function deleteRow(RowId) {
+            $("#" + RowId).addClass("danger").fadeOut('slow');
+        }
+        function updateRow(url, RowId) {
+            $.ajax({
+                url: url,
+                success: function (result) {
+                    $("#" + RowId).html(result);
+                }
+            })
+            $("#" + RowId).addClass("success");
+        }
+
+    </script>
+    <script>
+        function modal(data, title, size) {
+            $(".modal." + size).find(".modal-title").html("").html(title);
+            $(".modal." + size).find(".modal-body").html("").html(data);
+            $(".modal." + size).modal('show');
+        }
+        function closeModal(size) {
+            $(".modal." + size).modal("hide");
+        }
+        function guid() {
+            var d = new Date().getTime();
+            var guid = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/[x]/g, function (c) {
+                var r = (d + Math.random() * 16) % 16 | 0;
+                d = Math.floor(d / 16);
+                return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            return guid;
+        };
+    </script>
+    <script>
+        (function ($) {
+            $.fn.showHide = function (options) {
+
+                //default vars for the plugin
+                var defaults = {
+                    speed: 200,
+                    easing: '',
+                    changeText: 0,
+                    showText: 'Show',
+                    hideText: 'Hide'
+
+                };
+                var options = $.extend(defaults, options);
+
+                $(this).click(function () {
+                    $('.toggleDiv').slideUp(options.speed, options.easing);
+                    // this var stores which button you've clicked
+                    var toggleClick = $(this);
+                    // this reads the rel attribute of the button to determine which div id to toggle
+                    var toggleDiv = $(this).attr('rel');
+
+                    // here we toggle show/hide the correct div at the right speed and using which easing effect
+                    $(toggleDiv).slideToggle(options.speed, options.easing, function () {
+                        // this only fires once the animation is completed
+                        if (options.changeText == 1) {
+                            $(toggleDiv).is(":visible") ? toggleClick.html(options.hideText) : toggleClick.html(options.showText);
+                        }
+                    });
+
+                    return false;
+
+                });
+
+            };
+        })(jQuery);
+
+
+    </script>
+    @RenderSection("scripts", required: false)
+</head>
+
+<body style="background-color: #fff">
+    @RenderBody()
+    <script>
+        HTMLElement.prototype.deleteParentByTagName = function (tagName, className, duration, complete) {
+            var element = this;
+            while (element.tagName != tagName.toUpperCase()) {
+                element = element.parentElement
+            };
+            element.classList.add(className);
+            var FX = {
+                easing: {
+                    linear: function (progress) {
+                        return progress;
+                    },
+                    quadratic: function (progress) {
+                        return Math.pow(progress, 2);
+                    },
+                    swing: function (progress) {
+                        return 0.5 - Math.cos(progress * Math.PI) / 2;
+                    },
+                    circ: function (progress) {
+                        return 1 - Math.sin(Math.acos(progress));
+                    },
+                    back: function (progress, x) {
+                        return Math.pow(progress, 2) * ((x + 1) * progress - x);
+                    },
+                    bounce: function (progress) {
+                        for (var a = 0, b = 1, result; 1; a += b, b /= 2) {
+                            if (progress >= (7 - 4 * a) / 11) {
+                                return -Math.pow((11 - 6 * a - 11 * progress) / 4, 2) + Math.pow(b, 2);
+                            }
+                        }
+                    },
+                    elastic: function (progress, x) {
+                        return Math.pow(2, 10 * (progress - 1)) * Math.cos(20 * Math.PI * x / 3 * progress);
+                    }
+                },
+                animate: function (options) {
+                    var start = new Date;
+                    var id = setInterval(function () {
+                        var timePassed = new Date - start;
+                        var progress = timePassed / options.duration;
+                        if (progress > 1) {
+                            progress = 1;
+                        }
+                        options.progress = progress;
+                        var delta = options.delta(progress);
+                        options.step(delta);
+                        if (progress == 1) {
+                            clearInterval(id);
+                            options.complete();
+                        }
+                    }, options.delay || 10);
+                },
+                fadeOut: function (element, options) {
+                    var to = 1;
+                    this.animate({
+                        duration: options.duration,
+                        delta: function (progress) {
+                            progress = this.progress;
+                            return FX.easing.circ(progress);
+                        },
+                        complete: function () { options.complete; FX.remove(element); },
+                        step: function (delta) {
+                            element.style.opacity = to - delta;
+                        }
+                    });
+                },
+                remove: function (element) {
+                    element.style.display = "none";
+                }
+            };
+            FX.fadeOut(element, { duration: duration, complete: complete });
+        }
+    </script>
+    <script src="~/Scripts/classie.js"></script>
+
+</body>
+
+</html>
+<script type="text/javascript">
+    String.prototype.toPersianDigit = function (a) { return this.replace(/\d+/g, function (digit) { var enDigitArr = [], peDigitArr = []; for (var i = 0; i < digit.length; i++) { enDigitArr.push(digit.charCodeAt(i)); } for (var j = 0; j < enDigitArr.length; j++) { peDigitArr.push(String.fromCharCode(enDigitArr[j] + ((!!a && a == true) ? 1584 : 1728))); } return peDigitArr.join(''); }); }; function TraceNodes(Node) {
+        if (Node.nodeType == 3)
+            document.toPersianDigit();
+        //TextNode Node.nodeValue = Node.nodeValue.toPersianDigit(); else for (var i = 0; i < Node.childNodes.length; i++) TraceNodes(Node.childNodes[i]); } TraceNodes(document);
+        (function ($) {
+            $("input[type = 'radio']").click(function () {
+                $(this).parents("form").submit(); // post form
+            });
+
+        })(jQuery);
+    }
+</script>

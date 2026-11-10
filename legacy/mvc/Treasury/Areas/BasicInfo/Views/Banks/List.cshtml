@@ -1,0 +1,141 @@
+﻿@model IEnumerable<CSD.Treasury.DataModel.Bank>
+
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>
+                نام شعبه
+            </th>
+            <th>
+                @Resources.Code
+            </th>
+            <th>
+                @Resources.BankAccountNumber
+            </th>
+            <th>تفصیل</th>
+            <th>
+                @Resources.HasBackup
+            </th>
+
+            <th></th>
+            <th></th>
+            <td></td>
+
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.HasRelation("Banks", "BankID", item.BankID.ToString(), "BankCards", "BankID");
+            var related2 = Utility.HasRelation("Banks", "BankID", item.BankID.ToString(), "Cheques", "BankID");
+
+            <tr>
+                <td>
+                    @item.BranchName
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.BranchCode)
+                </td>
+                <td>
+                    @item.Bank_AccountNumber
+                </td>
+                <td>
+                    @item.Unique_Account_No
+                </td>
+                <td>
+                    @if (item.HasBackup)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+
+                </td>
+                <td>
+                    @Ajax.ActionLink(Resources.DetailsAccountBank, "Details", "Banks", new { Area = "BasicInfo", BankId = item.BankID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.DetailsAccountBank + "/" + Utility.GetBasicBankInfo(item.BasicBankID) + "', 'lg:not(.xlg)');"
+               }
+                   , new { @class = "btn btn-material-blue-700 btn-xs" })
+
+                    @Ajax.ActionLink(Resources.Edit, "Edit", "Banks", new { Area = "BasicInfo", id = item.BankID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Bank + "', 'lg:not(.xlg)');"
+               }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+
+                    @if (related1 || related2)
+                    {
+
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+
+                    }
+                    else
+                    {
+
+                        @Html.ActionLink(Resources.Delete, "Delete", "Banks", new { Area = "BasicInfo", id = item.BankID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                </td>
+                <td>
+                    @Html.ActionLink(Resources.BankCard, "Index", "BankCards", new { Area = "BasicInfo", BankId = item.BankID, BasicBankID = item.BasicBankID }, new { @class = "btn btn-material-blue-700 btn-xs " })
+                    @if (!item.HasBackup && !item.Deposited)
+                    {
+                        @Html.ActionLink(Resources.CheckBook + "/" + Resources.Scan + "/" + Resources.Design + " " + Resources.Cheque, "Index", "CheckBook", new { Area = "BasicInfo", BankID = item.BankID, BasicBankID = item.BasicBankID }, new { @class = "btn btn-material-blue-700 btn-xs " })
+                    }
+                </td>
+                <td>
+
+                    @Ajax.ActionLink(Resources.BankBalance, "Index", "BankBalance", new { Area = "BasicInfo", Date = Utility.ToPersianDate(DateTime.Now), BankID = item.BankID, showSum = true }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.BankBalance + "/" + Utility.GetBasicBankInfo(item.BasicBankID) + "', 'lg:not(.xlg)');"
+               }
+                   , new { @class = "btn btn-material-blue-700 btn-xs" })
+
+
+                    @*@Html.ActionLink(Resources.BankBalance, "Index", "BankBalance", new { area = "BasicInfo", Date = Utility.ToPersianDate(DateTime.Now), BankID=item.BankID, showSum=true }, new { @class = "btn btn-material-blue-700 btn-xs" })*@
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<script>
+    //$(document).ready(function () {
+    //    $(function () {
+    //        $("#myTable").tablesorter();
+    //    });
+    //});
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+</script>

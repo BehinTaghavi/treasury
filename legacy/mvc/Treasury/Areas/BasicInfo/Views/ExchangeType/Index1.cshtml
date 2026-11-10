@@ -1,0 +1,65 @@
+﻿
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+
+<script src="@Url.Content("~/Scripts/Resources/Controller/BasicInfo/ExchangeTypeController.js")"></script>
+@{
+    ViewBag.Title = "Index1";
+}
+@section PageHeader{
+    @Resources.List @Resources.ExchangeType
+}
+<div ng-app="ExchangeApp" ng-controller="ExchangeCtrl">
+  
+
+    <table class="table table-striped">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th>#</th>
+                <th>
+                    @Resources.ExchangeType
+                </th>
+                <th>
+                    @Resources.ExchangeType-@Resources.EN
+                </th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr ng-repeat="exch in ExchangeTypeLs">
+                <th scope="row">
+                    {{$index+1}}
+                </th>
+                <td>
+                    <span ng-show="exch.showEdit">{{exch.ExchangeTypeDescription}}</span>
+                    <input ng-show="!exch.showEdit" type="text" class="form-control" ng-model="exch.ExchangeTypeDescription">
+                </td>
+                <td>
+                    <span ng-show="exch.showEdit">{{exch.ExchangeTypeDescription2}}</span>
+                    <input ng-show="!exch.showEdit" type="text" class="form-control" ng-model="exch.ExchangeTypeDescription2">
+                </td>
+                <td>
+                    <a ng-show="exch.showEdit" ng-click="toggleEdit(exch)" class="btn btn-material-light-blue-A700 btn-xs"><i class="zmdi zmdi-hc-lg zmdi-edit"></i></a>
+                    <a ng-show="!exch.showEdit" ng-click="toggleEdit(exch)" class="btn btn-danger btn-xs delete"><i class="zmdi zmdi-hc-lg zmdi-close"></i></a>
+                    <a ng-show="!exch.showEdit" ng-click="Save(exch)" class="btn btn-material-green-600 btn-xs"><i class="zmdi zmdi-check"></i></a>
+                    <a  ng-click="delete(exch)" class="btn btn-danger btn-xs delete"><i class="zmdi zmdi-delete"></i></a>              
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+
+                <td>          
+                    <input type="text" ng-model="ExchangeTypeDescription" class="form-control floating-label" placeholder=@Resources.ExchangeType />
+                </td>
+
+                <td>
+                    <input type="text" ng-model="ExchangeTypeDescription2" class="form-control floating-label" placeholder=@Resources.ExchangeType@Resources.EN />
+                </td>
+                <td></td>
+            </tr>
+
+        </tbody>
+
+    </table>
+</div>
+
+

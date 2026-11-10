@@ -1,0 +1,46 @@
+﻿@model List<CSD.Treasury.Service.Request_PaymentService.Request_Payment>
+
+@*@using (Html.BeginForm("DeleteDuplication", "Request", FormMethod.Post, new { Area = "Payment" ,id = "DeleteDuplicationForm" }))
+{*@
+@using (Ajax.BeginForm("DeleteDuplication", "Request", new { area = "Payment", RequestID = ViewBag.RequestId, PageIndex = ViewBag.PageIndex }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, null))
+{ 
+    <table id="lst" class="table table-striped sortable">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th>@Resources.RequestId </th>
+                <th>@Resources.Behalf</th>
+                <th>@Resources.Unique_Account_No</th>
+                <th>@Resources.Price</th>
+            </tr>
+        </thead>
+        @foreach (var item in Model)
+        {
+            
+            <tbody>
+                <tr>
+                    <td>@item.RequestID</td>
+                    <td>@Utility.GetBehalf(item.BehalfID)</td>
+                    <td>@Utility.GetUniqueAccount(item.Unique_Account_No)</td>
+                    <td>@item.PayAmount</td>
+                </tr>
+            </tbody>
+        }
+    </table>
+    <button type="submit" class="btn btn-primary">@Resources.Delete</button>
+}
+@*<script type="text/javascript">
+    document.getElementById("DeleteDuplicationForm").onsubmit = function (e) {
+        $.ajax({
+            data: { RequestID:@( ViewBag.RequestId), PageIndex: @(ViewBag.PageIndex) },
+            type: 'POST',
+            url: '/Payment/Request/DeleteDuplication',
+            success: function () {
+                successMessage(data);closeModal('md');updateTable();
+            },
+        });
+    };
+</script>*@

@@ -1,0 +1,105 @@
+﻿@model CSD.Treasury.Service.BeneficiariesDetailInfoService.BeneficiariesDetailInfo
+
+@using (Ajax.BeginForm("CreateDetails", "Beneficiaries", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "CreateDetails" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.HiddenFor(model => model.BeneficiarID)
+                @Html.DropDownListFor(model => model.BankID, new SelectList(ViewBag.BasicBank, "BasicBankId", "BasicBankDescription"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BasicBank })
+                @Html.ValidationMessageFor(model => model.BankID, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.EditorFor(model => model.Bank_BranchName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchName } })
+                @Html.ValidationMessageFor(model => model.Bank_BranchName, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-md-5">@Resources.BankAccountNumber<input type="radio" value="0" id="AccountNumber" name="Number" calss="Number" />  </div>
+            <div class="col-md-5">
+                @Html.EditorFor(model => model.Bank_AccountNumber, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label hidden", placeholder = Resources.BankAccountNumber } })
+                @Html.ValidationMessageFor(model => model.Bank_AccountNumber, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-5">
+               @Resources.Sheba <input type="radio" value="1" name="Number" id="Sheba" calss="Number"  />
+            </div>
+            <div class="col-md-5">
+                   @Html.EditorFor(model => model.Bank_ShebaNo, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label hidden", placeholder = Resources.Sheba } })
+                @Html.ValidationMessageFor(model => model.Bank_ShebaNo, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                    <a class="btn btn-white btn-sm" data-dismiss='modal'><i class="zmdi zmdi-chevron-left zmdi-hc-lg"></i></a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(document).ready(function () {
+        $('#AccountNumber').click(function () {
+            $('#Bank_AccountNumber').removeClass("hidden");
+            $('#Bank_ShebaNo').addClass("hidden");
+        });
+        $('#Sheba').click(function () {
+            $('#Bank_ShebaNo').removeClass("hidden");
+            $('#Bank_AccountNumber').addClass("hidden");
+        });
+    });
+    $(function () {
+        $.material.init();
+    });
+    function successMessage(data) {
+        $.ajax({
+            url: "/BasicInfo/Beneficiaries/DetailsList",
+            data: { BeneficiarID: "@Model.BeneficiarID" },
+            success: function (result) {
+                modal(result, $(".modal-lg .modal-title").html(), 'lg:not(.xlg)')
+                closeModal('md');
+            }
+        });
+    }
+    $('#CreateDetails').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+</script>

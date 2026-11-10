@@ -1,0 +1,12 @@
+:root { --c-bg: #f5f7fa; --c-ink: #1f2933; --c-primary: #2563eb; --c-muted: #616e7c; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: Vazirmatn, Tahoma, sans-serif; background: var(--c-bg); color: var(--c-ink); }
+.shell { display: grid; grid-template-columns: 13rem 1fr; grid-template-rows: auto 1fr; min-height: 100vh; }
+.bar { grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center; padding: .75rem 1.25rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
+.bar .lang { margin-inline-start: auto; background: transparent; border: 1px solid #cbd2d9; border-radius: 6px; padding: .35rem .75rem; cursor: pointer; }
+.menu { display: flex; flex-direction: column; padding: 1rem .5rem; background: #fff; border-inline-end: 1px solid #e4e7eb; }
+.menu a { padding: .55rem .75rem; border-radius: 6px; color: var(--c-ink); text-decoration: none; }
+.menu a.router-link-exact-active { background: #e8f0fe; color: var(--c-primary); font-weight: 600; }
+.content { padding: 1.5rem; }
+.muted { color: var(--c-muted); }
+.error { color: #8a1c1c; }

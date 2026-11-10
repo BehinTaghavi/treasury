@@ -1,0 +1,70 @@
+﻿@using CSD.Treasury.UI.Areas.Report.Models
+@using CSD.Treasury.Resourse
+
+@model List<bankbalanceModel>
+@{
+    ViewBag.Title = "listburse";
+
+}
+
+
+<table class="table">
+    <thead>
+        <tr>
+            <th colspan="9"><h3>گزارش دریافت ها و پرداختها ریالی و ارزی</h3></th>
+        </tr>
+        <tr class="mdc-bg-grey-100">
+            <th>
+                @Resources.BehalfGroup
+            </th>
+            <th>
+                پرداخت ها/مبلغ 
+            </th>
+            <th>
+                دریافت ها/مبلغ 
+            </th>
+            <th>
+                مبلغ ارز
+            </th>
+            <th> @Resources.ExchangeType</th>
+            <th>هم ارزریالی</th>
+        </tr>
+    </thead>
+        @foreach (var item in Model)
+        {
+
+            <tr>
+                <td>
+                    @item.BehalfGroupDescription
+                </td>
+                <td data-lang-number="fa">
+                    @{
+                        var sum = item.ls.Sum(d => d.Credit);
+                        if (sum != 0)
+                        {
+                            @Math.Truncate(sum.Value).ToString("#,##0")
+                        }
+                    }
+                </td>
+                <td data-lang-number="fa">
+                    @{
+                        var sum1 = item.ls.Sum(d => d.Debit);
+                        if (sum1 != 0)
+                        {
+                            @Math.Truncate(sum1.Value).ToString("#,##0")
+                        }
+                    }
+
+                </td>
+                <td></td>
+                <td></td>
+                <td></td>
+            </tr>
+
+        }
+
+
+</table>
+
+
+   

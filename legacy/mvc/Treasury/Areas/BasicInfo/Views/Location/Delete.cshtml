@@ -1,0 +1,20 @@
+﻿@model CSD.Treasury.Service.LocationsService.Location
+
+@{
+    ViewBag.Title = "Delete";
+}
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+    @using (Ajax.BeginForm("Delete", "Location", new AjaxOptions
+    {
+        HttpMethod = "Post",
+        OnSuccess = "successMessage(data);closeModal('sm');updateTable();"
+    }, new { enctype = "multipart/form-data" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.LocationID)
+        <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>

@@ -1,0 +1,177 @@
+﻿@using CSD.Treasury.Resourse
+@model CSD.Treasury.UI.Models.CheckBookStatusSearch
+@{
+    ViewBag.Title = "Index";
+}
+@section PageHeader{
+    وضعیت دسته چک
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="row">
+                <div class="col-sm-12">
+                    @using (Ajax.BeginForm("list", "Payment", new { Area = "Report" },
+new AjaxOptions()
+{
+    UpdateTargetId = "Result",
+    InsertionMode = InsertionMode.Replace,
+}, new { id = "SearchForm" }))
+                    {
+                        <div class="clearfix">
+                            <div class="col-xs-4">
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <label for="ChequeFormatType" class="control-label">@Resources.ChequeFormatType</label>
+                                    </div>
+
+                                    <div class="col-xs-8">
+                                        @Html.DropDownListFor(model => model.ChequeFormatType, new SelectList(ViewBag.GetChequeFormatTypeLs, "ChequeFormatType_DescriptionID", "ChequeFormatType_Description1"), " ", new { data_lang_number = "fa", @class = "form-control " })
+                                       
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xs-4">
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <label for="BankAccountNumber" class="control-label">@Resources.CheckBook</label>
+                                    </div>
+
+                                    <div class="col-xs-8">
+                                        @Html.DropDownListFor(model => model.BankAccountNumber, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber })
+                                        @*@Html.DropDownListFor(model => model.BankAccountNumber, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber})*@
+                                        @*@Html.DropDownList("BankAccountName", new SelectList(ViewBag.Banks, "BankID", "Bank_AccountNumber"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control" })*@
+                                        @*@Html.TextBoxFor(model => model.BankAccountNumber, new { @type = "number", data_lang_number = "fa", @class = "form-control" })*@
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-4">
+                                <div class="text-left">
+                                    <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                                    <button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Report</button>
+                                </div>
+                            </div>
+
+                        </div>
+                              <div class="clearfix">
+                                  <div class="col-xs-4">
+                                      <div class="clearfix">
+                                          <div class="col-xs-4">
+                                              <label for="ChequeFormatType" class="control-label">@Resources.DueDate -@Resources.From</label>
+                                          </div>
+
+                                          <div class="col-xs-8">
+                                              @Html.TextBoxFor(d => d.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.DueDate + "-" + Resources.From + " " + Resources.Date })
+                                          </div>
+                                      </div>
+                                  </div>
+                                  <div class="col-xs-4">
+                                      <div class="clearfix">
+                                          <div class="col-xs-4">
+                                              <label for="ChequeFormatType" class="control-label">@Resources.To</label>
+                                          </div>
+
+                                          <div class="col-xs-8">
+                                              @Html.TextBoxFor(d => d.DueDateTo, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.DueDate + "-" + Resources.To + " " + Resources.Date })
+                                          </div>
+                                      </div>
+                                  </div>
+                                  </div>
+                        @* <div class="clearfix">
+                                <div class="col-sm-6">
+                                                                <div style="padding: 8px 0;">
+                                                                    <div class="clearfix">
+                                                                        <div class="col-xs-4">
+                                                                            <label for="BankAccountName" class="control-label">@Resources.BankAccount </label>
+                                                                        </div>
+                                                                        <div class="col-xs-8">
+                                                                            @Html.DropDownListFor(model => model.BankAccountName, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Number + " " + Resources.Source })
+                                                                            @Html.ValidationMessageFor(model => model.BankAccountName)
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                            </div>*@
+
+                    }
+                </div>
+
+            </div>
+
+
+        </div>
+    </div>
+}
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Payment", new { Area = "Report", Model })
+    </div>
+}
+
+
+<script>
+    $('#ChequeFormatType').change(function () {
+        var address = "@(Url.Action("GetBanks", "Payment", new { Area = "Report" }))";
+        $("#BankAccountNumber").load(address, { FormatDescriptionID_Main: $('#ChequeFormatType').val() }, function (data) {
+            $("#BankAccountNumber").val($("#BankAccountNumber option:first").val());
+        });
+    });
+
+  
+
+
+
+    $(document).ready(function () {
+        @*var address = "@(Url.Action("GetBanks", "Request", new { Area= "Payment" }))";
+        $("#BankAccountNumber").load(address, { id: $(this).val() }, function (data) {
+            $("#BankAccountNumber").val($("#BankAccountName option:first").val()).show();
+        });*@
+
+        var address = "@(Url.Action("GetBasicBankByFormatDescriptionID", "Payment", new { Area= "Payment"  }))";
+        $("#BasicBankId").load(address, { id: $(this).val() }, function (data) {
+            $("#BasicBankId").val($("#BankAccountName option:first").val()).show();
+        });
+    });
+  
+
+
+    $(function () {
+        $('body').on("click", "#report", function () {
+            var data = $('#SearchForm').serializeArray();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            xhttp.open("POST", "@Url.Action("CheckBookStatus", "Payment", new { Area = "Report" })", true);
+            xhttp.send(new FormData(document.querySelector("#SearchForm")));
+        })
+    });
+
+
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date()
+    });
+
+    function updateTable() {
+        var url = '@(Url.Action("List", "Payment", new { area = "Report"  }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+
+
+</script>

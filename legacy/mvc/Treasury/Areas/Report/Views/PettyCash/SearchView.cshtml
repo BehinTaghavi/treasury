@@ -1,0 +1,137 @@
+﻿@using CSD.Treasury.Resourse
+@model CSD.Treasury.UI.Models.SearchModelPettyCash2
+@section PageHeader{
+  پرداخت های تنخواه گردان
+}
+@using (Ajax.BeginForm("PettyCashList", "PettyCash", new { Area = "Report" },
+                            new AjaxOptions()
+                            {
+                                UpdateTargetId = "Result",
+                                InsertionMode = InsertionMode.Replace,
+                            }, new { id = "SearchForm" }))
+{
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.PettyCashID, new SelectList(ViewBag.PettyCashLs, "PettyCashID", "PettyCashName"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.PettyCashName })
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DateFrom, null, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date, @ReadOnly = "readonly" })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DateTo, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date, @ReadOnly = "readonly" })
+            </div>
+        </div>
+
+
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-1">
+            <div class="form-group">
+                @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+            </div>
+        </div>
+        <div class="col-sm-2">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(model => model.Account_NO, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.account_code })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(model => model.Description,  new { @class = "form-control floating-label", @placeholder = Resources.Description })
+            </div>
+        </div>
+        
+    </div>
+        <div class="clearfix">
+            <div class="col-sm-12">
+                <div class="text-left">
+
+                    <button type="button" class="btn btn-info btn-sm" onclick="$('#PettyCashID,#DateFrom,#DateTo,#Account_NO,#UniqueAccountType,#Unique_Account_No,#Description').val('');">@Resources.Empty</button>
+                    <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                    @*<button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Report</button>*@
+
+                </div>
+            </div>
+        </div>
+}
+
+<div id="Result">
+</div>
+
+
+
+<script>
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        console.log(typeid);
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+      
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+ 
+    });
+    $('#Account_NO').select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+</script>

@@ -1,0 +1,72 @@
+﻿@model CSD.Treasury.Service.ProvinceService.Province
+@{
+    ViewBag.Title = "Create";
+}
+
+@using (Ajax.BeginForm("EditProvince", "Region", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal",id= "EditProvince" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(model => model.CountryID)
+    @Html.HiddenFor(model => model.provinceID)
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.Hidden("InitialProvinceDescription", Model.ProvinceDescription)
+                @Html.EditorFor(model => model.ProvinceDescription, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Name } })
+                @Html.ValidationMessageFor(model => model.ProvinceDescription, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.EditorFor(model => model.ProvinceDescription2, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.ENname } })
+                @Html.ValidationMessageFor(model => model.ProvinceDescription2, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                    <a class="btn btn-white btn-sm" data-ajax="true" data-ajax-success="modal(data,'@Resources.Province', 'md')" href="/BasicInfo/Region/Listprovince?CountryID=@Model.CountryID"><i class="zmdi zmdi-chevron-left zmdi-hc-lg"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $('#EditProvince').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+</script>
+

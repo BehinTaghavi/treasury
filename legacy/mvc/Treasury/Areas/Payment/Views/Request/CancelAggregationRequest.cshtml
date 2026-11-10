@@ -1,0 +1,48 @@
+﻿@using (Ajax.BeginForm("RequestPayment", "Request",new { area = "Payment" }, new AjaxOptions
+{
+    HttpMethod = "get",
+    UpdateTargetId = "Result",
+    InsertionMode = InsertionMode.Replace,
+
+}, new { enctype = "multipart/form-data" }))
+{
+<div class="clearfix">
+    <div class="form-group">
+        <div class="row">
+            @Html.Hidden("Type", 0)
+            <div class="col-sm-3">
+                @Html.Editor("RequestId", new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.RequestId } })
+            </div>
+            <button id="ShowRequest" class="btn btn-primary">نمایش</button>
+        </div>
+
+    </div>
+</div>
+  }
+
+<div id="Result"></div>
+
+<script type="text/javascript">
+  
+    @*   $(document).ready(function () {
+        
+            $('#ShowRequest').click(function () {
+                console.log('asdhskajhd');
+               var url = '@(Url.Action("RequestPayment", "Request", new { area = "Payment" }))';
+                $.ajax({
+                    url: url, type: 'get',
+                    data: {
+                        requestId: $("#RequestId").val(),
+                        Type: 0
+                    },
+                    success: function (data, status) {
+                        $("#Result").html(data);
+                    }
+                });
+            });
+    });*@
+
+    
+
+</script>
+

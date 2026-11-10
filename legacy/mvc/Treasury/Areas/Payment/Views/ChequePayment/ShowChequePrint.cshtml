@@ -1,0 +1,341 @@
+﻿@model Issuance
+<style>
+    #chequeImage {
+        margin-bottom: 30px;
+    }
+</style>
+<div id="chequeImage">
+    <div id="chequePanel" style="direction: ltr; width: 700px; height: 300px; position: relative; background-image: url(data:image/@Model.Extension;base64,@Model.Image); background-position: center; background-repeat: no-repeat; margin: 0cm;">
+        <div id="margin-print">
+            @foreach (var item in Model.Elements)
+            {
+                switch (item.labelMapToField)
+                {
+                    //حذف حواله کرد
+                    case "lineDraft":
+                        if (Model.ChequeDetails.RemoveRemit)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">
+            </div>
+                        }
+                        else
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.labelValue</div>
+                        }
+                        break;
+                    // حدف حواله "بابت"
+                    case "behalf":
+                        if (!Model.ChequeDetails.RemoveOrdersFor)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.labelValue</div>
+                        }
+                        break;
+                    // در وجه حامل
+                    case "beneficiary":
+                        if (Model.ChequeDetails.Bearer)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">حامل</div>
+                        }
+                        else
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.labelValue</div>
+                        }
+                        break;
+                    // چک فاقد هر گونه قلم خوردگی است
+                    case "withoutCrossing":
+                        if (Model.ChequeDetails.WithoutCrossing)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // چک فاقد ظهرنویسی است
+                    case "checkIsUnderwritten":
+                        if (Model.ChequeDetails.checkIsUnderwritten)
+                        {
+                            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // چک غیر قابل انتقال می باشد
+                    case "nonTransferable":
+                        if (Model.ChequeDetails.NonTransferable)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // چک در وجه حساب جاری
+                    case "currentAccount":
+                        if (Model.ChequeDetails.CurrentAccount)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // چک در وجه حساب شبا
+                    case "shebaAccount":
+                        if (Model.ChequeDetails.ShebaAccount)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // در شعبه صادر کننده قابل وصول است
+                    case "branchExporterReceivable":
+                        if (Model.ChequeDetails.BranchExporterReceivable)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    // تایید صدور چک
+                    case "approveIssuance":
+                        if (Model.ChequeDetails.ApproveIssuance)
+                        {
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.ChequeLable</div>
+                        }
+                        break;
+                    default:
+            <div style="position: absolute; top: @(item.m_TOP)px; left: @(item.m_Left)px; font-family: @(item.m_FontName); font-size: @(item.m_FontSize)px; text-align: @(item.m_TextAlign); font-weight: @(item.m_fontweight); width: @((int)item.m_Width)px; height: @((int)item.m_height)px; direction: @(item.m_Direction); z-index: 2;">@item.labelValue</div>
+                        break;
+                }
+            }
+        </div>
+    </div>
+</div>
+<style>
+    .modal-dialog.lg-1170 {
+        width: 1170px;
+    }
+    /*.form-control.cheque-control {
+                background-color: rgba(255, 255, 255, 0.8);
+                background-image: none;
+                border: 1px dashed #03a9f4;
+                color: #a6a6a6;
+                font-size: 11px;
+                padding: 2px 5px;
+                width: 150px;
+                margin: 0;
+                direction: rtl;
+                font-weight: normal;
+                text-align: right;
+            }*/
+    /*p { background: lime; height: 200px; width: 300px; }*/
+    /*div .resizable {
+                background: cyan;
+                position: relative;
+            }
+
+            div .resizer {
+                width: 10px;
+                height: 10px;
+                background: blue;
+                position: absolute;
+                right: 0;
+                bottom: 0;
+                cursor: se-resize;
+            }*/
+
+    #inputcontextmenu {
+        position: absolute;
+        width: 100px;
+    }
+
+    /*.cheque-control .remove {
+                border-radius: 0;
+                height: 100%;
+                left: 0;
+                margin: 0;
+                padding: 0 5px;
+                position: absolute;
+                top: 0;
+                width: 20px;
+            }*/
+
+    /*.cheque-control .remove .zmdi {
+                    vertical-align: sub;
+                }*/
+
+    /* Required CSS classes: must be included in all pages using this script */
+
+    /* Apply the element you want to drag/resize */
+    .drsElement {
+        position: absolute;
+        border: 1px solid #333;
+    }
+
+    /*
+                 The main mouse handle that moves the whole element.
+                 You can apply to the same tag as drsElement if you want.
+                */
+    .drsMoveHandle {
+        height: 20px;
+        background-color: #CCC;
+        border-bottom: 1px solid #666;
+        cursor: move;
+    }
+
+    /*
+                 The DragResize object name is automatically applied to all generated
+                 corner resize handles, as well as one of the individual classes below.
+                */
+    .dragresize {
+        position: absolute;
+        width: 5px;
+        height: 5px;
+        font-size: 1px;
+        background: #EEE;
+        border: 1px solid #333;
+    }
+
+    /*
+                 Individual corner classes - required for resize support.
+                 These are based on the object name plus the handle ID.
+                */
+    .dragresize-tl {
+        top: -8px;
+        left: -8px;
+        cursor: nw-resize;
+    }
+
+    .dragresize-tm {
+        top: -8px;
+        left: 50%;
+        margin-left: -4px;
+        cursor: n-resize;
+    }
+
+    .dragresize-tr {
+        top: -8px;
+        right: -8px;
+        cursor: ne-resize;
+    }
+
+    .dragresize-ml {
+        top: 50%;
+        margin-top: -4px;
+        left: -8px;
+        cursor: w-resize;
+    }
+
+    .dragresize-mr {
+        top: 50%;
+        margin-top: -4px;
+        right: -8px;
+        cursor: e-resize;
+    }
+
+    .dragresize-bl {
+        bottom: -8px;
+        left: -8px;
+        cursor: sw-resize;
+    }
+
+    .dragresize-bm {
+        bottom: -8px;
+        left: 50%;
+        margin-left: -4px;
+        cursor: s-resize;
+    }
+
+    .dragresize-br {
+        bottom: -8px;
+        right: -8px;
+        cursor: se-resize;
+    }
+</style>
+<script src="~/Scripts/dom-to-image.js"></script>
+<script>
+    //document.getElementById("marginLeftValue").addEventListener("change", setMarginLeft);
+    //document.getElementById("marginTopValue").addEventListener("change", setMarginTop);
+    //function setMarginLeft() {
+    //    document.getElementById("chequePanel").style.marginLeft = this.value + "px";
+    //}
+    //function setMarginTop() {
+    //    document.getElementById("chequePanel").style.marginTop = this.value + "px";
+    //}
+    function print() {
+        var prtContent = document.getElementById("chequeImage");
+        var WinPrint = window.open('', '', 'left=0,top=0,width=800,height=900,toolbar=0,scrollbars=0,status=0');
+        WinPrint.document.write('<link href="../../Content/css/print.css" rel="stylesheet" />' + prtContent.innerHTML);
+        //WinPrint.document.close();
+        WinPrint.focus();
+        //WinPrint.print(); // change window to winPrint
+        //WinPrint.close(); // change window to winPrint
+        if (confirm("آیا صدور چک با موفقیت انجام شد؟")) {
+            var dt = {
+                DueDate: "@ViewBag.DueDate",
+                ChequeNo: "@ViewBag.ChequeNo",
+                RequestId: "@ViewBag.RequestId",
+                ChequeFormatID: "@ViewBag.ChequeFormatID"
+            };
+            console.log(dt);
+            $.ajax({
+                url: "@Url.Action("SavePaymentDueDate", "ChequePayment")",
+                data: dt,
+                success: function (data) {
+                    alertify.success("پرداخت با موفقیت انجام شد");
+                    @*var node = document.getElementById("chequeImage");
+                        domtoimage.toPng(node).then(function (pngDataUrl) {
+                            var image = new Image();
+                            image.src = pngDataUrl;
+                            $.ajax({
+                                url: "@Url.Action("Create", "Attachment", new { area = "Payment" })",
+                                data: [relatedID = "", file = image, fromWhere = "Payment"],
+                                success: function (result) {
+
+                                }
+                            })
+
+                        })*@
+                    setTimeout(function () { window.location.reload(); }, 1000);
+                }
+            });
+            //   window.location.reload();
+        }
+        else {
+            if (!confirm("آیا برگه قابل استفاده است؟")) {
+                $.ajax({
+                    url: "@Url.Action("CancelRequestForCancelCheque", "ChequePayment")",
+                    data: { RequestId: "@ViewBag.RequestId" },
+                    success: function (data) {
+                        alertify.warning("پرداخت ابطال شد");
+                        alertify.warning("برگه چک ابطال شد");
+                        alertify.success("درخواست جدید با موفقیت صادر شد");
+                    }
+                })
+            }
+        }
+    }
+    $("body").on("change", "#BasicBank", function () {
+        var addressBankList = "@(Url.Action("GetChequeFormatType", "Cheque", new { Area= "BasicInfo" }))";
+        $("#ChequeFormatID").load(addressBankList, { id: $(this).val() }, function (data) {
+            $("#ChequeFormatID").val($("#ChequeFormatID option:first").val()).removeClass("empty");
+            updateChequeImage($("#ChequeFormatID").val());
+        });
+    });
+
+    $("body").on("change", "#ChequeFormatID", function () {
+        updateChequeImage($(this).val());
+    });
+    function updateChequeImage(relatedID) {
+        if (relatedID != null) {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    if (xhttp.responseText) {
+                        var file = JSON.parse(xhttp.responseText);
+                        var chequePanel = document.getElementById("chequePanel");
+                        chequePanel.style.backgroundImage = "url(data:image/" + file.Extension + ";base64," + file.Image + ")";
+                        chequePanel.style.height = file.Height + "px";
+                        chequePanel.style.width = file.Width + "px";
+                        // dragresize = new DragResize('dragresize', { minWidth: 0, minHeight: 0, minLeft: 0, minTop: 0, maxLeft: file.Width, maxTop: file.Height });
+                        $("#elemensForm").html("");
+                        $(chequePanel).html("");
+                        for (var i = 0; i < file.Elements.length; i++) {
+                            $(chequePanel).append('<div class="form-control cheque-control drsElement drsMoveHandle" data-name="1" style="position: absolute; top: ' + file.Elements[i].m_TOP + 'px; left: ' + file.Elements[i].m_Left + 'px; font-family: ' + file.Elements[i].m_FontName + '; font-size: ' + file.Elements[i].m_FontSize + 'px; text-align: ' + file.Elements[i].m_TextAlign + '; font-weight: ' + file.Elements[i].m_fontweight + '; width: ' + file.Elements[i].m_Width + 'px; height: ' + file.Elements[i].m_height + 'px; direction: ' + file.Elements[i].m_Direction + '; z-index: 2;">' + file.Elements[i].ChequeLable + '</div>')
+                            $("#elemensForm").append('<div class="form-group"><label class="control-label">' + file.Elements[i].ChequeLable + '</label><input class="form-control" type="text" name="name" placeholder="' + file.Elements[i].ChequeLable + '" /></div>')
+                        }
+                    }
+                }
+            };
+            xhttp.open("GET", "@Url.Action("GetChequeFormatTypeImage", "ChequePayment", new { Area= "Payment" })" + "?tableName=ChequeFormatTypes&relatedID=" + relatedID, true);
+            xhttp.send();
+        }
+    }
+</script>

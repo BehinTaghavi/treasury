@@ -1,0 +1,54 @@
+﻿@if (ViewBag.Isok == true)
+{
+    using (Ajax.BeginForm("ConvertOrDeleiverdLasheCheque", "Pay", new { area = "Payment", IsConvert = true },
+            new AjaxOptions
+            {
+                HttpMethod = "GET",
+                OnSuccess = "successMessage(data);location.reload();"
+            }, new { id = "ConvertForm" }))
+    {
+        if (ViewBag.remain != 0)
+        {
+            <span>مبلغ انتقال از ‍بشتیبان</span><span lang="fa"> @Math.Truncate(ViewBag.remain).ToString("#,##0") </span>
+            <br />
+            <span>  @(ViewBag.Message)</span>
+            <br />
+
+        }
+
+
+        <input type="hidden" name="RequestId" value="@ViewBag.RequestId" />
+        <label for='DueDate' class='control-label'>تاریخ سررسید</label>
+        <input type="text" class="datepicker form-control" name="DueDate" data-lang-number="fa" placeholder="____/__/__" readonly autocomplete="off" />
+        @Html.ValidationMessage("DueDate")
+        <input type="hidden" id="Pay_TypeDetailID_source" name="Pay_TypeDetailID_source" value="1" />
+        <input type="hidden" id="remain" name="remain" value="@(ViewBag.remain)" />
+        <input type="hidden" id="BackupBankId" name="BackupBankId" value="@(ViewBag.BackupBankId)" />
+
+        @*<label for='DueDate' class='control-label'>نوع چک</label>
+            <select id="Pay_TypeDetailID_source" name="Pay_TypeDetailID_source" class="form-control">
+                <option>لطفا انتخاب نمایید</option>
+                <option value="1">چک روز</option>
+                <option value="4">چک مدت دار</option>
+            </select>*@
+        <button type="submit" id="btnSubmit" onsubmit="$(this).prop('disabled', true);"  style="margin-top: 30px" class="btn btn-material-light-blue-A700">تبدیل به چک روز/مدت دار</button>
+    }
+}
+else
+{
+    <div>@(ViewBag.Message)</div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $('#ConvertForm').submit(function () {
+        if ($("#CreateRequset").valid()) {
+            $('#btnSubmit').attr('disabled', 'disabled');
+        }
+    });
+
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        minDate: new Date()
+    });
+</script>

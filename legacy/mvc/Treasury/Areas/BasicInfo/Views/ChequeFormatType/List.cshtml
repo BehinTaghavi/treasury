@@ -1,0 +1,109 @@
+﻿@using CSD.Treasury.UI.Models
+@{
+    int i = 0;
+    List<CSD.Treasury.Service.BasicBanksService.BasicBank> BankLs= (List<CSD.Treasury.Service.BasicBanksService.BasicBank>) ViewBag.BankList;
+}
+
+    @foreach (var item in BankLs)
+    {
+        i = i + 1;
+        <div class="panel-group" id="accordion">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4 class="panel-title clearfix">
+                        <a data-toggle="collapse" data-parent="#accordion" href="#collapse@(i)">↴ @Utility.GetBasicBankInfo(item.BasicBankId)</a>                       
+                        <a class="pull-left" data-ajax="true" data-ajax-success="modal(data,'@(Resources.Create + " " + Resources.ChequeFormatType +" " + @Resources.Bank+ " " +Utility.GetBasicBankInfo(item.BasicBankId))', 'md')" href="@Url.Action("Create", "ChequeFormatType", new { Area = "BasicInfo" ,BankId=item.BasicBankId})">+ @(Resources.Create + " " + Resources.ChequeFormatType )</a>
+                        @*@Ajax.ActionLink(Resources.Create + " " + Resources.ChequeFormatType, "Create", "ChequeFormatType", new { Area = "BasicInfo",BankId=item.BasicBankId}, new AjaxOptions
+                         {
+                             OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.ChequeFormatType + "', 'md')"
+                         }, new { data_lang_number="fa", @class = "pull-left" })*@
+                    </h4>
+                </div>
+                <div id="collapse@(i)" class="panel-collapse collapse ">
+                    <div class="panel-body">
+                        
+                            @Html.Action("GetChequeTypeByBankId", "ChequeFormatType", new { area = "BasicInfo", BankId = item.BasicBankId })
+                        
+                      
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+
+@*<div class="container">
+    <h2>@Resources.List   @Resources.Bank </h2>
+    @foreach (var item in Model.GroupBy(d => d.BankID))
+    {
+        i = i + 1;
+        <div class="panel-group" id="accordion">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h4 class="panel-title">
+                        <a data-toggle="collapse" data-parent="#accordion" href="#collapse@(i)">@Utility.GetBasicBankInfo(item.FirstOrDefault().BankID)</a>
+                    </h4>
+                </div>
+                <div id="collapse@(i)" class="panel-collapse collapse ">
+                    <div class="panel-body">
+                        @foreach (var item1 in item)
+                        {
+                            var fileId = Utility.CheckIfHasFile(item1.ChequeFormatID, "ChequeFormatTypes");
+                            <div class="row">
+                                <div class="col-sm-3">
+                                    @Utility.GetChequeDesc(item1.FormatDescriptionID_Main)
+                                </div>
+                                <div class="col-sm-9">
+                                    @Ajax.ActionLink(Resources.Edit, "Edit", "ChequeFormatType", new { Area = "BasicInfo", id = item1.ChequeFormatID }, new AjaxOptions
+                                   {
+                                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.ChequeFormatType + "', 'md');"
+                                   }, new { @class = "btn btn-success btn-xs" })
+
+                                    @Ajax.ActionLink(Resources.Delete, "Delete", "ChequeFormatType", new { Area = "BasicInfo", id = item1.ChequeFormatID }, new AjaxOptions
+                                   {
+                                       OnSuccess = "modal(data,'" + Resources.Delete + " " + Resources.ChequeFormatType + "', 'sm');"
+                                   }, new { @class = "btn btn-danger btn-xs" })
+                                    @if (fileId != 0)
+                                    {
+                                        if (Utility.CheckIfExistChequeType(item1.ChequeFormatID))
+                                        {
+                                            @Html.ActionLink(Resources.Design + " " + Resources.Cheque, "Edit", "Cheque", new { Area = "BasicInfo", id = item1.ChequeFormatID }, new { @class = "btn btn-material-grey btn-xs" })
+                                        }
+                                        else
+                                        {
+                                            @Html.ActionLink(Resources.Design + " " + Resources.Cheque, "Create", "Cheque", new { Area = "BasicInfo", id = item1.ChequeFormatID }, new { @class = "btn btn-material-grey btn-xs" })
+                                        }
+                                        @Ajax.ActionLink(Resources.Delete + " " + Resources.Scan, "ShowDeleteConfirm", "Attachment", new { Area = "Payment", id = fileId }, new AjaxOptions
+                                       {
+                                           HttpMethod = "Post",
+                                           OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+                                       }, new { @class = "btn btn-danger btn-xs" })
+                                    }
+                                    else
+                                    {
+                                        @Ajax.ActionLink(Resources.Scan, "Index", "Scan", new { Area = "BasicInfo", id = item1.ChequeFormatID }, new AjaxOptions
+                                       {
+                                           OnSuccess = "modal(data,'" + Resources.Scan + "', 'md');updateTable();"
+                                       }, new { @class = "btn btn-material-grey  btn-xs" })
+                                    }
+
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+</div>*@
+@*@section scripts{
+        <script>
+            $(document).ready(function () {
+                $(function () {
+                    $("#myTable").tablesorter();
+                });
+            });
+
+        </script>
+    }*@

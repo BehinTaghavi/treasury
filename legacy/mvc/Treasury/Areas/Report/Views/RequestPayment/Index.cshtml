@@ -1,0 +1,50 @@
+﻿@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+
+@{
+    ViewBag.Title = "Index";
+    Layout = null;
+}
+@*@Html.Stimulsoft().StiMvcDesigner(
+                           new StiMvcDesignerOptions
+                           {
+                               ActionGetReportTemplate = "GetReportTemplateDesigner",
+                               ActionSaveReportTemplate = "SaveReportTemplateDesigner",
+                               ActionGetReportSnapshot = "GetReportSnapshotDesigner",
+                               Width = System.Web.UI.WebControls.Unit.Percentage(100),
+                               Height = System.Web.UI.WebControls.Unit.Pixel(800),
+                               PrintAllowToPdf = false,
+                               PrintAllowToHtml = false,
+                               AllowModifyConnections = false,
+                               AllowModifyDictionary = false,
+                               //ShowSaveFileDialog = false,
+                               ViewerShowButtonSave = false,
+                               MainMenuShowNew = false,
+                               MainMenuShowNewReport = false,
+                               MainMenuShowExitButton = false,
+                               MainMenuShowOpenReport = false,
+                               MainMenuShowOpenReportFromGoogleDocs = false,
+                               MainMenuShowSaveAs = false,
+                               LocalizationDirectory = Url.Content("~/Areas/Relatorios/Content/Localization"),
+                               //Localization = System.Threading.Thread.CurrentThread.CurrentCulture.Name,
+                               ActionGetLocalization = "GetLocalization",
+                           })*@
+
+@*<head>
+    @Html.Stimulsoft().RenderMvcDesignerScripts()
+</head>
+
+@(Html.Stimulsoft().StiMvcDesigner(new StiMvcDesignerOptions()
+{
+    ActionGetReportTemplate = "GetCardReportSs",
+    LocalizationDirectory = Server.MapPath("~/Content/Localization/"), // Necessary to   get a list of available localization files
+    ActionDataProcessing = "DataProcessing",
+    Width = Unit.Percentage(300),
+    Height = Unit.Pixel(800)
+})
+)*@
+
+@*@Html.Stimulsoft().StiMvcMobileDesigner("MvcMobileDesigner1", new StiMvcMobileDesignerOptions()
+{
+    Localization = "Localizations/en.xml",
+})*@

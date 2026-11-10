@@ -1,0 +1,46 @@
+﻿@model List<CSD.Treasury.Service.cmpBranchesService.cmpBranch_TELS>
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+
+<div id="tellList">
+    @foreach (var item in Model)
+    {
+        var rowId = Guid.NewGuid().ToString("N");
+        <div class="clearfix" id="@rowId">
+            @Ajax.BeginForm("EditTel", "BranchInfo", new { area = "BasicInfo" }, new AjaxOptions
+   {
+       OnSuccess = "UpdateRow(data, '" + rowId + "')"
+   }, null)
+            {
+            @Html.HiddenFor(model => item.ID)
+            <div class="pull-right">
+                @Html.TextBoxFor(model => item.cmpBranchTel)
+            </div>
+            }
+        </div>
+    }
+</div>
+
+<div class="clearfix">
+    @Ajax.BeginForm("CreateTel", "BranchInfo", new { area = "BasicInfo" }, new AjaxOptions
+{
+    OnSuccess = "AddRow(data, 'tellList')"
+}, null)
+    {
+    @Html.Hidden("ID")
+    <div class="pull-right">
+        @Html.TextBox("cmpBranchTel")
+    </div>
+    <div class="pull-right">
+        <a class=""><i class="zmdi zmdi-delete"></i></a>
+    </div>
+    }
+</div>
+<script>
+    function UpdateRow(data, rowId) {
+        data = JSON.parse(data);
+        console.log(data);
+    }
+    function AddRow(data, rowId) { }
+</script>

@@ -1,0 +1,24 @@
+﻿@{
+    ViewBag.Title = Resources.Scan;
+    var id = ViewBag.id;
+    var BankID = ViewBag.BankID;
+    var BasicBankID = ViewBag.BasicBankID;
+}
+
+<script src="@Url.Content("~/Resources/dynamsoft.webtwain.initiate.js")"></script>
+<script src="@Url.Content("~/Scripts/DWTSample_ScanAndUpload.js")"></script>
+<script src="@Url.Content("~/Resources/dynamsoft.webtwain.config.js")"></script>
+
+@section PageHeader{
+    @Resources.Scan
+}
+<div style="height:500px;">
+    <a class="btn btn-material-blue-grey-600 btn-sm" value="@Resources.Scan" onclick="AcquireImage();">@Resources.Scan</a>
+    <a class="btn btn-primary btn-sm" value="@Resources.Save" onclick="btn_SaveOnClick();">@Resources.Save</a>
+    <a class="btn btn-primary btn-sm" value="@Resources.SaveInDB" onclick="btn_saveToDB(@id,@BankID,@BasicBankID);">@Resources.SaveInDB</a>
+
+
+    <div id="dwtcontrolContainer" style="float:left;"></div>
+</div>
+
+

@@ -1,0 +1,83 @@
+﻿@model CSD.Treasury.DataModel.CashDesk
+
+@{
+    ViewBag.Title = "Details";
+}
+
+<h2>Details</h2>
+
+<div>
+    <h4>CashDesk</h4>
+    <hr />
+    <dl class="dl-horizontal">
+        <dt>
+            @Html.DisplayNameFor(model => model.cmpBranch.cmpBranchAddress)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.cmpBranch.cmpBranchAddress)
+        </dd>
+
+      
+        <dt>
+            @Html.DisplayNameFor(model => model.Account_No)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.Account_No)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.CashDeskDescription)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.CashDeskDescription)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.CashDeskDescription2)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.CashDeskDescription2)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.CreateDateTime)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.CreateDateTime)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.IsActive)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.IsActive)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.Unique_Account_No)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.Unique_Account_No)
+        </dd>
+
+        <dt>
+            @Html.DisplayNameFor(model => model.Unique_Account_No_two)
+        </dt>
+
+        <dd>
+            @Html.DisplayFor(model => model.Unique_Account_No_two)
+        </dd>
+
+    </dl>
+</div>
+<p>
+    @Html.ActionLink("Edit", "Edit", new { id = Model.CashDeskID }) |
+    @Html.ActionLink("Back to List", "Index")
+</p>

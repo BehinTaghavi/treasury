@@ -1,0 +1,164 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelUniqueAccount
+@{
+    Model.Area = "Payment";
+    var code = ViewData.Eval("Code");
+    var name = ViewData.Eval("Name");
+}
+@if (Model.List.Count != 0)
+{
+    <div class="clearfix header">
+        <div class="col-xs-4">@Resources.Code</div>
+        <div class="col-xs-8">@Resources.Name</div>
+    </div>
+    <div class="body">
+        @foreach (var item in Model.List)
+        {
+            <div class="clearfix item" onclick="getLookupDataItem(this)" data-bind="@Model.Bind" data-content="@item.Account_Code" data-Name="@item.Account_Name" data-selector="@item.Account_Code">
+                <div class="col-xs-3" data-target="@(string.IsNullOrEmpty(Model.CodeField) ? "Code" : Model.CodeField)">@item.Account_Code</div>
+                <div class="col-xs-9" data-target="@(string.IsNullOrEmpty(Model.NameField) ? "Name" : Model.NameField)">@item.Account_Name</div>
+            </div>
+        }
+    </div>
+    <nav class="text-center">
+        <ul class="pagination  pagination-sm">
+            @if (Model.CurrentPage != 1)
+            {
+                Model.PageIndex = Model.CurrentPage - 1;
+                <li>
+                    <a href="@Url.Action("UniqueAccount", "Request", Model)"
+                       data-ajax-update="#@Model.UpdateTargetId"
+                       data-ajax-mode="replace"
+                       data-ajax="true"
+                       class="zmdi zmdi-chevron-right"></a>
+                </li>
+            }
+            else
+            {
+                <li class="disabled">
+                    <a href="#" class="zmdi zmdi-chevron-right"></a>
+                </li>
+            }
+            @if (Model.TotalPageCount <= 8)
+            {
+                for (int j = 0; j < Model.TotalPageCount; j++)
+                {
+                    Model.PageIndex = j + 1;
+                    if (Model.CurrentPage == j + 1)
+                    {
+                        <li class="active">
+                            <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                        </li>
+                    }
+                    else
+                    {
+                        <li>
+                            @Ajax.ActionLink((j + 1).ToString(), "UniqueAccount", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = Model.UpdateTargetId,
+    InsertionMode = InsertionMode.Replace,
+})
+                        </li>
+                    }
+                }
+            }
+            else
+            {
+                for (int j = (Model.CurrentPage - 2 > 1) ? ((Model.CurrentPage >= Model.TotalPageCount - 3) ? Model.CurrentPage - 4 : Model.CurrentPage - 3) : 0; j < ((Model.CurrentPage > 3) ? ((Model.CurrentPage == Model.TotalPageCount - 1) ? Model.TotalPageCount : ((Model.CurrentPage >= Model.TotalPageCount - 3) ? Model.TotalPageCount : Model.CurrentPage + 1)) : 5); j++)
+                {
+                    Model.PageIndex = j + 1;
+                    if (Model.CurrentPage == j + 1)
+                    {
+                        <li class="active">
+                            <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                        </li>
+                    }
+                    else
+                    {
+                        if ((j + 1) <= Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink((j + 1).ToString(), "UniqueAccount", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = Model.UpdateTargetId,
+    InsertionMode = InsertionMode.Replace,
+})
+                            </li>
+                        }
+                    }
+                }
+                if (Model.CurrentPage < Model.TotalPageCount - 3)
+                {
+                    <li class="disabled">
+                        <a href="#">...</a>
+                    </li>
+                    for (int j = Model.TotalPageCount - 2; j <= Model.TotalPageCount - 1; j++)
+                    {
+                        Model.PageIndex = j + 1;
+                        if (Model.CurrentPage == j + 1)
+                        {
+                            <li class="active">
+                                <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                            </li>
+                        }
+                        else
+                        {
+                            <li>
+                                @Ajax.ActionLink((j + 1).ToString(), "UniqueAccount", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = Model.UpdateTargetId,
+    InsertionMode = InsertionMode.Replace,
+})
+                            </li>
+                        }
+                    }
+                }
+            }
+            @if (Model.CurrentPage != Model.TotalPageCount)
+            {
+                Model.PageIndex = Model.CurrentPage + 1;
+                <li>
+                    <a href="@Url.Action("UniqueAccount", "Request", Model)"
+                       data-ajax-update="#@Model.UpdateTargetId"
+                       data-ajax-mode="replace"
+                       data-ajax="true"
+                       class="zmdi zmdi-chevron-left"></a>
+                </li>
+            }
+            else
+            {
+                <li class="disabled">
+                    <a href="#" class="zmdi zmdi-chevron-left"></a>
+                </li>
+            }
+        </ul>
+    </nav>
+  <script>
+      $('body').on("click", ".lookup .dropdown-menu", function (e) {
+
+          if (e.target.nodeName == "A") {
+              e.stopPropagation();
+              e.preventDefault();
+              var address = e.target.attributes["href"].nodeValue;
+              var updateTargetId = e.target.attributes["data-ajax-update"].nodeValue.replace("#", "");
+              if (e.target.attributes["data-ajax"].nodeValue) {
+                  var xmlhttp = new XMLHttpRequest();
+                  xmlhttp.onreadystatechange = function () {
+                      if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                          document.getElementById(updateTargetId).innerHTML = xmlhttp.responseText;
+                      }
+                  }
+                  var type = document.getElementById("UniqueAccountType");
+
+                  xmlhttp.open("GET",
+                      address
+                      , true);
+                  xmlhttp.send();
+              }
+          }
+      });
+  </script>
+}
+

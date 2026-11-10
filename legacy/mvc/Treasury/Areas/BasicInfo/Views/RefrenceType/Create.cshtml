@@ -1,0 +1,70 @@
+﻿@model CSD.Treasury.Service.ReferenceTypeService.ReferenceType
+@using System.Configuration;
+@{
+    ViewBag.Title = "Create";
+}
+
+@using (Ajax.BeginForm("Create", "RefrenceType", new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "RefrenceTypeCreate" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.EditorFor(model => model.referenceTypeDescription, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.ReferenceType } })
+                @Html.ValidationMessageFor(model => model.referenceTypeDescription, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        @if (ConfigurationManager.AppSettings["bilingual"] == "True")
+        {
+            <div class="form-group">
+                <div class="col-md-10">
+                    @Html.EditorFor(model => model.referenceTypeDescription2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.ReferenceType + "-" + Resources.EN } })
+                    @Html.ValidationMessageFor(model => model.referenceTypeDescription2, "", new { @class = "text-danger" })
+                </div>
+            </div>
+        }
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $('#RefrenceTypeCreate').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+</script>

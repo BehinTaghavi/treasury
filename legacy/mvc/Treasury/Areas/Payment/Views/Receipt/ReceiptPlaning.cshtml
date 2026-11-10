@@ -1,0 +1,130 @@
+﻿@model CSD.Treasury.Service.Receipt_Detail_PlanStateService.Receipt_Detail_PlanState
+
+@using (Html.BeginForm())
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(model => Model.ReceiptDetailId)
+
+    <div class="form-horizontal">
+        <h4>Receipt_Detail_PlanState</h4>
+        <hr />
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            @Html.LabelFor(model => model.Account_No, htmlAttributes: new { data_lang_number="fa", @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                @Html.EditorFor(model => model.Account_No, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control" } })
+                @Html.ValidationMessageFor(model => model.Account_No, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="row">
+                <label class="control-label col-sm-2" for="UniqueAccountType">@Resources.UniqueAccountType</label>
+                <div class="col-sm-4">
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number="fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                </div>
+                <div class="col-md-6">
+                    @Html.HiddenFor(d => d.Unique_Account_No)
+                    <div class="dropdown keep-open lookup">
+                        <div class="clearfix">
+                            <div class="col-xs-4">
+                                <input type="text" lookup data-action="UniqueAccount" autocomplete="off" data-related="Name" placeholder="@Resources.Unique_Account_Code" name="Code" id="Code" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                            </div>
+                            <div class="col-xs-8">
+                                <input type="text" lookup data-action="UniqueAccount" autocomplete="off" data-related="Code" placeholder="@Resources.Unique_Account_No" name="Name" id="Name" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                            </div>
+                        </div>
+                        <ul class="dropdown-menu" style="width: 100%">
+                            <li class="UniqueAccountList" id="acc1">
+                            </li>
+                        </ul>
+                    </div>
+                    @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                </div>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-sm-6">
+                    <label class="control-label col-sm-4" for="BehalfGropId">@Resources.PlaningTypeID</label>
+                    <div class="col-sm-8">
+                        <div class="form-group">
+                            @Html.EditorFor(model => model.StateDate, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control" } })
+                            @Html.ValidationMessageFor(model => model.StateDate, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="form-group">
+            <div class="row">
+                <div class="col-sm-6">
+                    <label class="control-label col-sm-4" for="BehalfGropId">@Resources.PlaningTypeID</label>
+                    <div class="col-sm-8">
+                        <div class="form-group">
+                            @Html.DropDownListFor(model => model.PlaningTypeID, new SelectList(ViewBag.planningTypeLs, "PlaningTypeID", "PlaningTypeDesc"), Resources.PleaseSelect, new { data_lang_number="fa", @class = "form-control" })
+                            @Html.ValidationMessageFor(model => model.PlaningTypeID, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+                    <label class="control-label col-sm-4" for="BehalfID">@Resources.PlaningType_Value</label>
+                    <div class="col-sm-8">
+                        <div class="form-group">
+                            @Html.EditorFor(model => model.PlaningType_Value, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control" } })
+                            @Html.ValidationMessageFor(model => model.PlaningType_Value, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div>
+                        <div id="RefrenceLable"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        @*<div class="form-group">
+                @Html.LabelFor(model => model.StateTime, htmlAttributes: new { data_lang_number="fa", @class = "control-label col-md-2" })
+                <div class="col-md-10">
+                    @Html.EditorFor(model => model.StateTime, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control" } })
+                    @Html.ValidationMessageFor(model => model.StateTime, "", new { @class = "text-danger" })
+                </div>
+            </div>*@
+
+
+
+        @*<div class="form-group">
+                @Html.LabelFor(model => model.UserID, htmlAttributes: new { data_lang_number="fa", @class = "control-label col-md-2" })
+                <div class="col-md-10">
+                    @Html.EditorFor(model => model.UserID, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control" } })
+                    @Html.ValidationMessageFor(model => model.UserID, "", new { @class = "text-danger" })
+                </div>
+            </div>*@
+
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script type="text/javascript">
+    $(function () {
+        $.material.init();
+    });
+
+    $("#StateDate").datepicker({
+        dateFormat: "yy/m/d",
+        changeMonth: true,
+        changeYear: true,
+        showButtonPanel: true
+    });
+
+</script>
+

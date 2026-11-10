@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Treasury.BuildingBlocks.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Cashflow/">
+    <Project Path="src/Services/Cashflow/Treasury.Cashflow.Api/Treasury.Cashflow.Api.csproj" />
+    <Project Path="src/Services/Cashflow/Treasury.Cashflow.Application/Treasury.Cashflow.Application.csproj" />
+    <Project Path="src/Services/Cashflow/Treasury.Cashflow.Domain/Treasury.Cashflow.Domain.csproj" />
+    <Project Path="src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/Treasury.Cashflow.Infrastructure.Postgres.csproj" />
+    <Project Path="src/Services/Cashflow/Treasury.Cashflow.Infrastructure/Treasury.Cashflow.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Treasury.ArchitectureTests/Treasury.ArchitectureTests.csproj" />
+    <Project Path="tests/Treasury.Cashflow.Application.Tests/Treasury.Cashflow.Application.Tests.csproj" />
+    <Project Path="tests/Treasury.Cashflow.Domain.Tests/Treasury.Cashflow.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.TestShim/Treasury.TestShim.csproj" />
+  </Folder>
+</Solution>

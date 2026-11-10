@@ -1,0 +1,220 @@
+﻿@{
+    Layout = "~/Views/Shared/Layout/Empty.cshtml";
+
+}
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+@using CSD.Treasury.MVCHelpers
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/vocherListReceiptController.js")"></script>
+ @*ng-init="StateDate = '@(ViewBag.StateDate)';value_Field = '@(ViewBag.value_Field)';voucherNo = '@(ViewBag.voucherNumber)' "*@
+<div ng-app="treasury" ng-controller="vocherListReceiptController" ng-init="ReceiptDetailId = '@(((int)ViewBag.ReceiptDetailId).ToString())'; StateId = '@(((int)ViewBag.StateId).ToString())'; PlaningTypeID = '@(((int)ViewBag.PlaningTypeID).ToString())';">
+    <p class="field-validation-valid text-info" ng-if="AccVoucherNo != null">سریال سند دفترداری : {{AccVoucherNo}}</p>
+    <p class="field-validation-valid text-info" ng-if="AccVoucherNo == null">سند به دفترداری ارسال نشده است</p>
+    <form ng-submit="save()" novalidate name="form">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th style="width: 3%;"></th>
+                    <th style="width: 25%;">معین</th>
+                    <th style="width: 12%;">تفصیل اول</th>
+                    <th style="width: 12%;">تفصیل دوم</th>
+                    <th style="width: 17%;">شرح</th>
+                    <th style="width: 7%;">بدهکار</th>
+                    <th style="width: 7%;">بستانکار</th>
+                    <th style="width: 10%;">مقدار</th>
+                    @*<th style="width: 6%;">نرخ ارز</th>*@
+                    <th style="width: 8%;">تاریخ </th>
+                    <th style="width: 3%;">تاریخ سند</th>
+
+                    <th style="width: 3%;"></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="item in vocherList" ng-if="item.Editable">
+                    @*<td style="vertical-align: top">{{$index + 1}}</td>*@
+                    <td style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.Account_No_{{$index}}.$invalid}">
+                        @*ng-change="ChangeAccount(item.Account_No)"*@
+                        <select required name="Account_No_{{$index}}"
+                                class="form-control input-sm"
+                                ng-options="uniqAccountType.account_code as uniqAccountType.account_code + ' / ' + uniqAccountType.Account_Name for uniqAccountType in model.AccountNumLs"
+                                ng-model="item.Account_No"
+                                ng-change="EmptyDateValuefield(item)"
+                                ui-select2="select2Options"
+                                style="width: 100px"
+                                title="{{item.uniqAccountType.Account_Name}}"></select>
+                    </td>
+                    <td style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.UniqueAccount1_{{$index}}.$invalid}">
+                        <a ng-if="getUniqueAccount(item.Account_No).Has_Unique_Account"
+                           class="btn btn-sm"
+                           ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                           ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                           style="margin: 4px 0;"
+                           ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Code.trim() +"/"+item.UniqueAccount1.Name.trim() : "تفصیل اول"'>
+                        </a>
+                        <input ng-if="getUniqueAccount(item.Account_No).Has_Unique_Account" type="hidden" name="UniqueAccount1_{{$index}}" required ng-model="item.UniqueAccount1.Code" />
+                    </td>
+                    <td style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.UniqueAccount2_{{$index}}.$invalid}">
+                        <a ng-if="getUniqueAccount(item.Account_No).Has_Unique_Account_Two"
+                           class="btn btn-sm"
+                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                           style="margin: 4px 0;"
+                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "تفصیل دوم"'>
+                        </a>
+                        <input ng-if="getUniqueAccount(item.Account_No).Has_Unique_Account_Two" type="hidden" name="UniqueAccount2_{{$index}}" required ng-model="item.UniqueAccount2.Code" />
+                    </td>
+                    <td style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.Description_{{$index}}.$invalid}">
+                        <input type="text" class="form-control" placeholder="شرح" name="Description_{{$index}}" required ng-model="item.description" />
+                    </td>
+                    <td data-lang-number="fa" ng-class="{'mdc-bg-red-50':((form.debit_{{$index}}.$invalid || item.debit == 0) && (form.credit_{{$index}}.$invalid || item.credit == 0))}" style="vertical-align: top" ng-style="item.credit > 0 && {'opacity':'.2'}">
+                        <input ng-disabled="item.credit > 0" req type="number" min="0" step="1000" class="form-control" placeholder="بدهکار" name="debit_{{$index}}" required ng-model="item.debit" />
+                        <label style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.debit | number}} ریال</label>
+                    </td>
+                    <td data-lang-number="fa" ng-class="{'mdc-bg-red-50':((form.debit_{{$index}}.$invalid || item.debit == 0) && (form.credit_{{$index}}.$invalid || item.credit == 0))}" style="vertical-align: top" ng-style="item.debit > 0 && {'opacity':'.2'}">
+                        <input ng-disabled="item.debit > 0" type="number" min="0" step="1000" class="form-control" placeholder="بستانکار" name="credit_{{$index}}" required ng-model="item.credit" />
+                        <label style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.credit | number}} ریال</label>
+                    </td>
+
+                    <td data-lang-number="fa" style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.Value_Field_{{$index}}.$invalid}">
+                        <input class="form-control" placeholder="مقدار" name="Value_Field_{{$index}}" ng-model="item.Value_Field" type="number" ng-required="getUniqueAccount(item.Account_No).Has_Value_Field" ng-disabled="!getUniqueAccount(item.Account_No).Has_Value_Field" AutoCompleteType="Disabled" />
+                    </td>
+
+                    @*<td ng-class="{'mdc-bg-red-50':form.Exchange_Ammount_{{$index}}.$invalid}" style="vertical-align: top">
+                            <input type="text" class="form-control" placeholder="نرخ ارز" name="Exchange_Ammount_{{$index}}" required ng-model="item.exchange_Ammount" />
+                        </td>*@
+
+                    <td data-lang-number="fa" style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.Date_{{$index}}.$invalid}">
+                        @*{{getUniqueAccount(item.Account_No).Has_Value_Field}}*@
+
+                        <div class="input-append">
+                            @* readonly
+                                required
+                                 <input type="text" class="form-control" name="Date_Field_{{$index}}" ng-model="item.Date_Field" readonly="readonly" />*@
+                            <input date-p
+                                   maxdate="@((string)ViewBag.maxdate)"
+                                   class="form-control"
+                                   ng-disabled="!getUniqueAccount(item.Account_No).Has_Date_Field"
+                                   type="text"
+                                   placeholder="____/__/__" lang="en"
+                                   ui-mask="99/99/9999"
+                                   name="Date_{{$index}}"
+                                   ng-required="getUniqueAccount(item.Account_No).Has_Date_Field"
+                                   ng-model="item.Date_Field" />
+                        </div>
+
+                    </td>
+                    <td data-lang-number="fa" style="vertical-align: top" ng-class="{'mdc-bg-red-50':form.Value_Field_{{$index}}.$invalid}">
+                        <input type="text" class="form-control" name="StateDate_{{$index}}" ng-model="item.StateDate" disabled />
+                    </td>
+                    <td class="text-center"><a class="mdc-text-blue-A700" href="javascript:void(0)" title="کپی" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></a></td>
+                    <td class="text-center"><a ng-if="!item.AccVoucherNo" class="mdc-text-red-A700" href="javascript:void(0)" title="حذف" ng-click="removeItem(item)" tooltip-placement="top" uib-tooltip="حذف"><i class="zmdi zmdi-hc-lg zmdi-close"></i></a></td>
+                </tr>
+                <tr ng-repeat="item in vocherList" ng-if="!item.Editable" class="mdc-bg-grey-100" style="opacity: .5">
+                    @*<td>{{$index + 1}}</td>*@
+                    <td style="padding:7px">
+                        {{item.Account_No}}/{{item.Account_No_Title}}
+                    </td>
+                    <td style="padding:7px">
+                        <span ng-if="item.UniqueAccount1.Code.trim() && item.UniqueAccount1.Name.trim()">
+                            {{item.UniqueAccount1.Code.trim()}} / {{item.UniqueAccount1.Name.trim()}}
+                        </span>
+                    </td>
+                    <td style="padding:7px">
+                        <span ng-if="item.UniqueAccount2.Code.trim() && item.UniqueAccount2.Name.trim()">
+                            {{item.UniqueAccount2.Code.trim()}} / {{item.UniqueAccount2.Name.trim()}}
+                        </span>
+                    </td>
+                    <td style="padding:7px">
+                        {{item.description}}
+                    </td>
+
+                    <td ng-style="item.credit > 0 && {'opacity':'.2'}; padding:7px">
+                        {{item.debit | number}} ریال
+                    </td>
+                    <td ng-style="item.debit > 0 && {'opacity':'.2'}; padding:7px">
+                        {{item.credit | number}} ریال
+                    </td>
+                    <td style="padding:7px">
+                        {{item.value_Field}}
+                    </td>
+                    @*<td style="padding:7px">
+                            {{item.exchange_Ammount}}
+                        </td>*@
+                    <td style="padding:7px">
+                        {{item.Date_Field}}
+                    </td>
+                    <td style="padding:7px">
+                        {{item.StateDate}}
+                    </td>
+                    <td style="padding:7px" class="text-center"><a class="mdc-text-blue-A700" href="javascript:void(0)" title="کپی" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></a></td>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr ng-class="{'mdc-bg-red-100':(sumdebit() != sumcredit()), 'mdc-bg-green-100':(sumdebit() == sumcredit())}">
+                    <td style="padding:7px" colspan="4"></td>
+                    <td style="padding:7px"><span style="white-space: nowrap">{{sumdebit() | number}} ریال</span></td>
+                    <td style="padding:7px"><span style="white-space: nowrap">{{sumcredit() | number}} ریال</span></td>
+                    <td style="padding:7px" colspan="5"></td>
+                </tr>
+            </tfoot>
+        </table>
+        <div class="clearfix">
+            <div class="pull-right">
+                <button class="btn btn-info" type="button" ng-click="addVocherRow()">ایجاد سطر</button>
+            </div>
+            <div class="pull-left">
+                <button class="btn btn-success"
+                        type="submit"
+                        ng-class="{'btn-success': !(form.$invalid || vocherList.length == 0), 'btn-material-red-600': form.$invalid || vocherList.length == 0 || (sumdebit() != sumcredit())}"
+                        ng-disabled="(form.$invalid || vocherList == 0) || (sumdebit() != sumcredit())">
+                    ذخیره
+                </button>
+            </div>
+            @*<div class="pull-left">
+                    <a class="btn btn-info"
+                       ng-click="resetReceipt()">
+                        بازیابی سطرها
+                    </a>
+                </div>*@
+            <div class="pull-left">
+                <a class="btn btn-info"
+                   ng-click="send(StateId)">
+                    ارسال اسناد
+                </a>
+            </div>
+
+            <div style="line-height: 54px; padding-left: 15px" class="pull-left mdc-text-red" ng-if="sumdebit() != sumcredit()">مجموع بدهکار و بستانکار یکسان نمیباشد</div>
+        </div>
+    </form>
+
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+    <div class="modal md ang fade" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+
+                <div class="modal-body">
+                    <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>

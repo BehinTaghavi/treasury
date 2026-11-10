@@ -1,0 +1,48 @@
+﻿@model IEnumerable<CSD.Treasury.Service.PermissiveSignatureForEachBankAccountService.PermissiveSignatureForEachBankAccount>
+
+@{
+                /**/
+
+                ViewBag.Title = "SavepermisiveForRequest";
+                var MinPermissiveSignatureCount = ViewBag.MinPermissiveSignatureCount;
+}
+@using (Ajax.BeginForm("SavepermisiveForRequest", "Request", new { Area = "Payment" }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "permisiveForRequestForm" }))
+{
+    @Html.Hidden("RequestId", (int)ViewBag.RequestId)
+    @Html.Hidden("BankId", (int)ViewBag.BankId)
+    @Html.Hidden("PermissiveTicked")
+    foreach (var item in Model)
+    {
+        <p>
+            <label>
+                <input type="checkbox" id="@item.PermissiveSignatureForEachBankAccountID" class="PermissiveCheckBox" />
+            </label>&nbsp;&nbsp;
+            @Utility.GetUserByPermissiveSignatureID(item.PermissiveSignatureID)
+        </p>
+    }
+    <div class="clearfix">
+
+        <div class="pull-right">
+            <button id="SubmitPermissiveSignatureCount" type="submit" class="btn btn-primary" onsubmit="$(this).prop('disabled', true);">@Resources.Save</button>
+        </div>
+    </div>
+   
+}
+<script type="text/javascript">
+    var elems = [];
+    $('.PermissiveCheckBox').change(function () {
+        this.checked ? elems.push(this.id) : elems.pop(this.id);
+        $('#PermissiveTicked').val(elems);
+    });
+    $("body").on("click", "#SubmitPermissiveSignatureCount", function () {
+        if (elems.length >= "@((int)MinPermissiveSignatureCount)") { $("#permisiveForRequestForm").submit() }
+        else {
+            alertify.error("حداقل تعداد امضا مجاز رعایت نشده است!")
+        }
+    })
+</script>

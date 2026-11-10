@@ -1,0 +1,50 @@
+﻿@using CSD.Treasury.MVCHelpers
+@{
+    ViewBag.Title = "Index";
+}
+
+@section PageHeader{
+  @Resources.List @Resources.DirectDebit
+}
+@section btnToolbar{
+<div class="mdc-bg-grey-50">
+    <div class="btn-toolbar">
+        <div class="clearfix">
+            <div class="pull-right">
+                @Html.ActionLink(Resources.Create, "Index", "DirectDebit", new { area = "payment" }, new { @class = "btn btn-material-green-600 btn-sm" })
+            </div>
+            <div class="pull-right">
+                <a class="btn btn-material-blue-grey-600 btn-sm" id="search" data-poload="@Url.Action("Search", "DirectDebit", new { area = "Payment" })">
+                   @Resources.Search
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+    }
+@section list{
+    <div id="Result">
+        @Html.Action("List", "DirectDebit", new { Area = "Payment", Model })
+    </div>
+}
+<script type="text/javascript">
+    document.getElementById("search").addEventListener("click", showSearchPanel);
+    function showSearchPanel() {
+        var e = this;
+        $.get(this.getAttribute("data-poload"), function (d) {
+            $("#modal-content").html(d);
+            modal(d, '@Resources.Search', 'md');
+        });
+    }
+
+        function updateTable() {
+            var url = '@(Url.Action("List", "DirectDebit", new { area = "Payment" }))';
+            $.ajax({
+                url: url, type: 'get',
+                success: function (data, status) {
+                    $("#Result").html(data);
+                }
+            });
+
+        }
+</script>

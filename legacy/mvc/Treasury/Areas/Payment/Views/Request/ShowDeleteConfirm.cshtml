@@ -1,0 +1,18 @@
+﻿@model CSD.Treasury.DataModel.Request_Payment
+
+<p>@Resources.AreYouSure</p>
+@using (Ajax.BeginForm("Delete", "Request", new { requestId = Model.RequestID }, new AjaxOptions
+{
+    OnSuccess = "successMessage(data); OnSuccessdelete(data)"
+}, null))
+{
+    <button class="btn btn-primary" type="submit">بله</button>
+    <button class="btn btn-primary" onclick="$('.modal.default').modal('hide')" type="button">خیر</button>
+}
+
+<script>
+        function OnSuccessdelete(data) {
+            deleteRow('@Hash.GetHashString(Model.RequestID.ToString())');
+            closeModal('md');
+        }
+</script>

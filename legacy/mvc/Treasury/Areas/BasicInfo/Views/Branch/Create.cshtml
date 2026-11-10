@@ -1,0 +1,91 @@
+﻿@model  CSD.Treasury.DataModel.cmpBranch
+
+@using (Ajax.BeginForm("Create", "Branch", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable('branchList');"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal",id= "BranchCreate" }))
+{
+    @Html.AntiForgeryToken()
+
+<div class="form-horizontal">
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+
+    <div class="form-group">
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.cmpBranchName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchName } })
+            @Html.ValidationMessageFor(model => model.cmpBranchName, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.cmpBranchName2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchName + "-" + Resources.EN } })
+            @Html.ValidationMessageFor(model => model.cmpBranchName2, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.cmpBranchAddress, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchAddress } })
+            @Html.ValidationMessageFor(model => model.cmpBranchAddress, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.cmpBranchAddress2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.EN } })
+            @Html.ValidationMessageFor(model => model.cmpBranchAddress2, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-10">
+            @Html.CheckBoxFor(model => model.IsMainBranch, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.EN } })  <span>شعبه اصلی</span>
+            @Html.ValidationMessageFor(model => model.IsMainBranch, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-10">
+                @Html.Label("شهر")
+                @Html.DropDownListFor(model => model.CityID, new SelectList(ViewBag.City, "CityID", "CityDescription"), new { data_lang_number = "fa", @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.CityID, "", new { @class = "text-danger" })
+            </div>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $('#BranchCreate').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+</script>

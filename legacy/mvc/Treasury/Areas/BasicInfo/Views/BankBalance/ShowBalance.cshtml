@@ -1,0 +1,60 @@
+﻿@model List<CSD.Treasury.Service.ProceduresDB.GetBankBalance_Result>
+@{
+    ViewBag.Title = "Index";
+    var i = 1;
+    var BankBalanceModel = (BankBalanceModel)ViewBag.BankBalanceModel;
+}
+
+@if (Model != null && Model.Count > 0)
+{
+    <table class="table table-striped sortable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>@Resources.Bank</th>
+                <th>@Resources.Debit</th>
+                <th>@Resources.Credit</th>
+                <th>@Resources.Balance</th>
+                <th>@Resources.Description</th>
+                <th></th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        @foreach (var item in Model)
+        {
+ 
+        <tr>
+            <td>@(i++)</td>
+            <td>@item.bankName</td>
+            <td>@Math.Truncate(item.Debit.Value).ToString("#,##0")@(item.ExchangeTypeID == 1 ? @Resources.Rial : "")</td>
+            <td>@Math.Truncate(item.Credit.Value).ToString("#,##0")@(item.ExchangeTypeID == 1 ? @Resources.Rial : "")</td>
+            <td>@Math.Truncate(item.balance.Value).ToString("#,##0")@(item.ExchangeTypeID == 1 ? @Resources.Rial : "")</td>
+            <td>@item.desc1</td>
+            @*<td>@item.RecordNo</td>*@
+            <td>
+                @*@if (item.Backup_BankID != null)
+            {
+                @Ajax.ActionLink(Resources.Details, "ShowBalance", "BankBalance", new { Area = "BasicInfo", BankID = item.Backup_BankID, showSum = true, }, new AjaxOptions { UpdateTargetId = "Details" }, new { @class = "btn btn-material-green-600 btn-sm" })
+            }*@
+            </td>
+            <td>
+                @if (BankBalanceModel.showSum == 1)
+                {
+                    @Ajax.ActionLink(Resources.Details, "ShowBalance", "BankBalance", new { Area = "BasicInfo", BankID = BankBalanceModel.BankId, showSum = false, }, new AjaxOptions { UpdateTargetId = "Details" }, new { @class = "btn btn-material-green-600 btn-sm" })
+                }
+            </td>
+            <td>
+                @{
+                    var BackUP = Utility.HasBackUp(item.BankID);
+                }
+                @if (BackUP != 0 && BankBalanceModel.showSum == 1)
+                {
+                    @Ajax.ActionLink(Resources.HasBackup, "ShowBalance", "BankBalance", new { Area = "BasicInfo", BankID = BackUP, showSum = false, }, new AjaxOptions { UpdateTargetId = "Details" }, new { @class = "btn btn-material-green-600 btn-sm" })
+                }
+            </td>
+        </tr>
+        }
+    </table>
+}
+

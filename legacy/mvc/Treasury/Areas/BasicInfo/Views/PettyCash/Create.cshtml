@@ -1,0 +1,339 @@
+﻿@model CSD.Treasury.Service.PettyCashService.PettyCash
+
+@using (Ajax.BeginForm("Create", "PettyCash", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "PettyCashCreate" }))
+{
+    @Html.AntiForgeryToken()
+
+<div class="form-horizontal">
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    @*<div class="form-group">
+            <button type="button" class="btn btn-sm btn-success" id="clone">اضافه کردن ذینفع</button>
+        </div>*@
+    <div class="form-group">
+        <div class="col-sm-3">
+            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Type, data_bind = "Unique_Account_No" })
+        </div>
+        <div class="col-sm-9">
+            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            @Html.ValidationMessageFor(model => model.Unique_Account_No)
+        </div>
+    </div>
+
+    @*<div id="add">
+
+        </div>*@
+    <div class="form-group">
+        <div class="col-md-6">
+            @Html.EditorFor(model => model.PettyCashName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.PettyCashName } })
+            @Html.ValidationMessageFor(model => model.PettyCashName, "", new { @class = "text-danger" })
+        </div>
+        <div class="col-md-6">
+            @Html.EditorFor(model => model.PettyCash_Ammount, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.PayAmount } })
+            @Html.ValidationMessageFor(model => model.PettyCash_Ammount, "", new { @class = "text-danger" })
+        </div>
+
+    </div>
+    <div class="form-group">
+        <div class="col-md-12">
+            <b id="PettyCash_AmmountText" class="mdc-text-green-700"></b>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-12">
+            @Html.EditorFor(model => model.PayCeiling, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.PayCeiling } })
+            @Html.ValidationMessageFor(model => model.PayCeiling, "", new { @class = "text-danger" })
+        </div>
+
+    </div>
+    <div class="form-group">
+        <div class="col-md-12">
+            <b id="PayCeilingText" class="mdc-text-green-700"></b>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-12">
+            @Html.EditorFor(model => model.Settle_Limit, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Settle_Limit } })
+            @Html.ValidationMessageFor(model => model.Settle_Limit, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-12">
+            <b id="Settle_LimitText" class="mdc-text-green-700"></b>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-md-6">
+            @Html.DropDownListFor(model => model.cmpBranchID, new SelectList(ViewBag.BranchLs, "cmpBranchID", "cmpBranchName"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Branch })
+            @Html.ValidationMessageFor(model => model.cmpBranchID)
+        </div>
+        <div class="col-md-6">
+            @Html.DropDownListFor(model => model.Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = "شماره حساب تنخواه گردان" })
+            @Html.ValidationMessageFor(model => model.Account_No)
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-md-6">
+            @Html.DropDownList("BehalfGroup", new SelectList(ViewBag.BehalfGroup, "BehalfGroupID", "BehalfGroupDescription"), new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.BehalfGroup, multiple = "multiple" })
+        </div>
+
+        <div class="col-md-6">
+            @Html.DropDownListFor(model => model.UserID, new SelectList(ViewBag.UserLs, "UserID", "User_FullName"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.UserName })
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-md-6">
+            @Resources.RecoverType:
+            <label>
+                <input type="radio" name="RecoveryType" value="true" checked="checked" /> @Resources.Cheque
+            </label>
+            <label>
+                <input type="radio" name="RecoveryType" value="false"  /> @Resources.Cash
+            </label>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script src="@Url.Content("~/Scripts/wordifyfa.js")"></script>
+<script>
+    $(document).ready(function () {
+        $("body").on("keyup", "#PettyCash_Ammount", function () {
+            if ($(this).val() != undefined) {
+                $("#PettyCash_AmmountText").text(wordifyfa($(this).val(), 0));
+            }
+        });
+        $("body").on("keyup", "#PayCeiling", function () {
+            if ($(this).val() != undefined) {
+                $("#PayCeilingText").text(wordifyfa($(this).val(), 0));
+            }
+        });
+        $("body").on("keyup", "#Settle_Limit", function () {
+            if ($(this).val() != undefined) {
+                $("#Settle_LimitText").text(wordifyfa($(this).val(), 0));
+            }
+        });
+        
+        //$("#PettyCash_Ammount").priceFormat({
+        //    centsSeparator: ',',
+        //    thousandsSeparator: '.'
+        //});
+        $("#BehalfGroup").select2({
+            tags: true,
+            dir: "rtl",
+            containerCssClass: "form-control"
+        });
+        $("#Account_No").select2({
+            tags: true,
+            dir: "rtl",
+            containerCssClass: "form-control"
+        });
+    })
+    $(function () {
+        $.material.init();
+        //setKeyUp("UniqueAccountType", "UniqueAccountList", "");
+    });
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $('PettyCashCreate').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+    //$('#clone').click(function () {
+    //    // $(".row").clone().appendTo("#add");
+    //    var codeAtt = guid();
+    //    var nameAtt = guid();
+    //    var updateTargetId = guid();
+    //    var bind = guid();
+    //    var uniqueAccountType = guid();
+    //    var rowId = guid();
+    //    var newItem =
+    //         '<div class="row" id="' + rowId + '">' +
+    //            '<div class="col-sm-3">' +
+    //               '<div class="form-group">' +
+    //                  '<div class="col-xs-12">' +
+    //                      '<div class="form-control-wrapper">' +
+    //                           '<select id="' + uniqueAccountType + '" class="form-control UniqueAccountType empty" data-bind="' + bind + '" name="UniqueAccountType" data-code-att = "' + codeAtt + '", data-name-att = "' + nameAtt + '", updatetargetid = "' + updateTargetId + '">' +
+    //                              '<option value=""></option>' +
+    //                              '<option value="1">اشخاص</option>' +
+    //                              '<option value="2">مراكز هزينه</option>' +
+    //                              '<option value="3">كاركنان</option>' +
+    //                              '<option value="4">پروژه  ها</option>' +
+    //                              '<option value="5">اعتبارات اسنادي</option>' +
+    //                              '<option value="6">موجوديها</option>' +
+    //                              '<option value="7">فروش  محصولات</option>' +
+    //                              '<option value="8">بانكها</option>' +
+    //                              '<option value="9">قراردادها ي بانكي</option>' +
+    //                              '<option value="12">سهامداران</option>' +
+    //                              '<option value="13">قرارداد فروش</option>' +
+    //                              '<option value="0">سایر</option>' +
+    //                           '</select><div class="floating-label">نوع</div><span class="material-input"></span>' +
+    //                      '</div>' +
+    //                  '</div>' +
+    //               '</div>' +
+    //            '</div>' +
+    //            '<div class="col-sm-9">' +
+    //               '<div class="form-group">' +
+    //                  '<input id="' + bind + '" name="Unique_Account_No" type="hidden" value="">' +
+    //                  '<div class="dropdown keep-open lookup">' +
+    //                  '<div class="clearfix">' +
+    //                  '<div class="col-xs-4">' +
+    //                  '<div class="form-control-wrapper"><input type="text" lookup="" data-action="UniqueAccount" data-related="' + nameAtt + '" name="Code" id="' + codeAtt + '" data-toggle="dropdown" class="form-control dropdown-toggle empty" aria-expanded="true"><div class="floating-label">کد</div><span class="material-input"></span></div>' +
+    //                  '</div>' +
+    //                  '<div class="col-xs-8">' +
+    //                  '<div class="form-control-wrapper"><input type="text" lookup="" data-action="UniqueAccount" data-related="' + codeAtt + '" name="Name" id="' + nameAtt + '" data-toggle="dropdown" class="form-control dropdown-toggle empty" aria-expanded="true"><div class="floating-label"> تفصیل</div><span class="material-input"></span></div>' +
+    //                  '</div>' +
+    //                  '</div>' +
+    //                  '<ul class="dropdown-menu" style="width: 100%">' +
+    //                  '<li id="' + updateTargetId + '">' +
+    //                  '</li>' +
+    //                  '</ul>' +
+    //                  '</div>' +
+    //                  '<span class="field-validation-valid" data-valmsg-for="unique_Account_No" data-valmsg-replace="true"></span>' +
+    //                  '</div>' +
+    //            '</div>' +
+    //         '</div>';
+    //    $("#add").append($(newItem));
+    //    $('.dropdown.keep-open').on({
+    //        "click": function () { this.classList.add("open"); this.closable = true; },
+    //        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    //    });
+    //    setKeyUp(uniqueAccountType, updateTargetId, rowId);
+    //})
+
+    @*$("body").on("change", ".UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+        var _this = $(this);
+
+        if (_this.val() != 0) {
+            $(this).parents(".row").find("#" + $(this).attr("updatetargetid")).load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") });
+        }
+        else {
+            $(this).parents(".row").find("#" + $(this).attr("updatetargetid")).load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") });
+        }
+    });
+
+    function setKeyUp(uniqueAccountTypeId, UniqueAccountListId, rowId) {
+        if (rowId != "") {
+            var lookup = document.getElementById(rowId).querySelectorAll("[lookup]");
+        }
+        else {
+            var lookup = document.querySelectorAll("[lookup]");
+        }
+        for (var i = 0; i < lookup.length; i++) {
+            lookup[i].onkeyup = function () {
+                var _this = this;
+
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.onreadystatechange = function () {
+                    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                        document.getElementById(UniqueAccountListId).innerHTML = xmlhttp.responseText;
+                    }
+                }
+                var type = document.getElementById(uniqueAccountTypeId);
+                var address = "/Payment/Request/" + _this.getAttribute("data-action") +
+                              "?CodeField=" + ((_this.getAttribute("Name") == "Code") ? _this.getAttribute("Id") : _this.getAttribute("data-related")) +
+                              "&NameField=" + ((_this.getAttribute("Name") == "Name") ? _this.getAttribute("Id") : _this.getAttribute("data-related")) +
+                              "&UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                              ((_this.value != "") ? "&" + _this.getAttribute("Name") + "=" + ((_this.value != "") ? _this.value : "") : "") +
+                              ((document.getElementById(_this.getAttribute("data-related")).value != "") ? "&" + _this.getAttribute("data-related") + "=" + ((document.getElementById(_this.getAttribute("data-related")).value != "") ? document.getElementById(_this.getAttribute("data-related")).value : " ") : "");
+
+                xmlhttp.open("GET",
+                    address
+                    , true);
+
+                xmlhttp.send();
+            }
+        }
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content").trim();
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML.trim();
+            elm.classList.remove("empty");
+        }
+    }
+
+    function formatRepoSelection(repo) {
+        return repo.full_name || repo.text;
+    }
+    $('.dropdown.keep-open').on({
+        "click": function () { this.classList.add("open"); this.closable = true; },
+        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    });*@
+
+
+</script>

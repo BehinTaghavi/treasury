@@ -1,0 +1,54 @@
+﻿ @model CSD.Treasury.UI.Models.SearchModelRequestPayment
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "IndexChecksIssued";
+}
+@section PageHeader{
+     لیست چک های صادره 
+}
+ 
+@section btnToolbar{
+ 
+<div class="mdc-bg-grey-50">
+    <div class="btn-toolbar">
+        <div class="clearfix">
+            <div class="pull-right">
+                <a class="btn btn-default btn-sm" id="search" data-poload="@Url.Action("Search", "Payment", new { area = "Report" })">
+                    <i class="zmdi zmdi-search zmdi-hc-lg"></i>&nbsp;&nbsp;&nbsp;&nbsp;@Resources.Search
+                </a>
+            </div>
+            <div class="pull-right">
+                <div id="progroup" data-has-content="empty"></div>
+            </div>
+        </div>
+    </div>
+</div>
+}
+@section list{
+    <div id="Result">
+        @Html.Action("ListChecksIssued", "Payment", new { Area = "Report", Model })
+    </div>
+}
+
+<script>
+    function updateTable() {
+        var url = '@(Url.Action("ListChecksIssued", "Payment", new { area = "Report"  }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }
+  
+    document.getElementById("search").addEventListener("click", showSearchPanel);
+    function showSearchPanel() {
+        var e = this;
+        $.get(this.getAttribute("data-poload"), function (d) {
+            $("#modal-content").html(d);
+            //$('.modal.default').modal('show');
+            //modal(data, '" + Resources.Show + " " + Resources.RequestPayment + "', 'md');
+            modal(d, '@Resources.Search', 'md');
+        });
+    }
+</script>

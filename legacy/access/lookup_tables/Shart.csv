@@ -1,0 +1,6 @@
+Sqlid,Ittype,Fldname,Fsymbol,D1,D2,Fldtype,Andor
+38,1,"Iif(IsNull([Person]),Null,BSPACE([Person]))Like","=","تدبير كالاي جام دارو","تدبير كالاي جام دارو",1,0
+61,1,"Iif(IsNull([Status]),Null,BSPACE([Status]))Like","=","نزد صندوق","نزد صندوق",1,0
+62,1,"Check.Maturity",">=","1384/01/01","1384/06/31",0,0
+66,2,"Iif(IsNull([Checktypen]),Null,BSPACE([Checktypen]))Like","=","چك مدت دار","چك مدت دار",1,0
+71,2,"Check.Maturity","BETWEEN","1389/01/01","1395/12/29",0,0

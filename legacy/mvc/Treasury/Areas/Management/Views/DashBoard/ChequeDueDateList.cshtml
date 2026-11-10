@@ -1,0 +1,326 @@
+﻿@model List<CSD.Treasury.Service.ProceduresDB.Get_Maturity_Cheques_Result>
+@using CSD.Treasury.UI.Models;
+@using CSD.Treasury.MVCHelpers
+@{
+    ViewBag.Title = "ChequeDueDateList";
+
+}
+@*<h3>@Resources.Decision</h3>*@
+<table class="table table-striped ">
+    <thead>
+        <tr>
+            <th colspan="9"><h3>@Resources.PayableDueDateCheque</h3></th>
+        </tr>
+        <tr class="mdc-bg-grey-100">
+            <th>@Resources.RequestId</th>
+            <th>@Resources.Price/@Resources.Rial</th>
+            <th>@Resources.BankAccountNumber</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.ChequeNo</th>
+            <th>@Resources.Unique_Account_No</th>
+            <th>@Resources.Behalf</th>
+            <th>@Resources.Delivered</th>
+            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+            {
+                <th>@Resources.Determine  </th>
+            }
+    </thead>
+    @foreach (var item in Model.Where(d => d.States == "Decision"))
+    {
+        <tbody>
+            <tr>
+                <td data-lang-number="fa">
+
+                    @(item.RequestID)
+                </td>
+
+                <td data-lang-number="fa">
+                    @Math.Truncate(item.PayAmount).ToString("N0")
+                    @*@if (item.ExchangeTypeID == 1)
+                        {
+                            <span>ریال</span>}
+                        else
+                        {
+                            <span>دلار</span>}*@
+                </td>
+                <td data-lang-number="fa">
+                    @item.Bank_AccountNumber
+                </td>
+                <td data-lang-number="fa">
+                    @(Utility.DateStructure(item.DueDate))
+                </td>
+                <td data-lang-number="fa">
+                    @(item.ChequeNo)
+                </td>
+                <td>
+                    @Utility.GetUniqueAccount(item.Unique_Account_No)
+                </td>
+                <td>
+                    @if (item.BehalfDescription.Length > 15)
+                    {
+                        @(item.BehalfDescription.Substring(0, 15) + "...")
+                    }
+                    else
+                    {
+                        @(item.BehalfDescription)
+                    }
+
+                </td>
+                <td>
+                    @if (item.TahvilDadeShodeh != 0)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                </td>
+                <td>
+
+                    <div class="dropdown">
+                        <button class="btn btn-material-light-blue-A700 btn-sm dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                            عملیات
+                            &nbsp;&nbsp;<span class="caret"></span>
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                     
+                                @*@Ajax.ActionLink("تمدیدچک", "", "Pay", new { Area = "Payment", RequestId = item.RequestID}, new AjaxOptions
+        {
+            Confirm = "آیا از تمدیدچک مطمئن هستید؟",
+            OnSuccess = "location.reload();"
+        })*@
+                                @*@Ajax.ActionLink("تمدیدچک", "ExtendDueDate", "Pay", new { area = "Payment", requestId = item.RequestID }, new AjaxOptions
+                    {
+                        HttpMethod = "GET",
+                        Confirm = "آیا از تمدید چک اطمینان دارید؟",
+                        //OnBegin = "getDate();"
+                        OnSuccess = "modal(data,'" + "تمدیدچک برای درخواست شماره: " + item.RequestID + "', 'md');"
+                        //OnSuccess = "successMessage(data);reload();"
+
+                    }, new { title = "ثبت تمدیدچک برای درخواست شماره: " + item.RequestID })*@
+                            
+                            <li>
+                                @Ajax.ActionLink(Resources.Show, "RequestPayment", "Request", new { area = "Payment", requestId = item.RequestID, Type = 0 }, new AjaxOptions
+             {
+                 OnSuccess = "modal(data,'نمایش جزییات اسناد پرداختنی', 'md');"
+             })
+                                @*, new { @Class = "btn btn-material-grey-A700 btn-xs" }*@
+                            </li>
+                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                            {
+                            <li>
+
+                                @Ajax.ActionLink(Resources.RecordBardasht, "BardashtDate", "Request", new { area = "Payment", requestId = item.RequestID, state = 3, DueDate = true }, new AjaxOptions
+                           {
+                               HttpMethod = "POST",
+                               Confirm = "آیا از ثبت برداشت اطمینان دارید؟",
+                               //OnBegin = "getDate();"
+                               OnSuccess = "modal(data,'" + "ثبت برداشت برای درخواست شماره: " + item.RequestID + "', 'md');",
+                              // OnComplete= "location.reload();",
+                               
+                              //OnSuccess = "successMessage(data);reload();"
+
+                           }, new { title = "ثبت برداشت برای درخواست شماره: " + item.RequestID })
+                                @*, @class = "btn btn-material-light-blue-A700 btn-xs"*@
+                            </li>
+                                if (item.ChequeNo != null)
+                                {
+                            <li>
+                                @Html.ActionLink("عودت چک", "CancelRequest", "Request", new { Area = "Payment", RequestId = item.RequestID }, new { @class = "CancelRequest" })
+                                @*, new { @class = "CancelRequest btn btn-material-blue-700 btn-xs" }*@
+                            </li>
+                                }
+                            <li>
+                                @Ajax.ActionLink(Resources.InActive, "Confirmation", "Request", new { area = "Payment", requestIds = item.RequestID, Status = 5 }, new AjaxOptions
+                           {
+                               HttpMethod = "POST",
+                               OnSuccess = "InActiveCheque()"
+
+                           }, new { title = Resources.InActive })
+                                @*, @class = "btn btn-material-red-A700 btn-xs" *@
+                            </li>
+                            <li>
+                                @Ajax.ActionLink("سند", "ShowVocherList", "Vocher_Row", new { Area = "Management", IsPayment = true, requestId = item.RequestID, IsReturend = false, Receipt_Pay_TypeID = 1, BehalfGroupID = item.BehalfGroupID, StatusID = 4, ReferenceId = item.RequestID }, new AjaxOptions
+           {
+               OnSuccess = "modal(data, 'سند', 'lg.ang')"
+           }, new { title = Resources.InActive })
+                                @*@class = "btn btn-material-grey-A700 btn-xs"*@
+                            </li>
+                              
+                            }
+                        </ul>
+                    </div>
+
+
+                  
+                </td>
+
+            </tr>
+        </tbody>
+    }
+    <thead>
+        <tr>
+            <th colspan="9"><h3>@Resources.Pendding</h3></th>
+        </tr>
+        <tr class="mdc-bg-grey-100">
+            <th>@Resources.RequestId</th>
+            <th>@Resources.Price</th>
+            <th>@Resources.BankAccountNumber</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.ChequeNo</th>
+            <th>@Resources.Unique_Account_No</th>
+            <th>@Resources.Behalf</th>
+            <th></th>
+
+            @if (Request.IsAuthenticated && (User.IsInRole("Admin") || User.IsInRole("Manager")))
+            {
+                <th>تعیین تکلیف</th>}
+    </thead>
+    @foreach (var item in Model.Where(d => d.States == "Pending"))
+    {
+        <tbody>
+            <tr>
+                <td data-lang-number="fa">
+                    @(item.RequestID)
+                </td>
+                <td data-lang-number="fa">
+                    @Math.Truncate(item.PayAmount).ToString("N0")
+                    @*@if (item.ExchangeTypeID == 1)
+                        {
+                            <span>ریال</span>}
+                        else
+                        {
+                            <span>دلار</span>}*@
+                </td>
+                <td data-lang-number="fa">
+                    @item.Bank_AccountNumber
+                </td>
+                <td data-lang-number="fa">
+                    @(Utility.DateStructure(item.DueDate))
+                </td>
+                <td data-lang-number="fa">
+                    @(item.ChequeNo)
+                </td>
+                <td>
+
+                    @*@if (item.Unique_Account_No.Count() > 5)
+                        {
+                            @(item.Unique_Account_No.Substring(0, 5) + "...")
+                        }
+                        else
+                        {
+                            @(item.Unique_Account_No)
+                        }*@
+                    @Utility.GetUniqueAccount(item.Unique_Account_No)
+                </td>
+                <td>
+                    @if (item.BehalfDescription.Length > 15)
+                    {
+                        @(item.BehalfDescription.Substring(0, 15) + "...")
+                    }
+                    else
+                    {
+                        @(item.BehalfDescription)
+                    }
+
+
+                </td>
+
+                <td></td>
+                @if (Request.IsAuthenticated && (User.IsInRole("Admin") || User.IsInRole("Manager")))
+                {
+                    <td>
+                        @Ajax.ActionLink(Resources.RecordBardasht, "BardashtDate", "Request", new { area = "Payment", requestId = item.RequestID, state = 3, DueDate = true }, new AjaxOptions
+                   {
+                       HttpMethod = "POST",
+                       Confirm = "آیا از ثبت برداشت اطمینان دارید؟",
+                       //OnBegin = "getDate();"
+                       OnSuccess = "modal(data,'" + "ثبت برداشت برای درخواست شماره: " + item.RequestID + "', 'md');"
+                       //OnSuccess = "successMessage(data);reload();"
+
+                   }, new { title = "ثبت برداشت برای درخواست شماره: " + item.RequestID, @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+
+                        @*@Ajax.ActionLink(Resources.CancellationReplacement, "Confirmation", "Request", new { area = "Payment", requestIds = item.RequestID, Status = -2 }, new AjaxOptions
+                            {
+                                HttpMethod = "POST",
+                                OnSuccess = "CancelCheque()"
+
+                            }, new { title = Resources.CancellationReplacement, @class = "btn btn-material-blue-700 btn-xs" })*@
+
+
+                        @if (item.ChequeNo != null)
+                        {
+
+                            @Html.ActionLink("کنسل / عودت چک88", "CancelRequest", "Request", new { Area = "Payment", RequestId = item.RequestID }, new { @class = "CancelRequest btn btn-material-blue-700 btn-xs" })
+
+                        }
+
+                        @*@Ajax.ActionLink(Resources.InActive, "Confirmation", "Request", new { area = "Payment", requestIds = item.RequestID, Status = 5 }, new AjaxOptions
+                            {
+                                HttpMethod = "POST",
+
+                            }, new { title = Resources.InActive, @class = "btn btn-material-grey-50 btn-xs" })*@
+                    </td>
+                }
+            </tr>
+        </tbody>
+    }
+</table>
+
+<script>
+
+    var CancelBtn = document.getElementsByClassName("CancelRequest");
+
+    for (var i = 0; i < CancelBtn.length; i++) {
+        CancelBtn[i].addEventListener("click", CancelItem);
+    }
+    function CancelItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   alertify.success(data.message);
+                                   updateTable2();
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+    function ConfirmCheque() {
+        alertify.success("تایید  چک با موفقیت انجام شد");
+        reload()
+    }
+    function CancelCheque() {
+        alertify.success("چک کنسل شد");
+        reload()
+    }
+    function InActiveCheque() {
+        alertify.success("چک با موفقیت به تعویق افتاد");
+        reload()
+    }
+
+    function sabtBardasht(requestId, status) {
+
+    }
+
+    function reload() {
+        setTimeout(function () {
+            location.reload();
+        }, 1000)
+    }
+</script>

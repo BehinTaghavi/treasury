@@ -1,0 +1,41 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { global-json-file: global.json }
+      - run: dotnet build Treasury.slnx -c Release
+      - run: dotnet test --solution Treasury.slnx -c Release --no-build
+
+  database-and-migration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r tools/migration/requirements.txt
+      - run: pytest db/postgres/tests
+        env: { TREASURY_TEST_DSN: "host=localhost user=postgres dbname=treasury_test" }
+      - run: cd tools/migration && pytest
+        env: { TREASURY_TEST_DSN: "host=localhost user=postgres dbname=treasury_migration_test" }
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: frontend/pnpm-lock.yaml }
+      - run: cd frontend && pnpm install --frozen-lockfile && pnpm test && pnpm build

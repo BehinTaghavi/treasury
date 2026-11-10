@@ -1,0 +1,954 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="f" xml:space="preserve">
+    <value>درباره ما</value>
+  </data>
+  <data name="BehalfGroupID" xml:space="preserve">
+    <value>گروه بابت</value>
+  </data>
+  <data name="BehalfRequired" xml:space="preserve">
+    <value>لطفا بابت را وارد نمایید</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>انصراف</value>
+  </data>
+  <data name="ContactUs" xml:space="preserve">
+    <value>تماس با ما</value>
+  </data>
+  <data name="ExchangeType" xml:space="preserve">
+    <value>نوع ارز</value>
+  </data>
+  <data name="From" xml:space="preserve">
+    <value>از</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>بالا</value>
+  </data>
+  <data name="Home" xml:space="preserve">
+    <value>خانه</value>
+  </data>
+  <data name="Login" xml:space="preserve">
+    <value>ورود</value>
+  </data>
+  <data name="Low" xml:space="preserve">
+    <value>پایین</value>
+  </data>
+  <data name="Normal" xml:space="preserve">
+    <value>معمولی</value>
+  </data>
+  <data name="PayAmount" xml:space="preserve">
+    <value>مبلغ</value>
+  </data>
+  <data name="PayAmountRequired" xml:space="preserve">
+    <value>لطفا مبلغ را وارد نمایید</value>
+  </data>
+  <data name="ReferenceType" xml:space="preserve">
+    <value>عطف های بابت</value>
+  </data>
+  <data name="Reference" xml:space="preserve">
+    <value>عطف</value>
+  </data>
+  <data name="Register" xml:space="preserve">
+    <value>ثبت نام</value>
+  </data>
+  <data name="RequestPayment" xml:space="preserve">
+    <value>درخواست وجه</value>
+  </data>
+  <data name="Save" xml:space="preserve">
+    <value>ذخیره</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>نمایش</value>
+  </data>
+  <data name="To" xml:space="preserve">
+    <value>به</value>
+  </data>
+  <data name="Approval" xml:space="preserve">
+    <value>تاییدیه</value>
+  </data>
+  <data name="Confirm" xml:space="preserve">
+    <value>تایید درخواست</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>حذف</value>
+  </data>
+  <data name="Delivered" xml:space="preserve">
+    <value>تحویل</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>ویرایش</value>
+  </data>
+  <data name="Paid" xml:space="preserve">
+    <value>پرداخت</value>
+  </data>
+  <data name="PayeeUnit" xml:space="preserve">
+    <value>واحد دریافت کننده وجه</value>
+  </data>
+  <data name="Priority" xml:space="preserve">
+    <value>اولویت</value>
+  </data>
+  <data name="RequestDate" xml:space="preserve">
+    <value>تاریخ درخواست</value>
+  </data>
+  <data name="IsConfirmMessage" xml:space="preserve">
+    <value>درخواست وجه تایید شده است</value>
+  </data>
+  <data name="IsDeliveredMessage" xml:space="preserve">
+    <value>درخواست وجه تحویل داده شده است</value>
+  </data>
+  <data name="IsNotConfirmMessage" xml:space="preserve">
+    <value>درخواست وجه تایید نشده است</value>
+  </data>
+  <data name="IsNotPaidMessage" xml:space="preserve">
+    <value>درخواست وجه پرداخت نشده است</value>
+  </data>
+  <data name="IsPaidMessage" xml:space="preserve">
+    <value>درخواست وجه پرداخت شده است</value>
+  </data>
+  <data name="ConfirmDelivered" xml:space="preserve">
+    <value>تایید تحویل</value>
+  </data>
+  <data name="ConfirmPayment" xml:space="preserve">
+    <value>تایید برای پرداخت</value>
+  </data>
+  <data name="ConfirmRequest" xml:space="preserve">
+    <value>تایید درخواست</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>واحدهای سازمانی</value>
+  </data>
+  <data name="UserName" xml:space="preserve">
+    <value>نام کاربری</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>درخواست با خطا مواجه شد </value>
+  </data>
+  <data name="CreateSuccessfully" xml:space="preserve">
+    <value>درخواست ایجاد با موفقیت انجام شد</value>
+  </data>
+  <data name="UniqueAccountNoRequired" xml:space="preserve">
+    <value>ذینفع اصلی را مشخص کنید</value>
+  </data>
+  <data name="BehalfGroupRequired" xml:space="preserve">
+    <value>لطفا گروه بابت را انتخاب نمایید</value>
+  </data>
+  <data name="Others" xml:space="preserve">
+    <value>سایر</value>
+  </data>
+  <data name="UniqueAccountTypeRequired" xml:space="preserve">
+    <value>لطفا نوع ذینفع را مشخص نمایید</value>
+  </data>
+  <data name="Report" xml:space="preserve">
+    <value>گزارش</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>جستجو</value>
+  </data>
+  <data name="FiscalYear" xml:space="preserve">
+    <value>سال مالی</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>رمز عبور</value>
+  </data>
+  <data name="Behalf" xml:space="preserve">
+    <value>بابت</value>
+  </data>
+  <data name="Destination" xml:space="preserve">
+    <value>مقصد</value>
+  </data>
+  <data name="ExchangeRate" xml:space="preserve">
+    <value>نرخ ارز</value>
+  </data>
+  <data name="Number" xml:space="preserve">
+    <value>شماره</value>
+  </data>
+  <data name="PleaseSelect" xml:space="preserve">
+    <value>لطفا انتخاب نمایید</value>
+  </data>
+  <data name="Source" xml:space="preserve">
+    <value>مبدا</value>
+  </data>
+  <data name="UniqueAccountType" xml:space="preserve">
+    <value>ذینفع/تفصیل</value>
+  </data>
+  <data name="AttachFile" xml:space="preserve">
+    <value>ضمیمه</value>
+  </data>
+  <data name="PayType" xml:space="preserve">
+    <value>نحوه پرداخت</value>
+  </data>
+  <data name="BasicInfo" xml:space="preserve">
+    <value>اطلاعات پایه</value>
+  </data>
+  <data name="Create" xml:space="preserve">
+    <value>ایجاد</value>
+  </data>
+  <data name="EN" xml:space="preserve">
+    <value>انگلیسی</value>
+  </data>
+  <data name="FA" xml:space="preserve">
+    <value>فارسی</value>
+  </data>
+  <data name="List" xml:space="preserve">
+    <value>لیست</value>
+  </data>
+  <data name="LogOff" xml:space="preserve">
+    <value>خروج</value>
+  </data>
+  <data name="Treasury" xml:space="preserve">
+    <value>خزانه داری</value>
+  </data>
+  <data name="ExchangeTypeDescription" xml:space="preserve">
+    <value>نوع ارز</value>
+  </data>
+  <data name="Bank" xml:space="preserve">
+    <value>بانک</value>
+  </data>
+  <data name="ENname" xml:space="preserve">
+    <value>نام انگلیسی</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>نام </value>
+  </data>
+  <data name="BehalfGroup" xml:space="preserve">
+    <value>گروه بابت</value>
+  </data>
+  <data name="AreYouSure" xml:space="preserve">
+    <value>آیا مطمین هستید؟</value>
+  </data>
+  <data name="Cheque" xml:space="preserve">
+    <value>چک</value>
+  </data>
+  <data name="Design" xml:space="preserve">
+    <value>طراحی</value>
+  </data>
+  <data name="Scan" xml:space="preserve">
+    <value>اسکن</value>
+  </data>
+  <data name="Code" xml:space="preserve">
+    <value>کد</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>بازگشت</value>
+  </data>
+  <data name="BankAccountNumber" xml:space="preserve">
+    <value>شماره حساب</value>
+  </data>
+  <data name="BranchCode" xml:space="preserve">
+    <value>کد شعبه</value>
+  </data>
+  <data name="BranchName" xml:space="preserve">
+    <value>نام شعبه</value>
+  </data>
+  <data name="IsActive" xml:space="preserve">
+    <value>فعال</value>
+  </data>
+  <data name="OpeningDate" xml:space="preserve">
+    <value>تاریخ افتتاح </value>
+  </data>
+  <data name="FullName" xml:space="preserve">
+    <value>نام و نام خانوادگی</value>
+  </data>
+  <data name="Users" xml:space="preserve">
+    <value>کاربران</value>
+  </data>
+  <data name="DefualtLanguage" xml:space="preserve">
+    <value>زبان پیش فرض</value>
+  </data>
+  <data name="IsAdmin" xml:space="preserve">
+    <value>مدیر</value>
+  </data>
+  <data name="ReceiptPayType" xml:space="preserve">
+    <value>نوع  پرداخت</value>
+  </data>
+  <data name="String1" xml:space="preserve">
+    <value>انگلیسی</value>
+  </data>
+  <data name="Roles" xml:space="preserve">
+    <value>نقش ها</value>
+  </data>
+  <data name="Branch" xml:space="preserve">
+    <value>شعب</value>
+  </data>
+  <data name="Aggregation" xml:space="preserve">
+    <value>تجمیع</value>
+  </data>
+  <data name="BranchAddress" xml:space="preserve">
+    <value>آدرس شعبه</value>
+  </data>
+  <data name="Description" xml:space="preserve">
+    <value>توضیحات</value>
+  </data>
+  <data name="Email" xml:space="preserve">
+    <value>ایمیل</value>
+  </data>
+  <data name="Fax" xml:space="preserve">
+    <value>فکس</value>
+  </data>
+  <data name="Tel" xml:space="preserve">
+    <value>تلفن</value>
+  </data>
+  <data name="BranchInformation" xml:space="preserve">
+    <value>اطلاعات شعبه</value>
+  </data>
+  <data name="Required" xml:space="preserve">
+    <value>لطفا وارد نمایید</value>
+  </data>
+  <data name="Region" xml:space="preserve">
+    <value>کشور/استان/شهر</value>
+  </data>
+  <data name="CostCenter" xml:space="preserve">
+    <value>مرکز هزینه</value>
+  </data>
+  <data name="BankCard" xml:space="preserve">
+    <value>کارت  بانک</value>
+  </data>
+  <data name="AccountNo" xml:space="preserve">
+    <value>شماره حساب</value>
+  </data>
+  <data name="CardNO" xml:space="preserve">
+    <value>شماره کارت</value>
+  </data>
+  <data name="ExpiryDate" xml:space="preserve">
+    <value>تاریخ انقضا</value>
+  </data>
+  <data name="City" xml:space="preserve">
+    <value>شهر</value>
+  </data>
+  <data name="Province" xml:space="preserve">
+    <value>استان</value>
+  </data>
+  <data name="Cashier" xml:space="preserve">
+    <value>دارندگان صندوق</value>
+  </data>
+  <data name="PettyCash" xml:space="preserve">
+    <value>دارندگان تنخواه گردان</value>
+  </data>
+  <data name="account_code" xml:space="preserve">
+    <value>معین/معین در معین</value>
+  </data>
+  <data name="Unique_Account_No" xml:space="preserve">
+    <value>نام تفصیل(ذینفع)</value>
+  </data>
+  <data name="CheckBook" xml:space="preserve">
+    <value>دسته چک</value>
+  </data>
+  <data name="Backup_BankID" xml:space="preserve">
+    <value>شماره حساب جاری</value>
+  </data>
+  <data name="HasBackup" xml:space="preserve">
+    <value>پشتیبان</value>
+  </data>
+  <data name="HasExchangeTransaction" xml:space="preserve">
+    <value>ارز</value>
+  </data>
+  <data name="IS_Facilities" xml:space="preserve">
+    <value>تسهیلات</value>
+  </data>
+  <data name="OpeningValue" xml:space="preserve">
+    <value>موجودی اول دوره</value>
+  </data>
+  <data name="SortOrder" xml:space="preserve">
+    <value>اولویت واگذاری</value>
+  </data>
+  <data name="Assign_Account_No" xml:space="preserve">
+    <value>معین/معین در معین واگذاری</value>
+  </data>
+  <data name="Return_Account_No" xml:space="preserve">
+    <value>معین/معین در معین برگشتی</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>نوع</value>
+  </data>
+  <data name="PayCeiling" xml:space="preserve">
+    <value>سقف پرداخت</value>
+  </data>
+  <data name="RecoverType" xml:space="preserve">
+    <value>نحوه ترمیم</value>
+  </data>
+  <data name="Settle_Limit" xml:space="preserve">
+    <value>حد واریز</value>
+  </data>
+  <data name="String2" xml:space="preserve">
+    <value>نام دارنده تنخواه گردان</value>
+  </data>
+  <data name="ChequeFormatType" xml:space="preserve">
+    <value>نوع چک</value>
+  </data>
+  <data name="NewestLarge" xml:space="preserve">
+    <value>جدید ترین-قطع بزرگ</value>
+  </data>
+  <data name="NewestSmall" xml:space="preserve">
+    <value>جدیدترین -قطع کوچک</value>
+  </data>
+  <data name="NewLarge" xml:space="preserve">
+    <value>جدید-قطع بزرگ</value>
+  </data>
+  <data name="NewSmall" xml:space="preserve">
+    <value>جدید -قطع کوچک</value>
+  </data>
+  <data name="OldLarge" xml:space="preserve">
+    <value>قدیمی -قطعه بزرگ</value>
+  </data>
+  <data name="Small" xml:space="preserve">
+    <value>قطع کوچک</value>
+  </data>
+  <data name="BasicBank" xml:space="preserve">
+    <value>بانک</value>
+  </data>
+  <data name="FirstPageNumber" xml:space="preserve">
+    <value>اولین برگ</value>
+  </data>
+  <data name="LastPageNumber" xml:space="preserve">
+    <value>آخرین برگ</value>
+  </data>
+  <data name="TotalPageCount" xml:space="preserve">
+    <value>تعداد برگ</value>
+  </data>
+  <data name="Beneficiaries" xml:space="preserve">
+    <value>ذینفعان</value>
+  </data>
+  <data name="LegalAccountName" xml:space="preserve">
+    <value>عنوان حقوقی ثبت (عامل)</value>
+  </data>
+  <data name="Details" xml:space="preserve">
+    <value>جزییات</value>
+  </data>
+  <data name="Sheba" xml:space="preserve">
+    <value>شبا</value>
+  </data>
+  <data name="Backup_Bank" xml:space="preserve">
+    <value>شماره حساب جاری اصلی</value>
+  </data>
+  <data name="RelationsError" xml:space="preserve">
+    <value>حذف به دلیل وجود وابسته امکان پذیر نیست</value>
+  </data>
+  <data name="NO" xml:space="preserve">
+    <value>خیر</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>بله</value>
+  </data>
+  <data name="SaveInDB" xml:space="preserve">
+    <value>ذخیره در دیتا بیس</value>
+  </data>
+  <data name="Profile" xml:space="preserve">
+    <value>پروفایل</value>
+  </data>
+  <data name="Country" xml:space="preserve">
+    <value>کشور</value>
+  </data>
+  <data name="Page" xml:space="preserve">
+    <value>صفحه</value>
+  </data>
+  <data name="Total" xml:space="preserve">
+    <value>کل</value>
+  </data>
+  <data name="Cash" xml:space="preserve">
+    <value>نقد</value>
+  </data>
+  <data name="DeleteSuccessfully" xml:space="preserve">
+    <value>درخواست حذف با موفقیت انجام شد</value>
+  </data>
+  <data name="EditSuccessfully" xml:space="preserve">
+    <value>درخواست ویرایش با موفقیت انجام شد</value>
+  </data>
+  <data name="Date" xml:space="preserve">
+    <value>تاریخ</value>
+  </data>
+  <data name="Price" xml:space="preserve">
+    <value>مبلغ</value>
+  </data>
+  <data name="Payment" xml:space="preserve">
+    <value>پرداخت </value>
+  </data>
+  <data name="RequestId" xml:space="preserve">
+    <value>شماره درخواست</value>
+  </data>
+  <data name="Duplication" xml:space="preserve">
+    <value>تکثیر</value>
+  </data>
+  <data name="Add" xml:space="preserve">
+    <value>اضافه</value>
+  </data>
+  <data name="AreNotEqual" xml:space="preserve">
+    <value>مبلغ تقسیم شده با کل مبلغ برابر نیست</value>
+  </data>
+  <data name="Return" xml:space="preserve">
+    <value>بازگشت</value>
+  </data>
+  <data name="SelectLanguage" xml:space="preserve">
+    <value>انتخاب زبان</value>
+  </data>
+  <data name="CheckIssuance" xml:space="preserve">
+    <value>چاپ چک</value>
+  </data>
+  <data name="DueDate" xml:space="preserve">
+    <value>تاریخ سررسید</value>
+  </data>
+  <data name="PaymentForm" xml:space="preserve">
+    <value>سند پرداخت</value>
+  </data>
+  <data name="Integration" xml:space="preserve">
+    <value>تجمیع</value>
+  </data>
+  <data name="ResultOfIntegration" xml:space="preserve">
+    <value>حاصل تجمیع</value>
+  </data>
+  <data name="MaxPermissiveSignatureCount" xml:space="preserve">
+    <value>حداکثر تعداد امضا مجاز</value>
+  </data>
+  <data name="MinPermissiveSignatureCount" xml:space="preserve">
+    <value>حداقل تعداد امضا مجاز</value>
+  </data>
+  <data name="Status" xml:space="preserve">
+    <value>وضعیت</value>
+  </data>
+  <data name="PermissiveSignature" xml:space="preserve">
+    <value>مجوز امضا</value>
+  </data>
+  <data name="CancelCheque" xml:space="preserve">
+    <value>کنسل چک</value>
+  </data>
+  <data name="String3" xml:space="preserve">
+    <value />
+  </data>
+  <data name="ResultOfDuplication" xml:space="preserve">
+    <value>حاصل تکثیر</value>
+  </data>
+  <data name="PaymentConfirm" xml:space="preserve">
+    <value>پرداخت های تایید شده</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>درخواست</value>
+  </data>
+  <data name="Anerroroccurred" xml:space="preserve">
+    <value>با خطا مواجه شد</value>
+  </data>
+  <data name="PayPettyCash" xml:space="preserve">
+    <value>ثبت پرداخت تنخواه گردان</value>
+  </data>
+  <data name="SerialNum" xml:space="preserve">
+    <value>شماره سریال</value>
+  </data>
+  <data name="Print" xml:space="preserve">
+    <value>چاپ</value>
+  </data>
+  <data name="Copy" xml:space="preserve">
+    <value>کپی</value>
+  </data>
+  <data name="Main_Unique_Account_No" xml:space="preserve">
+    <value>ذینفع اصلی</value>
+  </data>
+  <data name="Unique_Account_Code" xml:space="preserve">
+    <value>کدتفصیل</value>
+  </data>
+  <data name="ChequeNo" xml:space="preserve">
+    <value>شماره چک</value>
+  </data>
+  <data name="DirectDebit" xml:space="preserve">
+    <value>برداشت مستقیم</value>
+  </data>
+  <data name="PickUp" xml:space="preserve">
+    <value>برداشت</value>
+  </data>
+  <data name="InActive" xml:space="preserve">
+    <value>غیرفعال</value>
+  </data>
+  <data name="Form" xml:space="preserve">
+    <value>برگه</value>
+  </data>
+  <data name="Decision" xml:space="preserve">
+    <value>بلاتکلیف</value>
+  </data>
+  <data name="Pendding" xml:space="preserve">
+    <value>غیرفعال</value>
+  </data>
+  <data name="CancellationReplacement" xml:space="preserve">
+    <value>ابطال</value>
+  </data>
+  <data name="Insert_success_Confirmed" xml:space="preserve">
+    <value>تایید با موفقیت انجام شد</value>
+  </data>
+  <data name="insert_success_ConfirmPayment" xml:space="preserve">
+    <value>تایید پرداخت با موفقیت انجام شد</value>
+  </data>
+  <data name="insert_success_Delivered" xml:space="preserve">
+    <value>تحویل با موفقیت انجام شد</value>
+  </data>
+  <data name="insert_success_Paid" xml:space="preserve">
+    <value>پرداخت با موفقیت انجام شد</value>
+  </data>
+  <data name="DonePayment" xml:space="preserve">
+    <value>پرداخت های انجام شده</value>
+  </data>
+  <data name="DuringPayment" xml:space="preserve">
+    <value>درخواست وجه های در جریان پرداخت</value>
+  </data>
+  <data name="Determine" xml:space="preserve">
+    <value>تعیین تکلیف</value>
+  </data>
+  <data name="PaymentIsNotRegistered" xml:space="preserve">
+    <value>نحوه پرداخت ثبت نشده است</value>
+  </data>
+  <data name="Receive" xml:space="preserve">
+    <value>دریافت</value>
+  </data>
+  <data name="ReceiptPlaning" xml:space="preserve">
+    <value>برنامه ریزی نقدی چک دریافتنی </value>
+  </data>
+  <data name="PlaningTypeID" xml:space="preserve">
+    <value>نوع برنامه ریزی </value>
+  </data>
+  <data name="PlaningType_Value" xml:space="preserve">
+    <value>مقدار</value>
+  </data>
+  <data name="ATM" xml:space="preserve">
+    <value>کارت بانک</value>
+  </data>
+  <data name="CashDeposit" xml:space="preserve">
+    <value>واریز نقدی به بانک</value>
+  </data>
+  <data name="GetCash" xml:space="preserve">
+    <value> دریافت نقدی</value>
+  </data>
+  <data name="PromissoryNote" xml:space="preserve">
+    <value>سفته</value>
+  </data>
+  <data name="Assignment" xml:space="preserve">
+    <value>واگذاری</value>
+  </data>
+  <data name="Planing" xml:space="preserve">
+    <value>برنامه ریزی </value>
+  </data>
+  <data name="ReceiptReturn" xml:space="preserve">
+    <value>وصول -برگشت - عودت</value>
+  </data>
+  <data name="ReturnSpent" xml:space="preserve">
+    <value>عودت چک خرج شده</value>
+  </data>
+  <data name="Spend" xml:space="preserve">
+    <value>خرج</value>
+  </data>
+  <data name="DeliveredRequest" xml:space="preserve">
+    <value>چک های تحویل شده</value>
+  </data>
+  <data name="ThePriceIsNotDivided" xml:space="preserve">
+    <value>مبلغ تقسیم نشده است</value>
+  </data>
+  <data name="Deferred" xml:space="preserve">
+    <value>مدت دار</value>
+  </data>
+  <data name="Disciplinary" xml:space="preserve">
+    <value>انتظامی</value>
+  </data>
+  <data name="Company" xml:space="preserve">
+    <value>شرکت</value>
+  </data>
+  <data name="FuturePaymentStatus" xml:space="preserve">
+    <value>وضعیت تعهدات آتی</value>
+  </data>
+  <data name="PayableDueDateCheque" xml:space="preserve">
+    <value>اسنادپرداختنی</value>
+  </data>
+  <data name="ReceivableDueDateCheque" xml:space="preserve">
+    <value>وضعیت اسناد دریافتنی</value>
+  </data>
+  <data name="BankAccount" xml:space="preserve">
+    <value>حساب بانکی</value>
+  </data>
+  <data name="BranchBankAccountInfo" xml:space="preserve">
+    <value>اطلاعات شعب و حساب بانکی</value>
+  </data>
+  <data name="DetailsAccountBank" xml:space="preserve">
+    <value>جزییات حساب بانکی</value>
+  </data>
+  <data name="ChequeCreate" xml:space="preserve">
+    <value>تعریف چک</value>
+  </data>
+  <data name="DeleteDuplication" xml:space="preserve">
+    <value>حذف تکثیر شده ها</value>
+  </data>
+  <data name="PettyCashName" xml:space="preserve">
+    <value>عنوان تنخواه گردان</value>
+  </data>
+  <data name="RequsetName" xml:space="preserve">
+    <value>درخواست کننده</value>
+  </data>
+  <data name="Repetitive" xml:space="preserve">
+    <value>تکراری است</value>
+  </data>
+  <data name="PettyCashPayment" xml:space="preserve">
+    <value>پرداخت های تنخواه گردان</value>
+  </data>
+  <data name="PettyCashLssummaryReport" xml:space="preserve">
+    <value>گزارش خلاصه پرداخت های تنخواه گردان</value>
+  </data>
+  <data name="Title" xml:space="preserve">
+    <value>عنوان</value>
+  </data>
+  <data name="ReceiptCheck" xml:space="preserve">
+    <value>چک های دریافتنی</value>
+  </data>
+  <data name="Payer" xml:space="preserve">
+    <value>پرداخت کننده</value>
+  </data>
+  <data name="Rial" xml:space="preserve">
+    <value>ریال</value>
+  </data>
+  <data name="LocationName" xml:space="preserve">
+    <value>ع.واحد</value>
+  </data>
+  <data name="RequestIdCompressed" xml:space="preserve">
+    <value>ش.د</value>
+  </data>
+  <data name="ReceiptDetailId" xml:space="preserve">
+    <value>شماره رسید دریافت</value>
+  </data>
+  <data name="ChequeExporter" xml:space="preserve">
+    <value>صادر کننده چک</value>
+  </data>
+  <data name="LastUsedPaperNo" xml:space="preserve">
+    <value>آخرین برگه استفاده شده</value>
+  </data>
+  <data name="PleaseCreateCheckBook" xml:space="preserve">
+    <value>لطفا دسته چک تعریف نمایید</value>
+  </data>
+  <data name="NoSheet" xml:space="preserve">
+    <value>فاقد برگه</value>
+  </data>
+  <data name="RecordBardasht" xml:space="preserve">
+    <value>ثبت برداشت</value>
+  </data>
+  <data name="BackTo" xml:space="preserve">
+    <value>برگشت شده</value>
+  </data>
+  <data name="Collected" xml:space="preserve">
+    <value>وصول شده</value>
+  </data>
+  <data name="RequestsCanceled" xml:space="preserve">
+    <value>درخواست های ابطال شده</value>
+  </data>
+  <data name="ChequeReadyToDelivery" xml:space="preserve">
+    <value>چک های آماده تحویل</value>
+  </data>
+  <data name="FollowUp" xml:space="preserve">
+    <value>پیگیری</value>
+  </data>
+  <data name="Cheque_OwnerName" xml:space="preserve">
+    <value>نام دارنده حساب</value>
+  </data>
+  <data name="Empty" xml:space="preserve">
+    <value>خالی کردن</value>
+  </data>
+  <data name="CovertCheque" xml:space="preserve">
+    <value>چک های انتظامی تبدیل شده</value>
+  </data>
+  <data name="DeleiverdLasheCheque" xml:space="preserve">
+    <value>لاشه چک های انتظامی تحویل شده</value>
+  </data>
+  <data name="Converted" xml:space="preserve">
+    <value>تبدیل شده</value>
+  </data>
+  <data name="DeleiverdLashe" xml:space="preserve">
+    <value>تحویل لاشه</value>
+  </data>
+  <data name="Balance" xml:space="preserve">
+    <value>مانده</value>
+  </data>
+  <data name="Credit" xml:space="preserve">
+    <value>بستانکار</value>
+  </data>
+  <data name="Debit" xml:space="preserve">
+    <value>بدهکار</value>
+  </data>
+  <data name="BankBalance" xml:space="preserve">
+    <value>موجودی بانک</value>
+  </data>
+  <data name="ReceiveDueDateCheque" xml:space="preserve">
+    <value>اسناددریافتنی</value>
+  </data>
+  <data name="Transfer" xml:space="preserve">
+    <value>نقل و انتقال از پشتیبان</value>
+  </data>
+  <data name="ReceiptType" xml:space="preserve">
+    <value>نوع دریافت</value>
+  </data>
+  <data name="Public" xml:space="preserve">
+    <value>عمومی</value>
+  </data>
+  <data name="reason" xml:space="preserve">
+    <value>دلیل</value>
+  </data>
+  <data name="GardesheHesab" xml:space="preserve">
+    <value>گردش حساب</value>
+  </data>
+  <data name="Deposited" xml:space="preserve">
+    <value>سپرده</value>
+  </data>
+  <data name="Internet" xml:space="preserve">
+    <value>اینترنت</value>
+  </data>
+  <data name="ResetSuccess" xml:space="preserve">
+    <value>بازیابی با موفقیت انجام شد</value>
+  </data>
+  <data name="ShowSum" xml:space="preserve">
+    <value>نمایش خلاصه</value>
+  </data>
+  <data name="insert_success_Cancellation" xml:space="preserve">
+    <value>کنسل با موفقیت انجام شد</value>
+  </data>
+  <data name="NewPassword" xml:space="preserve">
+    <value>رمزعبورجدید</value>
+  </data>
+  <data name="CashdeskDescription" xml:space="preserve">
+    <value>صندوق</value>
+  </data>
+  <data name="SearchForm" xml:space="preserve">
+    <value>فرم جستجو</value>
+  </data>
+  <data name="Deadline" xml:space="preserve">
+    <value> مهلت</value>
+  </data>
+  <data name="Satna" xml:space="preserve">
+    <value>ساتنا</value>
+  </data>
+  <data name="FutureDate" xml:space="preserve">
+    <value>روزآینده</value>
+  </data>
+  <data name="ExchangeStandards" xml:space="preserve">
+    <value>نرخ استاندارد ارز</value>
+  </data>
+  <data name="ExchangeRatesdDaily" xml:space="preserve">
+    <value>نرخ رسمی/غیررسمی ارز</value>
+  </data>
+  <data name="CashDesk" xml:space="preserve">
+    <value>صندوق</value>
+  </data>
+  <data name="ReceiptDate" xml:space="preserve">
+    <value>تاریخ دریافت</value>
+  </data>
+  <data name="FishNo" xml:space="preserve">
+    <value>شماره فیش واریزی</value>
+  </data>
+  <data name="ExchangeRateType" xml:space="preserve">
+    <value>نوع نرخ ارز</value>
+  </data>
+</root>

@@ -1,0 +1,98 @@
+﻿@model List<CSD.Treasury.DataModel.cmpBranch>
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>@Resources.BranchCode</th>
+            <th>@Resources.BranchName</th>
+            <th>@Resources.BranchName @Resources.EN</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            var related1 = Utility.HasRelation("cmpBranches", "cmpBranchID", item.cmpBranchID.ToString(), "PettyCash", "cmpBranchID");
+            var related2 = Utility.HasRelation("cmpBranches", "cmpBranchID", item.cmpBranchID.ToString(), "cmpBranch_TELS", "cmpBranchID");
+            var related3 = Utility.HasRelation("cmpBranches", "cmpBranchID", item.cmpBranchID.ToString(), "cmpBranch_EmailAddress", "cmpBranchID");
+            var related4 = Utility.HasRelation("cmpBranches", "cmpBranchID", item.cmpBranchID.ToString(), "cmpBranch_FAX", "cmpBranchID");
+            var related5 = Utility.HasRelation("cmpBranches", "cmpBranchID", item.cmpBranchID.ToString(), "Locations", "cmpBranchID");
+            <tr>
+                <td>@item.cmpBranchID</td>
+                <td>@item.cmpBranchName</td>
+                <td>@item.cmpBranchName2</td>
+                <td>
+                    @if (related1 || related2 || related3 || related4 || related5)
+                    {
+                        <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                    }
+                    else
+                    {
+                        @Ajax.ActionLink(Resources.Edit, "Edit", "Branch", new { Area = "BasicInfo", id = item.cmpBranchID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Branch + "', 'md');"
+                   }, new { @class = "btn btn-success btn-xs" })
+
+                        @Html.ActionLink(Resources.Delete, "Delete", "Branch", new { Area = "BasicInfo", cmpBranchID = item.cmpBranchID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                    @Ajax.ActionLink(Resources.BranchInformation, "BranchInformation", "Branch", new { Area = "BasicInfo", id = item.cmpBranchID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.BranchInformation + "/" + item.cmpBranchName + "', 'md');"
+               }, new { @class = "btn btn-material-grey btn-xs" })
+
+                    @Ajax.ActionLink(Resources.Location, "Index", "Location", new { Area = "BasicInfo", BranchId = item.cmpBranchID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Location + "/" + item.cmpBranchName + "', 'md');"
+               }, new { @class = "btn btn-material-grey btn-xs" })
+
+                    @*@Html.ActionLink(Resources.Location, "Index", "Location", new { area= "BasicInfo", BranchId = item.cmpBranchID }, new { @class = "btn btn-material-grey btn-xs" })*@
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+
+
+<script>
+
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               console.log(data.result+data.message);
+                               if (data.result == true) {
+                                   alertify.success(data.message);
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                 
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+</script>
+
+
+

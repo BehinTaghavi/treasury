@@ -1,0 +1,125 @@
+﻿<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script><script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/Request/duplicationController.js")"></script>
+@section PageHeader{
+    @Resources.Duplication @Resources.RequestPayment
+}
+<div ng-app="treasury" ng-controller="duplicationController">
+    <input type="hidden" id="requestId" value="@ViewBag.RequestId" ng-model="requestId" />
+    <input type="hidden" id="pageIndex" value="@ViewBag.PageIndex" ng-model="pageIndex" />
+    @Html.ActionLink(Resources.Back, "Index", "Request", new { Area = "Payment", ViewBag.PageIndex }, new { @class = "btn btn-default btn-sm" })
+
+    <p>
+        <h3>شماره درخواست: {{request.requestId}}</h3>
+    </p>
+    <p>
+        <h5>مبلغ: {{request.price | number}}&nbsp;&nbsp;{{request.Exchange}}</h5>
+    </p>
+    <p>
+        <h5>تاریخ درخواست: {{request.RequestDate}}</h5>
+    </p>
+    <p>
+        <h5>بابت: {{request.BehalfTitle}}</h5>
+    </p>
+    <p class="text-left" ng-if="requests.length == 0">
+        تبدیل درخواست به <input type="number" class="form-control text-center" style="width: 50px; display: inline-block; margin: 0 10px" ng-model="duplicateCount" /> درخواست <button style="margin: 0 10px 0 0" class="btn btn-xs btn-material-blue-700" ng-click="setDivision(duplicateCount)">اعمال</button>
+    </p>
+    <hr />
+    <table ng-app="treasury" id="lst" class="table table-striped">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th></th>
+                <th>@Resources.RequestId </th>
+                <th>@Resources.Unique_Account_No</th>
+                <th>@Resources.Price</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr id="Request" class="disabled" ng-repeat="item in requests">
+                <td>{{$index+1}}</td>
+                <td>{{(item.RequestId) ? item.RequestId : ""}}</td>
+              
+                <td>
+                    @*{{item.Unique_Account_No}}*@
+                    @*<button class="btn btn-xs"
+                            ng-class="item.UniqueAccount.Name == '' ? 'btn-material-red-A700' : 'btn-material-light-blue-A700'"
+                            ng-click="changeUniqueAccount(item.UniqueAccount)"
+                            style="margin: 4px 0;">
+                        {{item.UniqueAccount.Name != "" ? item.UniqueAccount.Name : "تفصیل را انتخاب کنید"}}
+                    </button>*@
+                    <a class="btn btn-sm"
+                       ng-class="item.UniqueAccount.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                       ng-click="changeUniqueAccount(item.UniqueAccount)"
+                       style="margin: 4px 0;"
+                       ng-bind-html='item.UniqueAccount.Name != "" ? item.UniqueAccount.Name : "تفصیل را انتخاب کنید"'>
+                    </a>
+                    <input type="hidden" name="UniqueAccount_{{$index}}" required ng-model="item.UniqueAccount.Code" />
+                    @*@Utility.GetUniqueAccount(Model.Unique_Account_No)*@
+                </td>
+                <td>
+                    <input type="number" ng-model="item.price" class="form-control" />
+                    @* @Html.TextBoxFor(model => model.price, new { data_lang_number="fa", @class = "TotalPrice" })*@
+                </td>
+                <td>
+                    <div class="btn-group">
+                        <button class="btn btn-material-red-A700 btn-xs" type="button" ng-if="item.allowDelete" ng-click="removeDuplicate(item)"><i class="zmdi zmdi-hc-lg zmdi-delete"></i></button>
+                        <button class="btn btn-material-green-600 btn-xs" type="button" ng-click="copyDuplicate(item)"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></button>
+                    </div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="3"></td>
+                <td colspan="2" class="text-right">
+                    <button class="btn btn-material-blue-700 btn-sm" ng-click="autoCalc()">محاسبه مبلغ ها به صورت خودکار</button>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="3" class="text-left">
+                    <h3>مجموع مبالغ تکثیرها:</h3>
+                </td>
+                <td colspan="2" class="text-right">
+                    <h3 ng-class="{'mdc-text-red-A700':sumprice > request.price}">
+                        {{sumPrice()}}
+                    </h3>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <button id="add" name="add" type="button" class="btn btn-material-grey-600" ng-click="addDuplicate()">@Resources.Add</button>
+    <button type="submit" class="btn btn-material-light-blue-A700" ng-click="saveDuplicate()" ng-if="sumprice == request.price && isCorrectUniqueAccount">@Resources.Save</button>
+    <label ng-if="requests.length > 0 && sumprice > request.price" class="label label-danger">مجموع مبالغ از مبلغ درخواست وجه بیشتر میباشد</label>
+    <label ng-if="requests.length > 0 && sumprice < request.price" class="label label-danger">مجموع مبالغ از مبلغ درخواست وجه کمتر میباشد</label>
+    <label ng-if="requests.length > 0 && !isCorrectUniqueAccount" class="label label-danger">تفصیل درخواست ها را مشخص نمایید</label>
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+    <div class="modal md ang fade" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+
+                <div class="modal-body">
+                    <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+</div>

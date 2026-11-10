@@ -1,0 +1,21 @@
+﻿@model CSD.Treasury.Service.CountryService.Country
+
+@{
+    ViewBag.Title = "DeleteCountry";
+}
+
+<h5>@Resources.AreYouSure</h5>
+<div>    
+@using (Ajax.BeginForm("DeleteCountry", "Region", new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);$('.modal.default').modal('hide');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+        @Html.AntiForgeryToken()
+    @Html.HiddenFor(model=>model.CountryID)
+    <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+    <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+}
+</div>

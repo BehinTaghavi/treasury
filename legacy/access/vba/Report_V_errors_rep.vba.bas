@@ -1,0 +1,84 @@
+Attribute VB_Name = "Report_V_errors_rep"
+Attribute VB_Base = "0{1040EAD3-F05E-11D7-BC94-8154B80D7F75}"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = True
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = False
+Attribute VB_TemplateDerived = False
+Attribute VB_Customizable = False
+Option Compare Database
+
+Private Sub Command28_Click()
+    Dim FilterStr As String
+    FilterStr = ""
+    
+    If Not IsNull(Me!T1) Then
+       FilterStr = "InStr(1,Vid,'" & Me!T1 & "',0) > 0"
+    End If
+    
+    If Not IsNull(Me!T2) Then
+       FilterStr = "InStr(1,Vdate,'" & Me!T2 & "',0) > 0"
+    End If
+    
+    If Not IsNull(Me!T3) Then
+       FilterStr = "InStr(1,Tafno,'" & Me!T3 & "',0) > 0"
+    End If
+    If Not IsNull(Me!T4) Then
+       FilterStr = "InStr(1,Accno,'" & Me!T4 & "',0) > 0"
+    End If
+    If Not IsNull(Me!T5) Then
+       FilterStr = "InStr(1,errordesc,'" & Me!T5 & "',0) > 0"
+    End If
+    
+    If Not IsNull(Me!T6) Then
+       FilterStr = "InStr(1,Bed,'" & Me!T6 & "',0) > 0"
+    End If
+    
+    If Not IsNull(Me!T7) Then
+       FilterStr = "InStr(1,Bes,'" & Me!T7 & "',0) > 0"
+    End If
+
+    If Not IsNull(Me!T8) Then
+       FilterStr = "InStr(1,Accvno,'" & Me!T8 & "',0) > 0"
+    End If
+
+    If FilterStr = "" Then
+       Me.FilterOn = False
+    Else
+       Me.Filter = FilterStr
+       Me.FilterOn = True
+    End If
+End Sub
+
+Private Sub Command31_Click()
+       Me.FilterOn = False
+End Sub
+
+Private Sub Form_Open(Cancel As Integer)
+    DoCmd.Close acForm, "voucher_send"
+End Sub
+
+Private Sub Vid_DblClick(Cancel As Integer)
+    Dim stDocName As String
+    Dim stLinkCriteria As String
+
+    stDocName = "Voucher"
+    
+    stLinkCriteria = "[Voucher.Vid]=" & Me![Vid]
+    DoCmd.OpenForm stDocName, , , stLinkCriteria
+
+End Sub
+Private Sub Command21_Click()
+On Error GoTo Err_Command21_Click
+
+
+    DoCmd.Close
+
+Exit_Command21_Click:
+    Exit Sub
+
+Err_Command21_Click:
+    MsgBox Err.Description
+    Resume Exit_Command21_Click
+    
+End Sub

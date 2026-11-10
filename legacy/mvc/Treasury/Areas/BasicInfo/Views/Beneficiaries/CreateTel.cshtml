@@ -1,0 +1,27 @@
+﻿@model CSD.Treasury.Service.Beneficiaries_TELSService.Beneficiaries_TELS
+
+@using (Ajax.BeginForm("CreateTel", "Beneficiaries", new { area = "BasicInfo" }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "updateTable(" + (int)ViewBag.BeneficiarID + "); successMessage(data)"
+}, null))
+{
+    @Html.Hidden("BeneficiarID", (int)ViewBag.BeneficiarID)
+    <div class="row">
+        <div class="col-xs-2 col-sm-1">
+            <button type="submit" class="btn btn-success btn-flat btn-xs"><i class="zmdi zmdi-plus"></i></button>
+        </div>
+        <div class="col-xs-10 col-sm-6">
+            @Html.TextBoxFor(model => model.Beneficiar_TEL, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Tel })
+            @Html.ValidationMessageFor(model => model.Beneficiar_TEL, "", new { @class = "text-danger" })
+        </div>
+    </div>
+}
+
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>

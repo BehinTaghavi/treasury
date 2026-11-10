@@ -1,0 +1,66 @@
+﻿@model  CSD.Treasury.DataModel.UserInfo
+@using CSD.Treasury.UI.Models
+@{
+    ViewBag.Title = "ShowUser";
+    Layout = "~/Views/Shared/Layout/Admin.cshtml";
+}
+<div id="Result" class="row">
+    <div class="col-sm-7">
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.UserName
+                </label>
+                @(Model.UserName)
+            </p>
+        </div>
+
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.FullName
+                </label>
+                @(Model.User_FullName)
+            </p>
+        </div>
+    </div>
+    <div class="col-sm-7">
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.Location
+                </label>
+                @Utility.GetUserLocation(Model.UserID)
+
+            </p>
+        </div>
+
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.CostCenter
+                </label>
+                @Utility.GetUniqueAccount(Model.LocationByCostCenter.Unique_Account_No)
+            </p>
+        </div>
+    </div>
+</div>
+<div>
+    @Ajax.ActionLink(Resources.Edit, "EditProfile", "Account", new { Area = "", id = Model.UserID }, new AjaxOptions
+{
+    OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Users + "', 'md');"
+}, new { @class = "btn btn-success btn-xs" })
+</div>
+
+
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("ShowUser", "User", new { area = "Management" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }
+</script>

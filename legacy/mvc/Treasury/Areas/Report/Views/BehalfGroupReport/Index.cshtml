@@ -1,0 +1,60 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.BehalfModel
+@{
+    Layout = null;
+    string date = ViewBag.Date;
+    var S = "List/?";
+}
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+<div>
+    @if (!string.IsNullOrEmpty(Model.FromDate))
+    {
+        S = S + "FromDate=" + Model.FromDate + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.ToDate))
+    {
+        S = S + "&ToDate=" + Model.ToDate;
+    }
+    @if (Model.BehalfGroupId!=0)
+    {
+        S = S + "&BehalfGroupId=" + Model.BehalfGroupId;
+    }
+    @if (Model.type != 0)
+    {
+        S = S + "&type=" + Model.type;
+    }
+    @if (Model.ExchangeTypeId != 0)
+    {
+        S = S + "&ExchangeTypeId=" + Model.ExchangeTypeId;
+    }
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+
+{
+    Actions =
+    {
+        GetReportSnapshot = S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+    },
+    Toolbar =
+    {
+
+        BackgroundColor= System.Drawing.Color.Silver,
+        ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+        ShowTooltips=false,
+
+    },
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+
+
+</div>

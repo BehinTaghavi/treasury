@@ -1,0 +1,76 @@
+﻿@model List<PostVoucherErrors_Result>
+@{
+    ViewBag.Title = "ShowVoucherInfo";
+    Layout = null;
+}
+<table class="table">
+    <thead>
+        <tr>
+            <td>شماره دریافت/پرداخت</td>
+            <td>نوع</td>
+            <td>وضعیت</td>
+            <td>تاریخ سند</td>
+            <td>توضیحات</td>
+            <td>بستانکار</td>
+            <td>بدهکار</td>
+            <td></td>
+        </tr>
+    </thead>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.DocNo</td>
+            <td>
+                @if (item.TransType == 1)
+                {
+                    <span>
+                        دریافت
+                    </span>
+                }
+                else
+                {
+                    <span>
+                        پرداخت
+                    </span>
+                }
+            </td>
+            <td>@item.PlaningTypeDesc</td>
+            <td>@item.VoucherDate</td>
+            <td>@item.Description</td>
+            <td>@item.Credit</td>
+            <td>@item.Debit</td>
+            <td>
+                @if (item.TransType == 1)
+                {
+                    @Ajax.ActionLink("نمایش سند", "ShowVocherListReceipt", "Vocher_Row",
+                   new { Area = "Management",
+                       ReceiptDetailId = item.DocNo,
+                       StateId = item.DocType,
+                       PlaningTypeID = item.PlaningTypeID
+                   },
+                       new AjaxOptions
+                       {
+                           OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+                       })
+                }
+                else
+                {
+                    @Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row",
+                   new { Area = "Management",
+                       IsPayment = false,
+                       requestId = item.DocNo,
+                       IsReturend = false,
+                       Receipt_Pay_TypeID = 1,
+                       BehalfGroupID = 1,
+                       StatusID =item.DocType,
+                       ReferenceId = item.DocNo }, 
+                   new AjaxOptions
+                       {
+                           OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+                       })
+                }
+            </td>
+        </tr>
+    }
+</table>
+

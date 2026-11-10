@@ -1,0 +1,67 @@
+﻿@using CSD.Treasury.UI.Models;
+@using CSD.Treasury.Resourse
+@section PageHeader{
+   گزارش وضعیت تعهدات آتی
+}
+@using (Html.BeginForm("Index", "ExpiredCheckPayable", new { Area = "Report" }, FormMethod.Post, new { id = "SearchForm" }))
+{
+    <div class="clearfix">
+        @*<div class="col-sm-3">
+                <div class="form-group">
+                    @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date })
+                    @Html.ValidationMessageFor(model => model.FromDate)
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="form-group">
+                    @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date })
+                    @Html.ValidationMessageFor(model => model.ToDate)
+                </div>
+            </div>*@
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBox("Date", null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @autocomplete = "off", @placeholder = Resources.Date })
+                @Html.ValidationMessage("Date")
+            </div>
+        </div>
+        <div class="col-sm-8">
+            <div class="form-group" id="ShowDate">
+           
+            </div>
+        </div>
+       
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        //maxDate: new Date()
+    });
+    $("#Date").change(
+        function () {
+           
+            var address = "@(Url.Action("GetDates", "ExpiredCheckPayable", new { Area = "Report" }))";
+            $("#ShowDate").load(address, { Date: $('#Date').val() }, function (data) {
+           
+            });
+       
+        }
+    );
+
+</script>

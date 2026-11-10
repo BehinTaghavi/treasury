@@ -1,0 +1,37 @@
+﻿@using CSD.Treasury.MVCHelpers
+@section PageHeader{
+    @Resources.List @Resources.Users
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    
+                    @Ajax.IActionLink(Resources.Register, "Register", "User", new { area = "management" }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Register + "', 'md');"
+
+               }, new { @class = "btn btn-default btn-sm" }, "zmdi zmdi-hc-lg zmdi-account-add")
+
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@section list{
+    <div id="Result">
+        @Html.Action("List", "User", new { Area = "Management" })
+    </div>
+}
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("List", "User", new { area = "Management" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+    }
+</script>

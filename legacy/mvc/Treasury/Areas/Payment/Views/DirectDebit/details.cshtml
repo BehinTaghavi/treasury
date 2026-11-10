@@ -1,0 +1,206 @@
+﻿@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@using CSD.Treasury.Service.Request_Payment_StatusDetailsService
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.UI.Models
+@{
+    var IfHaveRefrence = Utility.GetReferenceTypeValue(Model.RequestID);
+}
+<div class="row">
+    <div class="col-sm-7">
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Number
+                </label>
+                @(Model.RequestID)
+            </p>
+        </div>
+
+ 
+
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Date
+                </label>
+                @Utility.GetPersianDate(Model.RequestDate)
+            </p>
+        </div>
+
+    
+        <div class="col-sm-12">
+            <p class="pardes">
+                <label>
+                    @Resources.Unique_Account_No /@Resources.Code
+                </label>
+                @Utility.GetUniqueAccount(Model.Unique_Account_No)/ @(Model.Unique_Account_No)
+            </p>
+        </div>
+        @if (Model.Main_Unique_Account_No != null)
+        {
+
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Main_Unique_Account_No
+                    </label>
+                    @Utility.GetUniqueAccount(Model.Main_Unique_Account_No)  @(Model.Main_Unique_Account_No)
+                </p>
+            </div>
+        }
+
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BehalfGroup
+                </label>
+
+                @Utility.GetBehalfGroupBybehalfId(Model.BehalfID).BehalfGroupDescription
+
+            </p>
+
+        </div>
+
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Behalf
+                </label>
+                @Utility.GetBehalf(Model.BehalfID)
+            </p>
+        </div>
+
+        
+        @if (IfHaveRefrence != "")
+        {
+            <div class="col-sm-12">
+                <p class="pardes">
+                    <label>
+                        @Resources.Reference
+                    </label>
+                    @Html.Raw(Utility.GetReferenceTypeValue(Model.RequestID, true))
+                </p>
+            </div>
+        }
+    </div>
+
+
+    <div class="col-sm-5">
+
+        <div class="panel panel-default">
+            <div class="panel-body mdc-bg-grey-100">
+
+                <p class="pardes">
+                    <label>
+                        @Resources.PayAmount
+                    </label>
+                    <span data-lang-number="fa">
+                        @Math.Truncate(Model.PayAmount).ToString("N0")
+                    </span>
+                </p>
+
+
+                <p class="pardes">
+                    <label>
+                        @Resources.ExchangeType
+                    </label>
+                    @if (Model.ExchangeTypeID == 1)
+                    {@Resources.Rial}
+                    else
+                    { <span>دلار</span>}
+
+                </p>
+                @if (Model.ExchangeTypeID != 1)
+                {
+                    <p class="pardes">
+                        <label>
+                            @Resources.ExchangeRate
+                        </label>
+                        <span data-lang-number="fa">
+                            @Math.Truncate(Convert.ToDecimal(Model.ExchangeRate)).ToString("N0")
+                        </span>
+                    </p>
+
+                }
+
+            </div>
+        </div>
+
+        <div class="panel panel-default">
+            <div class="panel-body  mdc-bg-grey-100">
+                @*<p class="pardes">
+                    <label>
+                        @Resources.ReceiptPayType
+                    </label>
+                    @if (Model.Pay_TypeDetailID_source != null)
+                    {
+                        @Utility.GetReceipt_Pay_TypeDetailTitle(Model.Pay_TypeDetailID_source.Value)
+                    }
+                    else
+                    {
+                        @Resources.Unknown
+                    }
+                </p>*@   
+           
+                <p class="pardes">
+                    <label>
+                        @Resources.From
+                    </label>
+                    <span data-lang-number="fa">
+                        @if (Model.Source_PaymentValue != null)
+                        {
+                            <span>@(Utility.GetBasicBankInfoWithBankId(int.Parse(Model.Source_PaymentValue)))</span>
+                            var Bank = Utility.GetBankInfoBankId(int.Parse(Model.Source_PaymentValue));
+                            if (Bank != null)
+                            {
+                                <span>@(Bank.BranchName)</span>
+                                <span>@(Bank.Bank_AccountNumber)</span>
+                            }
+                        }
+                        else
+                        {
+                            @Resources.Unknown
+                        }
+                    </span>
+                </p>
+                @if (Model.Pay_TypeDetailID_source != null)
+                {
+                    if (Model.Pay_TypeDetailID_source == 5)
+                    {
+                        <p class="pardes">
+                            <label>
+                                @Resources.To
+                            </label>
+                            @Model.Destination_TypesID
+                        </p>
+                        <p class="pardes">
+                            <label>
+                                @Resources.Number  @Resources.Destination
+                            </label>
+                            <span data-lang-number="fa">
+                                @if (Model.Destination_PaymentValue != null)
+                                {
+                                    @Utility.GetBasicBankInfoWithBankId(int.Parse(Model.Destination_PaymentValue))
+                                    <span></span>
+                                    @Utility.GetBankInfoBankId(int.Parse(Model.Source_PaymentValue)).BranchName
+                                    <span></span>
+                                    @Utility.GetBankInfoBankId(int.Parse(Model.Destination_PaymentValue)).Bank_AccountNumber
+                                }
+
+                            </span>
+                        </p>
+                    }
+
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .modal-dialog {
+        width: 900px;
+    }
+</style>
+
+

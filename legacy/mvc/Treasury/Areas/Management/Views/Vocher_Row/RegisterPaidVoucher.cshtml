@@ -1,0 +1,115 @@
+﻿@model CSD.Treasury.UI.Models.PostRegisterPaidVoucher
+@{
+    ViewBag.Title = "RegisterPaidVoucher";
+
+}
+@section PageHeader{
+    ارسال اسناد به حسابداری
+}
+@using (Ajax.BeginForm("ShowRegisteredPaidVoucher", "Vocher_Row", new { area = "Management",id= "PostVoucherForm" }, new AjaxOptions
+{
+
+    HttpMethod = "Post",
+    InsertionMode = InsertionMode.Replace,
+    OnComplete = "$('#ShowErrorList').empty();",
+    LoadingElementId = "LoadingRegisterdPaidVoucher",
+    UpdateTargetId = "RegisterdPaidVoucher"
+}))
+{
+    <div class="row">
+        <div class="col-sm-3">  
+            <div style="padding: 6px 0;">
+                <div class="clearfix">
+                    <div class="col-xs-4">
+                        <label for="startDate" class="control-label">از تاریخ</label>
+                    </div>
+                    <div class="col-xs-8">
+                        @Html.TextBoxFor(model => model.startDate, new
+                   {
+                       @class = "form-control from datepicker Date",
+                       @Value = ViewBag.MinDate
+                   })
+
+                    </div>  
+                    @Html.ValidationMessageFor(model => model.startDate)
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div style="padding: 6px 0;">
+                <div class="clearfix">
+                    <div class="col-xs-4">
+                        <label for="endDate" class="control-label">تا تاریخ</label>
+                    </div>
+                    <div class="col-xs-8">
+                        @Html.TextBoxFor(model => model.endDate, new { @class = "form-control from datepicker Date", @Value = ViewBag.MaxDate })
+
+                    </div>
+                    @Html.ValidationMessageFor(model => model.endDate)
+                </div>
+            </div>
+        </div>
+        @*<div class="col-sm-3">
+                <div style="padding: 6px 0;">
+                    <div class="clearfix">
+                        <div class="col-xs-8">
+                            @Html.CheckBoxFor(model => model.rebuilding)
+                            <label for="rebuilding" class="control-label">بازسازی</label>
+                        </div>
+                    </div>
+                </div>
+            </div>*@
+        <div class="col-sm-3">
+            <button id="PostBtn" type="submit" class="btn btn-success btn-sm">ارسال اسناد</button>
+        </div>
+    </div>
+}
+<div id="LoadingRegisterdPaidVoucher" style="display: none; margin: 50px 0">
+    <span></span>
+    <p class="text-center">در حال ثبت اسناد. لطفا منتظر بمانید...</p>
+</div>
+<div id="RegisterdPaidVoucher"></div>
+<div id="ShowErrorList"></div>
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+
+    $(document).ready(function () {
+        jQuery(function ($) {
+            $(".Date").mask("9999/99/99");
+        });
+        $('#PostBtn').submit(function () {
+            if ($("#PostVoucherForm").valid()) {
+                $('#btnSubmit').attr('disabled', 'disabled');
+            }
+        });
+    })
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+    //val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD'))
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date(),
+    });
+
+    //$(".until.datepicker").datepicker({
+    //    isRTL: true,
+    //    dateFormat: "yy/mm/dd",
+    //    maxDate: new Date()
+    //});
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+</script>

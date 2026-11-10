@@ -1,0 +1,280 @@
+﻿@model CSD.Treasury.DataModel.Bank
+
+<div class="row">
+    <div class="col-sm-12">
+        @if (Model.Unique_Account_No != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Unique_Account_No
+                    </label>
+                    @Utility.GetUniqueAccount(Model.Unique_Account_No)/@(Model.Unique_Account_No)
+                </p>
+            </div>
+        }
+        @if (Model.Unique_Account_No_two != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Unique_Account_No
+                    </label>
+                    @Utility.GetUniqueAccount(Model.Unique_Account_No_two)/@(Model.Unique_Account_No_two)
+                </p>
+            </div>
+        }
+        @if (Model.Account_No != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.account_code
+                    </label>
+                    @Utility.Getaccounts(Model.Account_No)/@(Model.Account_No)
+                </p>
+            </div>
+        }
+        @if (Model.Returns_Account_No != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Return_Account_No
+                    </label>
+                    @Utility.Getaccounts(Model.Returns_Account_No)/@(Model.Returns_Account_No)
+                </p>
+            </div>
+        }
+        @if (Model.Assign_Account_No != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Assign_Account_No
+                    </label>
+                    @Utility.Getaccounts(Model.Assign_Account_No)/@(Model.Assign_Account_No)
+                </p>
+            </div>
+        }
+
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BankAccountNumber
+                </label>
+                @Html.DisplayFor(model => model.Bank_AccountNumber)
+            </p>
+        </div>
+        @if (Model.Backup_BankID != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Backup_Bank
+                    </label>
+
+                    @Utility.GetBankInfoBankId(Model.Backup_BankID.Value).Bank_AccountNumber
+                </p>
+            </div>
+        }
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BasicBank
+                </label>
+                @Utility.GetBasicBankInfo(Model.BasicBankID)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BranchCode
+                </label>
+                @Html.DisplayFor(model => model.BranchCode)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BranchName
+                </label>
+                @Html.DisplayFor(model => model.BranchName)
+            </p>
+        </div>
+        @if (Model.CityID != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.City
+                    </label>
+                    @Utility.GetCity(Model.CityID.Value).CityDescription
+                </p>
+            </div>
+        }
+
+        @if (Model.ExchangeTypeID != 1)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        نوع ارز
+                    </label>    @(Model.ExchangeTypeID.HasValue ? Utility.GetExchaneName(Model.ExchangeTypeID.Value) : "ندارد")
+                    <label>
+                        نوع نرخ  ارز
+                    </label>   @(Model.ExchangeType.HasValue ? Utility.GetExchangeRateTypeName(Model.ExchangeType.Value) : "ندارد")
+                    <label>
+                        @Resources.ExchangeRate
+                    </label>
+                    @Math.Truncate(Model.ExchangeRate)
+
+                    <label>
+                        مقدارهم ارزی
+                    </label>   @Math.Truncate(Model.EquivalencePrice.Value)@Resources.Rial
+                </p>
+            </div>
+        }
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Deposited
+                </label>
+                @if (Model.Deposited)
+            {
+                    <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+                else
+                {
+                    <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+            </p>
+        </div>
+
+        <div class="col-sm-3">
+            <p class="pardes">
+                <label>
+                    @Resources.HasExchangeTransaction
+                </label>
+                @if (ViewBag.HasExchangeTransaction)
+            {
+                    <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+                else
+                {
+                    <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+            </p>
+        </div>
+        <div class="col-sm-3">
+            <p class="pardes">
+                <label>
+                    @Resources.HasBackup
+                </label>
+                @if (Model.HasBackup)
+            {
+                    <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+                else
+                {
+                    <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+            </p>
+        </div>
+
+        <div class="col-sm-3">
+            <p class="pardes">
+                <label>
+                    @Resources.IS_Facilities
+                </label>
+                @if (Model.IS_Facilities)
+            {
+                    <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+                else
+                {
+                    <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+            </p>
+        </div>
+        <div class="col-sm-3">
+            <p class="pardes">
+                <label>
+                    @Resources.IsActive
+                </label>
+                @if (Model.IsActive)
+            {
+                    <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+                else
+                {
+                    <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                }
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.MaxPermissiveSignatureCount
+                </label>
+                @Html.DisplayFor(model => model.MaxPermissiveSignatureCount)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.MinPermissiveSignatureCount
+                </label>
+                @Html.DisplayFor(model => model.MinPermissiveSignatureCount)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.OpeningDate
+                </label>
+                @Utility.GetPersianDate(Model.OpeningDate)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.OpeningValue
+                </label>
+                @Math.Truncate(Model.OpeningValue).ToString("N0") 
+                @foreach (var item in (List<CSD.Treasury.Service.ExchangeTypesService.ExchangeType>)ViewBag.exchangeType)
+                {
+                    if (item.ExchangeTypeID == Model.ExchangeTypeID)
+                    {
+                        @(item.ExchangeTypeDescription)
+                    }
+                }
+
+
+              
+            </p>
+        </div>
+
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.SortOrder
+                </label>
+                @if (Model.SortOrder == 1)
+                {
+                    @Resources.High
+                }
+                else if (Model.SortOrder == 2)
+                {
+                    @Resources.Normal
+                }
+                else if (Model.SortOrder == 3)
+                {
+                    @Resources.Low
+                }
+            </p>
+        </div>
+
+
+    </div>
+</div>

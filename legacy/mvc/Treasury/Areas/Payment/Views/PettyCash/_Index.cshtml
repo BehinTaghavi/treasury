@@ -1,0 +1,100 @@
+﻿@model List<CSD.Treasury.Service.PettyCash_TransactionHeaderService.PettyCash_TransactionHeader>
+@{
+    var i = 1;
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    @Html.ActionLink(Resources.PayPettyCash, "Index", "PettyCash", new { area = "Payment", HeaderId = 0 }, new { @class = "btn btn-success btn-sm" })
+                </div>
+            </div>
+        </div>
+    </div>
+}
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr class="mdc-bg-grey-100">
+                <th>
+
+                </th>
+                <th>
+                    @Resources.Unique_Account_No/@Resources.Unique_Account_Code
+                </th>
+
+                <th>
+                    @Resources.PettyCashName
+                </th>
+                <th>
+                    @Resources.UserName
+                </th>
+
+                <th>
+                    @Resources.account_code
+                </th>
+
+                <th>
+                    @Resources.Price (ریال)
+                </th>
+                <th>@Resources.PayCeiling (ریال)</th>
+                <th>@Resources.Settle_Limit (ریال)</th>
+                <th></th>
+                @*<th></th>*@
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var group in Model.GroupBy(d => d.PettyCashID))
+            {
+                if (group.FirstOrDefault().PettyCashID != 0)
+                {
+                    var a = Utility.GetPaettyCash(group.FirstOrDefault().PettyCashID);
+                    if (User.Id == a.UserID || User.IsInRole("Admin")|| User.IsInRole("Manager") || User.IsInRole("AcceptPettyCash") )
+                    {
+                        <tr>
+                            <td>
+                                @(i++)
+                            </td>
+                            <td>
+                                @Utility.GetUniqueAccount(a.Unique_Account_No)/@(a.Unique_Account_No)
+                            </td>
+                            <td>
+                                @(a.PettyCashName)
+                            </td>
+
+                            <td>
+                                @Utility.GetUserName(a.UserID)
+                            </td>
+                            <td>
+                                @if (a.Account_No != null)
+                            {
+                                    @Utility.Getaccounts(a.Account_No)  @(a.Account_No)
+                            }
+                            </td>
+
+                            <td>
+                                @((string.Format("{0:n0}", (Int64)a.PettyCash_Ammount)).ToString())
+                            </td>
+                            <td>
+                                @((string.Format("{0:n0}", (Int64)a.PayCeiling)).ToString())
+                            </td>
+                            <td>
+                                @((string.Format("{0:n0}", (Int64)a.Settle_Limit)).ToString())
+                            </td>
+                            <td>
+                                @Ajax.ActionLink(Resources.Details, "GetHeaders", "PettyCash", new { PettyCashID = a.PettyCashID }, new AjaxOptions { HttpMethod = "Get", UpdateTargetId = "ShowDetails" }, new { @class = "btn btn-material-blue-grey-600 btn-xs" })
+                            </td>
+                            @*<td>
+                                    @Html.ActionLink(Resources.Report, "PettyCashListReport", "PettyCash", new { Area = "Report", pettycashId = a.PettyCashID }, new { @calss = "btn btn-material-blue-grey-600 btn-xs" })
+                                </td>*@
+                        </tr>
+                }
+
+            }
+        }
+
+    </table>
+</div>
+<hr />
+<div id="ShowDetails"></div>

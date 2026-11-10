@@ -1,0 +1,18 @@
+﻿@model CSD.Treasury.Service.CashiersService.Cashier
+
+@{
+    ViewBag.Title = "Delete";
+}
+<p>@Resources.AreYouSure</p>
+<div>
+    @using (Ajax.BeginForm("Delete", "Cashier", new AjaxOptions
+    {
+        OnSuccess = "successMessage(data);closeModal('sm');updateTable();"
+    }, new { enctype = "multipart/form-data" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model=>model.CashierID)
+        <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>

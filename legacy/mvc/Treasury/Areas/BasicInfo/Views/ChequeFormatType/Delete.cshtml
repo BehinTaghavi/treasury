@@ -1,0 +1,21 @@
+﻿@model CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType
+
+@{
+    ViewBag.Title = "Delete";
+}
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+@using (Ajax.BeginForm("Delete", "ChequeFormatType", new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);updateTableChequeLs(" + ViewBag.BankID + "," + ViewBag.BasicBankID + ");closeModal('sm');"
+}, new { enctype = "multipart/form-data" }))
+{
+        @Html.AntiForgeryToken()
+    @Html.HiddenFor(model => model.ChequeFormatID)
+    <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+    <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+}
+</div>

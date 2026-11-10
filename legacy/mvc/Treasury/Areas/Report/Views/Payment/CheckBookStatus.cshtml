@@ -1,0 +1,45 @@
+﻿@model CSD.Treasury.UI.Models.CheckBookStatusSearch
+@{
+    Layout = null;
+    var S = "LoadCheckBookStatus";
+}
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+<div>
+
+    @if (!string.IsNullOrEmpty(Model.BankAccountNumber))
+    {
+        S = S + "/?BankAccountNumber=" + Model.BankAccountNumber + "";
+    }
+    @if (Model.ChequeFormatType!=0)
+    {
+        S = S + "&ChequeFormatType=" + Model.ChequeFormatType;
+    }
+  
+
+@Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+    Actions =
+    {
+        GetReportSnapshot = S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+    },
+    Toolbar =
+    {
+          BackgroundColor = System.Drawing.Color.Silver,
+        ShowPrintButton = true,
+         ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+
+    },
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+</div>

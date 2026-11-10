@@ -1,0 +1,94 @@
+﻿@*@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.DataModel
+<td>
+    <span data-lang-number="fa">
+        @(Model.RequestDate.Substring(0, 4) + "/" + Model.RequestDate.Substring(4, 2) + "/" + Model.RequestDate.Substring(6, 2))
+    </span>
+</td>
+<td>
+    <h4 data-lang-number="fa">
+        @Math.Truncate(Model.PayAmount)
+    </h4>
+</td>
+@if (Request.IsAuthenticated && User.IsInRole("Admin"))
+{
+    <td>
+        @Utility.GetUserLocation(Model.UserID)
+    </td>
+                    <td>
+                        @Utility.GetUserName(Model.UserID)
+                    </td>
+}
+<td>
+    @TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), Model.Priority))
+</td>
+<td>
+    @if (Model.Is_Ok)
+    {
+        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+    }
+    else
+    {
+        <i class="zmdi zmdi-minus mdc-text-red-800 zmdi-hc-lg"></i>
+    }
+</td>
+<td>
+    @if (Model.Is_Paid)
+    {
+        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+    }
+    else
+    {
+        <i class="zmdi zmdi-minus mdc-text-red-800 zmdi-hc-lg"></i>
+    }
+</td>
+<td>
+    @if (Model.Is_delivered)
+    {
+        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+    }
+    else
+    {
+        <i class="zmdi zmdi-minus mdc-text-red-800 zmdi-hc-lg"></i>
+    }
+</td>
+
+<td>
+    @if (Request.IsAuthenticated && User.IsInRole("Admin"))
+    {
+        @Ajax.ActionLink(Resources.Approval, "Confirmation", "Request", new { area = "Payment", requestId = Model.RequestID }, new AjaxOptions
+                   {
+                       InsertionMode = InsertionMode.Replace,
+                       LoadingElementId = "loading",
+                       UpdateTargetId = "modal-content",
+                       OnSuccess = "$('.modal.default').modal('show')"
+                   }, new { @class = "btn btn-primary btn-xs" })
+    }
+
+    @Ajax.ActionLink(Resources.Show, "RequestPayment", "Request", new { area = "Payment", requestId = Model.RequestID }, new AjaxOptions
+               {
+                   InsertionMode = InsertionMode.Replace,
+                   LoadingElementId = "loading",
+                   UpdateTargetId = "modal-content",
+                   OnSuccess = "$('.modal.default').modal('show')"
+               }, new { @class = "btn btn-info btn-xs" })
+
+    <div class="btn-group">
+        @if (Model.Is_Ok == false && Model.Is_Paid == false && Model.Is_delivered == false)
+        {
+
+            @Html.ActionLink(Resources.Edit, "Edit", "request", new { area = "payment", requestId = Model.RequestID }, new { @class = "btn btn-xs btn-success btn-flat" })
+
+            @Ajax.ActionLink(Resources.Delete, "ShowDeleteConfirm", "Request", new { area = "Payment", requestId = Model.RequestID }, new AjaxOptions
+                       {
+                           InsertionMode = InsertionMode.Replace,
+                           LoadingElementId = "loading",
+                           UpdateTargetId = "modal-content",
+                           OnSuccess = "$('.modal.default').modal('show')"
+                       }, new { @class = "btn btn-xs btn-danger btn-flat" })
+        }
+
+
+    </div>
+</td>*@

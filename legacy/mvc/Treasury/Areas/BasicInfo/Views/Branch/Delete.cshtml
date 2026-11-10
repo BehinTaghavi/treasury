@@ -1,0 +1,17 @@
+﻿@model CSD.Treasury.DataModel.cmpBranch
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+    @using (Ajax.BeginForm("Delete", "Branch", new AjaxOptions
+    {
+        HttpMethod = "Post",
+        LoadingElementId = "loading",
+        OnSuccess = "successMessage(data);closeModal('md');updateTable('branchList');"
+    }, new { enctype = "multipart/form-data" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.cmpBranchID)
+        <button class="btn btn-primary btn-sm" type="submit">@Resources.Yes</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>

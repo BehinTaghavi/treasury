@@ -1,0 +1,81 @@
+﻿@model BankBalanceModel
+@{
+    ViewBag.Title = Resources.Back;
+}
+@section PageHeader{
+    @Resources.BankBalance
+}
+@if (Model.showInput)
+{
+    <div class="clearfix">
+        <div class="col-sm-6 col-md-3">
+            <label>انتخاب بانک</label>
+            <select class="form-control" id="basicBankList">
+                <option selected>انتخاب بانک</option>
+                @foreach (var item in ViewBag.Banks)
+                {
+                    <option value="@item.BasicBankId">@item.BasicBankDescription</option>
+                }
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <label>انتخاب   شعبه</label>
+            <select class="form-control" id="bankList">
+                <option selected>انتخاب شعبه</option>
+            </select>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            @Html.ActionLink("گردش حساب", "SearchView1", "GardesheHesab", new { area = "Report" },new { @Class = "btn btn-info btn-sm" })
+        </div>
+    </div>
+}
+<hr />
+
+<div id="BankResult">
+    @Html.Action("ShowBalance", "BankBalance", new { area = "BasicInfo", Model })
+</div>
+<div id="Details">
+
+</div>
+<script>
+    $(function () {
+        $("body").on("change", "#basicBankList", function () {
+            $.ajax({
+                url: "@Url.Action("GetBanks", "BankBalance", new { area = "BasicInfo" })",
+                data: {
+                    BasicBankId: $(this).val()
+                },
+                success: function (result) {
+                    console.log(result);
+                    var str = "";
+                    for (var i = 0; i < result.length; i++) {
+                        var Branch = result[i].BranchName;
+                        if (result[i].HasBackup)
+                        {
+                            Branch = Branch+"-پشتیبان"
+                        }
+                        str += "<option value='" + result[i].BankID + "'>" + result[i].Bank_AccountNumber + " - " + Branch + "</option>"
+                    }
+                    $("#bankList").html("<option selected>انتخاب شعبه</option>" + str);
+                }
+            })
+        });
+
+
+        $("body").on("change", "#bankList", function () {
+            $.ajax({
+                url: "@Url.Action("ShowBalance", "BankBalance", new { area = "BasicInfo" })",
+                data: {
+                    Date: "",
+                    BankId: $(this).val(),
+                    showSum: true
+                },
+                success: function (result) {
+                    $("#BankResult").html(result);
+                }
+            })
+        })
+
+
+    })
+</script>

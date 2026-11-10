@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- HTTP API of the cashflow service (receipts, payments, instruments, petty cash). -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Cashflow.Api</RootNamespace>
+    <UserSecretsId>treasury-cashflow-api</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Cashflow.Infrastructure\Treasury.Cashflow.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- With NuGet (normal build): PostgreSQL storage and Keycloak token validation.
+       Offline build (-p:Offline=true): in-memory storage and development identity only. -->
+  <PropertyGroup Condition="'$(Offline)' != 'true'">
+    <DefineConstants>$(DefineConstants);WITH_PACKAGES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Offline)' != 'true'">
+    <ProjectReference Include="..\Treasury.Cashflow.Infrastructure.Postgres\Treasury.Cashflow.Infrastructure.Postgres.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+  </ItemGroup>
+</Project>

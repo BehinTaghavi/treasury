@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Minimal stand-in for xUnit, used only when NuGet is not reachable (Offline=true). Not used in normal builds. -->
+  <PropertyGroup>
+    <RootNamespace>Xunit</RootNamespace>
+    <!-- The shim deliberately mirrors xUnit's naming. -->
+    <NoWarn>$(NoWarn);CA1711;CA1716;CA1720;CA1051;CA1062;CA1031;CA1819;CA1303;CA2201</NoWarn>
+  </PropertyGroup>
+</Project>

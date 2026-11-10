@@ -1,0 +1,145 @@
+﻿@using CSD.Treasury.Common.Enumeration
+@using System.Configuration;
+@model  CSD.Treasury.DataModel.UserInfo
+@using (Ajax.BeginForm("Register", "User", new { Area = "Management" }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            @*<div class="col-md-5">
+                @Html.TextBoxFor(model => model.User_FullName, new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.FullName })
+                @Html.ValidationMessageFor(model => model.User_FullName, "", new { @class = "text-danger" })
+            </div>*@
+            @*@if (ConfigurationManager.AppSettings["bilingual"] == "True")
+            {
+                <div class="col-md-5">
+                    @Html.EditorFor(model => model.User_FullName2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control", placeholder = Resources.FullName + " " + Resources.EN } })
+                    @Html.ValidationMessageFor(model => model.User_FullName2, "", new { @class = "text-danger" })
+                </div>
+            }*@
+        </div>
+        <div class="form-group">
+            <div class="col-md-5">
+                @Html.EditorFor(model => model.UserName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.UserName } })
+                @Html.ValidationMessageFor(model => model.UserName, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-5">
+                @Html.EditorFor(model => model.UserPassword, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Password } })
+                @Html.ValidationMessageFor(model => model.UserPassword, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-4">
+                <div class="checkbox">
+                    <label>
+                        @Html.CheckBoxFor(model => model.IsActive)&nbsp;&nbsp;@(Resources.IsActive)
+                    </label>
+                </div>
+                @Html.ValidationMessageFor(model => model.IsActive, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                <div class="checkbox">
+                    <label>
+                        @Html.CheckBoxFor(model => model.IsAdmin)&nbsp;&nbsp;@(Resources.IsAdmin)
+
+                    </label>
+                </div>
+                @Html.ValidationMessageFor(model => model.IsAdmin, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                <div class="checkbox">
+                    <label>
+                        @Html.CheckBoxFor(model => model.HasPermissiveSignature)&nbsp;&nbsp;@(Resources.PermissiveSignature)
+                    </label>
+                </div>
+            </div>
+        </div>
+        @*<div class="form-group">
+                <div class="col-md-4">
+                    <label class="control-label" for="DefualtLanguage">@Resources.DefualtLanguage</label>
+                    <select id="DefualtLanguage" name="DefualtLanguage" class="form-control">
+                        @foreach (var item in EnumUtility.ToList(typeof(DefualtLanguage), "", "", "", false))
+                        {
+                            <option value="@(item.Id)">
+                                @item.Title
+                            </option>
+                        }
+                    </select>
+                    @Html.ValidationMessageFor(model => model.DefualtLanguage, "", new { @class = "text-danger" })
+                </div>
+            </div>*@
+        @*<div class="form-group">
+            <div class="col-md-5">
+                <label class="control-label" for="LocationID">@Resources.Location</label>
+                @Html.DropDownListFor(model => model.LocationID, new SelectList(ViewBag.Location, "LocationID", "LocationName"), new { data_lang_number = "fa", @class = "form-control" })
+                @Html.ValidationMessageFor(model => model.LocationID)
+            </div>
+            <div class="col-md-5">
+                <label class="control-label" for="LocationByCostCenterID">@Resources.CostCenter</label>
+                <select id="LocationByCostCenterID" name="LocationByCostCenterID" class="form-control">
+                    <option>-------</option>
+                </select>
+                @Html.ValidationMessageFor(model => model.LocationByCostCenterID)
+            </div>
+        </div>*@
+        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+        {
+            <div class="form-group">
+                @Html.DropDownList("RoleIds", new SelectList(ViewBag.Roles, "RoleID", "RoleName"), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = "دسترسی ها", multiple = "multiple" })
+            </div>
+        }
+    </div>
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Create</button>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+
+    $("#RoleIds").select2({
+        tags: true,
+        dir: "rtl",
+        containerCssClass: "form-control",
+        templateSelection: formatRepoSelection,
+    });
+    function formatRepoSelection(repo) {
+        return repo.full_name || repo.text;
+    }
+
+    $("body").on("change", "#LocationID", function () {
+        var address = "@(Url.Action("GetCostCenter", "User", new {Area="Management"}))";
+        $("#LocationByCostCenterID").load(address, { LocationID: $(this).val(), Bind: $(this).attr("data-bind") });
+
+    });
+    //var Roles = [];
+
+    //$('.Roles').click(function () {
+    //    if ($(this).is(':checked')) {
+    //        Roles.push( $(this).val());
+    //        $('#RoleIDs').val(Roles);
+    //    }
+    //    else {
+    //        removeItem = $(this).val();
+    //        Roles = jQuery.grep(Roles, function (value) {
+    //            return value != removeItem;
+    //        });
+    //        $('#RoleIDs').val(Roles);
+    //    }
+    //});
+</script>

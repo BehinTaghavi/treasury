@@ -1,0 +1,116 @@
+﻿@model CSD.Treasury.UI.Models.DaryaftaniPardakhtaniAti
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+
+@using CSD.Treasury.Resourse
+@{
+
+    ViewBag.Title = "DaryaftaniPardakhtaniAtiPerZinaf";
+    <table class="table table-striped sortable">
+        <thead>
+            <tr class="mdc-bg-grey-200">
+                <th>@Resources.DueDate</th>
+                <th>@Resources.Description</th>
+                <th>@Resources.Unique_Account_No</th>
+                <th>@Resources.Price</th>
+            </tr>
+        </thead>
+        @foreach (var item in Model.ListPerZinafSaresid)
+        {
+            <tr>
+                <td>@item.DueDate</td>
+                <td>@item.PlaningTypeDesc</td>
+                <td>@item.Account_Name</td>
+                <td>@item.ChequePrice_Rial</td>
+            </tr>
+        }
+    </table>
+    <div class="container-fluid">
+        <div class="clearfix">
+            <div class="pull-right">
+                <span class="pagination pagination-total">
+                    @Resources.Total : @Model.TotalItemCount
+                    @Resources.Page @(ix + 1)
+                    @Resources.From @Model.TotalPageCount
+                </span>
+            </div>
+            <div class="pull-left">
+                <nav class="text-center">
+                    <ul class="pagination  pagination-sm">
+                        @{
+                            var start = ix;
+                            if (start > 0)
+                            {
+                                int c = 0;
+                                while (start > 0 && c < 4)
+                                {
+                                    c++;
+                                    start--;
+                                }
+                            }
+                            if (ix != 0)
+                            {
+                                Model.PageIndex = 0;
+                                <li>
+                                    @Ajax.ActionLink("<<", "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+InsertionMode = InsertionMode.Replace,
+HttpMethod = "post",
+
+})
+
+                                </li>
+                            }
+                            for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                            {
+                                if (ix != j)
+                                {
+                                    Model.PageIndex = j;
+                                    <li>
+                                        @Ajax.ActionLink((j + 1).ToString(), "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+HttpMethod = "post",
+InsertionMode = InsertionMode.Replace,
+
+})
+                                    </li>
+                                }
+                                else
+                                {
+                                    <li class="active">
+                                        <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                    </li>
+                                }
+                            }
+                            if (start + 9 < Model.TotalPageCount)
+                            {
+                                <li>
+                                    @Ajax.ActionLink(">>", "List", "BehalfGroup", Model,
+new AjaxOptions
+{
+UpdateTargetId = "Result",
+HttpMethod = "post",
+InsertionMode = InsertionMode.Replace,
+
+})
+                                </li>
+                            }
+                        }
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+    </div>
+
+
+}
+
+

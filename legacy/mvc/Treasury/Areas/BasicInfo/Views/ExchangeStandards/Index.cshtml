@@ -1,0 +1,37 @@
+﻿@section PageHeader{
+    @Resources.List @Resources.ExchangeStandards
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+
+                    @Ajax.ActionLink(Resources.Create, "Create", "ExchangeStandards", new { Area = "BasicInfo" }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Create + " " + @Resources.ExchangeStandards + "', 'md')"
+               }, new { @class = "btn btn-material-green-600 btn-sm" })
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+}
+@section list{
+    <div id="Result">
+        @Html.Action("List", "ExchangeStandards", new { Area = "BasicInfo" })
+    </div>
+}
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("List", "ExchangeStandards", new { area = "BasicInfo" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+</script>

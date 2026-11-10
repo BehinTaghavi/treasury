@@ -1,0 +1,246 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch1
+@using CSD.Treasury.MVCHelpers
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+    int inum = 0;
+}
+
+
+@*<table class="table">
+        <thead>
+            <tr class="mdc-bg-grey-100">
+                <th></th>
+                <th>@Resources.SerialNum</th>
+                <th>@Resources.ReceiptPayType</th>
+                <th>@Resources.Price</th>
+                <th>@Resources.Unique_Account_No/@Resources.Unique_Account_Code</th>
+                <th>@Resources.Behalf</th>
+                <th></th>
+            </tr>
+        </thead>
+        @foreach (var group in Model.List.GroupBy(d => d.Unique_Account_No))
+        {
+            if (group.FirstOrDefault().Unique_Account_No != null)
+            {
+                <thead>
+                    <tr class="mdc-bg-grey-50">
+                        <th colspan="7"><h4>@Utility.GetUniqueAccount(group.FirstOrDefault().Unique_Account_No)</h4></th>
+                    </tr>
+                </thead>
+            }
+
+            <tbody>
+                @foreach (var item in group)
+                {
+                    var related1 = Utility.HasPlanState(item.ReceiptDetailId);
+
+                    <tr>
+                        <td>
+
+                            @{i++;}
+                            @i
+                        </td>
+                        <td>@(item.ReceiptDetailId)</td>
+                        <td>@Utility.GetReceipt_Pay_TypeDetailTitle(item.RecieptTypeId)</td>
+                        <td>@Math.Truncate(item.EquivalencePrice.Value).ToString("#,##0")  </td>
+                        <td id="Unique_Account_No">@Utility.GetUniqueAccount(item.Unique_Account_No)/@(item.Unique_Account_No)</td>
+                        <td>@Utility.GetBehalf(item.BehalfID)</td>
+                        <td>
+                            <div class="btn-group">
+
+
+
+                                @if (related1)
+                                {
+                                    <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.AttachFile</button>
+                                            <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                                            <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+
+                                }
+                                else
+                                {
+                                    @Ajax.IActionLink("", "List", "Attachment", new { area = "Payment", Id = item.ReceiptDetailId, TableName = "Reciept_Header" }, new AjaxOptions
+                                       {
+                                           InsertionMode = InsertionMode.Replace,
+                                           OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+                                       }, new { title = Resources.AttachFile, @class = "btn btn-material-teal-600 btn-sm" }, "zmdi zmdi-hc-lg zmdi-file")
+
+                                            @Html.IActionLink("", "ShowReceiptForm", "Receipt", new { area = "payment", headerId = item.ReceiptId, ReceiptPayTypeId = item.RecieptTypeId }, new { @title = Resources.Edit, @class = "btn btn-material-light-blue-A700 btn-sm" }, "zmdi zmdi-hc-lg zmdi-edit")
+                                            @Html.IActionLink("", "Delete", "Receipt", new { Area = "Payment", HeaderID = item.ReceiptId }, new { title = Resources.Delete, data_lang_number="fa", @class = "delete btn btn-material-red-A700 btn-sm" }, "zmdi zmdi-hc-lg zmdi-delete")
+                                }
+
+                            </div>
+                        </td>
+                    </tr>
+                                    }
+            </tbody>
+                                    }
+    </table>*@
+<div class="container">
+    <div class="panel-group" id="accordion">
+        @foreach (var group in Model.List.GroupBy(d => d.DetailUnique_Account_No))
+            {
+            <div class="panel panel-default">
+                @if (group.FirstOrDefault().DetailUnique_Account_No != null)
+                {
+                    <div class="panel-heading">
+                        <h4 class="panel-title">
+                           <a data-toggle="collapse" data-parent="#accordion" href="#collapse@(group.FirstOrDefault().ReceiptDetailId)">@Utility.GetUniqueAccount(group.FirstOrDefault().DetailUnique_Account_No)</a>
+                        </h4>
+                    </div>
+                }
+                <div id="collapse@(group.FirstOrDefault().ReceiptDetailId)" class="panel-collapse collapse @(inum == 0 ? "in" : "")">
+                    <div class="panel-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th></th>
+                                    <th>@Resources.ReceiptDetailId</th>
+                                    <th>@Resources.Date @Resources.Receive </th>
+                                    <th>@Resources.ReceiptType</th>
+                                    <th>@Resources.Price/@Resources.Rial</th>
+                                    <th>@Resources.Unique_Account_No/@Resources.Unique_Account_Code</th>
+                                    <th>@Resources.Behalf</th>
+                                    <th>@Resources.Status</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            @foreach (var item in group)
+                            {
+                                var related1 = Utility.HasPlanState(item.ReceiptDetailId);
+
+                                <tr>
+                                    <td>
+                                        @{i++;}
+                                        @i
+                                    </td>
+                                    <td>@(item.ReceiptDetailId)</td>
+                                    <td>@Utility.GetPersianDate(item.ReceiptDate)</td>
+                                    <td>@(item.Receipt_Pay_TypeDetailDescription)</td>
+                                    <td>@Math.Truncate(item.EquivalencePrice.Value).ToString("#,##0")  </td>
+                                    <td id="Unique_Account_No">@item.DetailUnique_Account_No_One_Title/@(item.DetailUnique_Account_No)</td>
+                                    <td>@(item.BehalfDescription)</td>
+                                    <td>@item.PlaningTypeDesc</td>
+                                    <td>
+                                            @Ajax.IActionLink("", "ShowReceiptDetails", "Receipt", new { area = "Payment", ReceiptDetailsId = item.ReceiptDetailId }, new AjaxOptions
+                                        {
+                                            OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.Receipt + "', 'md');"
+                                        }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-700 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+                                            @if (related1)
+                                            {
+                                                @*<button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.AttachFile</button>
+                                                <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                                                <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>*@
+                                            }
+                                            else
+                                            {
+                                               
+                                                @Ajax.IActionLink("", "List", "Attachment", new { area = "Payment", Id = item.ReceiptDetailId, TableName = "Receipt_Detail" }, new AjaxOptions
+                                           {
+                                               InsertionMode = InsertionMode.Replace,
+                                               OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+                                           }, new { title = Resources.AttachFile, @class = "btn btn-material-teal-600 btn-xs" }, "zmdi zmdi-hc-lg zmdi-file")
+
+                                                @Html.IActionLink("", "ShowReceiptForm", "Receipt", new { area = "payment", headerId = item.ReceiptId, ReceiptDetailId = item.ReceiptDetailId, ReceiptPayTypeId = item.RecieptTypeId }, new { @title = Resources.Edit, @class = "btn btn-material-light-blue-A700 btn-xs" }, "zmdi zmdi-hc-lg zmdi-edit")
+                                                @Html.IActionLink("", "Delete", "Receipt", new { Area = "Payment", ReceiptDetailId = item.ReceiptDetailId }, new { title = Resources.Delete, data_lang_number = "fa", @class = "delete btn btn-material-red-A700 btn-xs" }, "zmdi zmdi-hc-lg zmdi-delete")
+                                            }
+
+                                    </td>
+                                </tr>
+
+
+                                            }
+                        </table>
+                    </div>
+                </div>
+
+
+            </div>
+                                                inum++;
+                                            }
+    </div>
+</div>
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+        //OnSuccess = "reLoadListSuccess()"
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+        //OnSuccess = "reLoadListSuccess()"
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+        //OnSuccess = "reLoadListSuccess()"
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

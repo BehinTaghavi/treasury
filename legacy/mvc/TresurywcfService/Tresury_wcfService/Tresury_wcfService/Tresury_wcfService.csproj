@@ -1,0 +1,283 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>8.0.50727</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{E37FEAAF-AC18-4C51-9188-72E5976E2921}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Tresury_wcfService</RootNamespace>
+    <AssemblyName>Tresury_wcfService</AssemblyName>
+    <ProjectTypeGuids>{3D9AD99F-2412-4246-B90B-4EAA41C64699};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <StartArguments>/client:"WcfTestClient.exe"</StartArguments>
+    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <WcfConfigValidationEnabled>True</WcfConfigValidationEnabled>
+    <XsdCodeGenEnabled>True</XsdCodeGenEnabled>
+    <SccProjectName>SAK</SccProjectName>
+    <SccLocalPath>SAK</SccLocalPath>
+    <SccAuxPath>SAK</SccAuxPath>
+    <SccProvider>SAK</SccProvider>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>..\packages\EntityFramework.6.1.3\lib\net45\EntityFramework.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="EntityFramework.SqlServer, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>..\packages\EntityFramework.6.1.3\lib\net45\EntityFramework.SqlServer.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Security" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AccountsModel.Context.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AccountsModel.Context.tt</DependentUpon>
+    </Compile>
+    <Compile Include="AccountsModel.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AccountsModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="AccountsModel.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>AccountsModel.edmx</DependentUpon>
+    </Compile>
+    <Compile Include="Bank.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="BankCard.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="BasicBank.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Behalf.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="BehalfGroup.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="CashDesk.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="clsConfig.cs" />
+    <Compile Include="ClsPaging.cs" />
+    <Compile Include="cls_Accounts.cs" />
+    <Compile Include="cls_Bank.cs" />
+    <Compile Include="cls_BankCards.cs" />
+    <Compile Include="cls_BasicBanks.cs" />
+    <Compile Include="cls_BehalfGroup.cs" />
+    <Compile Include="cls_Behalfs.cs" />
+    <Compile Include="cls_CashDesk.cs" />
+    <Compile Include="cls_cmpBranches.cs" />
+    <Compile Include="cls_cmpBranch_EmailAddress.cs" />
+    <Compile Include="cls_cmpBranch_FAX.cs" />
+    <Compile Include="cls_cmpBranch_TELS.cs" />
+    <Compile Include="cls_ExchangeTypes.cs" />
+    <Compile Include="cls_Locations.cs" />
+    <Compile Include="cls_Receipt_Pay_Type.cs" />
+    <Compile Include="cls_Receipt_Pay_TypeDetail.cs" />
+    <Compile Include="cls_ReferenceType.cs" />
+    <Compile Include="cls_Request_Payment.cs" />
+    <Compile Include="cls_Source_DestinationTypes.cs" />
+    <Compile Include="cmpBranch.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="cmpBranch_EmailAddress.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="cmpBranch_FAX.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="cmpBranch_TELS.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Config.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="DynamicQueryable.cs" />
+    <Compile Include="ExchangeType.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Icls_Accounts.cs" />
+    <Compile Include="Icls_BankCards.cs" />
+    <Compile Include="Icls_BasicBanks.cs" />
+    <Compile Include="Icls_BehalfGroup.cs" />
+    <Compile Include="Icls_Behalfs.cs" />
+    <Compile Include="Icls_CashDesk.cs" />
+    <Compile Include="Icls_cmpBranches.cs" />
+    <Compile Include="Icls_cmpBranch_EmailAddress.cs" />
+    <Compile Include="Icls_cmpBranch_FAX.cs" />
+    <Compile Include="Icls_cmpBranch_TELS.cs" />
+    <Compile Include="Icls_ExchangeTypes.cs" />
+    <Compile Include="Icls_Locations.cs" />
+    <Compile Include="Icls_Receipt_Pay_Type.cs" />
+    <Compile Include="Icls_Receipt_Pay_TypeDetail.cs" />
+    <Compile Include="Icls_ReferenceType.cs" />
+    <Compile Include="Icls_Request_Payment.cs" />
+    <Compile Include="Icls_Source_DestinationTypes.cs" />
+    <Compile Include="Icls_Bank.cs" />
+    <Compile Include="Location.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Receipt_Pay_Type.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Receipt_Pay_TypeDetail.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="ReferenceType.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Request_Payment.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Request_Payment_GetAllInfo_ForSpecialRequestID_Result.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Source_DestinationTypes.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="sp_helpdiagramdefinition_Result.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="sp_helpdiagrams_Result.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="sysdiagram.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="TreasuryModel.Context.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>TreasuryModel.Context.tt</DependentUpon>
+    </Compile>
+    <Compile Include="TreasuryModel.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="TreasuryModel.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>TreasuryModel.edmx</DependentUpon>
+    </Compile>
+    <Compile Include="t_Accounts_Result.cs">
+      <DependentUpon>AccountsModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="t_unique_Accounts_Result.cs">
+      <DependentUpon>AccountsModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="t_unique_account_type_Result.cs">
+      <DependentUpon>AccountsModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="UserInfo.cs">
+      <DependentUpon>TreasuryModel.tt</DependentUpon>
+    </Compile>
+    <Compile Include="Utility.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EntityDeploy Include="AccountsModel.edmx">
+      <Generator>EntityModelCodeGenerator</Generator>
+      <LastGenOutput>AccountsModel.Designer.cs</LastGenOutput>
+    </EntityDeploy>
+    <None Include="AccountsModel.edmx.diagram">
+      <DependentUpon>AccountsModel.edmx</DependentUpon>
+    </None>
+    <None Include="App - Copy.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="App.config">
+      <SubType>Designer</SubType>
+    </None>
+    <None Include="packages.config" />
+    <EntityDeploy Include="TreasuryModel.edmx">
+      <Generator>EntityModelCodeGenerator</Generator>
+      <LastGenOutput>TreasuryModel.Designer.cs</LastGenOutput>
+    </EntityDeploy>
+    <None Include="TreasuryModel.edmx.diagram">
+      <DependentUpon>TreasuryModel.edmx</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Service Include="{508349B6-6B84-4DF5-91F0-309BEEBAD82D}" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="AccountsModel.Context.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <DependentUpon>AccountsModel.edmx</DependentUpon>
+      <LastGenOutput>AccountsModel.Context.cs</LastGenOutput>
+    </Content>
+    <Content Include="AccountsModel.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <DependentUpon>AccountsModel.edmx</DependentUpon>
+      <LastGenOutput>AccountsModel.cs</LastGenOutput>
+    </Content>
+    <Content Include="TreasuryModel.Context.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <DependentUpon>TreasuryModel.edmx</DependentUpon>
+      <LastGenOutput>TreasuryModel.Context.cs</LastGenOutput>
+    </Content>
+    <Content Include="TreasuryModel.tt">
+      <Generator>TextTemplatingFileGenerator</Generator>
+      <DependentUpon>TreasuryModel.edmx</DependentUpon>
+      <LastGenOutput>TreasuryModel.cs</LastGenOutput>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <VSToolsPath Condition="'$(VSToolsPath)' == '' and '$(VisualStudioVersion)' != '' and '$(VisualStudioVersion)' != '11.0'">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio</VSToolsPath>
+    <WcfServiceModelTargetPath>$(VSToolsPath)\WCF</WcfServiceModelTargetPath>
+  </PropertyGroup>
+  <Import Project="$(WcfServiceModelTargetPath)\Microsoft.VisualStudio.ServiceModel.targets" />
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{3D9AD99F-2412-4246-B90B-4EAA41C64699}">
+        <WcfProjectProperties>
+          <AutoStart>True</AutoStart>
+        </WcfProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

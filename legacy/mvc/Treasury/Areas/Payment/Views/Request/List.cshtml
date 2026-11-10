@@ -1,0 +1,622 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.MVCHelpers
+@{
+
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+    var admin = User.IsInRole("Admin");
+    var manager = User.IsInRole("Manager");
+    var AcceptRequestPayment=User.IsInRole("AcceptRequestPayment");
+}
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+
+
+
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>
+
+<table class="table sortable">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+            <th class="text-center">#</th>
+            <th data-defaultsort='disabled' class="text-right">
+                @if (admin || manager || AcceptRequestPayment)
+                {
+                    <div class="checkbox">
+                        <label style="padding: 0">
+                            <input type="checkbox" class="datapropfull" />
+                        </label>
+                    </div>
+                }
+            </th>
+
+
+            <th>@Resources.Number</th>
+            <th>@Resources.RequestDate</th>
+            <th>@Resources.PayAmount</th>
+            <th>@Resources.Unique_Account_No/@Resources.Unique_Account_Code</th>
+
+            @*<th>@Resources.Priority</th>*@
+            <th>@Resources.Status</th>
+            <th>@Resources.DueDate</th>
+            <th data-defaultsort='disabled'>@Resources.Behalf</th>
+            <th data-defaultsort='disabled'>@Resources.PayType</th>
+            <th>@Resources.ChequeNo</th>
+            <th data-defaultsort='disabled'></th>
+        </tr>
+    </thead>
+    @foreach (var item in Model.List)
+    {
+        var related = Utility.HasRelation("Request_Payment", "RequestID", item.RequestID.ToString(), "Payment", "RequestID");
+        var rel = "";
+        if (item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegrationRequest)
+        {
+            rel = Guid.NewGuid().ToString("N");
+        }
+        <tbody>
+            @*//if (item.ChildList != null && item.ChildList.Count != 0)
+            //var _c = "";
+            //switch (item.Priority)
+            //{
+            //    case (short)Priority.High:
+            //        _c = "background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%, rgba(241,241,241,0) 80%, rgba(0,173,28,1) 100%);background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(0,173,28,1) 100%);background: linear-gradient(to right, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(0,173,28,1) 100%);filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00ffffff', endColorstr='#00ad1c',GradientType=1 );";
+            //        break;
+            //    case (short)Priority.Normal:
+            //        _c = "background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%, rgba(241,241,241,0) 80%, rgba(218,234,0,1) 100%);background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(218,234,0,1) 100%);background: linear-gradient(to right, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(218,234,0,1) 100%);filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00ffffff', endColorstr='#daea00',GradientType=1 );";
+            //        break;
+            //    case (short)Priority.Low:
+            //        _c = "background: -moz-linear-gradient(left, rgba(255,255,255,0) 0%, rgba(241,241,241,0) 80%, rgba(229,160,0,1) 100%);background: -webkit-linear-gradient(left, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(229,160,0,1) 100%);background: linear-gradient(to right, rgba(255,255,255,0) 0%,rgba(241,241,241,0) 80%,rgba(229,160,0,1) 100%);filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#00ffffff', endColorstr='#e5a000',GradientType=1 );";
+            //        break;
+            //}*@
+            @if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Integration && item.AggrigateOrDuplicationStatusID != (int)RequestDescription.ResultOfDuplication && item.AggrigateOrDuplicationStatusID != (int)RequestDescription.IntegrationRequest)
+            {
+
+                @*<tr id="@Hash.GetHashString(item.RequestID.ToString())" style="@(item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication ? "opacity: .5" : "")" class="@((item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication)||item.Cancellation!=null ||item.CancelCheque!=null ? "mdc-bg-grey-300" : "")@(item.ChildList != null && item.ChildList.Count != 0 && item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegration ? "mdc-bg-green-200" : "")">*@
+            <tr class="ctr" id="@Hash.GetHashString(item.RequestID.ToString())" style="@( item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication ? "opacity: .5" : "")" class="@(( item.AggrigateOrDuplicationStatusID ==(int)RequestDescription.Duplication)||item.Cancellation!=null ||item.CancelCheque!=null ? "mdc-bg-grey-300" : "")@( item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegration ? "mdc-bg-green-200" : "")">
+                @*<td style="@_c min-width: 15px"> *@
+                <td class="text-center">
+
+                    @{i++;}
+                    @i
+
+                </td>
+                <td class="text-right">
+                    @if (admin || manager)
+                    {
+
+                        //if (item.Cancellation == null && item.Confirmed == null && item.ChildList != null && item.ChildList.Count != 0 && item.Pay_TypeDetailID_source != null)
+                        if (item.Cancellation == null && item.Confirmed == null && item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegrationRequest && item.Source_PaymentValue != null)
+                        {
+                            if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                            {
+                                if (admin || manager || AcceptRequestPayment)
+                                {
+                                    <div class="checkbox" style="display: inline-block">
+
+                                        <label style="padding: 0">
+                                            <input type="checkbox" class="dataprop" value="@item.RequestID" />
+                                        </label>
+                                    </div>
+                                }
+                            }
+                        }
+                        else if (item.Cancellation == null && item.Confirmed == null && item.Source_PaymentValue != null && item.Unique_Account_No != "0")
+                        {
+                            if (admin || manager || AcceptRequestPayment)
+                            {
+                                <div class="checkbox" title="@Resources.ConfirmRequest" style="display: inline-block">
+                                    <label style="padding: 0">
+                                        <input type="checkbox" class="dataprop" value="@item.RequestID" />
+                                    </label>
+                                </div>
+                            }
+                        }
+                        else if (item.Cancellation == null && item.Confirmed == null && item.Unique_Account_No == "0")
+                        {
+                            @Html.IActionLink("", "ShowDuplication", "Request", new { area = "Payment", requestId = item.RequestID, pageIndex = Model.PageIndex }, new { title = Resources.Duplication, @class = "btn btn-material-grey-600 btn-xs" }, "zmdi zmdi-hc-lg zmdi-plus-circle-o-duplicate")
+
+                        }
+                        else if (item.Source_PaymentValue == null && item.Confirmed == null && item.ConfirmPayment == null && item.Paid == null && item.Delivered == null)
+                        {
+                            if (related)
+                            {
+                                <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                            }
+                            else
+                            {
+                                @Html.IActionLink("", "Edit", "request", new { area = "payment", requestId = item.RequestID, pageIndex = Model.PageIndex }, new { @title = Resources.PaymentIsNotRegistered, @class = "btn btn-material-light-blue-A700 btn-xs" }, "zmdi zmdi-hc-lg zmdi-edit")
+
+                            }
+
+                        }
+   
+                    }
+                    @*@if (item.ChildList != null && item.ChildList.Count != 0)*@
+                    @if (item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegrationRequest)
+                    {
+                        @*<button type="button" class="showSubRequest" rel></button>*@
+                        @*<a style="display: inline-block" class="show_hide btn btn-xs btn-link" rel=".@rel"><i class="zmdi zmdi-chevron-left zmdi-hc-3x"></i></a>*@
+                        @Ajax.ActionLink(">>", "ResultOfIntegrationRequest", "Request", new { area = "Payment", requestId = item.RequestID}, new AjaxOptions
+                   {
+                       UpdateTargetId = rel,
+                       InsertionMode = InsertionMode.Replace,
+                       OnSuccess = "$('#"+rel+"').show()"
+                   },new { @class= "show_hide btn btn-xs btn-link ", rel=rel})
+                        @*@Ajax.IActionLink("", "ResultOfIntegrationRequest", "Request", new { area = "Payment", requestId = item.RequestID }, new AjaxOptions
+            {
+                UpdateTargetId = rel,
+                InsertionMode = InsertionMode.Replace,
+                OnSuccess = "$('#" + rel + "').show()"
+            }, new { @class = "show_hide btn btn-xs btn-link ", rel = rel }, "zmdizmdi-chevron-leftzmdi-hc-3x")*@
+
+                        @*@Ajax.ImageActionLink("","", "RequestPayment", "Request", new { area = "Payment", requestId = item.RequestID, Type = 0 }, new AjaxOptions
+            {
+                OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+            }, null,null)*@
+                    }
+                </td>
+
+
+
+                <td data-lang-number="fa">@(item.RequestID)</td>
+                <td>
+                    <span data-lang-number="fa">
+                        @if (!string.IsNullOrEmpty(item.RequestDate))
+                        {
+                            @(item.RequestDate.Substring(0, 4) + "/" + item.RequestDate.Substring(4, 2) + "/" + item.RequestDate.Substring(6, 2))
+                        }
+                    </span>
+                </td>
+                <td>
+                    <b data-lang-number="fa" style="font-size: 15px" class="mdc-text-light-blue-900">
+                        @if (item.PayAmount == 0)
+                        {
+                            @Math.Truncate(item.ExchangeAmount.Value).ToString("#,##0")
+
+                        }
+                        else
+                        {
+                            @Math.Truncate(item.PayAmount).ToString("#,##0")
+                        }
+
+                    </b>
+                </td>
+
+                <td>
+                    @(item.Account_Name)
+                </td>
+
+                @*<td>
+            @switch (item.Priority)
+            {
+                case (short)Priority.High:
+                    <b class='mdc-text-green-700'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))</b>
+                    break;
+                case (short)Priority.Normal:
+                    <b class='mdc-text-lime-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))</b>
+                    break;
+                case (short)Priority.Low:
+                    <b class='mdc-text-amber-600'>@TreasuryEnums.GetTitleFromResource("Priority", Enum.GetName(typeof(Priority), item.Priority))</b>
+                    break;
+            }
+        </td>*@
+                <td>
+
+                    @if (item.Cancellation != null)
+                    {
+                        @Resources.Cancel
+                    }
+                    else if (item.CancelCheque != null)
+                    {
+                        @Resources.CancelCheque
+                    }
+                    else if (item.AccVoucherNo != null)
+                    {
+                        <span>شماره سند : @(item.AccVoucherNo)</span>
+                    }
+                    else if (item.Paid != null)
+                    {
+                        @Resources.Paid
+                    }
+                    else if (item.Delivered != null)
+                    {
+                        @Resources.Delivered
+                    }
+                    else if (item.mojavezeEmza == true)
+                    {
+                        <span> مجوز امضا</span>
+                    }
+                    else if (item.ChequeElements_PrintLayout != null)
+                    {
+                        <span> چاپ چک</span>
+                    }
+
+                    else if (item.ConfirmPayment != null)
+                    {
+                        @Resources.ConfirmPayment
+                    }
+                    else if (item.Confirmed != null)
+                    {
+                        @Resources.Confirm
+                    }
+                    else if (item.Unknown != null)
+                    {
+                        <text>@Resources.Unknown</text>
+                    }
+                </td>
+                <td>
+                    <span data-lang-number="fa">
+                        @if (!string.IsNullOrEmpty(item.DueDate))
+                        {
+                            @(item.DueDate.Substring(0, 4) + "/" + item.DueDate.Substring(4, 2) + "/" + item.DueDate.Substring(6, 2))
+                        }
+                    </span>
+                </td>
+                <td>
+                    <b>
+
+                        @{
+                            var Behalf = item.BehalfDescription;
+                            if (Behalf.Count() >= 15)
+                            {
+                                @(Behalf.Substring(0, 15).Substring(0, 15) + "...")
+                            }
+                            else
+                            {
+                                @(Behalf)
+                            }
+
+                        }
+                    </b>
+                </td>
+                @*<td>
+            @if (item.AggrigateOrDuplicationStatusID != null)
+        {
+                @TreasuryEnums.GetTitleFromResource("AggrigateOrDuplicationStatusID", Enum.GetName(typeof(RequestDescription), item.AggrigateOrDuplicationStatusID))
+            }
+
+        </td>*@
+                <td>
+                    @if (item.Pay_TypeDetailID_source == 1)
+                    {
+                        <text>چک روز</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 2)
+                    {
+                        <text>چک انتظامی</text>
+                    }
+
+                    else if (item.Pay_TypeDetailID_source == 4)
+                    {
+                        <text>چک مدت دار</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 5)
+                    {
+                        <text>چک نقل و انتقال</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 6)
+                    {
+                        <text>سفته</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 7)
+                    {
+                        <text>پرداخت نقدی</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 8)
+                    {
+                        <text>پرداخت کارت</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 32)
+                    {
+                        <text>پرداخت اینترنتی</text>
+                    }
+                    else if (item.Pay_TypeDetailID_source == 33)
+                    {
+                        <text>پرداخت ساتنا</text>
+                    }
+                </td>
+                <td data-lang-number="fa">@(item.ChequeNo)</td>
+                <td>
+                    @if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                    {
+                        <div class="dropdown">
+                            <button class="btn btn-material-light-blue-A700 btn-sm dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                                عملیات
+                                &nbsp;&nbsp;<span class="caret"></span>
+                            </button>
+                            <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                                <li>
+
+                                    @Ajax.ActionLink("نمایش", "RequestPayment", "Request", new { area = "Payment", requestId = item.RequestID, Type = 0 }, new AjaxOptions
+                           {
+                               OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+                           }, null)
+                                </li>
+                                @if (item.Cancellation == null)
+                                {
+                                    <li>
+                                        @Html.ActionLink("گزارش", "RequestDetails", "RequestPayment", new { Area = "Report", RequestId = item.RequestID }, null)
+                                    </li>
+                                    <li>
+                                        @Html.ActionLink("کپی", "Copy", "request", new { area = "payment", RequestID = item.RequestID, @calss = "zmdi zmdi-copy" }, null)
+                                        @*@Html.IActionLink(Resources.Copy, "Copy", "request", new { area = "payment" },null, "zmdi zmdi-hc-lg zmdi-copy")*@
+                                    </li>
+                                    if (item.Confirmed == null && item.ConfirmPayment == null && item.Paid == null && item.Delivered == null)
+                                    {
+                                        if (related)
+                                        {
+                                            <li>
+                                                <a class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</a>
+                                            </li>
+                                        }
+                                        else
+                                        {
+                                            <li>
+
+                                                @Html.ActionLink("ویرایش", "Edit", "request", new { area = "payment", requestId = item.RequestID, pageIndex = Model.PageIndex }, null)
+                                            </li>
+
+                                        }
+
+                                    }
+
+                                    if (item.AggrigateOrDuplicationStatusID != (int)RequestDescription.Duplication)
+                                    {
+                                        <li>
+                                            @Ajax.ActionLink("ضمیمه", "List", "Attachment", new { area = "Payment", Id = item.RequestID, TableName = "Request_Payment" }, new AjaxOptions
+                               {
+                                   InsertionMode = InsertionMode.Replace,
+                                   OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+                               }, null)
+                                        </li>
+                                        if (item.Paid == null && item.Delivered == null && item.Confirmed == null)
+                                        {
+                                            <li>
+                                                @Html.ActionLink("حذف", "Delete", "Request", new { Area = "Payment", requestIds = item.RequestID }, new { @class = "delete" })
+                                            </li>
+                                        }
+                                        else if(item.Paid == null && item.Delivered == null && item.ConfirmPayment == null && item.Confirmed != null)
+                                        {
+                                            <li>
+                                                @Ajax.ActionLink("لغو تایید درخواست", "ReturnConfirmation", "Request", new { area = "Payment", requestId = item.RequestID }, new AjaxOptions
+                                           {
+                                               HttpMethod = "Get",
+                                               Confirm = "آیا از برگشت تایید پرداخت اطمینان دارید؟",
+                                               OnSuccess = "successMessage(data);location.reload();",
+
+                                           }, new { title = "ثبت برداشت برای درخواست شماره: " + item.RequestID })
+                                            </li>
+                                        }
+
+                                        @*if (item.Pay_TypeDetailID_source != null && item.Paid == null && item.Confirmed == null && item.ConfirmPayment == null && item.Delivered == null)
+                                        {
+                                            <li>
+                                                @Html.ActionLink("تکثیر", "ShowDuplication", "Request", new { area = "Payment", requestId = item.RequestID, pageIndex = Model.PageIndex }, null)
+                                            </li>
+
+                                        }*@
+                                        @*if (item.Confirmed != null && item.ConfirmPayment != null && item.Paid == null && item.Delivered == null)
+                {
+                    <li>
+                        @Html.ActionLink(Resources.Cancel, "CancelRequest", "Request", new { Area = "Payment", RequestId = item.RequestID }, new { @class = "CancelRequest" })
+                    </li>
+                }*@
+
+                                    }
+                                }
+                            </ul>
+                        </div>
+                    }
+                    @*@if (item.ChildList != null && item.ChildList.Count != 0)*@
+                    @if (item.AggrigateOrDuplicationStatusID == (int)RequestDescription.ResultOfIntegrationRequest)
+                    {
+                        if (item.AggrigateOrDuplicationStatusID == (int)RequestDescription.Duplication)
+                        {
+
+                            @Ajax.IActionLink("", "RequestPayment", "Request", new { area = "Payment", requestId = item.RequestID, Type = 0 }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Show + " " + Resources.RequestPayment + "', 'md');"
+               }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+                            @Html.IActionLink("", "ShowDuplication", "Request", new { area = "Payment", requestId = item.RequestID, pageIndex = Model.PageIndex }, new { title = Resources.Duplication, @class = "btn btn-material-grey-600 btn-xs" }, "zmdi zmdi-hc-lg zmdi-plus-circle-o-duplicate")
+
+                        }
+                    }
+                    else
+                    {
+                        <text>&nbsp;</text>
+                    }
+                </td>
+            </tr>
+                @*<cs ></cs>*@
+                @*<tr  style="display: none"></tr>*@
+
+
+            }
+
+
+        </tbody>
+        <tbody id="@rel"></tbody>
+
+    }
+
+</table>
+
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = "Result",
+    InsertionMode = InsertionMode.Replace,
+    HttpMethod = "post",
+    OnSuccess = "reLoadListSuccess()"
+})
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = "Result",
+    HttpMethod = "post",
+    InsertionMode = InsertionMode.Replace,
+    OnSuccess = "reLoadListSuccess()"
+})
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "Request", Model,
+new AjaxOptions
+{
+    UpdateTargetId = "Result",
+    HttpMethod = "post",
+    InsertionMode = InsertionMode.Replace,
+    OnSuccess = "reLoadListSuccess()"
+})
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+<script>
+        function reLoadListSuccess() {
+            $("#_delPrdS").remove();
+            $("#_disPrdS").remove();
+            document.getElementById("progroup").setAttribute("data-has-content", "empty");
+        }
+        var CancelBtn = document.getElementsByClassName("CancelRequest");
+
+
+        for (var i = 0; i < CancelBtn.length; i++) {
+            CancelBtn[i].addEventListener("click", CancelItem);
+        }
+        function CancelItem(e) {
+            e.preventDefault();
+            var item = this;
+            alertify.confirm("", '@Resources.AreYouSure',
+                       function () {
+                           var xmlhttp = new XMLHttpRequest();
+                           xmlhttp.onreadystatechange = function () {
+                               if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                                   var data = JSON.parse(xmlhttp.responseText);
+                                   if (data.result == true) {
+                                       alertify.success(data.message);
+                                       updateTable();
+                                   }
+                                   else {
+                                       alertify.error(data.message);
+                                   }
+                               }
+                           };
+                           xmlhttp.open("POST", item.href, true);
+                           xmlhttp.send();
+                       },
+      function () {
+      }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+        }
+
+
+        var deleteBtn = document.getElementsByClassName("delete");
+
+        for (var i = 0; i < deleteBtn.length; i++) {
+            deleteBtn[i].addEventListener("click", deleteItem);
+        }
+        function deleteItem(e) {
+            e.preventDefault();
+            var item = this;
+            alertify.confirm("", '@Resources.AreYouSure',
+                       function () {
+                           var xmlhttp = new XMLHttpRequest();
+                           xmlhttp.onreadystatechange = function () {
+                               if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                                   var data = JSON.parse(xmlhttp.responseText);
+                                   if (data.result == true) {
+                                       item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                           alertify.success(data.message);
+                                       })
+                                   }
+                                   else {
+                                       alertify.error(data.message);
+                                   }
+                               }
+                           };
+                           xmlhttp.open("POST", item.href, true);
+                           xmlhttp.send();
+                       },
+      function () {
+      }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+        }
+        $(document).ready(function () {
+            //$('.show_hide').showHide({
+            //    speed: 200,  // speed you want the toggle to happen
+            //    easing: '',  // the animation effect you want. Remove this line if you dont want an effect and if you haven't included jQuery UI
+            //    changeText: 1, // if you dont want the button text to change, set this to 0
+            //    showText: '<i class="zmdi zmdi-chevron-left zmdi-hc-3x"></i>',// the button text to show when a div is closed
+            //    hideText: '<i class="zmdi zmdi-chevron-down zmdi-hc-3x"></i>' // the button text to show when a div is open
+            //});
+        });
+</script>
+<style>
+    .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
+        /*padding: 0;
+            line-height: 0;*/
+        vertical-align: middle;
+        border-top: 1px solid #ddd;
+    }
+    .ctr td {
+        vertical-align: middle;
+        border-top: 1px solid #ddd;
+    }
+</style>

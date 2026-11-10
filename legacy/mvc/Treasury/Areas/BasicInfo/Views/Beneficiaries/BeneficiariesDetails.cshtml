@@ -1,0 +1,29 @@
+﻿@model CSD.Treasury.Service.BeneficiaryService.Beneficiary
+
+<div>
+    <dl class="dl-horizontal">
+        <dt>
+            @Resources.LegalAccountName
+        </dt>      
+        <dd>
+            @Html.DisplayFor(model => model.LegalAccountName)
+        </dd>
+
+    </dl>
+</div>
+<div class="panel-heading">تلفن</div>
+<div class="panel-body mdc-bg-grey-50">
+    @Html.Action("TelIndex", "Beneficiaries", new { area = "BasicInfo", ID = Model.BeneficiarID })
+</div>
+<script>
+    function updateTable(Id) {
+        var url = '@(Url.Action("ListTel", "Beneficiaries", new { area = "BasicInfo" }))' + '/?Id=' + Id;;
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#telList").html(data);
+            }
+        });
+    }
+
+</script>

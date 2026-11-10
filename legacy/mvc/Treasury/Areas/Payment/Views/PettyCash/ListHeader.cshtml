@@ -1,0 +1,174 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelPettyCash
+@using CSD.Treasury.MVCHelpers
+@{
+    ViewBag.Title = "ListHeader";
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+
+}
+
+<div class="table-responsive">
+    <table class="table">
+        <thead>
+            <tr class="mdc-bg-grey-100">
+                <th>
+                    @Resources.Unique_Account_No
+                </th>
+
+                <th>
+                    @Resources.PettyCashName
+                </th>
+                <th>
+                    @Resources.UserName
+                </th>
+
+                <th>
+                    @Resources.account_code
+                </th>
+
+                <th>
+                    @Resources.Price
+                </th>
+                <th>@Resources.PayCeiling</th>
+                <th>@Resources.Settle_Limit </th>
+                <th></th>
+
+            </tr>
+        </thead>
+        <tbody>
+
+            @foreach (var group in Model.List.GroupBy(d => d.PettyCashID))
+            {
+                if (group.FirstOrDefault().PettyCashID != 0)
+                {
+                    var a = @Utility.GetPaettyCash(group.FirstOrDefault().PettyCashID);
+                <thead>
+
+                    @*<th colspan="11"><h4>@a.PettyCashName /@Utility.GetUniqueAccount(a.Unique_Account_No)/@a.Unique_Account_No</h4></th>*@
+                    <tr class="mdc-bg-grey-50">
+
+                        <td>
+                            @Utility.GetUniqueAccount(a.Unique_Account_No)
+                        </td>
+                        <td>
+                            @(a.PettyCashName)
+                            @*@Utility.GetPaettyCashById(item.PettyCashID)/@PettyCash.PettyCashName*@
+                        </td>
+
+                        <td>
+                            @Utility.GetUserName(a.UserID)
+                        </td>
+                        <td>
+                            @if (a.Account_No != null)
+                    {
+                                @Utility.Getaccounts(a.Account_No)
+                            }
+                        </td>
+
+                        <td>
+                            @(a.PettyCash_Ammount)
+                        </td>
+                        <td>
+                            @(a.PayCeiling)
+                        </td>
+                        <td>
+                            @(a.Settle_Limit)
+                        </td>
+                        <td>
+                            @Ajax.ActionLink(Resources.Details, "GetHeaders", "PettyCash", new { PettyCashID = a.PettyCashID }, new AjaxOptions { HttpMethod = "Get", UpdateTargetId = "ShowDetails" })
+                        </td>
+                    </tr>
+
+
+                </thead>
+                }
+
+            }
+
+        </table>
+    </div>
+    <hr />
+    <div class="container-fluid">
+        <div class="clearfix">
+            <div class="pull-right">
+                <span class="pagination pagination-total">
+                    (@Resources.Total : @Model.TotalItemCount)
+                    @Resources.Page @(ix + 1)
+                    @Resources.From @Model.TotalPageCount
+                </span>
+            </div>
+            <div class="pull-left">
+                <nav class="text-center">
+                    <ul class="pagination  pagination-sm">
+                        @{
+                            var start = ix;
+                            if (start > 0)
+                            {
+                                int c = 0;
+                                while (start > 0 && c < 4)
+                                {
+                                    c++;
+                                    start--;
+                                }
+                            }
+                            if (ix != 0)
+                            {
+                                Model.PageIndex = 0;
+                        <li>
+                            @Ajax.ActionLink("<<", "ListHeader", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                        </li>
+                            }
+                            for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                            {
+                                if (ix != j)
+                                {
+                                    Model.PageIndex = j;
+                        <li>
+                            @Ajax.ActionLink((j + 1).ToString(), "ListHeader", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                        </li>
+                                }
+                                else
+                                {
+                        <li class="active">
+                            <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                        </li>
+                                }
+                            }
+                            if (start + 9 < Model.TotalPageCount)
+                            {
+                        <li>
+                            @Ajax.ActionLink(">>", "ListHeader", "PettyCash", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                        </li>
+                            }
+                        }
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+    </div>
+    <hr />
+    <div id="ShowDetails"></div>

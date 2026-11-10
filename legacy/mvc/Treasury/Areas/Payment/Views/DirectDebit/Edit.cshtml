@@ -1,0 +1,459 @@
+﻿@model CSD.Treasury.DataModel.Request_Payment
+@using CSD.Treasury.Common.Enumeration;
+@{
+    ViewBag.Title = Resources.Edit + "" + Resources.DirectDebit;
+
+}
+@section PageHeader{
+    @Resources.DirectDebit
+}
+
+@using (Ajax.BeginForm("Edit", "DirectDebit", new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);closeModal('lg:not(.xlg)');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+    @Html.Hidden("RequestCreatedTime", DateTime.Now.ToString("h:mm"))
+    @Html.HiddenFor(model => model.RequestDate)
+    @Html.HiddenFor(model => model.RequestID)
+    <label>
+        تاریخ ثبت: <span class="moment-date mdc-text-grey-600" data-lang-number="fa">@Model.RequestDate</span>
+    </label>
+
+    <div class="clearfix">
+        <div class="form-group">
+            <div class="clearfix">
+             
+                <div class="col-sm-4">
+                    <label class="control-label" for="BehalfID">@Resources.Bank</label>
+                    @Html.DropDownListFor(d=>d.Source_PaymentValue, new SelectList(ViewBag.BankLS, "BankID", "Bank_AccountNumber", ViewBag.bankid), new { data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.Source_PaymentValue)
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="clearfix">
+                <div class="col-sm-4">
+                    <label class="control-label" for="BehalfGropId">@Resources.BehalfGroupID</label>
+                    @Html.DropDownList("BehalfGropId", new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription", ViewBag.BehalfGroupId), new { data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessage("BehalfGropId")
+                </div>
+                <div class="col-sm-4">
+                    <label class="control-label" for="BehalfID">@Resources.Behalf</label>
+                    @Html.DropDownList("BehalfID", new SelectList(ViewBag.BehalfsLs, "BehalfID", "BehalfDescription"), new { data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.BehalfID)
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="clearfix" id="References">
+                @Html.Raw(Utility.GetReferenceTypeValue(Model.RequestID))
+            </div>
+        </div>
+        <div class="form-group">
+            <div id="RefrenceLable" class="clearfix"></div>
+        </div>
+        <hr />
+        <div class="form-group" @(Model.Unique_Account_No != null && Model.Unique_Account_No != "000000" ? "" : "hidden") id="UniqueAccount1">
+            <div class="clearfix">
+                <div class="col-sm-3">
+                    <label class="control-label" for="UniqueAccountType">@Resources.UniqueAccountType</label>
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                </div>
+                <div class="col-md-5">
+                    <label class="control-label" for="UniqueAccountType">@Resources.Unique_Account_Code / @Resources.Unique_Account_No</label>
+
+                    @if (Model.Unique_Account_No != null && Model.Unique_Account_No != "000000")
+                    {
+                        @Html.DropDownListFor(model => model.Unique_Account_No, new SelectList(ViewBag.SlectedLs, "Account_Code", "Account_Name", new { Type_Code = Model.Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control js-data-example-ajax" })
+                    }
+                    else
+                    {
+                        @Html.DropDownListFor(model => model.Main_Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                    }
+                    @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                </div>
+            </div>
+        </div>
+
+
+        <div class="form-group" @(Model.Main_Unique_Account_No != null && Model.Main_Unique_Account_No != "000000" ? "" : "hidden") id="UniqueAccount2">
+            <div class="clearfix">
+                <div class="col-sm-3">
+                    <label class="control-label" for="UniqueAccountType">@Resources.UniqueAccountType</label>
+                    @Html.DropDownList("UniqueAccountType1", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                </div>
+                <div class="col-md-5">
+                    <label class="control-label" for="UniqueAccountType">@Resources.Unique_Account_Code / @Resources.Unique_Account_No</label>
+                    @if (Model.Main_Unique_Account_No != null && Model.Main_Unique_Account_No != "000000")
+                    {
+                        @Html.DropDownListFor(model => model.Main_Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                    }
+                    else
+                    {
+                        @Html.DropDownListFor(model => model.Main_Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                    }
+                    @Html.ValidationMessageFor(model => model.Main_Unique_Account_No)
+                </div>
+            </div>
+        </div>
+
+
+        @*<div class="form-group">
+            <div class="panel-body mdc-bg-grey-100">*@
+                <div class="form-group">
+                    <div class="clearfix">
+                        @*<div class="col-sm-2">
+            <label class="control-label">@Resources.ExchangeType</label>
+            @Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeLs, "ExchangeTypeID", "ExchangeTypeDescription"), new { data_lang_number = "fa", @class = "form-control" })
+            @Html.ValidationMessageFor(model => model.ExchangeTypeID)
+        </div>
+        <div class="col-sm-3 hidden" id="ShowExchangeRate">
+            <label class="control-label">@Resources.ExchangeRate</label>
+            @Html.TextBoxFor(model => model.ExchangeRate, new { data_lang_number = "fa", @class = "form-control", type = "number" })
+            @Html.ValidationMessageFor(model => model.ExchangeRate)
+        </div>*@
+                        <div class="col-sm-3">
+                            <label class="control-label">@Resources.PayAmount</label>
+                            @Html.TextBoxFor(model => model.PayAmount, new { data_lang_number = "fa", @class = "form-control", type = "number" })
+                            @*<input data_lang_number="fa" class="form-control" type="number" value="@(Model.PayAmount)" />*@
+                            @*@Html.TextBoxFor(model => model.PayAmount, new { data_lang_number = "fa", @class = "form-control", @type = "number"})*@
+                            @Html.ValidationMessageFor(model => model.PayAmount)
+                        </div>
+                    </div>
+                </div>
+                <p id="PayAmountText" class="mdc-text-green-700"></p>
+            </div>
+        @*</div>
+    </div>*@
+    <button type="submit" class="btn btn-primary">@Resources.Save</button>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script src="@Url.Content("~/Scripts/wordifyfa.js")"></script>
+<script type="text/javascript">
+    $(function () {
+        $.material.init();
+    });
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+    $(".moment-date").text(moment(today, 'YYYY-M-D').format('jYYYY/jM/jD'));
+    $("#RequestDate").val(moment(today, 'YYYY-M-D').format('jYYYY/jMM/jDD').split('/').join(""))
+    $("#FiscalYear").val(moment(today, 'YYYY-M-D').format('jYYYY'))
+    $(".datepicker").val(moment(today, 'YYYY-M-D').format('jYYYY/jM/jD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/m/d",
+        maxDate: new Date()
+    });
+    $('.timepicker').timepicker({
+        template: false,
+        showInputs: false,
+        minuteStep: 1,
+        showMeridian: false
+    });
+    $(function () {
+        $("#PayAmountText").text(wordifyfa($("#PayAmount").val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        $("body").on("keyup", "#PayAmount", function () {
+            $("#PayAmountText").text(wordifyfa($(this).val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        });
+        $("body").on("change", "#PayAmount", function () {
+            $("#PayAmountText").text(wordifyfa($(this).val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        });
+        $("body").on("change", "#ExchangeTypeID", function () {
+            $("#PayAmountText").text(wordifyfa($("#PayAmount").val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        })
+        $("body").on("change", "#referenceTypeID", function () {
+            var txt = ""
+            if ($(this).val() != 0) {
+                var txt = $("#referenceTypeID option:selected").text();
+            }
+            $("#referenceTypeValue").parent().find(".floating-label").text("شماره " + txt);
+        })
+        $("body").on("change", "#BehalfGropId", function () {
+            $('#References').empty();
+            $('#UniqueAccount1').removeClass('hidden');
+            $('#UniqueAccount2').removeClass('hidden');
+            if ($(this).val() != "") {
+                var address = "@(Url.Action("GetBehalfs", "Request", new { Area= "Payment" }))";
+                $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                    $("#BehalfID").val($("#BehalfID option:first").val());
+                });
+
+                var BehalfGroupID = $('#BehalfGropId').val();
+
+                var url = "@(Url.Action("GetReferenceTypeByBehalfGroup", "Request", new { Area= "Payment"}))";
+                url = url + "?BehalfGroupID=" + BehalfGroupID;
+                $("#RefrenceLable").hide();
+                $("#RefrenceLable").load(url, { id: $(this).val() }, function () { $("#RefrenceLable").show() });
+                $.ajax({
+                    type: "Post",
+                    url: "/Payment/Request/HasUniqueAccount",
+                    data: { BehalfGroupID: $('#BehalfGropId').val() },
+
+                    success: function (data, status) {
+
+                        if (data[0]) {
+                            $('#UniqueAccount1').removeClass('hidden');
+                        }
+                        else {
+                            $('#UniqueAccount1').addClass('hidden');
+                        }
+                        if (data[1]) {
+                            $('#UniqueAccount2').removeClass('hidden');
+                        }
+                        else {
+                            $('#UniqueAccount2').addClass('hidden');
+                        }
+                    }
+                });
+            }
+            else {
+                $("#BehalfID").html("");
+            }
+        })
+        $("body").on("change", "#Pay_TypeDetailID_source", function () {
+            var address = "@(Url.Action("GetSource", "Request", new { Area= "Payment" }))";
+            var address1 = "@(Url.Action("GetDestination", "Request", new { Area= "Payment" }))";
+            var address2 = "@(Url.Action("CheckDueDate", "Request", new { Area= "Payment" }))";
+
+            if ($('#Pay_TypeDetailID_source').val() != 0) {
+                $("#Source_TypeID").load(address, { id: $(this).val() }, function (data) {
+                    if (data.length < 10) { $("#Source_TypeID").parent().parent().parent().hide(); $("#Source_PaymentValue").parent().parent().parent().hide(); }
+                    else {
+                        $("#Source_TypeID").parent().parent().parent().show();
+                        $("#Source_TypeID").removeClass("empty");
+                        $("#Source_PaymentValue").parent().parent().parent().show();
+                        $("#Source_PaymentValue").removeClass("empty");
+                        $("#Source_TypeID").val($("#Source_TypeID option:first").val());
+                        //Fill To
+                        if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.BankCheque)') {
+                            var address = "@(Url.Action("GetBanks", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.Cash)') {
+                            var address = "@(Url.Action("GetCashDesk", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.CardBank)') {
+                            var address = "@(Url.Action("GetBankCard", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                    }
+                });
+                $("#Destination_TypesID").load(address1, { id: $(this).val() }, function (data) {
+                    if (data.length < 10) { $("#Destination_TypesID").parent().parent().parent().hide(); $("#Destination_PaymentValue").parent().parent().parent().hide(); }
+                    else {
+                        $("#Destination_TypesID").parent().parent().parent().show();
+                        $("#Destination_TypesID").removeClass("empty");
+                        $("#Destination_PaymentValue").parent().parent().parent().show();
+                        $("#Destination_PaymentValue").removeClass("empty");
+                        $("#Destination_TypesID").val($("#Destination_TypesID option:first").val());
+                        //Fill To
+                        if ($('#Destination_TypesID').val() == '@((int)Source_DestinationType.BankCheque)') {
+                            var address = "@(Url.Action("GetBanks", "Request", new { Area= "Payment" }))";
+                            $("#Destination_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Destination_PaymentValue").val($("#Destination_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Destination_TypesID').val() == '@((int)Source_DestinationType.Cash)') {
+                            var address = "@(Url.Action("GetCashDesk", "Request", new { Area= "Payment" }))";
+                            $("#Destination_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Destination_PaymentValue").val($("#Destination_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.CardBank)') {
+                            var address = "@(Url.Action("GetBankCard", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                    }
+                });
+
+            }
+            else {
+                $("#Source_TypeID").text("---");
+                $("#Source_TypeID").val('0');
+                $("#Destination_TypesID").text("---");
+                $("#Destination_TypesID").val('0');
+            }
+        })
+        var pageSize = 20;
+        $("#UniqueAccountType").change(function () {
+            $('#Unique_Account_No').val('');
+            var typeid = $(this).val();
+            $("#Unique_Account_No").select2({
+                dir: "rtl",
+                containerCssClass: "form-control",
+                ajax: {
+                    url: "/Payment/Request/UniqueAccountLs",
+                    dataType: 'json',
+                    delay: 250,
+
+                    data: function (params) {
+                        params.page = params.page || 1;
+                        return {
+                            pageSize: pageSize,
+                            page: params.page,
+                            pageLimit: 10,
+                            typeid: typeid,
+                            q: params.term, // search term
+                        };
+                    },
+                    processResults: function (data, params) {
+
+                        params.page = params.page || 1;
+                        return {
+                            results: data.query,
+                            pagination: {
+                                more: (params.page * pageSize < data.total_count)
+                            }
+                        };
+                    },
+
+                    cache: true
+                },
+                escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+                minimumInputLength: 1,
+                //templateResult: formatRepo, // omitted for brevity, see the source of this page
+                //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+            });
+        });
+        $("#UniqueAccountType1").change(function () {
+            $('#Main_Unique_Account_No').val('');
+            var typeid = $(this).val();
+            $("#Main_Unique_Account_No").select2({
+                dir: "rtl",
+                containerCssClass: "form-control",
+                ajax: {
+                    url: "/Payment/Request/UniqueAccountLs",
+                    dataType: 'json',
+                    delay: 250,
+
+                    data: function (params) {
+                        params.page = params.page || 1;
+                        return {
+                            pageSize: pageSize,
+                            page: params.page,
+                            pageLimit: 10,
+                            typeid: typeid,
+                            q: params.term, // search term
+                        };
+                    },
+                    processResults: function (data, params) {
+
+                        params.page = params.page || 1;
+                        return {
+                            results: data.query,
+                            pagination: {
+                                more: (params.page * pageSize < data.total_count)
+                            }
+                        };
+                    },
+
+                    cache: true
+                },
+                escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+                minimumInputLength: 1,
+                //templateResult: formatRepo, // omitted for brevity, see the source of this page
+                //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+            });
+        });
+
+        @*$("body").on("change", ".UniqueAccountType", function () {
+            var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+            var _this = $(this);
+            if (_this.val() != 0) {
+                $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") }, function () {
+                    $("input[name=" + _this.attr("data-code-att") + "]").focus();
+                    $("input[name=" + _this.attr("data-code-att") + "]").dropdown('toggle');
+                    $("input[name=" + _this.attr("data-code-att") + "]").parents(".dropdown").addClass("open");
+                    $("input[name=" + _this.attr("data-code-att") + "]").on({
+                        "click": function () { $("input[name=" + _this.attr("data-code-att") + "]").parents(".dropdown").addClass("open"); }
+                    });
+
+                });
+            }
+            else {
+                $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") }).ajaxComplete(function () {
+                    alert("a");
+                    $("input[name=" + $(this).attr("data-code-att") + "]").focus();
+                });
+            }
+        });
+        var formData = new FormData(document.getElementsByTagName("form")[0]);
+        var lookup = document.querySelectorAll("[lookup]");
+        for (var i = 0; i < lookup.length; i++) {
+            lookup[i].onkeyup = function () {
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.onreadystatechange = function () {
+                    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                        document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                    }
+                }
+                var type = document.getElementById("UniqueAccountType");
+                var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                    ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                    ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+                xmlhttp.open("GET",
+                    address
+                    , true);
+                xmlhttp.send();
+            }
+        }
+        function getLookupDataItem(e) {
+            document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content").trim();
+            for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+                var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+                elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+            }
+        }
+        $('.dropdown.keep-open').on({
+            "click": function () { this.classList.add("open"); this.closable = true; },
+            "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+        });*@
+
+    })
+
+
+
+    function findAncestor(el, cls) {
+        while ((el = el.parentElement) && !el.classList.contains(cls));
+        return el;
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");
+        }
+    }
+    //$('.dropdown.keep-open').on({
+    //    "click": function () { this.classList.add("open"); this.closable = true; },
+    //    "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    //});
+    $('#ExchangeTypeID').change(function () {
+        if ($('#ExchangeTypeID').val() == 2) {
+            $('#ShowExchangeRate').removeClass("hidden");
+        }
+        else {
+            $('#ShowExchangeRate').addClass("hidden");
+        }
+    });
+</script>
+
+

@@ -1,0 +1,76 @@
+﻿@model CSD.Treasury.DataModel.Request_Payment
+@using System.Configuration
+
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+
+@using (Ajax.BeginForm("Confirmation", "Request", new { area = "Payment", requestIds = Model.RequestID, Status = 3, DueDate = true, id = "BardastDateForm"  }, new AjaxOptions
+{
+    HttpMethod = "Get",
+    OnSuccess = "successMessage(data);reload();",
+}))
+{
+<div>
+    <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">مبلغ برداشت:  @Math.Truncate(Model.PayAmount).ToString("N0")</label></div>
+    <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">تاریخ سررسید:@(Utility.DateStructure(Model.DueDate))</label></div>
+    <div class="form-group"><label class="control-label" style="padding: 0; margin: 0">شماره چک: @Model.ChequeNo</label></div>
+    <div class="form-group">
+        <label class="control-label" style="padding: 0; margin: 0">تاریخ برداشت: </label>
+        <div style="max-width: 300px">
+            <input class="form-control datepicker" name="BardashtDate" id="BardashtDate" data-val="true" data-val-number="The field BackUpPrice must be a number." data-val-required="The BackUpPrice field is required." autocomplete="off" readonly="readonly" />
+        </div>
+    </div>
+
+    @if (ConfigurationManager.AppSettings["CompletePayBackup"] == "True" && Utility.HasBackUp(int.Parse(Model.Source_PaymentValue)) != 0)
+    {
+
+        <div class="form-group">
+            <label class="control-label" style="padding: 0; margin: 0">مبلغ برداشت ازپشتیبان: </label>
+            <div style="max-width: 300px">
+
+                <input class="form-control" data-lang-number="fa" data-val="true" data-val-number="The field BackUpPrice must be a number." data-val-required="The BackUpPrice field is required." id="BackUpPrice" name="BackUpPrice" type="number" value="@((Int64)Model.EquivalencePrice)">
+                @*@Html.TextBox("BackUpPrice",Model.EquivalencePrice.Value, new { @class="form-control fa"})*@
+
+            </div>
+        </div>
+    }
+    @*@if (ConfigurationManager.AppSettings["CompletePayBackup"] == "True")
+        {
+            <div class="form-group">
+                <label class="control-label" style="padding: 0; margin: 0">برداشت ازحساب پشتیبان:</label>
+                <input type="radio" name="PayBackUp"    value="PayBackUp"/>
+            </div>
+        }*@
+
+    <button id="btnSubmit" type="submit" class="btn btn-primary" onsubmit="$(this).prop('disabled', true);">ذخیره</button>
+
+</div>
+}
+
+<script>
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date(),
+        minDate: new Date('@ViewBag.MinDate')
+    });
+    function reload() {
+        setTimeout(function () {
+            location.reload();
+        }, 1000)
+    }
+
+    //$('#BardastDateForm').submit(function () {
+    //    $('#btnSubmit').prop('disabled', true);
+    //    $(this).find(':input[type=submit]').prop('disabled', true);
+    //    if ($("#BardastDateForm").valid()) {
+    //        $('#btnSubmit').attr('disabled', true);
+    //    }
+    //});
+
+</script>

@@ -1,0 +1,48 @@
+﻿@{
+    ViewBag.Title = Resources.ReferenceType;
+}
+@section PageHeader{
+    @Resources.List @Resources.ReferenceType
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    @Ajax.ActionLink(Resources.Create, "Create", "RefrenceType", new { Area = "BasicInfo" }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + @Resources.Create + " " + @Resources.ReferenceType + "', 'md')"
+               }, new { @class = "btn btn-material-green-600 btn-sm" })
+                </div>
+                <div class="pull-left">
+                    @if (ViewBag.status == "menu")
+                    {
+                        @Html.ActionLink(Resources.Return, "Index", "BehalfGroup", new { Area = "BasicInfo" }, new { @class = "btn btn-default btn-sm" })
+                    }
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "RefrenceType", new { Area = "BasicInfo" })
+    </div>
+}
+
+<script type="text/javascript">
+    function updateTable() {
+        var url = '@(Url.Action("List", "RefrenceType", new { area = "BasicInfo" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+</script>
+

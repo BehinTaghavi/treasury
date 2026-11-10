@@ -1,0 +1,389 @@
+﻿
+@model CSD.Treasury.UI.Models.SearchModelRequestPayment
+@{
+    var Title = "";
+    if (Model.Status == "ChequeReadyToDelivery")
+    {
+        Title = Resources.ChequeReadyToDelivery;
+    }
+    else if (Model.Status == "DuringPayment")
+    {
+        Title = Resources.DuringPayment;
+    }
+    else if (Model.Status == "DeliveredPayment")
+    {
+        Title = Resources.DeliveredRequest;
+    }
+    else if (Model.Status == "CovertCheque")
+    {
+        Title = Resources.CovertCheque;
+    }
+    else if (Model.Status == "DeleiverdLasheCheque")
+    {
+        Title = Resources.DeleiverdLasheCheque;
+    }
+    else if (Model.Status == "GetCash")
+    {
+        Title = "پرداخت نقدی";
+    }
+    else if (Model.Status == "ATM")
+    {
+        Title = Resources.Paid + " " + Resources.ATM;
+    }
+    else if (Model.Status == "InternetPay")
+    {
+        Title = Resources.Paid + " " + Resources.Internet;
+    }
+    else if (Model.Status == "Satna")
+    {
+        Title = Resources.Paid + " " + Resources.Satna;
+    }
+    else if (Model.Status == "safte")
+    {
+        Title = "سفته";
+    }
+    ViewBag.Title = Resources.List + " " + Title;
+
+}
+
+@section PageHeader{
+
+    <div class="clearfix">
+        <div class="pull-right">@(ViewBag.Title)</div>
+        <div class="pull-left">
+            @if (Model.Status == "DuringPayment")
+            {
+                @Html.ActionLink(Resources.Aggregation + " " + Resources.RequestPayment, "AggregationRequest", "Request", new { area = "Payment" }, new { @class = "btn btn-material-light-blue-A700 btn-sm", style = "margin:0;" })
+            }
+        </div>
+    </div>
+
+
+}
+@section btnToolbar{
+
+
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    <div id="progroup" data-has-content="empty">
+                    </div>
+                </div>
+                <div class="col-sm-12">
+                    @using (Ajax.BeginForm("List", "Pay", new { Area = "Payment" },
+new AjaxOptions()
+{
+UpdateTargetId = "Result",
+InsertionMode = InsertionMode.Replace,
+}, new { id = "SearchForm" }))
+                    {
+                        @Html.HiddenFor(d => d.Unique_Account_No)
+                        @Html.HiddenFor(d => d.Status)
+                        <div class="clearfix">
+                            <div class="col-sm-3">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.FiscalYear</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.TextBoxFor(model => model.FiscalYear, new { @type = "number", data_lang_number = "fa", @class = "form-control", @placeholder = Resources.FiscalYear })
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDate" class="control-label">@Resources.DueDate</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.DueDate, new { @class = "form-control from Date datepicker",@dir="ltr", @placeholder = "____/__/__" })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.RequestId</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.TextBoxFor(model => model.RequsetId, new { @type = "number", data_lang_number = "fa", @class = "form-control from", @placeholder = Resources.RequestId })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.ChequeNo</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.TextBoxFor(model => model.ChequeNo, new { @type = "number", data_lang_number = "fa", @class = "form-control from", @placeholder = Resources.ChequeNo })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.Bank</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.DropDownList("BasicBank", new SelectList(ViewBag.Banks, "BasicBankId", "BasicBankDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Bank })
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.Branch</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.DropDownListFor(model => model.BankId, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber })
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            @if (Model.Status != "GetCash" || Model.Status != "ATM" || Model.Status != "InternetPay" || Model.Status != "Satna")
+                            {
+                                @*<div class="clearfix">*@
+                                <div class="col-sm-3">
+                                    <div style="padding: 6px 0;">
+                                        <div class="clearfix">
+                                            <div class="col-xs-6">
+                                                <label for="PayType" class="control-label">@Resources.PayType</label>
+                                            </div>
+                                            <div class="col-xs-6">
+
+                                                <select id="payTypeLs" name="payTypeLs" class="form-control floating-label" multiple placeholder="">
+                                                    @foreach (var item in (List<CSD.Treasury.Service.Receipt_Pay_TypeDetailService.Receipt_Pay_TypeDetail>)ViewBag.Receipt_Pay_TypeDetailLs)
+                                                    {
+                                                        <option value="@item.Receipt_Pay_TypeDetailID">
+                                                            @item.Receipt_Pay_TypeDetailDescription
+                                                        </option>
+                                                    }
+                                                </select>
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                @*</div>*@
+                            }
+                            <div class="col-sm-3">
+                                <div>
+                                    <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                                </div>
+                            </div>
+                        </div>
+
+
+
+                    }
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Pay", new { Area = "Payment", Model })
+    </div>
+}
+
+<script>
+    $(document).ready(function () {
+        jQuery(function ($) {
+            $(".Date").mask("9999/99/99");
+        });
+          $('#BasicBank').change(function () {
+        var address = "@(Url.Action("GetBanks", "GardesheHesab", new { Area = "Report" }))";
+        $("#BankId").load(address, { BasicBankID: $('#BasicBank').val() }, function (data) {
+            $("#BankId").val($("#BankId option:first").val());
+        });
+
+    });
+    });
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+    //val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD'))
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        //maxDate: new Date()
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        //maxDate: new Date()
+    });
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+    $("#payTypeLs").select2({
+        tags: true,
+        dir: "rtl",
+        containerCssClass: "form-control",
+        templateSelection: formatRepoSelection,
+    });
+    function formatRepoSelection(repo) {
+        return repo.full_name || repo.text;
+    }
+    function updateTable() {
+        var url = '@(Url.Action("List", "Pay", new { area = "Payment" ,Status= Model.Status }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+
+    var progroup = document.getElementById("progroup");
+    function generateGUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    function unMarkList() {
+        $.each($(".fa-check-square-o"), function (i, element) {
+            $(this).removeClass("fa-check-square-o").addClass("fa-square-o");
+        });
+        $.each($(".prop input[type=hidden]"), function (i, index) {
+            $("#" + $(this).val()).remove();
+        })
+        $(".prop").remove();
+    }
+    var guid = generateGUID();
+    $(function () {
+        $(".dataprop, .datapropfull").attr("checked", false);
+        var SelectedCount = 0
+        $("body").on("click", ".dataprop", function () {
+            if ($(this).is(':checked')) {
+                $(this).parents("tr").addClass("rowchecked");
+                SelectedCount++;
+            }
+            else {
+                $(".datapropfull").prop('checked', false);
+                $(this).parents("tr").removeClass("rowchecked");
+                SelectedCount--;
+            }
+            if (SelectedCount == 0) {
+                $("#progroup").html("");
+                progroup.setAttribute("data-has-content", "empty");
+            }
+            else {
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    var ShowTitle = "";
+
+                    if ('@(Model.Status)' == 'ChequeReadyToDelivery' ||'@(Model.Status)' == 'safte') {
+                        ShowTitle = '@Resources.Delivered';
+                    }
+                    else if ('@(Model.Status)' == 'DuringPayment') {
+                        ShowTitle = '@Resources.ConfirmPayment';
+                    }
+                    else if ('@(Model.Status)' == 'ATM' || '@(Model.Status)' == 'GetCash' || '@(Model.Status)' == 'InternetPay' ||  '@(Model.Status)' == 'Satna') {
+                        ShowTitle = '@Resources.Payment';
+                    }
+                    $("#progroup").append('<button id="_conPrdS" onclick="ConfirmPay()" class="btn btn-material-green-600 btn-sm">' + ShowTitle + '</button>')
+                    //$("#progroup").append('<button id="_conPrdS" onclick="ConfirmPay()" class="btn btn-default btn-sm" title="'+ShowTitle+'" ><i class="zmdi zmdi-check-all zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+            }
+        });
+
+        @*@*$("body").on("click", ".datapropfull", function () {
+            if ($(this).is(':checked')) {
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', true);
+                    $(this).parents("tr").addClass("rowchecked");
+                });
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    $("#progroup").append('<button id="_conPrdS" onclick="DeleteSelectedItem()" class="btn btn-default btn-sm" title="@Resources.Delete" ><i class="zmdi zmdi-check-all zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+                SelectedCount = document.getElementsByClassName("dataprop").length;
+            }
+            else {
+                $("#progroup").html("");
+                progroup.setAttribute("data-has-content", "empty");
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', false);
+                    $(this).parents("tr").removeClass("rowchecked");
+                });
+                SelectedCount = 0;
+            }
+        });*@
+    });
+    function ConfirmPay() {
+        alertify.confirm('@Resources.AreYouSure',
+            function () {
+                var requestList = [];
+                $.each($(".dataprop"), function (i, element) {
+                    if ($(this).is(':checked')) {
+                        requestList.push($(this).val());
+                    }
+                });
+                var status;
+                if ('@(Model.Status)' == 'ChequeReadyToDelivery' || '@(Model.Status)' == 'safte') {
+                    status = 4;
+                }
+                else if ('@(Model.Status)' == 'DuringPayment') {
+                    status = 2;
+                }
+                else if ('@(Model.Status)' == 'ATM' || '@(Model.Status)' == 'GetCash' || '@(Model.Status)' == 'InternetPay' ||  '@(Model.Status)' == 'Satna') {
+                    status = 3;
+                }
+
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("Confirmation", "Request", new { area = "Payment" })',
+                    data: $.param({ requestIds: requestList, Status: status }, true),
+                    success: function (data) {
+                        //alertify.success(data.Message);
+                        $("#progroup").html("");
+                        progroup.setAttribute("data-has-content", "empty");
+                        successMessage(data);
+                        updateTable();
+                    },
+                    datatype: "json",
+                    traditional: true,
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alertify.error(xhr.Message);
+                        //alertify.error(thrownError);
+                    }
+                })
+            })
+    }
+
+</script>

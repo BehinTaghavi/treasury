@@ -1,0 +1,14 @@
+bin/
+obj/
+*.user
+.vs/
+node_modules/
+.nuxt/
+.output/
+dist/
+__pycache__/
+.pytest_cache/
+reports/
+deploy/.env
+*.bak
+*.mdb

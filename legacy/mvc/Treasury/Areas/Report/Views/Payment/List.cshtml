@@ -1,0 +1,171 @@
+﻿@model CSD.Treasury.UI.Models.CheckBookStatusSearch
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.MVCHelpers
+@using CSD.Treasury.Resourse
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>@Resources.RequestId</th>
+            <th>@Resources.ChequeNo</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.Price  </th>
+            <th>@Resources.Beneficiaries</th>
+            <th>@Resources.ChequeFormatType</th>
+            <th>@Resources.Bank</th>
+            <th>@Resources.BranchName</th>
+            <th>@Resources.BankAccountNumber</th>
+            <th>@Resources.CancellationReplacement</th>
+            <th>@Resources.reason</th>
+
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List.Where(d => d.Source_PaymentValue != null))
+        {
+
+
+<tr>
+                <td data-lang-number="fa">
+                    @{
+                        
+                        i++;
+                        var Bank = Utility.GetBankInfoBankId(int.Parse(item.Source_PaymentValue));
+                    }
+                    @(i)
+                </td>
+                <td data-lang-number="fa">@item.RequestID</td>
+                <td data-lang-number="fa">@item.ChequeNo</td>
+                <td data-lang-number="fa">
+                    @if (item.DueDate != null) {@Utility.GetPersianDate(item.DueDate)}
+                </td>
+                <td data-lang-number="fa">@Math.Truncate(item.EquivalencePrice.Value).ToString("#,##0")</td>
+                <td data-lang-number="fa">@Utility.GetUniqueAccount(item.Unique_Account_No) &nbsp;&nbsp; @Utility.GetUniqueAccount(item.Main_Unique_Account_No)</td>
+                <td>@Utility.GetReceipt_Pay_TypeDetailTitle(item.Pay_TypeDetailID_source.Value)</td>
+                <td>@Utility.GetBasicBankInfoWithBankId(int.Parse(item.Source_PaymentValue))</td>
+                <td>
+                    @if (Bank != null) {@(Bank.BranchName)}
+                </td>
+                <td data-lang-number="fa">
+                    @if (Bank != null){ @(Bank.Bank_AccountNumber)}
+
+                </td>
+                <td>
+                    @if (item.Cancellation != null)  { @Resources.Cancel }
+                    else if(item.CancelCheque != null) {@Resources.CancelCheque }
+                </td>
+                <td>
+                    @if (item.Description != null)
+                    {
+                        var Desc = item.Description.Split(';');
+
+                        if (Desc[0] == RequestDescription.TearingCheque.ToString())
+                        {
+                            @("پاره شدن چک")
+                        }
+
+                    }
+                    else if (item.Description == "ResultOfConvertCheque")
+                    {
+                        @("نتیجه تبدیل چک")
+                    }
+                    else if (item.Description == "CancelCheque")
+                    {
+                        @("کنسل شدن")
+                    }
+                
+                </td>
+
+            </tr>
+                        }
+    </tbody>
+</table>
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                (@Resources.Total : @Model.TotalItemCount)
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "Payment", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "Payment", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "Payment", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

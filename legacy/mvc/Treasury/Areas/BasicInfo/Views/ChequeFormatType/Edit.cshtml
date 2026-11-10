@@ -1,0 +1,52 @@
+﻿@model CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType
+@using CSD.Treasury.Common.Enumeration;
+@{
+    ViewBag.Title = "Edit";
+}
+@using (Ajax.BeginForm("Edit", "ChequeFormatType", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable("+Model.BankID+");"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(model=>model.ChequeFormatID)
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        @*<div class="form-group">
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.BankID, new SelectList(ViewBag.BsicBankLSLs, "BasicBankId", "BasicBankDescription",Model.BankID), " ", new { data_lang_number="fa", @class = "form-control floating-label", @placeholder = Resources.Bank })
+                @Html.ValidationMessageFor(model => model.BankID)
+            </div>
+        </div>*@
+        @*@if (CSD.Treasury.UI.Models.Utility.CheckIfHasFile(Model.ChequeFormatID))
+        {
+            <div class="form-group">
+                <div class="col-md-10">
+                    فایل ضمیمه:   @Html.ActionLink(Model.ChequeFormatID.ToString(), "GetContentAttachedFile", "Attachment", new { Area = "Payment", relateID = Model.ChequeFormatID }, new { target = "_blank" })
+                </div>
+            </div>
+        }*@
+      
+
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.DropDownListFor(model => model.FormatDescriptionID_Main, new SelectList(ViewBag.GetChequeFormatTypeLs, "ChequeFormatType_DescriptionID", "ChequeFormatType_Description1", new { Model.FormatDescriptionID_Main }), Resources.PleaseSelect, new { data_lang_number="fa", @class = "form-control floating-label", @placeholder = Resources.Type })
+                @Html.ValidationMessageFor(model => model.FormatDescriptionID_Main, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.EditorFor(model => model.FormatDescription, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Description } })
+                @Html.ValidationMessageFor(model => model.FormatDescription)
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

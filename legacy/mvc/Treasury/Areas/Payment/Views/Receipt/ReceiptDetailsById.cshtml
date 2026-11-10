@@ -1,0 +1,101 @@
+﻿@model CSD.Treasury.DataModel.Receipt_Detail
+@{
+    var Receipt_Detail_PlanStatels = (List<CSD.Treasury.Service.Receipt_Detail_PlanStateService.Receipt_Detail_PlanState>)ViewBag.Receipt_Detail_PlanState;
+}
+<div class="row">
+    <div class="col-sm-12">
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.ChequeNo
+                </label>
+                @Model.Cheque_Number
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Cheque_OwnerName
+                </label>
+                @Model.Cheque_OwnerName
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.DueDate
+                </label>
+                @Utility.GetPersianDate(Model.DueDate)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Unique_Account_No
+                </label>
+                @Utility.GetUniqueAccount(Model.Unique_Account_No)/@Model.Unique_Account_No
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Price
+                </label>
+                @Math.Truncate(Model.ChequePrice_Rial).ToString("N0")
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Behalf
+                </label>
+                @Utility.GetBehalf(Model.BehalfID)
+            </p>
+        </div>
+        @if (Model.BankID != null)
+        {
+            <div class="col-sm-6">
+                <p class="pardes">
+                    <label>
+                        @Resources.Bank
+                    </label>
+                    @Utility.GetBasicBankInfo(Model.BankID.Value)
+                </p>
+            </div>
+        }
+
+    </div>
+</div>
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>@Resources.PlaningTypeID</th>
+            <th>@Resources.Date</th>
+            <th>@Resources.account_code</th>
+            <th>@Resources.Unique_Account_No 1</th>
+            <th>@Resources.Unique_Account_No 2</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Receipt_Detail_PlanStatels)
+        {
+            <tr>
+                <td>@Utility.GetPlanType(item.PlaningTypeID)</td>
+                <td>@Utility.GetPersianDate(item.StateDate)</td>
+                <td>@Utility.Getaccounts(item.Account_No)</td>
+                <td>@Utility.GetUniqueAccount(item.Unique_Account_No)</td>
+                <td>@Utility.GetUniqueAccount(item.Unique_Account_No_Two)</td>
+                <td>
+                    @Ajax.ActionLink("نمایش سند", "ShowVocher", "Receipt",new { area="Payment", ReceiptDetailId =Model.ReceiptDetailId, StateID =item.StateID}, new AjaxOptions
+           {
+               UpdateTargetId= "divShowVocher"
+           },null)
+            </td>
+        </tr>
+    }
+
+    </tbody>
+</table>
+<div id="divShowVocher"></div>

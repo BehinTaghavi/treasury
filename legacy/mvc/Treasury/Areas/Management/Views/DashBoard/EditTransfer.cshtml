@@ -1,0 +1,32 @@
+﻿@model CSD.Treasury.Service.TransferFromBackupBankService.TransferFromBackupBank
+@using System.Configuration;
+
+@using (Ajax.BeginForm("EditTransfer", "DashBoard", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", id = "ExchangeTypeEdit" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.HiddenFor(model=>model.TransferId)
+                @Html.EditorFor(model => model.Price, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", min =ViewBag.remain, placeholder = Resources.Price } })
+                @Html.ValidationMessageFor(model => model.Price, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+}

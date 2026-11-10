@@ -1,0 +1,109 @@
+﻿@{
+    ViewBag.Title = "IndexForm";
+}
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/BasicInfo/Beneficiaries/BeneficiariesController.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/BasicInfo/Beneficiaries/BeneficiariesUC.js")"></script>
+@section PageHeader{
+    @Resources.Beneficiaries
+}
+<div ng-app="treasury" ng-controller="BeneficiariesController">
+    <form name="form" novalidate ng-submit="saveBeneficiaries()">
+        <div class="row">
+            <div class="col-sm-3 col-md-2">
+                <label class="control-label">@Resources.LegalAccountName</label>
+                <input type="text"
+                       required
+                       ng-bind="LegalAccountName"
+                       ng-model="LegalAccountName"
+                       class="form-control input-sm"
+                       title="{{LegalAccountName}}" />
+            </div>
+            <div class="col-sm-3 col-md-2">
+                <label>
+                    @Resources.Unique_Account_No
+                </label>
+                    <a class="btn btn-sm"required
+                       style="margin: 0 10px 0 0"
+                       ng-class="UniqueAccount.Name ? 'btn-material-green-500' : 'btn-material-grey-500'"
+                       ng-click="changeUniqueAccount(UniqueAccount)"
+                       ng-bind-html="UniqueAccount.Name ? UniqueAccount.Name : 'انتخاب تفصیل دوم'">
+                    </a>
+                    <input type="hidden" name="UniqueAccount" ng-model="UniqueAccount.Code" />
+                       <div id="UniqueAccountList"></div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xs-12">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>@Resources.Bank</th>
+                            <th>
+                                @Resources.BranchName @Resources.Bank
+                            </th>
+                            <th>
+                                @Resources.BankAccountNumber
+                            </th>
+                            <th>@Resources.Sheba</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in model.BankAccountList">
+                            <td class="text-center">{{$index + 1}}</td>
+                            <td>
+                            
+                                <select class="form-control input-sm" required name="basicBank_{{$index}}" 
+                                        ng-options="basicBank as basicBank.BasicBankDescription for basicBank in model.BasicBanksLs"
+                                         ng-model="item.basicBank"  style="max-width: 150px"></select>
+                            </td>
+                            <td>
+                                <div class="form-group">
+                                    <input required name="Bank_BranchName_{{$index}}" type="number" ignore-mouse-wheel class="form-control input-sm"  ng-model="item.Bank_BranchName" placeholder="@Resources.BranchName" />
+                                    <label ng-if="item.Bank_BranchName" style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.Bank_BranchName}} </label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="form-group" >
+                                    <input required name="Bank_AccountNumber_{{$index}}" type="number" ignore-mouse-wheel class="form-control input-sm" ng-model="item.Bank_AccountNumber" placeholder="@Resources.BankAccountNumber" />
+                                    <label ng-if="item.Bank_AccountNumber" style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.Bank_AccountNumber}} </label>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="form-group" >
+                                    <input required  name="Bank_ShebaNo_{{$index}}" type="number" ignore-mouse-wheel class="form-control input-sm" ng-model="item.Bank_ShebaNo" placeholder="@Resources.Sheba" />
+                                    <label ng-if="item.Bank_ShebaNo" style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.Bank_ShebaNo}} </label>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="clearfix">
+                    <div class="pull-right">
+                        <button type="button" ng-click="addBankAccount()" class="btn btn-material-grey-600">@Resources.Add @Resources.BankAccount</button>
+                    </div>
+                    <div class="pull-left">
+                        <span class="mdc-text-red-A700" ng-if="!form.$dirty || form.$invalid">لطفا موارد فرم را به صورت کامل تکمیل نمایید</span>
+                        <button class="btn btn-material-green-600" ng-class="{'btn-success': !(!form.$dirty || form.$invalid), 'btn-material-red-600': !form.$dirty || form.$invalid }" ng-disabled="form.$invalid" type="submit">@Resources.Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </form>
+</div>

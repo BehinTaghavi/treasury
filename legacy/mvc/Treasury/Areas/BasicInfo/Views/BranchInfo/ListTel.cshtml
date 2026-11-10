@@ -1,0 +1,35 @@
+﻿@model List<CSD.Treasury.Service.cmpBranch_TELSService.cmpBranch_TELS>
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+
+@foreach (var item in Model)
+{
+    <div class="form-group">
+        <div class="row">
+            @using (Ajax.BeginForm("EditTel", "BranchInfo", new { area = "BasicInfo", cmpBranchID = ViewBag.BranchId }, new AjaxOptions
+            {
+                OnSuccess = "updateTable('telList'); successMessage(data)"
+            }, null))
+            {
+                <input type="hidden" value="@item.ID" name="ID" id="ID">
+                <div class="col-xs-2 col-sm-1">
+                    <a class="btn btn-danger btn-flat btn-xs" 
+                       href="@Url.Action("DeleteTel", "BranchInfo", new { area = "BasicInfo", ID = item.ID })" 
+                       data-ajax-success="updateTable('telList'); successMessage(data)" 
+                       data-ajax="true"><i class="zmdi zmdi-close"></i></a>
+                </div>
+                <div class="col-xs-10 col-sm-6">
+                    @Html.TextBox("cmpBranchTel",item.cmpBranchTel, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = "شماره تماس" })
+                </div>
+            } 
+        </div>
+    </div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>

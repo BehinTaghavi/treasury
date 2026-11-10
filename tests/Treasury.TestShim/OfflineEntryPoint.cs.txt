@@ -1,0 +1,6 @@
+// Compiled into a test project only when Offline=true (see tests/Directory.Build.props).
+internal static class OfflineEntryPoint
+{
+    public static async Task<int> Main() =>
+        await Xunit.OfflineRunner.RunAsync(typeof(OfflineEntryPoint).Assembly).ConfigureAwait(false) == 0 ? 0 : 1;
+}

@@ -1,0 +1,28 @@
+﻿@model CSD.Treasury.Service.BasicBanksService.BasicBank
+
+@{
+    ViewBag.Title = "Delete";
+}
+
+<h5>@Resources.AreYouSure</h5>
+<div>
+    @using (Ajax.BeginForm("Delete", "BasicBank", new AjaxOptions
+    {
+        HttpMethod = "Post",
+        LoadingElementId = "loading",
+        OnSuccess = "successMessage(data);closeModal('sm');updateTable();"
+    }, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+    {
+        @Html.AntiForgeryToken()
+        @Html.HiddenFor(model => model.BasicBankId)
+
+        <button class="btn btn-primary btn-xs" type="submit">@Resources.Yes</button>
+            <button class="btn btn-material-grey btn-xs" onclick="closeModal('sm')" type="button">@Resources.NO</button>
+    }
+</div>
+
+<script>
+        $(function () {
+            $.material.init();
+        });
+</script>

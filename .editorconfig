@@ -1,0 +1,17 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+end_of_line = lf
+insert_final_newline = true
+
+[*.{cs,csx}]
+indent_size = 4
+# Result<T>.Ok / Fail factory methods are the intended API.
+dotnet_diagnostic.CA1000.severity = none
+# Test method names use underscores for readability.
+dotnet_diagnostic.CA1707.severity = none
+
+[*.{json,yml,yaml,ts,vue,js,mjs,css,props,csproj,slnx}]
+indent_size = 2

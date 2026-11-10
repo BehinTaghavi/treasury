@@ -1,0 +1,22 @@
+﻿@model CSD.Treasury.Service.BehalfsService.Behalf
+<p>@Resources.AreYouSure</p>
+<div>
+    @using (Ajax.BeginForm("Delete", "ExchangeType", new { id = Model.BehalfID }, new AjaxOptions
+    {
+        OnSuccess = "successMessage(data); OnSuccessdelete(data)"
+    }, null))
+    {
+        <button class="btn btn-primary btn-sm" type="submit">بله</button>
+        <button class="btn btn-primary btn-sm" onclick="closeModal('sm')" type="button">خیر</button>
+    }
+        </div>
+
+<script>
+    function OnSuccessdelete(data) {
+        deleteRow('@Hash.GetHashString(Model.BehalfID.ToString())');
+        closeModal('sm');
+    }
+    $(function () {
+        $.material.init();
+    });
+</script>

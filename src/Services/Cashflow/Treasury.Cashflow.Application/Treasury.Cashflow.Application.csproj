@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Application layer: use cases and ports (interfaces). Depends only on the domain. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Cashflow.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Cashflow.Domain\Treasury.Cashflow.Domain.csproj" />
+  </ItemGroup>
+</Project>

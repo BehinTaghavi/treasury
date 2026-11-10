@@ -1,0 +1,30 @@
+# Plan and progress
+
+Update this file when a task finishes (what is done, what is next). Months count from the start of Phase A. The pace is set by review and business answers, not by coding.
+
+## Phases
+
+| Phase | When | Scope | Done when | Status |
+|---|---|---|---|---|
+| 0 · First package | done 9 Nov 2026 | Repository skeleton, Cashflow domain (instruments, cheque books), PostgreSQL schema with fiscal-year partitions, migration tool, Nuxt shell + receipts screen | 49 + 12 + 6 .NET tests, 10 DB tests, 21 migration tests, browser smoke test pass | Done (see design document 13.8) |
+| A · Finish Phase 0 and set up | weeks 1–3 | First real build with NuGet; PostgreSQL adapters and Keycloak wiring compiled and tested; `docker compose` runs; GitHub CI green; test server; migration dry run on a copy of `Cashnajoo86` | Everything builds and passes on GitHub; test server runs; dry run reconciles | **Next** |
+| B · Login and basic information | months 1–2 | Keycloak login in the shell; fiscal years, branches, banks and accounts, cash desks, cheque books (`reference-svc`, `accounts-svc`) | Basic data migrated and reconciled | Planned |
+| C · Payment requests | months 2–4 | `requests-svc`: request, approval workflow, signatures, task inbox (rules R7, R9) | **Gate: early pilot at Iran Nazho Co.** | Planned |
+| D · Receipts and the cheque lifecycle | months 4–6 | Receive, deposit for collection, clear, bounce, return, endorse; answers to Q1–Q10 | All transitions tested; parallel run | Planned |
+| E · Payments and cheque printing | months 6–8 | Issue and print cheques (bank layouts, amount in words), deliver, cancel, bank transfers, cash payments | Parallel month-end close works | Planned |
+| F · Accounting vouchers | months 7–9 | `posting-svc`: posting rules, voucher batches, sending to the general ledger, error handling | **Gate: one parallel month-end, vouchers match the old system to the Rial** | Planned |
+| G · Reports and full pilot | months 9–12 | `reporting-svc`: the reports in both manuals, dashboard, cash-flow forecast | **Gate: Iran Nazho Co. signs off after two parallel month-ends**, then wider rollout | Planned |
+
+## Next tasks (Phase A)
+1. Install the .NET 10 SDK in the cloud environment (setup script), build `Treasury.slnx` with real packages, run all tests with real xUnit; fix what fails. Give the owner the setup script to save in the environment.
+2. Integration tests for the PostgreSQL adapters against a real PostgreSQL 17 (Docker).
+3. Run `deploy/docker-compose.yml` end to end; fix what fails.
+4. Make `.github/workflows/ci.yml` the required status check: .NET build + tests, DB tests, migration tests, frontend tests.
+5. Migration preflight and dry run on an anonymised copy of `Cashnajoo86` (the owner provides it outside GitHub); share the reconciliation report.
+6. Deployment notes for the test server (for the reviewer).
+
+## Done log
+| Date | What |
+|---|---|
+| 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
+| 2026-11-09 | Phase 0 first package delivered |

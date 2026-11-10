@@ -1,0 +1,23 @@
+# Decisions log
+
+Every decision the product owner has confirmed, newest first. Add a row in the same pull request whenever a new one is made. Architecture-level decisions also get an ADR in `docs/adr/`.
+
+| Date | Decision | Reason / notes | Source |
+|---|---|---|---|
+| 2026-11-09 | **Delivery model:** Claude Code (cloud sessions) writes the code; one remote engineer reviews every pull request on GitHub; the CEO is product owner and merges. `main` is protected: 1 approval + green CI. | No in-house team available. See setup guide (claude.ai doc "Building the Treasury system with Claude Code — setup guide"). | CEO, 9 Nov 2026 |
+| 2026-11-09 | **Phases revised** to A–G with three gates (early pilot after payment requests, parallel month-end after vouchers, full pilot sign-off). See `docs/plan.md`. | Smaller steps for a one-reviewer setup. | Setup guide, section 7 |
+| 2026-11-09 | **Documentation in English and Farsi:** English is the master; Farsi copies for what the domain expert reads (`docs/assessment.fa.md`, `docs/domain/*.fa.md`), updated in the same change. | Owner preference. | CEO, 9 Nov 2026 |
+| 2026-11-09 | **Team:** no hiring; rely on AI-assisted development with a minimal set of human roles. | Current situation of the company. | CEO, 9 Nov 2026 |
+| 2026-11-09 | **Database: PostgreSQL 17** as the standard. SQL Server 2025 only if a client requires it. One database per client company, one schema per service, transactional tables partitioned by fiscal year. | Open source; partitioning; cost. Design document 7. | CEO, 9 Nov 2026 |
+| 2026-11-09 | **Hosting:** preferably on the client's own server; **ArvanCloud** as the cloud option. | Clients' data-location needs. Design document 8.4. | CEO, 9 Nov 2026 |
+| 2026-11-08 | **Frontend: Nuxt 4** shell with Vue micro-frontends (Module Federation 2.0, client-side rendering). | Chosen over Next.js 16. Design document 6.3, ADR 0003. | CEO, 8 Nov 2026 |
+| 2026-11-08 | **Pilot client: Iran Nazho Co.** Two pilots: early (payment requests) and full (after accounting vouchers), each with parallel running. | Their old-system backups (`Cashnajoo05`, `Cashnajoo86`, `AccIranNajo05`) were provided. Design document 10.4. | CEO, 8 Nov 2026 |
+| 2026-11-08 | **Architecture:** microservices with Clean Architecture and DDD, micro-frontends, distributed users, open-source tools, one database for all fiscal years (partitioned), user-friendly. | Original requirements 1–6. | CEO, initial request |
+| 2026-11-08 | **Approach:** do not repair the MVC version; rebuild with a Strangler Fig migration, the old system running in parallel until each area is accepted. | Structural problems in the MVC version (design document 1–3). | Design document 1, 10.1 |
+
+## Still open
+- Answers to Q1–Q10 (`docs/domain/open-questions.md`).
+- Names: domain expert (currently the CEO) and the reviewer's GitHub account.
+- Test server location (office or ArvanCloud).
+- Who makes the anonymised copy of Iran Nazho Co.'s data, and where.
+- Legal check on sanctions rules for the Iran pilot (raised 9 Nov 2026).

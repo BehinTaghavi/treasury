@@ -1,0 +1,87 @@
+﻿@model IEnumerable<CSD.Treasury.Service.BasicBanksService.BasicBank>
+@{ var i = 1;}
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>
+                @Resources.Name @Resources.Bank
+            </th>
+            @*<th>
+                @Resources.Name@Resources.Bank-@Resources.EN
+            </th>*@
+            <th></th>
+          
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+
+            <tr>
+                <td>@(i++)</td>
+                <td>
+                    @item.BasicBankDescription
+                </td>
+                @*<td>
+                    @Html.DisplayFor(modelItem => item.BasicBankDescription2)
+                </td>*@
+                <td>
+                  
+                          @Html.ActionLink(Resources.BranchBankAccountInfo, "Index", "Banks", new { Area = "BasicInfo", BasicBankID = item.BasicBankId }, new { @class = "btn btn-material-blue-700 btn-xs " })
+                  
+                  
+                   
+                        @Ajax.ActionLink(Resources.Edit, "Edit", "BasicBank", new { Area = "BasicInfo", id = item.BasicBankId }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Bank + "', 'md');"
+                   }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+                        @Html.ActionLink(Resources.Delete, "Delete", "BasicBank", new { Area = "BasicInfo", BasicBankId = item.BasicBankId }, new { @class = "btn btn-danger btn-xs delete" })
+                   
+
+
+                </td>
+
+            </tr>
+        }
+    </tbody>
+</table>
+
+<script>
+    $(document).ready(function () {
+        //$(function () {
+        //    $("#myTable").tablesorter();
+        //});
+    });
+
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.Message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: '@Resources.Yes', cancel: '@Resources.NO' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+</script>

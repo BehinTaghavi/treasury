@@ -1,0 +1,322 @@
+﻿@model CSD.Treasury.DataModel.CashDesk
+
+@{
+    ViewBag.Title = "Edit";
+    var disabled   = false;
+    if(ViewBag.ReadOnly)
+    {
+        disabled = true;
+    }
+}
+@using (Ajax.BeginForm("Edit", "CashDesks", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", id = "CashierEdit" }))
+{
+
+    @Html.AntiForgeryToken()
+
+<div class="form-horizontal">
+
+    <hr />
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    @Html.HiddenFor(model => model.CashDeskID)
+    @Html.HiddenFor(model => model.CreateDateTime)
+    @Html.HiddenFor(model => model.IsActive)
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.Account_No, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-10">
+            @if (disabled)
+            {
+                @Html.DropDownListFor(model => model.Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name", Model.Account_No), new { data_lang_number = "fa", @class = "form-control", disabled = "disabled" })
+            }
+            else
+            {
+                @Html.DropDownListFor(model => model.Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name", Model.Account_No), new { data_lang_number = "fa", @class = "form-control" })
+            }
+            @Html.ValidationMessageFor(model => model.Account_No)
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.CashDeskDescription, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.CashDeskDescription, new { htmlAttributes = new { @class = "form-control" } })
+            @Html.ValidationMessageFor(model => model.CashDeskDescription, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+
+    @*<div class="form-group">
+            @Html.LabelFor(model => model.IsActive, htmlAttributes: new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                <div class=" col-md-3">
+                    @if (disabled)
+                    {
+                        @Html.CheckBoxFor(model => model.IsActive, new { @class = "checkbox", disabled= "disabled" })
+                    }
+                    else
+                    {
+                        @Html.CheckBoxFor(model => model.IsActive, new { @class = "checkbox" })
+                    }
+
+                    @Html.ValidationMessageFor(model => model.IsActive, "", new { @class = "text-danger", @disabled = "disabled" })
+                </div>
+            </div>
+        </div>*@
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.Unique_Account_No, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            @if (disabled)
+            {
+                @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1", disabled = "disabled" })
+            }
+            else
+            {
+                @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+            }
+
+        </div>
+        <div class="col-md-5">
+            @if (disabled)
+            {
+                @Html.DropDownListFor(model => model.Unique_Account_No, new SelectList(ViewBag.SlectedLs, "Account_Code", "Account_Name", new { Account_Code = Model.Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No, disabled = "disabled" })
+            }
+            else
+            {
+                @Html.DropDownListFor(model => model.Unique_Account_No, new SelectList(ViewBag.SlectedLs, "Account_Code", "Account_Name", new { Account_Code = Model.Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            }
+
+            @Html.ValidationMessageFor(model => model.Unique_Account_No, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.Unique_Account_No_two, htmlAttributes: new { @class = "control-label col-md-2" })
+
+        <div class="col-sm-5">
+            @if (disabled)
+            {
+                @Html.DropDownList("UniqueAccountType2", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId2), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No_two", data_code_att = "Code2", data_name_att = "Name2", updatetargetid = "acc2", disabled = "disdabled" })
+            }
+            else
+            {
+                @Html.DropDownList("UniqueAccountType2", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId2), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No_two", data_code_att = "Code2", data_name_att = "Name2", updatetargetid = "acc2" })
+            }
+        </div>
+        <div class="col-md-5">
+
+            @Html.DropDownListFor(model => model.Unique_Account_No_two, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            @Html.ValidationMessageFor(model => model.Unique_Account_No_two, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.cmpBranchID, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            @Html.DropDownList("cmpBranchID", null, htmlAttributes: new { @class = "form-control" })
+            @Html.ValidationMessageFor(model => model.cmpBranchID, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.ExchangeTypeID, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+
+            @if (disabled || !Model.arzi)
+            {
+                <select class="form-control" id="ExchangeTypeID" disabled name="ExchangeTypeID">
+                    <option></option>
+                    @foreach (var item in (List<ExchangeType>)ViewBag.ExchangeTypeID)
+                    {
+                        <option value="@item.ExchangeTypeID" @(Model.ExchangeTypeID == item.ExchangeTypeID ? "selected" : "")></option>
+                    }
+                </select>
+                @*@Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeTypeID, "ExchangeTypeID", "ExchangeTypeDescription", Model.ExchangeTypeID), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control", @disabled = "disabled" })*@
+                @*@Html.DropDownList("ExchangeTypeID", null, htmlAttributes: new { @class = "form-control", @disabled = "disabled" })*@
+            }
+            else
+            {
+
+                <select class="form-control" id="ExchangeTypeID" name="ExchangeTypeID" >
+                    <option></option>
+                    @foreach (var item in (List<ExchangeType>)ViewBag.ExchangeTypeID)
+                    {
+                        <option value="@item.ExchangeTypeID" @(Model.ExchangeTypeID == item.ExchangeTypeID ? "selected" : "")>@item.ExchangeTypeDescription</option>
+                    }
+                </select>
+                @*@Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeTypeID, "ExchangeTypeID", "ExchangeTypeDescription", Model.ExchangeTypeID), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control" })*@
+                @*@Html.DropDownList("ExchangeTypeID", null, htmlAttributes: new { @class = "form-control" })*@
+            }
+            @*@Html.DropDownListFor(model=>model.ExchangeTypeID, new SelectList(ViewBag.ExchangeTypeID, "ExchangeTypeID", "ExchangeTypeDescription",  Model.ExchangeTypeID), htmlAttributes: new { @class = "form-control" })*@
+
+            @Html.ValidationMessageFor(model => model.ExchangeTypeID, "", new { @disabled = "disabled", @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.Label("ExchangeType", "نوع نرخ ارز", new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            <select class="form-control" id="ExchangeTypeValues" name="ExchangeTypeValues" @(disabled || !Model.arzi ? "disabled=disabled" : "")>
+                <option @(Model.ExchangeTypeValues == null ? "selected" : "")></option>
+                <option value="1" @(Model.ExchangeTypeValues == 1 ? "selected" : "")>استاندارد</option>
+                <option value="2" @(Model.ExchangeTypeValues == 2 ? "selected" : "")>رسمی</option>
+                <option value="3" @(Model.ExchangeTypeValues == 3 ? "selected" : "")>غیررسمی</option>
+                <option value="4" @(Model.ExchangeTypeValues == 4 ? "selected" : "")>واقعی</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.Label("IsCheque", "نوع صندوق", new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            <select class="form-control" id="IsCheque" name="IsCheque" @(disabled || !Model.arzi ? "disabled=disabled" : "")>
+                <option value="1" @(Model.IsCheque == false ? "selected" : "")>وجه نقد</option>
+                <option value="2" @(Model.IsCheque == true ? "selected" : "")>چک</option>
+
+            </select>
+        </div>
+    </div>
+
+
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+
+@section Scripts {
+    @Scripts.Render("~/bundles/jqueryval")
+}
+<script>
+    $("#Account_No").select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+
+
+        $('#Unique_Account_No_two').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No_two").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $("#UniqueAccountType2").change(function () {
+        $('#Unique_Account_No_two').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No_two").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+</script>

@@ -1,0 +1,68 @@
+﻿@model CSD.Treasury.UI.Models.DaryaftaniPardakhtaniAti
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "IndexPerZinaf";
+    Layout = "~/Views/Shared/Layout/Admin.cshtml";
+}
+@section PageHeader{
+    دریافتنی و پرداختنی برحسب ذینفع
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div>
+                    @using (Ajax.BeginForm("ListPerZinaf", "DaryaftaniPardakhtani", new { Area = "Report" },
+                        new AjaxOptions()
+                        {
+                            UpdateTargetId = "Result",
+                            InsertionMode = InsertionMode.Replace,
+                        }, null))
+                    {
+                        <div class="col-sm-4">
+                            <div class="form-group">
+                                <select id="Type" name="Type" class="form-control">
+                                    <option value="0">-----</option>
+                                    <option value="1">@Resources.Receive</option>
+                                    <option value="2">@Resources.Paid</option>
+                                    <option value="3">همه</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="pull-right">
+                            <div class="col-sm-12">
+                                <div class="text-left">
+                                    <button type="submit" class="btn btn-info btn-sm">@Resources.Search</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+@*id="@tableId"*@
+
+<div id="Result">
+    @Html.Action("ListPerZinaf", "DaryaftaniPardakhtani", new { Area = "Report", Type = 3 })
+</div>
+
+@section scripts{
+    <script type="text/javascript">
+        function updateTable() {
+            var url = '@(Url.Action("ListPerZinaf", "DaryaftaniPardakhtani", new { area = "Report" }))';
+            $.ajax({
+                url: url, type: 'get',
+                success: function (data, status) {
+                    $("#Result").html(data);
+                }
+            });
+
+        }
+    </script>
+}
+
+

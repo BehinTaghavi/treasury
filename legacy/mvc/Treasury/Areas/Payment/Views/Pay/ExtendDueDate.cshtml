@@ -1,0 +1,59 @@
+﻿@using System.Configuration
+
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+
+
+@using (Ajax.BeginForm("ExtendDueDate", "Pay", new { area = "Payment", id = "ExtendDateForm" }, new AjaxOptions
+{
+    //OnSucceszs = "successMessage(data);reload();"
+    HttpMethod = "POST",
+    OnBegin= "$('#btnSubmit').attr('disabled', 'disabled')",
+    OnSuccess = "successMessage(data);location.reload();",
+}))
+{
+<input type="hidden" id="RequestId" name="RequestId"  value="@ViewBag.requestId"/>
+
+    <div class="form-group">
+        <label class="control-label" style="padding: 0; margin: 0">تاریخ درخواست: </label>
+        <div style="max-width: 300px">
+            <div class="form-group">
+                <input class="form-control from datepicker" data-lang-number="fa" data-val="true" data-val-required="The ActionDate field is required." id="ActionDate" name="ActionDate" placeholder="تاریخ  " readonly="readonly">
+
+            </div>
+        </div>
+        @Html.ValidationMessage("ActionDate")
+    </div>
+    <div class="form-group">
+        <label class="control-label" style="padding: 0; margin: 0">تاریخ سررسید: </label>
+        <div style="max-width: 300px">
+            <div class="form-group">
+                <input class="form-control from datepicker" data-lang-number="fa" data-val="true" data-val-required="The DueDate field is required." placeholder="تاریخ  " id="saresid" name="saresid" readonly="readonly">
+            </div>
+        </div>
+        @Html.ValidationMessage("saresid")
+    </div>
+
+
+    <button id="btnSubmit" type="submit" onsubmit="$(this).prop('disabled', true);" class="btn btn-sm btn-success">ذخیره</button>
+
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        minDate: new Date('@ViewBag.MinDate')
+    });
+    
+    function reload() {
+        setTimeout(function () {
+            location.reload();
+        }, 1000)
+    }
+</script>

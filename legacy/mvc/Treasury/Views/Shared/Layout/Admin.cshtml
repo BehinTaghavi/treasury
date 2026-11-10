@@ -1,0 +1,980 @@
+﻿@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Resourse
+
+@{
+    var culture = System.Threading.Thread.CurrentThread.CurrentUICulture.Name.ToLowerInvariant();
+}
+@helper selected(string c, string culture)
+{
+if (c == culture)
+{
+        @:class="active"
+}
+}
+<!DOCTYPE html>
+<html lang="@CultureHelper.GetCurrentNeutralCulture()">
+
+<head>
+
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+
+    <title>@Resources.Treasury @System.Configuration.ConfigurationManager.AppSettings["CompanyName"]</title>
+
+    @*@Styles.Render("~/Content/css")*@
+
+    <link href="@Url.Content("~/Content/css/spinner.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-datepicker.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-timepicker.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-fullpalette.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/ripples.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/roboto.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/snackbar.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/custom-bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-iconic-font.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/animate.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-color-palette.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.rtl.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/style.css")" rel="stylesheet" />
+
+
+    @*@Styles.Render("~/Content/admin")*@
+
+    <link href="@Url.Content("~/Content/css/bootstrap-rtl.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/timeline.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/sb-admin-2.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/morris.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/font-awesome.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-sortable.css")" rel="stylesheet" />
+
+    <link href="@Url.Content("~/Content/css/select2.min.css")" rel="stylesheet" />
+
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    @*@Scripts.Render("~/bundles/jquery")*@
+    <script src="@Url.Content("~/Scripts/jquery-1.10.2.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery-2.0.3.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery.unobtrusive-ajax.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery.mask.min.js")"></script>
+
+    @*@Scripts.Render("~/bundles/bootstrap")*@
+    <script src="@Url.Content("~/Scripts/moment.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/moment-with-locales.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-timepicker.js")"></script>
+    <script src="@Url.Content("~/Scripts/moment-jalaali.js")"></script>
+    <script src="@Url.Content("~/Scripts/material.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/ripples.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/snackbar.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/respond.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-sortable.js")"></script>
+    <script src="@Url.Content("~/Scripts/alertify.min.js")"></script>
+
+
+    <link href="@Url.Content("~/Content/css/normalize.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/icons.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/component.css")" rel="stylesheet" />
+    <script src="@Url.Content("~/Scripts/modernizr.custom.js")"></script>
+    @Scripts.Render("~/bundles/admin")
+
+    <script src="@Url.Content("~/Scripts/select2.full.min.js")"></script>
+
+
+    @*<script src="~/Scripts/dateparser.js"></script>
+        <script src="~/Scripts/position.js"></script>
+        <script src="~/Scripts/persian-datepicker-tpls.js"></script>
+        <script src="~/Scripts/datepicker-tpls.js"></script>
+        <script src="~/Scripts/Resources/app.js"></script>
+        <script src="~/Scripts/Resources/Controller/pettyCash.js"></script>
+        <script src="~/Scripts/Resources/Controller/pettyCashUC.js"></script>*@
+    <script>
+        var _d = [];
+        var _c = [];
+        $(document).ajaxStart(function () {
+
+            startLloadingAjax();
+        });
+        $(document).ajaxStop(function () {
+            endLloadingAjax();
+        });
+        function startLloadingAjax() {
+            $("#ajaxSpinner").fadeIn();
+            //_c = document.querySelectorAll(".btn:not(.disabled)");
+            //_d = document.querySelectorAll(".btn:not([disabled]):not([ng-disabled])");
+            //for (var i = 0; i < _d.length; i++) {
+            //    _d[i].setAttribute("disabled", "disabled")
+            //}
+            //for (var i = 0; i < _c.length; i++) {
+            //    _c[i].setAttribute("disabled", "disabled")
+            //}
+        }
+        function endLloadingAjax() {
+            $("#ajaxSpinner").fadeOut();
+            //$(".btn").removeAttr("disabled");
+
+            //for (var i = 0; i < _d.length; i++) {
+            //    _d[i].removeAttribute("disabled");
+            //}
+            //for (var i = 0; i < _c.length; i++) {
+            //    _c[i].removeAttribute("disabled");
+            //}
+        }
+        (function () {
+
+            var $button = $("<div id='source-button' class='btn btn-primary btn-xs'>&lt; &gt;</div>").click(function () {
+                var index = $('.bs-component').index($(this).parent());
+                $.get(window.location.href, function (data) {
+                    var html = $(data).find('.bs-component').eq(index).html();
+                    html = cleanSource(html);
+                    $("#source-modal pre").text(html);
+                    $("#source-modal").modal();
+                })
+
+            });
+
+            $('.bs-component [data-toggle="popover"]').popover();
+            $('[data-toggle="tooltip"]').tooltip();
+
+            $(".bs-component").hover(function () {
+                $(this).append($button);
+                $button.show();
+            }, function () {
+                $button.hide();
+            });
+
+            function cleanSource(html) {
+                var lines = html.split(/\n/);
+
+                lines.shift();
+                lines.splice(-1, 1);
+
+                var indentSize = lines[0].length - lines[0].trim().length,
+                    re = new RegExp(" {" + indentSize + "}");
+
+                lines = lines.map(function (line) {
+                    if (line.match(re)) {
+                        line = line.substring(indentSize);
+                    }
+
+                    return line;
+                });
+
+                lines = lines.join("\n");
+
+                return lines;
+            }
+
+            $(".icons-material .icon").each(function () {
+                $(this).after("<br><br><code>" + $(this).attr("class").replace("icon ", "") + "</code>");
+            });
+        })();
+    </script>
+    <script>
+        $(function () {
+            $.material.init();
+        });
+    </script>
+    <script>
+        $(function () {
+            var setTimeOut = setTimeout(function () {
+                //$("html, body").css("height", "100%")
+                $(".startpage.spinner").fadeOut();
+                $("#wrapper").fadeIn('slow');
+            }, 1000);
+        })
+        function successMessage(data) {
+            if (data.result) {
+                alertify.success(data.message);
+            }
+            else {
+                alertify.error(data.message);
+            }
+        }
+        function deleteRow(RowId) {
+            $("#" + RowId).addClass("danger").fadeOut('slow');
+        }
+        function updateRow(url, RowId) {
+            $.ajax({
+                url: url,
+                success: function (result) {
+                    $("#" + RowId).html(result);
+                }
+            })
+            $("#" + RowId).addClass("success");
+        }
+
+    </script>
+    <script>
+        function modal(data, title, size) {
+            $(".modal." + size).find(".modal-title").html("").html(title);
+            $(".modal." + size).find(".modal-body").html("").html(data);
+            $(".modal." + size).modal('show');
+        }
+        function closeModal(size) {
+            $(".modal." + size).modal("hide");
+        }
+        function guid() {
+            var d = new Date().getTime();
+            var guid = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/[x]/g, function (c) {
+                var r = (d + Math.random() * 16) % 16 | 0;
+                d = Math.floor(d / 16);
+                return (c == 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+            return guid;
+        };
+    </script>
+    <script>
+        (function ($) {
+            $.fn.showHide = function (options) {
+
+                //default vars for the plugin
+                var defaults = {
+                    speed: 200,
+                    easing: '',
+                    changeText: 0,
+                    showText: 'Show',
+                    hideText: 'Hide'
+
+                };
+                var options = $.extend(defaults, options);
+
+                $(this).click(function () {
+                    $('.toggleDiv').slideUp(options.speed, options.easing);
+                    // this var stores which button you've clicked
+                    var toggleClick = $(this);
+                    // this reads the rel attribute of the button to determine which div id to toggle
+                    var toggleDiv = $(this).attr('rel');
+
+                    // here we toggle show/hide the correct div at the right speed and using which easing effect
+                    $(toggleDiv).slideToggle(options.speed, options.easing, function () {
+                        // this only fires once the animation is completed
+                        if (options.changeText == 1) {
+                            $(toggleDiv).is(":visible") ? toggleClick.html(options.hideText) : toggleClick.html(options.showText);
+                        }
+                    });
+
+                    return false;
+
+                });
+
+            };
+        })(jQuery);
+
+
+    </script>
+    @RenderSection("scripts", required: false)
+</head>
+
+<body>
+    <div class="con">
+        <div class="mp-pusher" id="mp-pusher">
+            <nav id="mp-menu" class="mp-menu">
+                <div class="mp-level mdc-bg-blue-500">
+                    <h2>امکانات</h2>
+                    <ul>
+
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("BasicInfo"))
+                        {
+                            //اطلاعات پایه
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.BasicInfo
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.BasicInfo</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+
+                                        <li>
+                                            @Html.ActionLink(Resources.BehalfGroupID + "/" + Resources.Behalf, "Index", "BehalfGroup", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.ReferenceType, "Index", "RefrenceType", new { area = "BasicInfo", status = "menu" }, null)
+                                        </li>
+                                        <li class="dropdown-submenu">
+                                        <li>
+                                            @Html.ActionLink(Resources.Bank + "/" + Resources.ChequeCreate, "Index", "BasicBank", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li class="dropdown-submenu">
+                                            @Html.ActionLink(Resources.Branch + "/" + Resources.Location, "Index", "Branch", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Region, "Index", "Region", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.CashDesk, "Index", "CashDesks", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Cashier, "Index", "Cashier", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.PettyCash, "Index", "PettyCash", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Beneficiaries, "Index", "Beneficiaries", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.ExchangeType, "Index", "ExchangeType", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.ExchangeRate, "Index", "ExchangeRates", new { area = "BasicInfo" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.ExchangeStandards, "Index", "ExchangeStandards", new { area = "BasicInfo" }, null)
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("RequestPayment"))
+                        {
+                            //درخواست وجه
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.RequestPayment
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.RequestPayment</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        <li>
+                                            @Html.ActionLink(Resources.Create + " " + Resources.RequestPayment, "Create", "Request", new { area = "Payment" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.List + " " + Resources.RequestPayment, "Index", "Request", new { area = "Payment" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.RequestsCanceled, "RequestsCanceled", "Request", new { area = "Payment" }, null)
+                                        </li>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                                        {
+                                            <li>
+                                                @Html.ActionLink(Resources.Aggregation, "IndexAggregation", "Request", new { area = "Payment" }, null)
+                                            </li>
+                                        }
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Payment"))
+                        {
+                            //پرداخت
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.Payment
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.Payment</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        <li>
+                                            @Html.ActionLink(Resources.DuringPayment, "Index", "Pay", new { area = "Payment", Status = "DuringPayment" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Aggregation + " " + Resources.RequestPayment, "AggregationRequest", "Request", new { area = "Payment" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.ChequeReadyToDelivery, "Index", "Pay", new { area = "Payment", Status = "ChequeReadyToDelivery" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.DeliveredRequest, "Index", "Pay", new { area = "Payment", Status = "DeliveredPayment" }, null)
+                                        </li>
+
+                                        <li>
+                                            @Html.ActionLink(Resources.Paid + " " + Resources.GetCash, "Index", "Pay", new { area = "Payment", Status = "GetCash" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Paid + " " + Resources.ATM, "Index", "Pay", new { area = "Payment", Status = "ATM" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.Paid + " " + Resources.Internet, "Index", "Pay", new { area = "Payment", Status = "InternetPay" }, null)
+                                        </li>
+                                         <li>
+                                            @Html.ActionLink(Resources.Paid + " " + Resources.Satna, "Index", "Pay", new { area = "Payment", Status = "Satna" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.CovertCheque, "Index", "Pay", new { area = "Payment", Status = "CovertCheque" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.DeleiverdLasheCheque, "Index", "Pay", new { area = "Payment", Status = "DeleiverdLasheCheque" }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.FollowUp + " " + Resources.Status + " " + Resources.Payment + "ها", "FollowUpPayment", "Pay", new { area = "Payment", RecieptTypeId = 18 }, null)
+                                        </li>
+
+                                    </ul>
+                                </div>
+
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("PettyCash"))
+                        {
+
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.PettyCashPayment
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.PettyCashPayment</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        <li>
+                                            @Html.ActionLink(Resources.PayPettyCash, "Index", "PettyCash", new { area = "Payment", HeaderId = 0 }, null)
+                                        </li>
+                                        <li>
+                                            @Html.ActionLink(Resources.List + " " + Resources.Payment + Resources.PettyCash, "_Index", "PettyCash", new { area = "Payment" }, null)
+                                        </li>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("PettyCash"))
+                                        {
+                                            <li>
+                                                @Html.ActionLink(Resources.PettyCashLssummaryReport, "SearchView", "PettyCash", new { area = "Report" }, null)
+                                            </li>
+                                        }
+
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("DirectDebit"))
+                        {
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.PickUp
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.PickUp</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        <li>
+                                            @Html.ActionLink(Resources.DirectDebit, "_Index", "DirectDebit", new { Area = "Payment" }, null)
+                                        </li>
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Reciept"))
+                        {
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.Receive
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.Receive</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        @*<li class="icon icon-arrow-left">
+                                                <a href="#">
+                                                    @Resources.Receive
+                                                </a>
+                                                <div class="mp-level">
+                                                    <h2>ثبت دریافت جدید</h2>
+                                                    <a class="mp-back" href="#">@Resources.Return</a>
+
+                                                    <ul>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receive + " " + Resources.Cheque + " " + Resources.Cash, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 18 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receive + " " + Resources.Cheque + " " + Resources.Deferred, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 19 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receive + " " + Resources.Cheque + " " + Resources.Disciplinary, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 21 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receipt + " " + Resources.GetCash, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 22 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receipt + " " + Resources.CashDeposit, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 23 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receipt + " " + Resources.ATM, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 24 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receive + " " + Resources.PromissoryNote, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 25 }, null)
+                                                        </li>
+                                                        <li>
+                                                            @Html.ActionLink(Resources.Receive + " " + Resources.PromissoryNote + " " + Resources.Disciplinary, "Index", "Receipt", new { Area = "Payment", RecieptTypeId = 28 }, null)
+                                                        </li>
+
+                                                    </ul>
+                                                </div>
+                                            </li>*@
+                                        <li>
+                                            @Html.ActionLink("وروداطاعات/فهرست دریافتها", "ShowAllReceiptList", "Receipt", new { area = "Payment" }, null)
+                                        </li>
+                                        @*<li class="icon icon-arrow-left">
+                                                <a href="#">
+                                                    @Resources.Planing
+                                                </a>
+                                                <div class="mp-level">
+                                                    <h2>@Resources.Planing</h2>
+                                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                                    <ul>
+                                                        <li>@Html.ActionLink("واگذاری چک های دریافتی به حساب بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -1 }, null)</li>
+                                                        <li>@Html.ActionLink("ثبت وصول / عودت / برگشت چک های واگذاری", "ReceiptList", "Receipt", new { Area = "Payment", State = -2 }, null)</li>
+                                                        <li>@Html.ActionLink("وصول مستقیم - نقد", "ReceiptList", "Receipt", new { Area = "Payment", State = -3 }, null)</li>
+                                                        <li>@Html.ActionLink("وصول مستقیم - واریز به بانک", "ReceiptList", "Receipt", new { Area = "Payment", State = -4 }, null)</li>
+                                                        <li>@Html.ActionLink("ثبت خرج چک", "ReceiptList", "Receipt", new { Area = "Payment", State = -5 }, null)</li>
+                                                        <li>@Html.ActionLink("عودت چک نزد صندوق", "ReceiptList", "Receipt", new { Area = "Payment", State = -6 }, null)</li>
+                                                        <li>@Html.ActionLink("تبدیل چک انتظامی به چک دریافتنی", "ReceiptList", "Receipt", new { Area = "Payment", State = -7 }, null)</li>
+                                                        <li>@Html.ActionLink("حقوقی کردن چک های برگشتی", "ReceiptList", "Receipt", new { Area = "Payment", State = -8 }, null)</li>
+                                                        <li>@Html.ActionLink("ابطال چک های نزد صندوق", "ReceiptList", "Receipt", new { Area = "Payment", State = -10 }, null)</li>
+                                                        <li>@Html.ActionLink("تحویل لاشه چک های انتظامی", "ReceiptList", "Receipt", new { Area = "Payment", State = -15 }, null)</li>
+                                                        <li>@Html.ActionLink("ثبت عودت چک های خرج شده", "ReceiptList", "Receipt", new { Area = "Payment", State = -16 }, null)</li>
+                                                    </ul>
+                                                </div>
+                                            </li>*@
+                                        @*<li class="icon icon-arrow-left">
+                                                <a href="#">
+                                                    برنامه ریزی شده
+                                                </a>
+                                                <div class="mp-level">
+                                                    <h2> برنامه ریزی شده</h2>
+                                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                                    <ul>
+                                                        <li>@Html.ActionLink("واگذار شده به حساب بانک", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 2 }, null)</li>
+                                                        <li>@Html.ActionLink("وصول مستقیم شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 3 }, null)</li>
+                                                        <li>@Html.ActionLink("واریز بانک شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 4 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های خرج شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 5 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های نزد صندوق عودت شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 6 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های انتظامی تبدیل شده به چک دریافتنی شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 7 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های برگشتی حقوقی شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 8 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های عودت شده پس از برگشت از بانک", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 9 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های ابطال شده نزد صندوق", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 10 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های وصول شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 11 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های برگشت شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 12 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های واریز شده به تنخواه", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 13 }, null)</li>
+                                                        <li>@Html.ActionLink("لاشه چک های انتظامی تحویل شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 15 }, null)</li>
+                                                        <li>@Html.ActionLink("چک های خرج شده عودت شده", "PlannedReceiptList", "Receipt", new { Area = "Payment", State = 16 }, null)</li>
+                                                    </ul>
+                                                </div>
+                                            </li>*@
+                                    </ul>
+                                </div>
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Report"))
+                        {
+                            <li class="icon icon-arrow-left">
+                                <a href="#">
+                                    @Resources.Report
+                                </a>
+                                <div class="mp-level">
+                                    <h2>@Resources.Receipt</h2>
+                                    <a class="mp-back" href="#">@Resources.Return</a>
+                                    <ul>
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                @Resources.Receive
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>@Resources.Receive</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.Report + " " + Resources.ReceiptCheck, "Index", "ReceiptCheck", new { Area = "Report", isCheck = true }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.Report + " " + Resources.Others + " " + Resources.Receive + "ها", "Index", "ReceiptCheck", new { Area = "Report", isCheck = false }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.FollowUp + " " + Resources.Status + " " + Resources.Receive + "ها", "FollowUpReceipt", "Receipt", new { area = "Payment", RecieptTypeId = 18 }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.Report + " " + Resources.ReceivableDueDateCheque, "SearchView", "ExpiredCheckReceivable", new { area = "Report" }, null)
+                                                    </li>
+
+                                                </ul>
+                                            </div>
+                                        </li>
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                @Resources.Payment
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>@Resources.Payment</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>
+                                                    <li>
+                                                        @Html.ActionLink("گزارش چک های صادره", "IndexChecksIssued", "Payment", new { Area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.Report + " " + Resources.Status + " " + Resources.CheckBook, "Index", "Payment", new { Area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.FollowUp + " " + Resources.Status + " " + Resources.Payment + "ها", "FollowUpPayment", "Pay", new { area = "Payment" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.Report + " " + Resources.PayableDueDateCheque, "SearchView", "ExpiredCheckPayable", new { area = "Report" }, null)
+                                                    </li>
+													    <li>
+                                                        @Html.ActionLink("گزارش اسنادپرداختنی/تعهدات آتی", "ALLExpiredCheckPayable", "ExpiredCheckPayable", new { area = "Report" }, null)
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </li>
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                @Resources.PettyCash
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>@Resources.PettyCash</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.PettyCashLssummaryReport, "SearchView", "PettyCash", new { area = "Report" }, null)
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </li>
+
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                @Resources.Bank
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>@Resources.Bank</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.GardesheHesab, "SearchView1", "GardesheHesab", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink(Resources.BankBalance, "SearchView", "Bank", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink("نقدینگی", "SearchView", "Naghdinegi", new { area = "Report" }, null)
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </li>
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                گزارش روزانه
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>گزارش روزانه</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>
+                                                    @*<li>
+                                                            @Html.ActionLink("خلاصه گردش عملیات روزانه", "SearchViewdailyreport", "DailyReport", new { area = "Report" }, null)
+                                                        </li>*@
+                                                    <li>
+                                                        @Html.ActionLink("گزارش حسابهای جاری", "SearchViewDayReport", "GardesheHesab", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink("گزارش سپرده های بانکی", "SearchViewSeporde", "Naghdinegi", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink("گزارش صندوق ها", "SearchView", "CashDesk", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink("وضعیت اسناد دریافتنی", "SearchView", "ExpiredCheckReceivable", new { area = "Report" }, null)
+                                                    </li>
+                                                    <li>
+                                                        @Html.ActionLink("وضعیت تعهدات آتی", "SearchView", "ExpiredCheckPayable", new { area = "Report" }, null)
+                                                    </li>
+
+                                                </ul>
+                                            </div>
+                                        </li>
+                                        <li class="icon icon-arrow-left">
+                                            <a href="#">
+                                                گزارش جامع
+                                            </a>
+                                            <div class="mp-level">
+                                                <h2>گزارش جامع</h2>
+                                                <a class="mp-back" href="#">@Resources.Return</a>
+                                                <ul>                                                
+                                                    <li>
+                                                        @Html.ActionLink("گزارش گروه بابتها", "SearchView", "BehalfGroupReport", new { area = "Report" }, null)
+                                                    </li>  
+                                                    <li>
+                                                        @Html.ActionLink("گزارش  بابتها", "SearchView", "BehalfReport", new { area = "Report" }, null)
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("SendVoucher"))
+                        {
+                            <li>
+                                @Html.ActionLink("ارسال اسناد به حسابداری", "RegisterPaidVoucher", "Vocher_Row", new { area = "Management" }, null)
+                            </li>
+                        }
+                        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                        {
+                            <li>
+                                <a href="@Url.Content("~/management/User/Index")">@Resources.List @Resources.Users</a>
+                            </li>
+                        }
+
+
+
+                    </ul>
+                </div>
+            </nav>
+            <div class="scroller">
+                <div class="scroller-inner">
+                    <div class="con">
+                        <div id="wrapper" style="display: none">
+                            <div class="navbar navbar-material-light-blue">
+                                <div class="container-fluid">
+                                    <div class="navbar-header">
+                                        <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-responsive-collapse">
+                                            <span class="icon-bar"></span>
+                                            <span class="icon-bar"></span>
+                                            <span class="icon-bar"></span>
+                                        </button>
+
+
+                                        <a id="trigger" class="menu-trigger navbar-brand" title="امکانات">
+                                            <svg enable-background="new 0 0 32 32" height="25" id="Слой_1" version="1.1" viewBox="0 0 32 32" width="25" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g id="Menu"><path d="M1,7h30c0.552,0,1-0.448,1-1c0-0.552-0.448-1-1-1H1C0.448,5,0,5.448,0,6C0,6.552,0.448,7,1,7z" fill="#121313" style="
+                                                                                                                                                                                                                                                                              fill: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                              "></path><path d=" M31,15H1c-0.552,0-1,0.448-1,1c0,0.552,0.448,1,1,1h30c0.552,0,1-0.448,1-1C32,15.448,31.552,15,31,15z" fill="#121313" style="
+                                                                                                                                                                                                                                                                              fill: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                              "></path><path d=" M31,25H1c-0.552,0-1,0.448-1,1c0,0.552,0.448,1,1,1h30c0.552,0,1-0.448,1-1C32,25.448,31.552,25,31,25z" fill="#121313" style="
+                                                                                                                                                                                                                                                                              fill: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                              "></path></g></svg>
+                                        </a>
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                                        {
+                                            <a href="@Url.Action("Index", "DashBoard", new { Area = "Management" })" id="trigger" class="navbar-brand" title="خزانه داری - خانه">
+                                                <svg enable-background="new 0 0 32 32" height="25" id="Layer_1" version="1.1" viewBox="0 0 32 32" width="25" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="
+                                                     "><path d=" M29.707,15.793l-13-13c-0.391-0.391-1.023-0.391-1.414,0l-13,13c-0.391,0.391-0.391,1.023,0,1.414s1.023,0.391,1.414,0 L16,4.914l8.014,8.014C24.013,12.953,24,12.975,24,13v15H8V18c0-0.553-0.448-1-1-1s-1,0.447-1,1v11c0,0.553,0.448,1,1,1h18 c0.553,0,1-0.447,1-1V14.914l2.293,2.293C28.488,17.402,28.744,17.5,29,17.5s0.512-0.098,0.707-0.293 C30.098,16.816,30.098,16.184,29.707,15.793z" style="
+                                                     stroke: transparent;
+                                                     fill: rgba(255, 255, 255, 0.84);
+                                                     "></path></svg>
+                                            </a>
+                                        }
+                                        @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                                        {
+                                            <a class="navbar-brand" title="مانده بانک" data-ajax="true" data-ajax-success="modal(data,'موجودی بانک', 'lg:not(.xlg)');" href="/BasicInfo/BankBalance?Date=13960431&amp;BankID=0&amp;showSum=True">
+                                                <svg enable-background="new 0 0 50 50" height="25" id="Layer_1" version="1.1" viewBox="0 0 50 50" width="25" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><rect fill="none" height="50" width="50" style="
+                                                                                                                                                                                                                                                                      "></rect><path d=" M40,14c0,0-25.397,0-30,0c-3.076,0-5,3-5,5v21.384C5,42.934,7.066,45,9.616,45h30.768C42.933,45,45,42.934,45,40.384V18.846 C45,16.299,42.549,14,40,14z" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="3" style="
+                                                                                                                                                                                                                                                                      stroke: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                      "></path><path d=" M37,11V7.658 c0-3.331-0.719-4.292-4.852-3.202c-3.036,0.801-20.801,5.726-20.801,5.726c-5.471,2.062-6.306,3.817-6.306,7.816L5,20.453" fill="none" stroke="#fff" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="3" style="
+                                                                                                                                                                                                                                                                      stroke: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                      "></path><path d=" M38.502,32C37.121,32,36,30.882,36,29.501S37.121,27,38.502,27C39.879,27,41,28.12,41,29.501S39.879,32,38.502,32z" style="
+                                                                                                                                                                                                                                                                      stroke: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                      fill: rgba(255, 255, 255, 0.84);
+                                                                                                                                                                                                                                                                      "></path></svg>
+                                            </a>
+											
+											   <a href="@Url.Action("Show", "Naghdinegi", new { Area = "Report" })" id="trigger" class="navbar-brand" title="نقدینگی">
+                                                <svg width="25" height="25" viewBox="0 0 16 16" enable-background="new 0 0 50 50" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M4 0h5.5v1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h1V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z" />
+                                                    <path d="M9.5 3V0L14 4.5h-3A1.5 1.5 0 0 1 9.5 3z" />
+                                                </svg>
+
+                                            </a>
+                                            <a href="@Url.Action("ALLExpiredCheckReceivable", "ExpiredCheckReceivable", new { Area = "Report" })" id="trigger" class="navbar-brand" title="گزارش اسناد دریافتنی">
+                                                <svg width="25" height="25" viewBox="0 0 16 16" class="bi bi-file-earmark-text" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M4 0h5.5v1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h1V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z" />
+                                                    <path d="M9.5 3V0L14 4.5h-3A1.5 1.5 0 0 1 9.5 3z" />
+                                                    <path fill-rule="evenodd" d="M5 11.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm0-2a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5z" />
+                                                </svg>
+
+                                            </a>
+                                            <a href="@Url.Action("ALLExpiredCheckPayable", "ExpiredCheckPayable", new { Area = "Report" })" id="trigger" class="navbar-brand" title="گزارش اسناد پرداختنی">
+                                                <svg width="25" height="25" viewBox="0 0 16 16" class="bi bi-file-earmark-ruled" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                                    <path fill-rule="evenodd" d="M5 10H3V9h10v1H6v2h7v1H6v2H5v-2H3v-1h2v-2z" />
+                                                    <path d="M4 0h5.5v1H4a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4.5h1V14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2z" />
+                                                    <path d="M9.5 3V0L14 4.5h-3A1.5 1.5 0 0 1 9.5 3z" />
+                                                </svg>
+
+                                            </a>
+                                        }
+
+                                    </div>
+                                    <div class="navbar-collapse collapse navbar-responsive-collapse">
+
+                                        <ul class="nav navbar-nav navbar-left">
+                                            @*<li class="dropdown">
+                                                    <a class="dropdown-toggle" data-toggle="dropdown" href="#">
+                                                        <img src="@Url.Content("~/Content/images/country-flag/language_setting.png")" />
+                                                        &nbsp;
+                                                        @Resources.SelectLanguage
+                                                        <i class="zmdi zmdi-caret-down"></i>
+
+                                                    </a>
+                                                    <ul class="dropdown-menu dropdown-user">
+                                                        <li @selected("ar", culture)>
+                                                            <a href="@Url.Action("SetCulture", "Home", new { area = "", culture = "fa", url = ViewContext.RouteData.DataTokens["area"] + "/" + @HttpContext.Current.Request.RequestContext.RouteData.Values["controller"].ToString() + "/" + @HttpContext.Current.Request.RequestContext.RouteData.Values["action"].ToString() +"/"+ Request.Url.PathAndQuery })">
+
+                                                                <img src="@Url.Content("~/Content/images/country-flag/Iran.png")" />
+                                                                &nbsp;
+                                                                @Resources.FA
+                                                            </a>
+                                                        </li>
+                                                        <li @selected("en-us", culture)>
+                                                            <a href="@Url.Action("SetCulture", "Home", new { area = "", culture = "en-us", url = ViewContext.RouteData.DataTokens["area"] + "/" + @HttpContext.Current.Request.RequestContext.RouteData.Values["controller"].ToString() + "/" + @HttpContext.Current.Request.RequestContext.RouteData.Values["action"].ToString() })">
+
+                                                                <img src="@Url.Content("~/Content/images/country-flag/England.png")" />
+                                                                &nbsp;
+                                                                English
+                                                            </a>
+                                                        </li>
+                                                    </ul>
+                                                </li>*@
+                                            <li class="dropdown">
+                                                <a class="dropdown-toggle" data-toggle="dropdown" title="@((User as CustomPrincipal).UserFullName)-@((User as CustomPrincipal).LocationName)" href="#">
+                                                    <svg enable-background="new 0 0 512 512" height="25" width="25" id="Layer_1" version="1.1" viewBox="0 0 512 512" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><g><path d="M256,274.1c-75.6,0-137.1-61.5-137.1-137.1S180.4,0,256,0c75.6,0,137.1,61.5,137.1,137.1   S331.6,274.1,256,274.1z M256,20.4c-64.3,0-116.6,52.3-116.6,116.6S191.7,253.7,256,253.7c64.3,0,116.6-52.3,116.6-116.6   S320.3,20.4,256,20.4z" fill="rgba(255, 255, 255, 0.84)" /><path d="M493.9,512c-5.6,0-10.2-4.6-10.2-10.2c0-125.5-102.1-227.6-227.6-227.6c-125.5,0-227.6,102.1-227.6,227.6   c0,5.6-4.6,10.2-10.2,10.2s-10.2-4.6-10.2-10.2c0-66.3,25.8-128.6,72.7-175.4s109.2-72.7,175.4-72.7s128.6,25.8,175.4,72.7   s72.7,109.2,72.7,175.4C504.1,507.4,499.5,512,493.9,512z" fill="rgba(255, 255, 255, 0.84)" /></g></svg>
+
+                                                    @*-@((User as CustomPrincipal).LocationName)*@
+                                                    @*  <i class="zmdi zmdi-caret-down"></i>*@
+                                                </a>
+                                                <ul class="dropdown-menu dropdown-user">
+                                                    <li>
+                                                        <a href="@Url.Content("~/Account/ShowUser?userId="+User.Id)">
+                                                            <i class="zmdi zmdi-account"></i>&nbsp;
+                                                            @Resources.Profile - @((User as CustomPrincipal).UserFullName)
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a href="@Url.Content("~/Account/LogOff")">
+                                                            <i class="zmdi zmdi-power"></i>&nbsp;
+                                                            @Resources.LogOff
+                                                        </a>
+                                                    </li>
+                                                </ul>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="container-fluid">
+                                <div class="page-header">
+                                    <h4>
+                                        @RenderSection("PageHeader", false)
+                                    </h4>
+                                </div>
+                                <div class="panel panel-default">
+                                    @RenderSection("btnToolbar", false)
+                                    <div class="panel-body">
+                                        @RenderSection("list", false)
+                                        @RenderBody()
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        @Html.Partial("~/Views/Shared/Partials/Component.cshtml")
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <script>
+        HTMLElement.prototype.deleteParentByTagName = function (tagName, className, duration, complete) {
+            var element = this;
+            while (element.tagName != tagName.toUpperCase()) {
+                element = element.parentElement
+            };
+            element.classList.add(className);
+            var FX = {
+                easing: {
+                    linear: function (progress) {
+                        return progress;
+                    },
+                    quadratic: function (progress) {
+                        return Math.pow(progress, 2);
+                    },
+                    swing: function (progress) {
+                        return 0.5 - Math.cos(progress * Math.PI) / 2;
+                    },
+                    circ: function (progress) {
+                        return 1 - Math.sin(Math.acos(progress));
+                    },
+                    back: function (progress, x) {
+                        return Math.pow(progress, 2) * ((x + 1) * progress - x);
+                    },
+                    bounce: function (progress) {
+                        for (var a = 0, b = 1, result; 1; a += b, b /= 2) {
+                            if (progress >= (7 - 4 * a) / 11) {
+                                return -Math.pow((11 - 6 * a - 11 * progress) / 4, 2) + Math.pow(b, 2);
+                            }
+                        }
+                    },
+                    elastic: function (progress, x) {
+                        return Math.pow(2, 10 * (progress - 1)) * Math.cos(20 * Math.PI * x / 3 * progress);
+                    }
+                },
+                animate: function (options) {
+                    var start = new Date;
+                    var id = setInterval(function () {
+                        var timePassed = new Date - start;
+                        var progress = timePassed / options.duration;
+                        if (progress > 1) {
+                            progress = 1;
+                        }
+                        options.progress = progress;
+                        var delta = options.delta(progress);
+                        options.step(delta);
+                        if (progress == 1) {
+                            clearInterval(id);
+                            options.complete();
+                        }
+                    }, options.delay || 10);
+                },
+                fadeOut: function (element, options) {
+                    var to = 1;
+                    this.animate({
+                        duration: options.duration,
+                        delta: function (progress) {
+                            progress = this.progress;
+                            return FX.easing.circ(progress);
+                        },
+                        complete: function () { options.complete; FX.remove(element); },
+                        step: function (delta) {
+                            element.style.opacity = to - delta;
+                        }
+                    });
+                },
+                remove: function (element) {
+                    element.style.display = "none";
+                }
+            };
+            FX.fadeOut(element, { duration: duration, complete: complete });
+        }
+    </script>
+    <script src="@Url.Content("~/Scripts/classie.js")"></script>
+    <script src="@Url.Content("~/Scripts/mlpushmenu.js")"></script>
+    <script>
+        new mlPushMenu(document.getElementById('mp-menu'), document.getElementById('trigger'), {
+            type: 'cover'
+        });
+    </script>
+</body>
+
+</html>
+<script type="text/javascript">
+        String.prototype.toPersianDigit = function (a) { return this.replace(/\d+/g, function (digit) { var enDigitArr = [], peDigitArr = []; for (var i = 0; i < digit.length; i++) { enDigitArr.push(digit.charCodeAt(i)); } for (var j = 0; j < enDigitArr.length; j++) { peDigitArr.push(String.fromCharCode(enDigitArr[j] + ((!!a && a == true) ? 1584 : 1728))); } return peDigitArr.join(''); }); }; function TraceNodes(Node) {
+            if (Node.nodeType == 3)
+                document.toPersianDigit();
+            //TextNode Node.nodeValue = Node.nodeValue.toPersianDigit(); else for (var i = 0; i < Node.childNodes.length; i++) TraceNodes(Node.childNodes[i]); } TraceNodes(document);
+            (function ($) {
+                $("input[type = 'radio']").click(function () {
+                    $(this).parents("form").submit(); // post form
+                });
+
+            })(jQuery);
+        }
+</script>

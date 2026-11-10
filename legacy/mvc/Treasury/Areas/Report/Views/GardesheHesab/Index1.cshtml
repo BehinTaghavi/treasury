@@ -1,0 +1,65 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+@using CSD.Treasury.Resourse
+@{
+    Layout = null;
+    var S = "List1";
+}
+<div class="pull-left">
+    @Html.ActionLink(Resources.Back, "SearchView1", "GardesheHesab", new { Area = "Report" }, new { @class = "btn btn-default btn-sm" })
+</div>
+<div>
+    @if (Model.BankId!=0)
+    {
+        S = S + "/?BankId=" + Model.BankId + "";
+    }
+    @*@if (Model.BasicBank != 0)
+        {
+            S = S + "&BasicBank=" + Model.BasicBank;
+        }*@
+    @if (!string.IsNullOrEmpty(Model.FromDate))
+    {
+        S = S + "&FromDate=" + Model.FromDate + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.ToDate))
+    {
+        S = S + "&ToDate=" + Model.ToDate;
+    }
+     @if(Model.ShowSum)
+     {
+         S = S + "&ShowSum=" + Model.ShowSum;
+     }
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+
+{
+    Actions =
+    {
+        GetReportSnapshot = S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+    },
+    Toolbar =
+    {
+        BackgroundColor= System.Drawing.Color.Silver,
+         ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+         ShowTooltips=false,
+
+    },
+
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+
+</div>
+
+
+

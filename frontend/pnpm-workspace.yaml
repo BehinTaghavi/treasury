@@ -1,0 +1,7 @@
+packages:
+  - shell
+  - remotes/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - esbuild

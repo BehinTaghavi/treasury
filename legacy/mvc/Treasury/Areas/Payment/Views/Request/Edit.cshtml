@@ -1,0 +1,903 @@
+﻿@model CSD.Treasury.DataModel.Request_Payment
+
+@using CSD.Treasury.Common.Enumeration;
+@{
+    ViewBag.Title = Resources.Edit + "" + Resources.RequestPayment;
+    int i = -1;
+    //var Request_Payment_BreakPriceLs = ViewBag.Request_Payment_BreakPriceLs;
+}
+@section PageHeader{
+    <div class="clearfix">
+        <div class="pull-right">
+            @Resources.Edit @Resources.RequestPayment
+        </div>
+        <div class="pull-left">
+            @Html.ActionLink(Resources.Return, "Index", "Request", new { Area = "Payment", PageIndex = ViewBag.PageIndex }, new { @class = "btn btn-default btn-sm" })
+        </div>
+    </div>
+
+}
+
+
+@using (Html.BeginForm("Edit", "Request", new { PageIndex = ViewBag.PageIndex }, FormMethod.Post, new { id = "requestForm" }))
+{
+    <div class="clearfix">
+        <div class="pull-left"><span class="moment-date mdc-text-grey-600" data-lang-number="fa">@Model.RequestDate</span></div>
+
+        <div class="pull-right">
+            <button id="btnSubmit" type="submit" class="btn btn-primary" onsubmit="$(this).prop('disabled', true);">@Resources.Save</button>
+        </div>
+
+    </div>
+    @Html.AntiForgeryToken()
+    @Html.Hidden("RequestCreatedTime", DateTime.Now.ToString("h:mm"))
+    @Html.HiddenFor(model => model.RequestDate)
+    @Html.HiddenFor(model => model.RequestID)
+    @Html.HiddenFor(model => model.UserID)
+    <div class="container-fluid">
+
+        @if (Request.IsAuthenticated && (User.IsInRole("Admin") || User.IsInRole("RequestPayment") || User.IsInRole("Manager")))
+        {
+            <div class="form-group">
+                <label class="control-label" for="Pay_TypeDetailID_source">@Resources.PayType</label>
+                <div class="row">
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            @if (ViewBag.DisablePay_TypeDetailID_source)
+                            {
+                                @Html.DropDownListFor(d => d.Pay_TypeDetailID_source, new SelectList(ViewBag.Receipt_Pay_TypeDetailLs, "Receipt_Pay_TypeDetailID", "Receipt_Pay_TypeDetailDescription"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control",@disabled= "disabled", @readonly= "readonly" })
+                                @Html.HiddenFor(model=>model.Pay_TypeDetailID_source)   
+                            }
+                            else
+                            {
+                                @Html.DropDownListFor(d => d.Pay_TypeDetailID_source, new SelectList(ViewBag.Receipt_Pay_TypeDetailLs, "Receipt_Pay_TypeDetailID", "Receipt_Pay_TypeDetailDescription"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control" })
+                            }
+
+                            @Html.ValidationMessageFor(model => model.Pay_TypeDetailID_source)
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">                
+                    <div class="col-sm-6" style="display:@((Model.Pay_TypeDetailID_source.HasValue && (Model.Pay_TypeDetailID_source == 1 || Model.Pay_TypeDetailID_source == 4 || Model.Pay_TypeDetailID_source == 5 || Model.Pay_TypeDetailID_source == 7)) ? "block" : "none")">
+                        <div class="form-group">
+                            @Html.DropDownListFor(d => d.Source_TypeID, new SelectList(ViewBag.SourceDestinationTypesLs, "Source_DestinationTypeID", "Source_DestinationTypeDescription"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.From })
+                            @Html.ValidationMessageFor(model => model.Source_TypeID)
+                        </div>
+                    </div>
+                    <div class="col-sm-6" style="display:@((Model.Pay_TypeDetailID_source.HasValue && (Model.Pay_TypeDetailID_source == 1 || Model.Pay_TypeDetailID_source ==2 || Model.Pay_TypeDetailID_source == 4 || Model.Pay_TypeDetailID_source ==5 || Model.Pay_TypeDetailID_source ==7)) ? "block" : "none")">
+                        <div class="form-group">
+                            <select id="Source_PaymentValue" name="Source_PaymentValue" class="form-control floating-label" placeholder="@Resources.Number @Resources.Source">
+                                @Html.Raw(ViewBag.PaymentValueLs)
+                            </select>
+                            @Html.ValidationMessageFor(model => model.Source_PaymentValue)
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+
+                    <div class="col-sm-6" style="display:@((Model.Pay_TypeDetailID_source.HasValue && Model.Pay_TypeDetailID_source == 5) ? "block" : "none")">
+                        <div class="form-group">
+                            @Html.DropDownListFor(d => d.Destination_TypesID, new SelectList(ViewBag.SourceDestinationTypesLs, "Source_DestinationTypeID", "Source_DestinationTypeDescription"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.To })
+                            @Html.ValidationMessageFor(model => model.Destination_TypesID)
+                        </div>
+                    </div>
+                    <div class="col-sm-6" style="display:@((Model.Pay_TypeDetailID_source.HasValue && Model.Pay_TypeDetailID_source == 5) ? "block" : "none")">
+                        <div class="form-group">
+                            <select id="Destination_PaymentValue" name="Destination_PaymentValue" class="form-control floating-label" placeholder="@Resources.Number @Resources.Source">
+                                @Html.Raw(ViewBag.DestinationValueLs)
+                            </select>
+                            @Html.ValidationMessageFor(model => model.Destination_PaymentValue)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+    <hr />
+    <div class="clearfix">
+        <div class="col-sm-7">
+            <div class="form-group" id="UniqueAccount1">
+                <div class="row">
+                    <label class="control-label col-sm-2" for="UniqueAccountType">@Resources.UniqueAccountType</label>
+                    <div class="col-sm-3">
+                        @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), string.Empty, new { data_lang_number = "fa", @class = "form-control UniqueAccountType", placeholder = "نوع ذینفع", data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                    </div>
+                    <label class="control-label col-sm-2" for="Unique_Account_No">@Resources.Unique_Account_Code </label>
+                    <div class="col-md-5">
+                        @Html.DropDownListFor(model => model.Unique_Account_No, new SelectList(ViewBag.SlectedLs, "Account_Code", "Account_Name", new { Type_Code = Model.Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                    </div>
+                    @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                </div>
+            </div>
+
+
+            <div class="form-group" id="UniqueAccount2">
+                <div class="row">
+                    <label class="control-label col-sm-2" for="UniqueAccountType2">@Resources.Main_Unique_Account_No</label>
+                    <div class="col-sm-3">
+                        @Html.DropDownList("UniqueAccountType2", new SelectList(ViewBag.unique_account_type2, "Code", "Description", ViewBag.uniqueTypeId2), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = "نوع ذینفع", data_bind = "Main_Unique_Account_No", data_code_att = "Code2", data_name_att = "Name2", updatetargetid = "acc2" })
+                    </div>
+                    <label class="control-label col-sm-2" for="@Model.Main_Unique_Account_No">@Resources.Unique_Account_Code </label>
+                    <div class="col-md-5">
+                        @if (ViewBag.SlectedLsMain != null)
+                        {
+                            @Html.DropDownListFor(model => model.Main_Unique_Account_No, new SelectList(ViewBag.SlectedLsMain, "Account_Code", "Account_Name", new { Type_Code = Model.Main_Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label js-data-example-ajax", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        }
+                        else
+                        {
+                            @Html.DropDownListFor(model => model.Main_Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        }
+
+                        @*@Html.HiddenFor(d => d.Main_Unique_Account_No, (string)ViewBag.main_Unique_Account_Code)
+                            <div class="dropdown keep-open lookup">
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <input type="text" value="@ViewBag.uniqueAccount_Code2" lookup data-action="UniqueAccount"  autocomplete="off" data-related="Name2" placeholder="@Resources.Unique_Account_Code"  autocomplete="off" name="Code2" id="Code2" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                    </div>
+                                    <div class="col-xs-8">
+                                        <input type="text" value="@ViewBag.uniqueAccount_Name2" lookup data-action="UniqueAccount"  autocomplete="off" data-related="Code2" placeholder="@Resources.Unique_Account_No" autocomplete="off" name="Name2" id="Name2" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                    </div>
+                                </div>
+                                <ul class="dropdown-menu" style="width: 100%">
+                                    <li class="UniqueAccountList" id="acc2">
+                                    </li>
+                                </ul>
+                            </div>*@
+                        @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                    </div>
+                </div>
+            </div>
+
+
+
+            <hr />
+            <div class="form-group">
+                <div class="row">
+                    <label class="control-label col-sm-2" for="BehalfGropId">@Resources.BehalfGroupID</label>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            @Html.DropDownList("BehalfGropId", new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription", ViewBag.BehalfGroupId), new { data_lang_number = "fa", @class = "form-control" })
+                            @*@Html.ValidationMessageFor(model => model.BehalfGropId)*@
+                        </div>
+                    </div>
+                    <label class="control-label col-sm-2" for="BehalfID">@Resources.Behalf</label>
+                    <div class="col-sm-3">
+                        <div class="form-group">
+                            @Html.DropDownList("BehalfID", new SelectList(ViewBag.BehalfsLs, "BehalfID", "BehalfDescription"), new { data_lang_number = "fa", @class = "form-control" })
+                            @Html.ValidationMessageFor(model => model.BehalfID)
+                        </div>
+                    </div>
+                    <div class="col-sm-2">
+                        <button id="Behalfs" class="btn btn-material-light-blue-A700 btn-sm" type="button">@Resources.Create @Resources.Behalf</button>
+                    </div>
+
+                </div>
+            </div>
+            <div>
+                <div id="RefrenceLable">
+                    @Html.Raw(Utility.GetReferenceTypeValue(Model.RequestID))
+                </div>
+            </div>
+
+
+
+
+        </div>
+        <div class="col-sm-5">
+            <div class="form-group">
+                <div class="row">
+                    <label class="control-label col-sm-2" for="Priority">@Resources.Priority</label>
+                    <div class="col-sm-4">
+                        <select id="Priority" name="Priority" class="form-control" placeholder=@Resources.Priority>
+                            @foreach (var item in EnumUtility.ToList(typeof(Priority), "", "", "", false))
+                            {
+                                <option value="@(item.Id)" @(item.Id == Model.Priority ? "selected='selected'" : "")>
+                                    @item.Title
+                                </option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="row">
+                    <label class="control-label col-xs-2">
+                        @Resources.PayAmount
+                    </label>
+                    <div class="col-xs-7">
+                        @Html.TextBoxFor(model => model.PayAmount, new { @min = "1", required = "required", data_lang_number = "fa", @class = "form-control", placeholder = Resources.PayAmount })
+
+                        @Html.ValidationMessageFor(model => model.PayAmount)
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <div class="row">
+                        <label id="labelExchange" class="control-label col-xs-2 hidden">
+                            @Resources.ExchangeRate
+                        </label>
+                        <div class="col-xs-3">
+                            @Html.TextBoxFor(model => model.ExchangeTypeID, new { @type = "hidden", @readonly = "readonly", data_lang_number = "fa", @class = "form-control" })
+                            @Html.TextBoxFor(model => model.ExchangeRate, new { @readonly = "readonly", data_lang_number = "fa", @class = "form-control hidden" })
+                            @*@Html.ValidationMessageFor(model => model.ExchangeRate)*@
+                        </div>
+                        <label id="labelExchangeInfo" class="control-label col-xs-2 hidden">
+                            @Resources.ExchangeTypeDescription
+                        </label>
+                        <div id="ExchangeInfo" class="col-xs-3"></div>
+                    </div>
+
+                </div>
+
+
+
+
+                @*@if (Model.Pay_TypeDetailID_source == 7)
+        {
+            <button type="button" class="btn btn-material-grey-600" id="addExchange">اضافه کردن ارز</button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-material-grey-600" id="addExchange" style="display: none;">اضافه کردن ارز</button>
+        }
+        <div id="exchangePanel">
+            @foreach (var item in Model.Request_Payment_BreakPrice)
+            {
+                var id = Guid.NewGuid().ToString("N");
+                i++;
+                <div class="panel">
+                    <div class="panel-body mdc-bg-grey-100" style="position: relative">
+                        <div class="form-group">
+                            <div class="row">
+                                <label class="control-label col-xs-2">
+                                    @Resources.ExchangeType
+                                </label>
+                                <div class="col-xs-3">
+                                    <select class="form-control ExchangeTypeID valid" data-lang-number="fa" data-val="true" data-val-number="The field ExchangeTypeID must be a number." data-val-required="The ExchangeTypeID field is required." id="item_ExchangeTypeID" name="Request_Payment_BreakPriceLs[@i].ExchangeTypeID" placeholder="نوع ارز" relatedid="@id">
+
+                                        @foreach (var ex in Utility.GetExchangeLs())
+                                        {
+
+                                            <option value="0" selected></option>
+                                            if (ex.ExchangeTypeID == item.ExchangeTypeID)
+                                            {
+                                                <option selected value="@ex.ExchangeTypeID">@ex.ExchangeTypeDescription</option>
+                                            }
+                                            else
+                                            {
+                                                <option value="@ex.ExchangeTypeID">@ex.ExchangeTypeDescription</option>
+                                            }
+                                        }
+
+                                    </select>
+                                    <span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[@i].ExchangeTypeID" data-valmsg-replace="true"></span>
+
+                                </div>
+                                <label class="control-label col-xs-2 ShowExchangeRate hidden">
+                                    @Resources.ExchangeRate
+                                </label>
+                                @(item.ExchangeTypeID)
+                                @if (item.ExchangeTypeID == 0)
+                                {
+
+                                    <div class="col-xs-3 ShowExchangeRate hidden">
+                                        <input disabled="disabled" class="form-control Exchange_Rate" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Rate must be a number." data-val-required="The Exchange_Rate field is required." id="item_Exchange_Rate" name="Request_Payment_BreakPriceLs[@i].Exchange_Rate" placeholder="نرخ ارز" relatedid="@id" type="number">
+                                        <span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[@i].Exchange_Rate" data-valmsg-replace="true"></span>
+
+                                    </div>
+                                }
+                                else if (item.ExchangeTypeID == 1)
+                                {
+                                    <div class="col-xs-3 ShowExchangeRate hidden">
+                                        <input value="@((int)item.Exchange_Rate)" class="form-control Exchange_Rate" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Rate must be a number." data-val-required="The Exchange_Rate field is required." id="item_Exchange_Rate" name="Request_Payment_BreakPriceLs[@i].Exchange_Rate" placeholder="نرخ ارز" relatedid="@id" type="number">
+                                        <span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[@i].Exchange_Rate" data-valmsg-replace="true"></span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="col-xs-3 ShowExchangeRate">
+                                        <input value="@((int)item.Exchange_Rate)" class="form-control Exchange_Rate" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Rate must be a number." data-val-required="The Exchange_Rate field is required." id="item_Exchange_Rate" name="Request_Payment_BreakPriceLs[@i].Exchange_Rate" placeholder="نرخ ارز" relatedid="@id" type="number">
+                                        <span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[@i].Exchange_Rate" data-valmsg-replace="true"></span>
+                                    </div>
+                                }
+
+                            </div>
+                        </div>
+                        <div class="form-group form-group-material-indigo-500">
+                            <div class="row">
+                                <label class="control-label col-xs-2">
+                                    @Resources.PayAmount
+                                </label>
+                                <div class="col-xs-7">
+                                    <input class="form-control Exchange_Amount" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Amount must be a number." data-val-required="The Exchange_Amount field is required." id="item_Exchange_Amount" name="Request_Payment_BreakPriceLs[@i].Exchange_Amount" placeholder="مبلغ" relatedid="@id" type="number" value="@((Int64)item.Exchange_Amount)">
+                                    <span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[@i].Exchange_Amount" data-valmsg-replace="true"></span>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <label class="control-label col-xs-10 col-xs-offset-2 col-sm-offset-2 col-md-offset-2 col-lg-offset-2">
+                                    <b id="@id" class="mdc-text-green-700 Exchange_AmountText"></b>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>*@
+            </div>
+        </div>
+    </div>
+
+
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script src="@Url.Content("~/Scripts/wordifyfa.js")"></script>
+<script type="text/javascript">
+
+    $(function () {
+        $.material.init();
+        $('#Behalfs').click(function () {
+            if ($('#BehalfGropId').val() == "") {
+                alert("@Resources.PleaseSelect @Resources.BehalfGroup");
+            }
+            else {
+                $.ajax({
+                    type: "Post",
+                    url: "/BasicInfo/Behalf/Index",
+                    data: { BehalfGroupID: $('#BehalfGropId').val(), BehalfGroupDescription: " ", FromCreateRequest: true },
+
+                    success: function (data, status) {
+                        modal(data, '@Resources.BehalfGroup ', 'md');
+
+                    }
+                });
+            }
+        });
+    });
+    $('#requestForm').submit(function () {
+        $('#btnSubmit').attr('disabled', 'disabled');
+    });
+
+    $(document).ready(function () {
+        var ExchangeTypeID = @(Model.ExchangeTypeID.HasValue ? Model.ExchangeTypeID.Value : 0);
+        if (ExchangeTypeID != 0) {
+            document.getElementById("Pay_TypeDetailID_source").selectedIndex = @Model.Pay_TypeDetailID_source ; //"1";
+            document.getElementById("Pay_TypeDetailID_source").setAttribute("disabled", "disabled");
+            //*************************************************
+            $('#ExchangeRate').removeClass("hidden");
+            $('#labelExchange').removeClass("hidden");
+            $('#ExchangeInfo').removeClass("hidden");
+            $('#ExchangeTypeId').removeClass("hidden");
+
+            //*************************************************
+        }
+
+        $(".js-data-example-ajax").select2({
+            dir: "rtl",
+            containerCssClass: "form-control"
+        }
+            );
+        if ($('#ExchangeTypeID').val() != 1) {
+            $('#ShowExchangeRate').removeClass("hidden");
+        }
+        $("#BehalfGropId").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: 20,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: $('#UniqueAccountType').val(),
+                        q: params.term, // search term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * 20 < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; },
+            minimumInputLength: 1,
+
+        });
+    });
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+    $(".moment-date").text(moment(today, 'YYYY-M-D').format('jYYYY/jM/jD'));
+    $("#RequestDate").val(moment(today, 'YYYY-M-D').format('jYYYY/jMM/jDD').split('/').join(""))
+    $("#FiscalYear").val(moment(today, 'YYYY-M-D').format('jYYYY'))
+    $(".datepicker").val(moment(today, 'YYYY-M-D').format('jYYYY/jM/jD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/m/d",
+        maxDate: new Date()
+    });
+    $('.timepicker').timepicker({
+        template: false,
+        showInputs: false,
+        minuteStep: 1,
+        showMeridian: false
+    });
+    $(function () {
+        $(".Exchange_AmountText").text(wordifyfa($(".Exchange_Amount[relatedId=" + $(this).attr("id") + "]").val(), 0) + " " + $(".ExchangeTypeID[relatedId=" + $(this).attr("id") + "] option:selected").text());
+        var interval = setInterval(function () {
+            $(".Exchange_Amount").each(function (index) {
+                var e = $.Event('keyup');
+                e.which = 65; // Character 'A'
+                $(this).trigger(e);
+            });
+        }, 1000)
+
+
+        $("body").on("keyup", ".Exchange_Amount", function () {
+            var val = $(this).val();
+            var relatedId = $(this).attr("relatedid");
+            $(".Exchange_AmountText[id=" + relatedId + "]").text(wordifyfa(val, 0) + " " + $(".ExchangeTypeID[relatedId=" + relatedId + "] option:selected").text());
+        });
+        $("body").on("change", ".Exchange_Amount", function () {
+            var relatedId = $(this).attr("relatedId");
+            var val = $(this).val();
+            $(".Exchange_AmountText[id=" + relatedId + "]").text(wordifyfa(val, 0) + " " + $(".ExchangeTypeID[relatedId=" + relatedId + "] option:selected").text());
+        });
+        $("body").on("change", ".ExchangeTypeID", function () {
+            var relatedId = $(this).attr("relatedId");
+            $(".Exchange_AmountText[id=" + relatedId + "]").text(wordifyfa($(".Exchange_Amount[relatedId=" + relatedId + "]").val(), 0) + " " + $(".ExchangeTypeID[relatedId=" + relatedId + "] option:selected").text());
+        })
+        var exchangeNumber = "@i";
+        $("body").on("click", "#addExchange", function () {
+            var _id = guid();
+            exchangeNumber = parseInt(exchangeNumber) + 1;
+            $("#exchangePanel").append('<div class="panel"><div class="panel-body mdc-bg-grey-100" style="position: relative"><div class="form-group"><div class="row"><label class="control-label col-xs-2">نوع ارز</label><div class="col-xs-3"><select class="form-control ExchangeTypeID" data-lang-number="fa" data-val="true" data-val-number="The field ExchangeTypeID must be a number." data-val-required="The ExchangeTypeID field is required." id="item_ExchangeTypeID" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].ExchangeTypeID" placeholder="نوع ارز" relatedid="' + _id + '"><option value="1">ريال</option><option value="2">دلار</option><option value="28">يورو</option></select><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].ExchangeTypeID" data-valmsg-replace="true"></span></div><label class="control-label col-xs-2 ShowExchangeRate hidden">نرخ ارز</label><div class="col-xs-3 ShowExchangeRate hidden"><input value="1" class="form-control Exchange_Rate" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Rate must be a number." data-val-required="The Exchange_Rate field is required." id="item_Exchange_Rate" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Rate" placeholder="نرخ ارز" relatedid="' + _id + '" type="number"><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Rate" data-valmsg-replace="true"></span></div></div></div><div class="form-group form-group-material-indigo-500"><div class="row"><label class="control-label col-xs-2">مبلغ</label><div class="col-xs-7"><input class="form-control Exchange_Amount" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Amount must be a number." data-val-required="The Exchange_Amount field is required." id="item_Exchange_Amount" max="1000000000000" min="1000" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Amount" placeholder="مبلغ" relatedid="' + _id + '" type="number" value="1000"><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Amount" data-valmsg-replace="true"></span></div></div><div class="row"><label class="control-label col-xs-10 col-xs-offset-2 col-sm-offset-2 col-md-offset-2 col-lg-offset-2"><b id="' + _id + '" class="mdc-text-green-700 Exchange_AmountText"> </b></label></div></div></div></div>')
+            //<a class="btn btn-link mdc-text-red-A700 removeItem" style="line-height: 30px;text-align: center;position: absolute;left: 15px;top: 15px;width: 15px;cursor: pointer;font-size: 20px; z-index: 10" title="حذف"><i class="zmdi zmdi-close"></i></a>
+            //Remove current form validation information
+            $("form")
+                .removeData("validator")
+                .removeData("unobtrusiveValidation");
+
+            //Parse the form again
+            $.validator
+                .unobtrusive
+                .parse("form");
+        });
+        $("body").on("click", ".removeItem", function () {
+            $(this).parent().parent().remove();
+        });
+
+        function guid() {
+            function s4() {
+                return Math.floor((1 + Math.random()) * 0x10000)
+                  .toString(16)
+                  .substring(1);
+            }
+            return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+              s4() + '-' + s4() + s4() + s4();
+        }
+        $("body").on("change", "#referenceTypeID", function () {
+            var txt = ""
+            if ($(this).val() != 0) {
+                var txt = $("#referenceTypeID option:selected").text();
+            }
+            $("#referenceTypeValue").parent().find(".floating-label").text("شماره " + txt);
+        });
+        @*if ($("#BehalfGropId").val() != "") {
+            $('#UniqueAccount1').removeClass('hidden');
+            $('#UniqueAccount2').removeClass('hidden');
+            $("#RefrenceLable").empty();
+            var address = "@(Url.Action("GetBehalfs", "Request", new { Area= "Payment" }))";
+            $("#BehalfID").load(address, { id: $("#BehalfGropId").val() }, function (data) {
+                $("#BehalfID").val($("#BehalfID option:first").val());
+            });
+
+            var BehalfGroupID = $('#BehalfGropId').val();
+
+            var url = "@(Url.Action("GetReferenceTypeByBehalfGroup", "Request", new { Area= "Payment"}))";
+            url = url + "?BehalfGroupID=" + BehalfGroupID;
+            $("#RefrenceLable").hide();
+            $("#RefrenceLable").load(url, { id: $("#BehalfGropId").val() }, function () { $("#RefrenceLable").show() });
+        }*@
+        $("body").on("change", "#BehalfGropId", function () {
+            if ($(this).val() != "") {
+                $('#UniqueAccount1').removeClass('hidden');
+                $('#UniqueAccount2').removeClass('hidden');
+                $("#RefrenceLable").empty();
+                var address = "@(Url.Action("GetBehalfs", "Request", new { Area= "Payment" }))";
+                $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                    $("#BehalfID").val($("#BehalfID option:first").val());
+                });
+
+                var BehalfGroupID = $('#BehalfGropId').val();
+
+                var url = "@(Url.Action("GetReferenceTypeByBehalfGroup", "Request", new { Area= "Payment"}))";
+                url = url + "?BehalfGroupID=" + BehalfGroupID;
+                $("#RefrenceLable").hide();
+                $("#RefrenceLable").load(url, { id: $(this).val() }, function () { $("#RefrenceLable").show() });
+            }
+            else {
+                $("#BehalfID").html("");
+            }
+        })
+        $("body").on("change", "#Pay_TypeDetailID_source", function () {
+
+            if ($(this).val() == "7") {
+                $("#addExchange").show();
+            }
+            else {
+                $("#addExchange").hide();
+            }
+            var _id = guid();
+            exchangeNumber = 0;
+            var _val = $("#item_Exchange_Amount").val();
+            $("#exchangePanel").html("");
+            $("#exchangePanel").append('<div class="panel"><div class="panel-body mdc-bg-grey-100" style="position: relative"><div class="form-group"><div class="row"><label class="control-label col-xs-2">نوع ارز</label><div class="col-xs-3"><select class="form-control ExchangeTypeID" data-lang-number="fa" data-val="true" data-val-number="The field ExchangeTypeID must be a number." data-val-required="The ExchangeTypeID field is required." id="item_ExchangeTypeID" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].ExchangeTypeID" placeholder="نوع ارز" relatedid="' + _id + '"><option value="1">ريال</option><option value="2">دلار</option><option value="28">يورو</option></select><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].ExchangeTypeID" data-valmsg-replace="true"></span></div><label class="control-label col-xs-2 ShowExchangeRate hidden">نرخ ارز</label><div class="col-xs-3 ShowExchangeRate hidden"><input value="1" class="form-control Exchange_Rate" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Rate must be a number." data-val-required="The Exchange_Rate field is required." id="item_Exchange_Rate" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Rate" placeholder="نرخ ارز" relatedid="' + _id + '" type="number"><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Rate" data-valmsg-replace="true"></span></div></div></div><div class="form-group form-group-material-indigo-500"><div class="row"><label class="control-label col-xs-2">مبلغ</label><div class="col-xs-7"><input class="form-control Exchange_Amount" data-lang-number="fa" data-val="true" data-val-number="The field Exchange_Amount must be a number." data-val-required="The Exchange_Amount field is required." id="item_Exchange_Amount" max="1000000000000" min="1000" name="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Amount" placeholder="مبلغ" relatedid="' + _id + '" type="number" value="' + _val + '"><span class="field-validation-valid" data-valmsg-for="Request_Payment_BreakPriceLs[' + exchangeNumber + '].Exchange_Amount" data-valmsg-replace="true"></span></div></div><div class="row"><label class="control-label col-xs-10 col-xs-offset-2 col-sm-offset-2 col-md-offset-2 col-lg-offset-2"><b id="' + _id + '" class="mdc-text-green-700 Exchange_AmountText"> </b></label></div></div></div></div>')
+            //<a class="btn btn-link mdc-text-red-A700 removeItem" style="line-height: 30px;text-align: center;position: absolute;left: 15px;top: 15px;width: 15px;cursor: pointer;font-size: 20px; z-index: 10" title="حذف"><i class="zmdi zmdi-close"></i></a>
+            //Remove current form validation information
+            $("form")
+                .removeData("validator")
+                .removeData("unobtrusiveValidation");
+
+            //Parse the form again
+            $.validator
+                .unobtrusive
+                .parse("form");
+            var address = "@(Url.Action("GetSource", "Request", new { Area= "Payment" }))";
+            var address1 = "@(Url.Action("GetDestination", "Request", new { Area= "Payment" }))";
+            var address2 = "@(Url.Action("CheckDueDate", "Request", new { Area= "Payment" }))";
+
+            if ($('#Pay_TypeDetailID_source').val() != 0) {
+                $("#Source_TypeID").load(address, { id: $(this).val() }, function (data) {
+                    if (data.length < 10) { $("#Source_TypeID").parent().parent().parent().hide(); $("#Source_PaymentValue").parent().parent().parent().hide(); }
+                    else {
+                        $("#Source_TypeID").parent().parent().parent().show();
+                        $("#Source_TypeID").removeClass("empty");
+                        $("#Source_PaymentValue").parent().parent().parent().show();
+                        $("#Source_PaymentValue").removeClass("empty");
+                        $("#Source_TypeID").val($("#Source_TypeID option:first").val());
+                        //Fill To
+
+                        if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.BankCheque)') {
+                            var address = "@(Url.Action("GetBanks", "Request", new { Area= "Payment", destination = true }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.Cash)') {
+                            var address = "@(Url.Action("GetCashDesk", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.CardBank)') {
+                            var address = "@(Url.Action("GetBankCard", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                    }
+                });
+                $("#Destination_TypesID").load(address1, { id: $(this).val() }, function (data) {
+                    if (data.length < 10) { $("#Destination_TypesID").parent().parent().parent().hide(); $("#Destination_PaymentValue").parent().parent().parent().hide(); }
+                    else {
+                        $("#Destination_TypesID").parent().parent().parent().show();
+                        $("#Destination_TypesID").removeClass("empty");
+                        $("#Destination_PaymentValue").parent().parent().parent().show();
+                        $("#Destination_PaymentValue").removeClass("empty");
+                        $("#Destination_TypesID").val($("#Destination_TypesID option:first").val());
+                        //Fill To
+                        if ($('#Destination_TypesID').val() == '@((int)Source_DestinationType.BankCheque)') {
+                            var address = "@(Url.Action("GetBanks", "Request", new { Area= "Payment"}))";
+                            console.log(address);
+                            $("#Destination_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Destination_PaymentValue").val($("#Destination_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Destination_TypesID').val() == '@((int)Source_DestinationType.Cash)') {
+                            var address = "@(Url.Action("GetCashDesk", "Request", new { Area= "Payment" }))";
+                            $("#Destination_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Destination_PaymentValue").val($("#Destination_PaymentValue option:first").val()).show();
+                            });
+                        }
+                        else if ($('#Source_TypeID').val() == '@((int)Source_DestinationType.CardBank)') {
+                            var address = "@(Url.Action("GetBankCard", "Request", new { Area= "Payment" }))";
+                            $("#Source_PaymentValue").load(address, { id: $(this).val() }, function (data) {
+                                $("#Source_PaymentValue").val($("#Source_PaymentValue option:first").val()).show();
+                            });
+                        }
+                    }
+                });
+
+            }
+            else {
+                $("#Source_TypeID").text("---");
+                $("#Source_TypeID").val('0');
+                $("#Destination_TypesID").text("---");
+                $("#Destination_TypesID").val('0');
+            }
+        })
+        //Fill
+        //$("body").on("change", "#Source_TypeID", function () {
+
+        //});
+        //Fill
+        //$("body").on("change", "#Destination_TypesID", function () {
+
+        //});
+
+        @*$("body").on("change", ".UniqueAccountType", function () {
+            var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+            var _this = $(this);
+            if (_this.val() != 0) {
+                $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") }, function () {
+                    $("input[name=" + _this.attr("data-code-att") + "]").focus();
+                    $("input[name=" + _this.attr("data-code-att") + "]").dropdown('toggle');
+                    $("input[name=" + _this.attr("data-code-att") + "]").parents(".dropdown").addClass("open");
+                    $("input[name=" + _this.attr("data-code-att") + "]").on({
+                        "click": function () { $("input[name=" + _this.attr("data-code-att") + "]").parents(".dropdown").addClass("open"); }
+                    });
+
+                });
+            }
+            else {
+                $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") }).ajaxComplete(function () {
+                    alert("a");
+                    $("input[name=" + $(this).attr("data-code-att") + "]").focus();
+                });
+            }
+        });*@
+        var formData = new FormData(document.getElementsByTagName("form")[0]);
+        var lookup = document.querySelectorAll("[lookup]");
+        for (var i = 0; i < lookup.length; i++) {
+            lookup[i].onkeyup = function () {
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.onreadystatechange = function () {
+                    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                        document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                    }
+                }
+                var type = document.getElementById("UniqueAccountType");
+                var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                    ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                    ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+                xmlhttp.open("GET",
+                    address
+                    , true);
+                xmlhttp.send();
+            }
+        }
+        function getLookupDataItem(e) {
+            document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content").trim();
+            for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+                var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+                elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+            }
+        }
+        $('.dropdown.keep-open').on({
+            "click": function () { this.classList.add("open"); this.closable = true; },
+            "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+        });
+
+    })
+
+
+
+    function findAncestor(el, cls) {
+        while ((el = el.parentElement) && !el.classList.contains(cls));
+        return el;
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");
+        }
+    }
+    var pageSize = 20;
+    $("body").on("change", "#UniqueAccountType2", function () {
+        $('#Main_Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Main_Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+
+    });
+
+
+
+
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+
+    //$('.dropdown.keep-open').on({
+    //    "click": function () { this.classList.add("open"); this.closable = true; },
+    //    "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    //});
+    $('#ExchangeTypeID').change(function () {
+        if ($('#ExchangeTypeID').val() != 1) {
+            $('#ShowExchangeRate').removeClass("hidden");
+        }
+        else {
+            $('#ShowExchangeRate').addClass("hidden");
+        }
+    });
+
+    $("#BehalfGropId").select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+
+
+    //*****************************************************************
+     $('#Source_PaymentValue').change(function () {
+        //if ($(document.getElementById('ExchangeRate').value != 0)) {
+         if (@Model.ExchangeRate!= null) {
+             if (@Model.CashDeskID!= null) {
+                    $("#ExchangeRate").attr("readonly", true);
+                    document.getElementById("ExchangeRate").setAttribute("value", "");
+                    document.getElementById('ExchangeRate').value = '';
+                    document.getElementById('ExchangeTypeID').value = '';
+                    $.ajax({
+                        url: "@Url.Action("GetArziCashDeskInfo", "Request", new { area = "Payment" })",
+                        data: {
+                            CashDeskId: $('#Source_PaymentValue').val(),
+                        },
+                        success: function (result) {
+                            document.getElementById('ExchangeRate').value =  result.ExchangeRate;
+                            $('#ExchangeTypeID').attr("value", result.ExchangeTypeID);
+                            if (result.ExchangeType == 4) {
+                                $("#ExchangeRate").attr("readonly", false);
+                            }
+
+                            //document.getElementById("ExchangeInfo").innerHTML = "I have changed!";
+                            document.getElementById("ExchangeInfo").innerHTML=result.ExchangeDesc;
+                        }
+                    });
+                    $("#ExchangeRate").removeClass("hidden");
+                    $("#labelExchange").removeClass("hidden");
+                    $("#labelExchangeInfo").removeClass("hidden");
+                }
+                else {
+
+                    document.getElementById('ExchangeTypeID').value = '';
+                    $.ajax({
+                        url: "@Url.Action("GetArziBankInfo", "Request", new { area = "Payment" })",
+                        data: {
+                            BankId: $('#Source_PaymentValue').val(),
+                        },
+                        success: function (result) {
+
+                            document.getElementById('ExchangeRate').value =  result.ExchangeRate;
+                            $('#ExchangeTypeID').attr("value", result.ExchangeTypeID);
+                            //if (result.ExchangeType == 4) {
+                            //    $("#ExchangeRate").attr("readonly", false);
+                            //}
+
+                            //document.getElementById("ExchangeInfo").innerHTML = "I have changed!";
+                            document.getElementById("ExchangeInfo").innerHTML=result.ExchangeDesc;
+                        }
+                    });
+                    $("#ExchangeRate").removeClass("hidden");
+                    $("#labelExchange").removeClass("hidden");
+                    $("#labelExchangeInfo").removeClass("hidden");
+
+                }
+
+            }
+
+
+        });
+
+
+
+
+
+</script>
+

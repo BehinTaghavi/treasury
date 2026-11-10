@@ -1,0 +1,41 @@
+﻿@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@{
+    ViewBag.Title = "SaveAccountSheba";
+}
+@using (Html.BeginForm("SaveAccountSheba", "Request", new { Area = "Payment" }, FormMethod.Post, new { id = "CreateRequset" }))
+{
+    @Html.HiddenFor(model=>model.Status)
+    @Html.HiddenFor(model=>model.RequestID)
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="form-group">
+                <div class="row">
+                    <label class="control-label col-sm-6" for="BehalfGropId">@(Resources.AccountNo) /@(Resources.Sheba) @(Resources.UniqueAccountType)</label>
+                    <div class="col-sm-6">
+                        <div class="form-group">
+                            @Html.DropDownListFor(m=>m.Description, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control" })
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="pull-right">
+            <button id="btnSubmit" type="submit" class="btn btn-primary" onsubmit="$(this).prop('disabled', true);">@Resources.Save</button>
+        </div>
+    </div>
+}
+<script type="text/javascript">
+    $(document).ready(function () {
+        var address = "@(Url.Action("GetAccountShebaNo", "Request", new { Area = "Payment" }))";  
+        var UniqueAccountNo = '@(Model.Unique_Account_No)';
+        address = address + "?UniqueAccountNo=" + UniqueAccountNo+"&RequestID="+@(Model.RequestID);
+
+        $("#Description").load(address, function (data) {
+          
+        });
+
+    });
+
+</script>

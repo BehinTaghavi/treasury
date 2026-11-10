@@ -1,0 +1,25 @@
+<Project>
+  <!--
+    Test projects use the xUnit v3 API ([Fact], [Theory], Assert).
+    Normal build (NuGet available): dotnet test (see README for the exact commands).
+    Offline build (no NuGet access): dotnet run with -p:Offline=true (see README).
+      In offline mode a small built-in shim provides the same attributes and Assert methods, and an entry point runs the tests.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' != 'Treasury.TestShim'">
+    <OutputType>Exe</OutputType>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Treasury.TestShim' And '$(Offline)' != 'true'">
+    <!-- xUnit v3 on Microsoft.Testing.Platform (see global.json): no VSTest adapter needed. -->
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'Treasury.TestShim' And '$(Offline)' == 'true'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Treasury.TestShim/Treasury.TestShim.csproj" />
+    <Compile Include="$(MSBuildThisFileDirectory)Treasury.TestShim/OfflineEntryPoint.cs.txt" Link="OfflineEntryPoint.cs" />
+  </ItemGroup>
+</Project>

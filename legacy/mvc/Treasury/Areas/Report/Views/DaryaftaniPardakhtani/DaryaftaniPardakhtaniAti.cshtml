@@ -1,0 +1,189 @@
+﻿@model  List<CSD.Treasury.DataModel.DaryaftaniPardakhtaniAti_Result>
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "DaryaftaniPardakhtaniAti";
+    Layout = "~/Views/Shared/Layout/Admin.cshtml";
+}
+@section PageHeader{
+    دریافتنی و پرداختنی آتی
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="row">
+                <div class="col-sm-12">
+                    @using (Ajax.BeginForm("list", "ReceiptCheck", new { Area = "Report" },
+new AjaxOptions()
+{
+UpdateTargetId = "Result",
+InsertionMode = InsertionMode.Replace,
+}, new { id = "SearchForm" }))
+                    {
+
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div class="text-left">
+                                    <button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Report</button>
+                                </div>
+                            </div>
+                        </div>
+                     
+                    }
+                </div>
+
+            </div>
+
+
+        </div>
+    </div>
+}
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>@Resources.FiscalYear</th>
+            <th>@Resources.Description</th>
+            <th>فروردین</th>
+            <th>اردیبهشت</th>
+            <th>خرداد</th>
+            <th>تیر</th>
+            <th>مرداد</th>
+            <th>شهریور</th>
+            <th>مهر</th>
+            <th>آبان</th>
+            <th>آذر</th>
+            <th>دی</th>
+            <th>بهمن</th>
+            <th>اسفند</th>
+
+        </tr>
+    </thead>
+    @foreach (var item in Model)
+    {
+        <tr>
+            <td>@item.FiscalYear</td>
+            <td>@item.PlaningTypeDesc</td>
+            <td>
+                @if (item.Mon == "01")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "02")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "03")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "04")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "05")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "06")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "07")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "08")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "09")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "10")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "11")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+            <td>
+                @if (item.Mon == "11")
+                {
+                    @Math.Truncate(item.Total.Value).ToString("#,##0")
+                }
+                else
+                {
+                    @(0)
+                }
+            </td>
+
+        </tr>
+    }
+</table>
+

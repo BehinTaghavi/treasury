@@ -1,0 +1,399 @@
+﻿@using CSD.Treasury.Resourse
+@model CSD.Treasury.UI.Models.ReceiptSearch
+@{
+    ViewBag.Title = "Index";
+}
+@section PageHeader{
+    @if (Model.isCheck)
+    {
+        @(Resources.Report + " " + Resources.ReceiptCheck)
+    }
+    else
+    {
+        @( Resources.Report + " " + Resources.Others + " " + Resources.Receive + "ها")
+    }
+
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="row">
+                <div class="col-sm-12">
+                    @using (Ajax.BeginForm("list", "ReceiptCheck", new { Area = "Report" },
+new AjaxOptions()
+{
+UpdateTargetId = "Result",
+InsertionMode = InsertionMode.Replace,
+}, new { id = "SearchForm" }))
+                    {
+                        @Html.HiddenFor(D => D.isCheck)
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="State" class="control-label">وضعیت</label>
+                                        </div>
+                                        @if (Model.isCheck)
+                                        {
+                                            <div class="col-xs-8">
+                                                <select id="State" name="State" class="form-control">
+                                                    <option value="0" selected="selected">همه</option>
+                                                    <option value="1">نزد صندوق</option>
+                                                    <option value="2">واگذار به بانک</option>
+                                                    <option value="5">خرج چک</option>
+                                                    <option value="6">عودت چکِ نزد صندوق</option>
+                                                    <option value="7">تبديل انتظامي به دريافتني</option>
+                                                    <option value="8">حقوقي کردن چک برگشتي</option>
+                                                    <option value="9">عودت چک وصول نشده از بانک</option>
+                                                    <option value="10">ابطال چک نزد صندوق</option>
+                                                    <option value="11">وصول شده</option>
+                                                    <option value="12">برگشت شده</option>
+                                                    <option value="15">تحويل لاشه چک انتظامي</option>
+                                                    <option value="16">عودت چک هاي خرج شده</option>
+                                                </select>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="col-xs-8">
+                                                <select id="State" name="State" class="form-control">
+                                                    <option value="0" selected="selected">همه</option>
+                                                    <option value="4">وصول مستقیم</option>
+                                                    <option value="17">موجودی نقد نزد صندوق</option>
+                                                    <option value="18">اسناد دریافتنی تضمینی</option>
+                                                    <option value="19">وجوه واریزی به بانک</option>
+                                                    <option value="18">سفته نزد صندوق</option>
+                                                </select>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="ExchangeTypeId" class="control-label">نوع ارز</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            <select id="ExchangeTypeId" name="ExchangeTypeId" class="form-control">
+                                                <option value="0" selected="selected">همه</option>
+                                                <option value="2">دلار</option>
+                                                <option value="28">يورو</option>
+                                                <option value="34">درهم</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+
+
+
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="RecieptTypeId" class="control-label">@Resources.ReceiptType</label>
+                                        </div>
+                                        @if (Model.isCheck)
+                                        {
+                                            <div class="col-xs-8">
+                                                <select id="RecieptTypeId" name="RecieptTypeId" class="form-control">
+                                                    <option value="0" selected="selected">---</option>
+                                                    <option value="18">چک روز</option>
+                                                    <option value="19">چک مدت دار</option>
+                                                    <option value="21">چک انتظامی</option>
+                                                    <option value="25">سفته</option>
+                                                    <option value="28">سفته انتظامی</option>
+                                                </select>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="col-xs-8">
+                                                <select id="RecieptTypeId" name="RecieptTypeId" class="form-control">
+                                                    <option value="0" selected="selected">---</option>
+                                                    <option value="22">واریز نقدی به صندوق </option>
+                                                    <option value="23">واریزنقدی به بانک</option>
+                                                    <option value="24">عابر بانک</option>
+                                                    <option value="27">واریز نقد به تنخواه</option>
+                                                </select>
+                                            </div>
+                                        }
+
+                                    </div>
+
+
+
+
+
+
+
+                                </div>
+
+
+
+
+                            </div>
+                            <div class="col-xs-4">
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        @*  <label for="FiscalYear" class="control-label">@Resources.FiscalYear</label>*@
+                                    </div>
+                                    <div class="col-xs-8">
+                                        @*@Html.TextBoxFor(model => model.FiscalYear, new { @type = "number", data_lang_number = "fa", @class = "form-control" })*@
+                                    </div>
+
+                                    <div class="col-xs-4">
+                                        <label for="UniqueAccountType" class="control-label">@Resources.Unique_Account_No</label>
+                                    </div>
+                                    <div class="col-sm-3">
+                                        <div class="form-group">
+                                            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                                        </div>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <div class="form-group">
+                                            @Html.DropDownListFor( model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label ", placeholder = Resources.Unique_Account_No })
+                                        </div>
+                                    </div>
+
+                                </div>
+
+
+
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <label for="Price" class="control-label">@Resources.Price</label>
+                                    </div>
+                                    <div class="col-xs-8">
+                                        <input id="Price" name="Price" class="form-control">
+                                    </div>
+
+                                </div>
+
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <label for="CheckNo" class="control-label"> @(Model.isCheck? @Resources.ChequeNo : @Resources.FishNo)</label>
+                                    </div>
+                                    <div class="col-xs-8">
+                                        <input id="CheckNo" name="ChequeNo" class="form-control">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-sm-4">
+                                <div class="text-left">
+                                    <button type="button" class="btn btn-info btn-sm" onclick="$('#State,#Price,#ExchangeTypeId,#Behalf,#BehalfGroupID,#CheckNo,#RecieptDateTo,#RecieptDateFrom,#DueDateTo,#DueDateFrom,#RecieptTypeId,#UniqueAccountType,#Unique_Account_No').val('');">@Resources.Empty</button>
+                                  
+                                    <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                                    <button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Report</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDateFrom" class="control-label">@Resources.DueDate  @Resources.From</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.DueDate })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDateTo" class="control-label">@Resources.DueDate  @Resources.To</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(model => model.DueDateTo, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.DueDate })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="clearfix">
+
+                            <div class="col-sm-4" style="@(Model.isCheck?"display:block":"display:none")">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDateFrom" class="control-label">@Resources.Date  @Resources.Receive  @Resources.From</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.RecieptDateFrom, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = @Resources.Date + " " + Resources.Receive })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4" style="@(Model.isCheck?"display:block":"display:none")">
+
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDateTo" class="control-label">@Resources.Date  @Resources.Receive @Resources.To</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(model => model.RecieptDateTo, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = @Resources.Date + " " + Resources.Receive })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+
+
+
+                        </div>
+
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="BehalfGroupID" class="control-label">@Resources.BehalfGroupID</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.DropDownList("BehalfGropId", new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = @Resources.BehalfGroupID })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div style="padding: 8px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="Behalf" class="control-label">@Resources.Behalf</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.DropDownList("BehalfID", Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = @Resources.Behalf })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    }
+                </div>
+
+            </div>
+
+
+        </div>
+    </div>
+}
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "ReceiptCheck", new { Area = "Report", Model })
+    </div>
+}
+
+
+<script>
+    $(function () {
+        $('body').on("click", "#report", function () {
+            var data = $('#SearchForm').serializeArray();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            xhttp.open("POST", "@Url.Action("ShowReport", "ReceiptCheck", new { Area = "Report" })", true);
+            xhttp.send(new FormData(document.querySelector("#SearchForm")));
+        })
+    });
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+
+    });
+    //$("#RecieptTypeId").select2({
+    //    tags: true,
+    //    dir: "rtl",
+    //    containerCssClass: "form-control",
+    //    templateSelection: formatRepoSelection,
+
+    //});
+
+    //function formatRepoSelection(repo) {
+    //    return repo.full_name || repo.text;
+    //}
+    function updateTable() {
+        var url = '@(Url.Action("List", "ReceiptCheck", new { area = "Report"  }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term,
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+            escapeMarkup: function (markup) { return markup; },
+            minimumInputLength: 1,
+        });
+    });
+
+
+
+    $(document).ready(function () {
+        $("#payTypeLs").select2({
+            dir: "rtl",
+        });
+    });
+
+
+    $("body").on("change", "#BehalfGropId", function () {
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBehalfs", "Request", new { Area = "Payment" }))";
+            $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                $("#BehalfID").val($("#BehalfID option:first").val());
+            });
+        }
+        else {
+            $("#BehalfID").html("");
+        }
+    });
+</script>

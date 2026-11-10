@@ -1,0 +1,228 @@
+﻿
+@{
+    ViewBag.Title = Resources.List + " " + Resources.Cheque;
+}
+@section PageHeader{
+    @Resources.List @Resources.Cheque
+}
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="pull-right">
+                    @Html.ActionLink("طراحی چک", "Create", "Cheque", new { area = "BasicInfo" }, new { @class = "btn btn-default btn-sm" })
+                </div>
+                <div class="pull-right">
+                    <div id="progroup" data-has-content="empty"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Cheque", new { Area = "BasicInfo" })
+    </div>
+}
+
+
+<script>
+
+    //today
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+
+    //last month
+    var lstmonth = new Date();
+    var day = lstmonth.getDate();
+    var month = lstmonth.getMonth(); //January is 0!
+    var year = lstmonth.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    lstmonth = year + '-' + month + '-' + day;
+
+    function toGargDate(date) {
+        var day = date.getDate();
+        var month = date.getMonth() + 1; //January is 0!
+        var year = date.getFullYear();
+        if (day < 10) day = '0' + day;
+        if (month < 10) month = '0' + month;
+        date = year + '-' + month + '-' + day;
+        return moment(date, 'jYYYY/jM/jD').format('YYYY/M/D');
+    }
+
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+
+    $(".from.datepicker").val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date()
+    });
+
+    $(".until.datepicker").val(moment(today, 'YYYY-M-D').format('jYYYY/jMM/jDD')).datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        maxDate: new Date()
+    });
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+
+    $(function () {
+        $('body').on("click", "#report", function () {
+            var data = $('#SearchForm').serializeArray();
+            window.location.href = "@Url.Action("ShowPayment", "RequestPayment", new { Area="Report", parameterJson = Newtonsoft.Json.JsonConvert.SerializeObject(Model) })";
+        })
+
+    });
+
+</script>
+
+<script>
+    var progroup = document.getElementById("progroup");
+    function generateGUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    function unMarkList() {
+        $.each($(".fa-check-square-o"), function (i, element) {
+            $(this).removeClass("fa-check-square-o").addClass("fa-square-o");
+        });
+        $.each($(".prop input[type=hidden]"), function (i, index) {
+            $("#" + $(this).val()).remove();
+        })
+        $(".prop").remove();
+    }
+    var guid = generateGUID();
+    $(function () {
+        $(".dataprop, .datapropfull").attr("checked", false);
+        var SelectedCount = 0
+        $("body").on("click", ".dataprop", function () {
+            if ($(this).is(':checked')) {
+                $(this).parents("tr").addClass("rowchecked");
+                SelectedCount++;
+            }
+            else {
+                $(".datapropfull").prop('checked', false);
+                $(this).parents("tr").removeClass("rowchecked");
+                SelectedCount--;
+            }
+            if (SelectedCount == 0) {
+                $("#_delPrdS").remove();
+                $("#_disPrdS").remove();
+                progroup.setAttribute("data-has-content", "empty");
+            }
+            else {
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    $("#progroup").append('<button id="_delPrdS" onclick="DeleteSelectedItem()" class="btn btn-default btn-sm" title="حذف" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    //$("#progroup").append('<button id="_disPrdS" onclick="DiscountSelectedProduct()" class="btn btn-primary btn-sm btn-flat" title="تخفیف" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+            }
+        });
+
+        $("body").on("click", ".datapropfull", function () {
+            if ($(this).is(':checked')) {
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', true);
+                    $(this).parents("tr").addClass("rowchecked");
+                });
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    $("#progroup").append('<button id="_delPrdS" onclick="DeleteSelectedItem()" class="btn btn-default btn-sm" title="حذف" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    //$("#progroup").append('<button id="_disPrdS" onclick="DiscountSelectedProduct()" class="btn btn-primary btn-sm btn-flat" title="تخفیف" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+                SelectedCount = document.getElementsByClassName("dataprop").length;
+            }
+            else {
+                $("#_delPrdS").remove();
+                $("#_disPrdS").remove();
+                progroup.setAttribute("data-has-content", "empty");
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', false);
+                    $(this).parents("tr").removeClass("rowchecked");
+                });
+                SelectedCount = 0;
+            }
+        });
+    });
+    function DeleteSelectedItem() {
+        alertify.confirm('آیا مطمين هستید',
+            function () {
+                var deletedList = [];
+                $.each($(".dataprop"), function (i, element) {
+                    if ($(this).is(':checked')) {
+                        deletedList.push($(this).val());
+                    }
+                });
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("Delete", "Request", new { area = "Payment" })',
+                    data: $.param({ requestIds: deletedList }, true),
+                    success: function (data) {
+                        alertify.success(data.Message);
+                        var rowChecked = document.getElementsByClassName("rowchecked");
+                        for (var i = 0; i < rowChecked.length; i++) {
+                            deleteRow(rowChecked[i].getAttribute("id"));
+                        }
+                        $("#_delPrdS").remove();
+                        progroup.setAttribute("data-has-content", "empty");
+                    },
+                    datatype: "json",
+                    traditional: true,
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alertify.error(xhr.status);
+                        alertify.error(thrownError);
+                    }
+                })
+            })
+    }
+    @*function DiscountSelectedProduct() {
+            var discountList = [];
+            var storeId = "";
+            $.each($(".dataprop"), function (i, element) {
+                if ($(this).is(':checked')) {
+                    discountList.push($(this).val());
+                }
+                if (i == 0) {
+                    storeId = $(this).attr("data-st-val")
+                }
+            });
+            $.ajax({
+                type: "POST",
+                url: '@Url.Action("ApplyDiscountForm", "Product", new { area = "Management" })',
+                data: $.param({ ProductIds: discountList, storeId: storeId }, true),
+                success: function (data) {
+                    $("#modal-content").html(data);
+                    $(".modal").modal("show");
+                },
+                datatype: "json",
+                traditional: true,
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alertify.error(xhr.status);
+                    alertify.error(thrownError);
+                }
+            })
+        }*@
+</script>
+

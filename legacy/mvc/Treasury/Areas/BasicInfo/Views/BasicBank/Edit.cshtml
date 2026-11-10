@@ -1,0 +1,72 @@
+﻿@model CSD.Treasury.Service.BasicBanksService.BasicBank
+@using System.Configuration;
+@{
+    ViewBag.Title = "Edit";
+}
+
+@using (Ajax.BeginForm("Edit", "BasicBank", new AjaxOptions
+{
+    HttpMethod = "Post",
+    LoadingElementId = "loading",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "BasicBankEdit" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        <div class="form-group">
+            <div class="col-md-10">
+                @Html.Hidden("InitialBasicBankDescription", Model.BasicBankDescription)
+                @Html.EditorFor(model => model.BasicBankDescription, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Bank } })
+                @Html.ValidationMessageFor(model => model.BasicBankDescription, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        @if (ConfigurationManager.AppSettings["bilingual"] == "True")
+        {
+            <div class="form-group">
+                <div class="col-md-10">
+                    @Html.EditorFor(model => model.BasicBankDescription2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.ENname } })
+                    @Html.ValidationMessageFor(model => model.BasicBankDescription2, "", new { @class = "text-danger" })
+                </div>
+            </div>
+        }
+        @Html.HiddenFor(model => model.BasicBankId)
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $('#BasicBankEdit').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+</script>

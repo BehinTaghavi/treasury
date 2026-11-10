@@ -1,0 +1,269 @@
+﻿@*@model IEnumerable<CSD.Treasury.Service.BehalfGroupService.BehalfGroup>*@
+@model CSD.Treasury.UI.Models.SearchModelBehalfGroup
+@{
+    //var i = 1;
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "BasicInfo";
+    int ix = Model.PageIndex;
+}
+@*<div class="panel-group" id="accordion">
+    <div class="panel panel-default">*@
+
+        @*@foreach (var item in Model.List)
+        {*@
+  
+            @* <div class="panel-heading">
+                <h4 class="panel-title">
+                 <a data-toggle="collapse" data-parent="#accordion" href="#collapse@(i)">*@
+            @* if (item.FirstOrDefault().Receipt_Pay_TypeID == 1)
+                                    {
+                                        @Resources.Paid
+                                    }
+                                    else if (item.FirstOrDefault().Receipt_Pay_TypeID == 2)
+                                    {
+                                        @Resources.Receive
+                                    }
+                                    else if (item.FirstOrDefault().Receipt_Pay_TypeID == 3)
+                                    {
+                                        @Resources.Public
+                                    }
+                                    else if (item.FirstOrDefault().Receipt_Pay_TypeID == 4)
+                                    {
+                                        @Resources.PickUp
+                                    }
+
+
+
+
+                            </a>
+                            </h4>
+                </div>
+
+
+                        <div id="collapse@(i)" class="panel-collapse collapse ">
+                            <div class="panel-body">*@
+
+                    <table class="table table-striped sortable">
+                        <thead>
+                            <tr class="mdc-bg-grey-200">
+                                <th>#</th>
+                                <th>
+                                    @Resources.BehalfGroup
+                                </th>
+                                @*<th></th>*@
+                                <th>کدحساب</th>
+                                <th>عنوان حساب معین</th>
+                                <th>@Resources.Type</th>
+
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var j in Model.List)
+                            {
+                                var related1 = Utility.HasRelation("BehalfGroup", "BehalfGroupID", j.BehalfGroupID.ToString(), "Behalfs", "BehalfGroupID");
+                                var related3 = Utility.HasRelation("BehalfGroup", "BehalfGroupID", j.BehalfGroupID.ToString(), "PettyCash_TransactionDetail", "BehalfGroupID");
+                                var related4 = Utility.HasRelation("BehalfGroup", "BehalfGroupID", j.BehalfGroupID.ToString(), "PettyCash_BehalfGroups", "BehalfGroupID");
+                                var related5 = Utility.HasRelation("BehalfGroup", "BehalfGroupID", j.BehalfGroupID.ToString(), "ReferenceTypes_By_BehalfGroup", "BehalfGroupID");
+
+                                var RefrenceUsed = Utility.IfRefrenceUsed(j.BehalfGroupID);
+
+                                var BehalfUsed = Utility.IfBehlfUsed(j.BehalfGroupID);
+
+                            <tr id="@Hash.GetHashString(j.BehalfGroupID.ToString())">
+                                <td>
+                                    @(i = i + 1)
+                                </td>
+                                <td>
+                                    @j.BehalfGroupDescription
+                                </td>
+                                <td>@j.BehalfGroup_Account</td>
+                                <td>@j.Account_Name</td>
+                                <td>
+                                    @if (j.Receipt_Pay_TypeID == 1)
+                                    {
+                                        @Resources.Paid
+                                    }
+                                    else if (j.Receipt_Pay_TypeID == 2)
+                                    {
+                                        @Resources.Receive
+                                    }
+                                    else if (j.Receipt_Pay_TypeID == 3)
+                                    {
+                                        @Resources.Public
+                                    }
+                                    else if (j.Receipt_Pay_TypeID == 4)
+                                    {
+                                        @Resources.PickUp
+                                    }
+                                </td>
+                                
+                                <td>
+                    
+                                    @if (RefrenceUsed || BehalfUsed)
+                                    {
+                                        <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                                    }
+                                    else
+                                    {
+                                        @Ajax.ActionLink(Resources.Edit, "Edit", "BehalfGroup", new { Area = "BasicInfo", id = j.BehalfGroupID, BehalfGroupDescription = ViewBag.BehalfGroupDescription }, new AjaxOptions
+                                   {
+                                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.BehalfGroup + "', 'md');"
+                                   }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+                                    }
+                                    @if (related1 || related3 || related4)
+                                    {
+                                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                                    }
+                                    else
+                                    {
+                                        @Html.ActionLink(Resources.Delete, "Delete", "BehalfGroup", new { Area = "BasicInfo", id = j.BehalfGroupID }, new { @class = "btn btn-danger btn-xs delete" })
+                                    }
+
+
+
+                                    @Ajax.ActionLink(Resources.Behalf, "Index", "Behalf", new { Area = "BasicInfo", BehalfGroupID = j.BehalfGroupID, BehalfGroupDescription = j.BehalfGroupDescription , Receipt_Pay_TypeID = j.Receipt_Pay_TypeID }, new AjaxOptions
+                               {
+                                   OnSuccess = "modal(data,'" + Resources.BehalfGroup + "/" + j.BehalfGroupDescription + "', 'md');"
+
+                               }, new { @class = "btn btn-material-blue-700 btn-xs" })
+
+                                    @Ajax.ActionLink(Resources.Details, "Details", "BehalfGroup", new { Area = "BasicInfo", BehalfGroupID = j.BehalfGroupID }, new AjaxOptions
+                               {
+                                   OnSuccess = "modal(data,'" + Resources.Details + " " + Resources.BehalfGroup + "', 'md');"
+                               }, new { @class = "btn btn-material-blue-700 btn-xs" })
+                                </td>
+                            </tr>
+
+                            }
+
+                        </tbody>
+                    </table>
+                    <div class="container-fluid">
+                        <div class="clearfix">
+                            <div class="pull-right">
+                                <span class="pagination pagination-total">
+                                    @Resources.Total : @Model.TotalItemCount
+                                    @Resources.Page @(ix + 1)
+                                    @Resources.From @Model.TotalPageCount
+                                </span>
+                            </div>
+                            <div class="pull-left">
+                                <nav class="text-center">
+                                    <ul class="pagination  pagination-sm">
+                                        @{
+                                            var start = ix;
+                                            if (start > 0)
+                                            {
+                                                int c = 0;
+                                                while (start > 0 && c < 4)
+                                                {
+                                                    c++;
+                                                    start--;
+                                                }
+                                            }
+                                            if (ix != 0)
+                                            {
+                                                Model.PageIndex = 0;
+                                                <li>
+                                                    @Ajax.ActionLink("<<", "List", "BehalfGroup", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                                                </li>
+                                            }
+                                            for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                                            {
+                                                if (ix != j)
+                                                {
+                                                    Model.PageIndex = j;
+                                                    <li>
+                                                        @Ajax.ActionLink((j + 1).ToString(), "List", "BehalfGroup", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                                    </li>
+                                                }
+                                                else
+                                                {
+                                                    <li class="active">
+                                                        <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                                    </li>
+                                                }
+                                            }
+                                            if (start + 9 < Model.TotalPageCount)
+                                            {
+                                                <li>
+                                                    @Ajax.ActionLink(">>", "List", "BehalfGroup", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                                </li>
+                                            }
+                                        }
+                                    </ul>
+                                </nav>
+                            </div>
+                        </div>
+
+                    </div>
+
+                @*</div>
+            </div>*@
+        @*}  *@
+    @*</div>
+</div>*@
+
+
+
+
+
+
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>
+

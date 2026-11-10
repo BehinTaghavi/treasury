@@ -1,0 +1,72 @@
+﻿@model List<CSD.Treasury.DataModel.CashFlow_Result>
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "Index";
+    var i = 1;
+
+}
+@if(ViewBag.ErrorTime!=null)
+{
+<div class="validation-summary-errors">@(ViewBag.ErrorTime)</div>
+}
+@if (Model != null && Model.Count > 0)
+{
+    <table class="table table-striped sortable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>@Resources.Bank</th>
+                <th>@Resources.BranchName</th>
+                <th>شماره حساب</th>
+                <th>موجودی روز</th>
+                <th>پرداختنی سررسید گذشته</th>
+                <th>تعهدات امروز</th>
+                <th>پرداختنی تا</th>
+                <th>موجودی مطمئن</th>
+                <th>درجریان وصول مرکز</th>
+                <th>ج وصول +موجودی مطمئن</th>
+                <th>درجریان وصول خارج مرکز</th>
+                <th>جمع</th>
+            </tr>  
+        </thead>
+      
+        @foreach (var item in Model)
+        {
+
+        <tr>
+            <td data-lang-number="fa">@(i++)</td>
+            <td data-lang-number="fa">@(item.BasicBankDescription)</td>
+            <td>@(item.BranchName)</td>
+            <td data-lang-number="fa">@(item.Bank_AccountNumber)</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.Balance.Value).ToString("N0"))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.PardakhtaniSarresidGozashte).ToString("N0"))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.TaahodatEmrooz).ToString("N0"))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.PardakhtanihaTa).ToString("N0"))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.Balance.Value - item.PardakhtaniSarresidGozashte))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.DarjaryanVosoolMarkaz))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.Balance.Value - item.PardakhtaniSarresidGozashte + item.DarjaryanVosoolMarkaz))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.DarjaryanVosoolKharejAzMarkaz))</td>
+            <td data-lang-number="fa">@(Math.Truncate(item.Balance.Value - item.PardakhtaniSarresidGozashte + item.DarjaryanVosoolMarkaz+ item.DarjaryanVosoolKharejAzMarkaz))</td>
+           
+        </tr>
+       
+        }
+    </table>
+    <table class="table table-striped sortable">
+        <thead>
+            <tr>
+                <th>جمع کل</th>
+                <th>چک های نزد صندوق مرکز</th>
+                <th>چک های نزد صندوق خارج مرکز</th>
+               
+            </tr>
+        </thead>
+      
+        <tr>
+            <td data-lang-number="fa"> @(Math.Truncate(Model.Select(d => d.Balance).Sum().Value))</td>
+            <td data-lang-number="fa"> @(ViewBag.NazdeSandoghMarkaz)</td>       
+            <td data-lang-number="fa"> @(ViewBag.NazdeSandoghKharejAzMarkaz) </td>
+        </tr>
+    </table>
+
+}

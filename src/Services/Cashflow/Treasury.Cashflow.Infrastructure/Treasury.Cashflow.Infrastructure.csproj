@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adapters with no external packages: snapshots, outbox model, in-memory store for local runs and tests.
+       The PostgreSQL adapters are in Treasury.Cashflow.Infrastructure.Postgres (needs NuGet: Npgsql). -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Cashflow.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Cashflow.Application\Treasury.Cashflow.Application.csproj" />
+  </ItemGroup>
+</Project>

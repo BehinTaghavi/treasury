@@ -1,0 +1,621 @@
+﻿@model CSD.Treasury.DataModel.Bank
+@using CSD.Treasury.Service.PermissiveSignaturesService
+@using System.Configuration
+@{
+    ViewBag.Title = "Edit";
+    var SignitureLs = (List<CSD.Treasury.Service.PermissiveSignaturesService.PermissiveSignature>)ViewBag.PermissiveSignatures;
+    var SignitureSelectedLs = (List<int>)ViewBag.PermissiveSignaturesSlected;
+    var accountLs = ViewBag.v_accounts;
+    if (Model.HasExchangeTransaction)
+    {
+        accountLs = ViewBag.v_accounts_Has_Exchange;
+    }
+
+
+}
+
+@using (Ajax.BeginForm("Edit", "Banks", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);updateTable();closeModal('lg:not(.xlg)');"
+}, new { enctype = "multipart/form-data", id = "BankEdit" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(model => model.BasicBankID)
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+        @Html.HiddenFor(model => model.BankID)
+
+        <div class="alert alert-dismissible alert-material-grey-50">
+            <div class="form-group">
+                <div class="col-md-4">
+
+                    @Html.Label("Account_No", "معین وصول", new { data_lang_number = "fa", @class = "control-label" })
+                    @Html.DropDownListFor(model => model.Account_No, new SelectList(accountLs, "account_code", "Account_Name", new { Model.Account_No }), new { data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.Account_No)
+                </div>
+                <div class="col-md-4">
+                    @Html.Label("Assign_Account_No", "معین واگذاری", new { data_lang_number = "fa", @class = "control-label" })
+                    @Html.DropDownListFor(model => model.Assign_Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name", new { Model.Assign_Account_No }), new { data_lang_number = "fa", @class = "form-control" })
+                    @Html.ValidationMessageFor(model => model.Account_No)
+                </div>
+                <div class="col-md-4">
+
+                    @Html.Label("Returns_Account_No", "معین برگشتی", new { data_lang_number = "fa", @class = "control-label" })
+                    @Html.DropDownListFor(model => model.Returns_Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name", new { Model.Returns_Account_No }), new { data_lang_number = "fa", @class = "form-control" })
+
+                    @Html.ValidationMessageFor(model => model.Account_No)
+                </div>
+            </div>
+            <div class="form-group Has_Unique_Account">
+                <div class="col-sm-5">
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId), new { data_lang_number = "fa", @class = "form-control floating-label  ", @placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                </div>
+                <div class="col-md-7">
+
+                    @Html.Hidden("InitialUnique_Account_No", Model.Unique_Account_No)
+                    @*@if (Model.Unique_Account_No != null)
+                        {*@
+                    @Html.DropDownListFor(model => model.Unique_Account_No, new SelectList(ViewBag.SlectedLs, "Account_Code", "Account_Name", Model.Unique_Account_No), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label js-data-example-ajax", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+
+                    @*}
+                        else
+                        {
+                            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        }*@
+
+                    @*@Html.Hidden("Unique_Account_No", (string)ViewBag.uniqueAccount_Code)
+                        <div class="dropdown keep-open lookup">
+                            <div class="clearfix">
+                                <div class="col-xs-4">
+                                    <input type="text" value="@ViewBag.uniqueAccount_Code" lookup data-action="UniqueAccount" autocomplete="off" data-related="Name" placeholder="@Resources.Unique_Account_Code" name="Code" id="Code" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                </div>
+                                <div class="col-xs-8">
+                                    <input type="text" value="@ViewBag.uniqueAccount_Name" lookup data-action="UniqueAccount" autocomplete="off" data-related="Code" placeholder="@Resources.Unique_Account_No 1" name="Name" id="Name" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                </div>
+                            </div>
+                            <ul class="dropdown-menu" style="width: 100%">
+                                <li class="UniqueAccountList" id="acc1">
+                                    @Html.Action("UniqueAccount", "Request", new { Area = "Payment" })
+                                </li>
+                            </ul>
+                        </div>*@
+                    @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                </div>
+
+            </div>
+            
+                <div class="form-group Has_Unique_Account_Two">
+                    <div class="col-sm-5">
+
+                        @Html.DropDownList("UniqueAccountType2", new SelectList(ViewBag.unique_account_type, "Code", "Description", ViewBag.uniqueTypeId2), new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No_two", data_code_att = "Code2", data_name_att = "Name2", updatetargetid = "acc2" })
+                    </div>
+                    <div class="col-md-7">
+
+                        @if (ViewBag.SlectedLs2 != null)
+                        {
+
+                            @Html.DropDownListFor(model => model.Unique_Account_No_two, new SelectList(ViewBag.SlectedLs2, "Account_Code", "Account_Name", new { Type_Code = Model.Unique_Account_No }), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label js-data-example-ajax", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        }
+                        else
+                        {
+                            @Html.DropDownListFor(model => model.Unique_Account_No_two, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                        }
+
+                        @*@Html.HiddenFor(d => d.Unique_Account_No_two)
+                            <div class="dropdown keep-open lookup">
+                                <div class="clearfix">
+                                    <div class="col-xs-4">
+                                        <input type="text" value="@ViewBag.uniqueTypeCode2" lookup data-action="UniqueAccount" autocomplete="off" data-related="Name2" placeholder="@Resources.Unique_Account_Code" name="Code" id="Code2" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                    </div>
+                                    <div class="col-xs-8">
+                                        <input type="text" value="@ViewBag.uniqueTypeName2" lookup data-action="UniqueAccount" autocomplete="off" data-related="Code2" placeholder="@Resources.Unique_Account_No 2" name="Name" id="Name2" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                                    </div>
+                                </div>
+                                <ul class="dropdown-menu" style="width: 100%">
+                                    <li class="UniqueAccountList" id="acc2">
+                                        @Html.Action("UniqueAccount", "Request", new { Area = "Payment" })
+                                    </li>
+                                </ul>
+                            </div>*@
+                        @Html.ValidationMessageFor(model => model.Unique_Account_No)
+                    </div>
+
+                </div>
+            
+
+        </div>
+        <div class="form-group">
+            <div class="col-md-4">
+                @Html.EditorFor(model => model.Bank_AccountNumber, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BankAccountNumber } })
+                @Html.ValidationMessageFor(model => model.Bank_AccountNumber, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                @Html.TextBoxFor(model => model.OpeningDate, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.OpeningDate })
+                @Html.ValidationMessageFor(model => model.OpeningDate, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-4">
+                @Html.Hidden("InitialBranchCode", Model.BranchCode)
+                @Html.EditorFor(model => model.BranchCode, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchCode } })
+                @Html.ValidationMessageFor(model => model.BranchCode, "", new { @class = "text-danger" })
+            </div>
+            <div class="col-md-4">
+                @Html.EditorFor(model => model.BranchName, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BranchName } })
+                @Html.ValidationMessageFor(model => model.BranchName, "", new { @class = "text-danger" })
+            </div>
+            @if (ConfigurationManager.AppSettings["bilingual"] == "True")
+            {
+                <div class="col-md-4">
+                    @Html.EditorFor(model => model.BranchName2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.ENname } })
+                    @Html.ValidationMessageFor(model => model.BranchName2, "", new { @class = "text-danger" })
+                </div>
+            }
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-3">
+                @Html.Label("provinceID", Resources.Province, new { data_lang_number = "fa", @class = "control-label" })
+                @Html.DropDownList("provinceID", new SelectList(ViewBag.provinceLs, "provinceID", "ProvinceDescription", ViewBag.Province), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control" })
+            </div>
+            <div class="col-sm-3">
+                @Html.Label("CityID", Resources.City, new { data_lang_number = "fa", @class = "control-label" })
+                @{
+                    var CityName = "";
+                    if (Model.CityID != null)
+                    {
+                        CityName = Utility.GetCity(Model.CityID.Value).CityDescription;
+                    }
+                }
+
+                @*@Html.DropDownListFor(model => model.CityID, Enumerable.Empty<SelectListItem>(), (string.IsNullOrEmpty(CityName) ? Resources.PleaseSelect : CityName), new { data_lang_number="fa", @class = "form-control" })*@
+                <select id="CityID" name="CityID" class="form-control">
+                    <option value="@Model.CityID">
+                        @(CityName)
+                    </option>
+                </select>
+                @Html.ValidationMessageFor(model => model.CityID)
+            </div>
+            <div class="checkbox col-md-3">
+                <label>
+                    @Html.CheckBoxFor(model => model.Deposited)
+                    @Resources.Deposited
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox col-md-3">
+                <label>
+                    @Html.CheckBoxFor(model => model.HasBackup)
+                    @Resources.HasBackup
+                </label>
+            </div>
+            <div class="checkbox col-md-3">
+                <label for="IsActive">
+                    @Html.CheckBoxFor(model => model.IsActive)
+                    @Resources.IsActive
+                </label>
+            </div>
+            <div class="checkbox col-md-3">
+                <label>
+                    @Html.CheckBoxFor(model => model.HasExchangeTransaction)
+                    @Resources.HasExchangeTransaction
+                </label>
+            </div>
+            <div class="checkbox col-md-3">
+                <label>
+                    @Html.CheckBoxFor(model => model.IS_Facilities)
+                    @Resources.IS_Facilities
+                </label>
+            </div>
+        </div>
+        <div id="backup" class="form-group  @(Model.Backup_BankID == null ? "hidden" : "")">
+            <div class="col-md-6">
+                @Html.Label("Backup_BankID", Resources.Backup_Bank, new { data_lang_number = "fa", @class = "control-label" })
+                @Html.DropDownListFor(model => model.Backup_BankID, new SelectList(ViewBag.BankLs, "BankID", "Bank_AccountNumber", new { Model.Backup_BankID }), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control" })
+                <span id="ValidationMessage"></span>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-6">
+                @Html.TextBoxFor(model => model.OpeningValue, new { data_lang_number = "fa", @class = "form-control from floating-label", @placeholder = Resources.OpeningValue, type = "number", min = "0" })
+                @Html.ValidationMessageFor(model => model.OpeningValue, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group hidden" id="exchange">
+            <div class="col-md-3">                
+                @Html.Label("ExchangeTypeID", Resources.ExchangeType, new { data_lang_number = "fa", @class = "control-label" })
+                @Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeLs, "ExchangeTypeID", "ExchangeTypeDescription", new { Model.ExchangeTypeID }), "", new { data_lang_number = "fa", @class = "form-control" })
+                @* @Html.ValidationMessageFor(model => model.ExchangeTypeID, "", new { @class = "text-danger" })*@
+            </div>
+            <div class="col-md-3">
+                @Html.Label("ExchangeRate", Resources.ExchangeRate, new { data_lang_number = "fa", @class = "control-label" })
+                @Html.TextBoxFor(d => d.ExchangeRate, new { data_lang_number = "fa", @class = "form-control from floating-label", @placeholder = Resources.ExchangeRate, type = "number", min = "1", @Value = "1" })
+            </div>
+            <div class="col-md-3">
+                @Html.Label("EquivalencePrice", "مبلغ هم ارز ریالی موجودی اول دوره", new { data_lang_number = "fa", @class = "control-label" })
+                @Html.TextBoxFor(model => model.EquivalencePrice, new { data_lang_number = "fa", @class = "form-control", @readonly = "readonly" })
+
+            </div>
+            <div class="col-md-3">
+                @Html.Label("ExchangeType", "نوع نرخ ارز", new { data_lang_number = "fa", @class = "control-label" })
+                <select class="form-control" id="ExchangeType" name="ExchangeType">
+                    <option></option>
+                    <option value="1" @(Model.ExchangeType == 1 ? "selected" : "")>استاندارد</option>
+                    <option value="2" @(Model.ExchangeType == 2 ? "selected" : "")>رسمی</option>
+                    <option value="3" @(Model.ExchangeType == 3 ? "selected" : "")>غیررسمی</option>
+                    <option value="4" @(Model.ExchangeType == 4 ? "selected" : "")>واقعی</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="col-md-12">
+                <p id="OpeningValueText" class="mdc-text-green-700"></p>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-6">
+                @Html.TextBoxFor(model => model.SortOrder, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.SortOrder })
+                @Html.ValidationMessageFor(model => model.SortOrder, "", new { @class = "text-danger" })
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-md-4">
+                @Html.TextBoxFor(model => model.MinPermissiveSignatureCount, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.MinPermissiveSignatureCount, type = "number", min = "0" })
+            </div>
+            <div class="col-md-4">
+                @Html.TextBoxFor(model => model.MaxPermissiveSignatureCount, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.MaxPermissiveSignatureCount, type = "number", min = "0" })
+            </div>
+
+        </div>
+        <div class="form-group">
+            <div class="col-md-2">
+                @Html.Label("Permission", "اسامی امضا کنندگان مجاز", new { data_lang_number = "fa", @class = "control-label" })
+            </div>
+            <div class="col-md-10">
+                <select id="Permission" name="Permission" required multiple>
+                    @foreach (var item in SignitureLs)
+                    {
+                        <option @(SignitureSelectedLs.Contains(item.PermissiveSignatureID) ? "selected" : "") value="@item.PermissiveSignatureID">@Utility.GetUserName(item.UserID)</option>
+                    }
+                </select>
+
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script src="@Url.Content("~/Scripts/wordifyfa.js")"></script>
+<script type="text/javascript">
+    $("#Account_No,#Assign_Account_No,#Returns_Account_No,#Unique_Account_No").select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+    $(document).ready(function () {
+        if ($('#HasExchangeTransaction').is(':checked')) {
+            $('#exchange').removeClass("hidden");
+        }
+       
+        if ($("#Unique_Account_No_two").val() == null) {
+            $('.Has_Unique_Account_Two').addClass('hidden');
+        }
+                    });
+    $('#HasBackup').click(function () {
+        if ($('#HasBackup').is(':checked')) {
+            $('#backup').removeClass("hidden");
+            if ($('#Backup_BankID').val() == "") {
+                $('#ValidationMessage').html("<span class='text-danger field-validation-error' data-valmsg-for='Backup_BankID' data-valmsg-replace='true'><span for='Backup_BankID' class=''>لطفا وارد نمایید</span></span>");
+
+            }
+        }
+        else {
+            $('#backup').addClass("hidden");
+            $('#Backup_BankID').val("");
+        }
+    });
+    $(function () {
+        $.material.init();
+        $("#OpeningValueText").text(wordifyfa($("#OpeningValue").val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        $("body").on("keyup", "#OpeningValue", function () {
+            $("#OpeningValueText").text(wordifyfa($(this).val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        });
+        $("body").on("change", "#OpeningValue", function () {
+            $("#OpeningValueText").text(wordifyfa($(this).val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        });
+        $("body").on("change", "#ExchangeTypeID", function () {
+            $("#OpeningValueText").text(wordifyfa($("#OpeningValue").val(), 0) + " " + $("#ExchangeTypeID option:selected").text());
+        })
+        $("#Permission").select2({
+            placeholder: "@Resources.PleaseSelect",
+            tags: true,
+            dir: "rtl",
+            containerCssClass: "form-control",
+            templateSelection: formatRepoSelection,
+        });
+        function formatRepoSelection(repo) {
+            return repo.full_name || repo.text;
+        }
+    });
+
+    $('#OpeningValue').keypress(function () {
+        return event.charCode >= 48 && event.charCode <= 57;
+    });
+    onkeypress = ''
+    $('#HasBackup').click(function () {
+
+        if ($('#HasBackup').is(':checked')) {
+            $('#backup').removeClass("hidden");
+        }
+        else {
+            $('#backup').addClass("hidden");
+            $('#Backup_BankID').val("");
+        }
+    });
+
+    $("#OpeningDate").datepicker({
+        dateFormat: "yy/mm/dd",
+        changeMonth: true,
+        changeYear: true,
+        showButtonPanel: true
+    });
+    $("body").on("change", "#provinceID", function () {
+
+        var address = "@(Url.Action("GetCityLS", "Banks", new { Area= "BasicInfo" }))";
+        $("#CityID").load(address, { id: $(this).val() }, function (data) {
+            $("#CityID").val($("#CityID option:first").val()).show();
+        });
+    })
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $("#UniqueAccountType2").change(function () {
+        $('#Unique_Account_No_two').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No_two").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+
+    $('#Account_No').change(function () {
+        $('.Has_Unique_Account').addClass('hidden');
+        $('.Has_Unique_Account_Two').addClass('hidden');
+        $.ajax({
+            type: 'GET',
+            url: '@Url.Action("HasUniqueAccount", "Banks")',
+            dataType: "json",
+            data: { 'Account_Code': $(this).val() },
+            success: function (Response) {
+                if (Response.Has_Unique_Account == true) {
+                    $('.Has_Unique_Account').removeClass('hidden');
+                }
+                else {
+                    $('#Unique_Account_No').prop('selectedIndex', 0);
+                    $('#Unique_Account_No').val("");
+                }
+                if (Response.Has_Unique_Account_Two == true) {
+                    $('.Has_Unique_Account_Two').removeClass('hidden');
+                }
+                else {
+                    $('#Unique_Account_No_two').prop('selectedIndex', 0);
+                    $('#Unique_Account_No_two').val("");
+                }
+                console.log(Response.Has_Unique_Account_Two);
+               
+            },
+        });
+    });
+    //$('#HasExchangeTransaction').click(function () {
+      
+    //});
+    @*$("body").on("change", ".UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+        var _this = $(this);
+        if (_this.val() != 0) {
+            $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") });
+        }
+        else {
+            $(this).parents(".form-group").find(".UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind"), CodeField: $(this).attr("data-code-att"), NameField: $(this).attr("data-name-att"), UpdateTargetId: $(this).attr("updatetargetid") });
+        }
+    });
+    var formData = new FormData(document.getElementsByTagName("form")[0]);
+    var lookup = document.querySelectorAll("[lookup]");
+    for (var i = 0; i < lookup.length; i++) {
+        lookup[i].onkeyup = function () {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                }
+            }
+            var type = document.getElementById("UniqueAccountType");
+            var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+            xmlhttp.open("GET",
+                address
+                , true);
+            xmlhttp.send();
+        }
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+        }
+    }
+    $('.dropdown.keep-open').on({
+        "click": function () { this.classList.add("open"); this.closable = true; },
+        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    });*@
+    $('#BankEdit').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+    $('#BankEdit').submit(function () {
+        if ($('#HasBackup').is(':checked') && $('#Backup_BankID').val() == "") {
+            $('#ValidationMessage').html("<span class='text-danger field-validation-error' data-valmsg-for='Backup_BankID' data-valmsg-replace='true'><span for='Backup_BankID' class=''>لطفا وارد نمایید</span></span>");
+        }
+    })
+
+    $("body").on("keyup", "#OpeningValue", function () {
+        if ($.isNumeric($(this).val())) {
+            if ($.isNumeric($("#ExchangeRate").val())) {
+
+                $("#EquivalencePrice").val((parseInt($("#OpeningValue").val())) * (parseInt($("#ExchangeRate").val())));
+
+            }
+        }
+    })
+    $("body").on("keyup", "#ExchangeRate", function () {
+        if ($.isNumeric($(this).val())) {
+            if ($.isNumeric($("#OpeningValue").val())) {
+
+                $("#EquivalencePrice").val((parseInt($("#OpeningValue").val())) * (parseInt($("#ExchangeRate").val())));
+
+            }
+        }
+    })
+
+    $("body").on("change", "#HasExchangeTransaction", function () {
+        if ($(this).val() != "") {
+             var address = "@(Url.Action("GetAccount", "Banks", new { Area = "BasicInfo" }))";
+            address = address + "?HasExchange=" + this.checked;
+            $('.Has_Unique_Account').addClass('hidden');
+            $('.Has_Unique_Account_Two').addClass('hidden');
+            $("#Account_No").select2("val", "");
+            $('#Account_No').prop('selectedIndex', 0);
+            $("#Account_No").load(address, { id: $(this).val() }, function (data) {
+                    $("#Account_No").val("لطفا انتخاب نمایید");
+            });
+
+
+         }
+
+         if ($('#HasExchangeTransaction').is(':checked')) {
+             $('#exchange').removeClass("hidden");
+             $('#ExchangeTypeID').val(@(Model.ExchangeTypeID));
+             if ($('#ExchangeTypeID').val() == "") {
+                 $('#ValidationMessage').html("<span class='text-danger field-validation-error' data-valmsg-for='ExchangeTypeID' data-valmsg-replace='true'><span for='ExchangeTypeID' class=''>لطفا وارد نمایید</span></span>");
+             }
+             if ($('#ExchangeType').val() == 0) {
+                 $('#ValidationMessage').html("<span class='text-danger field-validation-error' data-valmsg-for='ExchangeType' data-valmsg-replace='true'><span for='ExchangeType' class=''>لطفا وارد نمایید</span></span>");
+             }
+             if ($('#ExchangeRate').val() == "") {
+                 $('#ValidationMessage').html("<span class='text-danger field-validation-error' data-valmsg-for='ExchangeRate' data-valmsg-replace='true'><span for='ExchangeRate' class=''>لطفا وارد نمایید</span></span>");
+             }
+             if ($('#EquivalencePrice').val() = "") {
+                 $('#EquivalencePrice').html("<span class='text-danger field-validation-error' data-valmsg-for='EquivalencePrice' data-valmsg-replace='true'><span for='EquivalencePrice' class=''>لطفا وارد نمایید</span></span>");
+             }
+         }
+         else {
+             $('#exchange').addClass("hidden");
+             $('#ExchangeTypeID').val(1);
+             $('#ExchangeType').val(1);
+             $('#ExchangeRate').val(1);
+
+         }
+     })
+    
+</script>
+

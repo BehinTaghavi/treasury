@@ -1,0 +1,209 @@
+﻿ @model CSD.Treasury.Service.CashiersService.Cashier
+
+@using (Ajax.BeginForm("Create", "Cashier", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+
+}, new { enctype = "multipart/form-data", @class = "form-horizontal",id= "CashierCreate" }))
+{
+    @Html.AntiForgeryToken()
+<div class="form-horizontal">
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    <div class="row">
+        <div class="col-sm-3">
+            <div class="form-group">
+                <div class="col-xs-12">
+                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Type, data_bind = "Unique_Account_No" })
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-9">
+            <div class="form-group">
+                @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { required = "required", data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+
+
+                @*@Html.HiddenFor(model=>model.Unique_Account_No)
+                    <div class="dropdown keep-open lookup">
+                        <div class="clearfix">
+                            <div class="col-xs-4">
+                                <input type="text" lookup data-action="UniqueAccount" required autocomplete="off" data-related="Name" placeholder="@Resources.Unique_Account_Code" name="Code" id="Code" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                            </div>
+                            <div class="col-xs-8">
+                                <input type="text" lookup data-action="UniqueAccount" required autocomplete="off" data-related="Code" placeholder="@Resources.Unique_Account_No " name="Name" id="Name" data-toggle="dropdown" class="form-control dropdown-toggle floating-label" aria-expanded="true">
+                            </div>
+                        </div>
+                        <ul class="dropdown-menu" style="width: 100%">
+                            <li id="UniqueAccountList">
+                                @Html.Action("UniqueAccount", "Request", new { Area = "Payment" })
+                            </li>
+                        </ul>
+                    </div>*@
+            </div>
+        </div>
+
+    </div>
+    <div class="form-group">
+        <div class="col-md-6">
+            @Html.DropDownListFor(model => model.Account_no, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.account_code })
+            @Html.ValidationMessageFor(model => model.Account_no)
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-6">
+            @Html.DropDownListFor(model => model.UserID, new SelectList(ViewBag.UserLS, "UserID", "User_FullName"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Users })
+            @Html.ValidationMessageFor(model => model.UserID)
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-6">
+            @Html.DropDownListFor(model => model.CashDeskID, new SelectList(ViewBag.CashdeskLsLS, "CashDeskID", "CashDeskDescription"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.ExchangeType })
+            @Html.ValidationMessageFor(model => model.UserID)
+        </div>
+        @* <div class="col-sm-6">
+                <label class="control-label col-xs-6">
+                    @Resources.ExchangeRateType
+                </label>
+                <input class="control-label col-lg-6" type="text" id="ExchangeRateType" name="ExchangeRateType">
+        </div>
+        *@
+    </div>
+
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(document).ready(function () {
+
+        $("#Account_No").select2({
+            tags: true,
+            dir: "rtl",
+            containerCssClass: "form-control"
+        });
+    })
+    $(function () {
+        $.material.init();
+        $("#Account_no").select2({
+            tags: true,
+            dir: "rtl",
+            containerCssClass: "form-control"
+        });
+    });
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $('#CashierCreate').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+   
+ 
+
+
+
+    @*$("body").on("change", "#UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+        if ($(this).val() != 0) {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind") });
+        }
+        else {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind") });
+        }
+    });
+    var formData = new FormData(document.getElementsByTagName("form")[0]);
+    var lookup = document.querySelectorAll("[lookup]");
+    for (var i = 0; i < lookup.length; i++) {
+        lookup[i].onkeyup = function () {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                }
+            }
+            var type = document.getElementById("UniqueAccountType");
+            var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+            xmlhttp.open("GET",
+                address
+                , true);
+            xmlhttp.send();
+        }
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content").trim();
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+        }
+    }
+    $('.dropdown.keep-open').on({
+        "click": function () { this.classList.add("open"); this.closable = true; },
+        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    });*@
+</script>

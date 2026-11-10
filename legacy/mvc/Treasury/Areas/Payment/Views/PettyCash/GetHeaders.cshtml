@@ -1,0 +1,319 @@
+﻿@model  CSD.Treasury.UI.Models.SearchModelPettyCash
+@using CSD.Treasury.MVCHelpers
+@{
+    /**/
+
+    ViewBag.Title = "ListHeader";
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+
+}
+
+<table class="table">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+            <th>
+                @Resources.SerialNum
+            </th>
+            <th>
+                تفصیل دوم
+            </th>
+            <th>
+                @Resources.Date
+            </th>
+            <th>
+                وضعیت
+            </th>
+            <th>
+                @Resources.RequestId
+            </th>
+            <th>
+                شماره سند
+            </th>
+            <th>
+
+            </th>
+            <th>
+
+            </th>
+        </tr>
+    </thead>
+    @foreach (var item in Model.List)
+    {
+        var PettyCash = Utility.GetPaettyCash(item.PettyCashID);
+        <tbody>
+            <tr>
+                <td>
+                    @Math.Truncate(item.PettyCashTransactionHeaderID).ToString("#,##0")
+                </td>
+                <td>
+                    @Utility.GetUniqueAccount(item.Unique_Account_no_two)
+                </td>
+                <td>
+                    @Utility.GetPersianDate(item.PettyCashTransactionDate)
+                </td>
+                <td>
+
+                    @if (item.IsConfirm)
+                    {
+                        @*<i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                        *@
+                        <b>تنخواه در تاریخ @(Utility.GetPersianDate(item.ConfirmDate)) بسته شده</b>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                </td>
+                <td>@(item.RequestID)</td>
+                <td>@(item.AccVoucherNo)</td>
+
+                <td>
+                    @if (!item.IsConfirm)
+                    {
+                        if (!item.RequestID.HasValue && string.IsNullOrEmpty(item.ConfirmDate))
+                        {
+                            @Html.ActionLink("ویرایش", "Index", "PettyCash", new { area = "payment", headerId = item.PettyCashTransactionHeaderID }, new { title = Resources.Edit, @class = "btn btn-material-light-blue-A700 btn-xs" })
+                        }
+
+                        if ((User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("AcceptPettyCash")) && Utility.HasAcceptOrVakhahi(item.PettyCashTransactionHeaderID))
+                        {
+                            if (item.RequestID == null)
+                            {
+                                @Ajax.ActionLink("ایجاد درخواست وجه", "CreateRequest", "PettyCash", new
+                           {
+                               area = "payment",
+                               HeaderId = item.PettyCashTransactionHeaderID
+                           }, new AjaxOptions
+                           {
+                               Confirm = "آیا برای پرداخت های ثبت و تایید شده درخواست وجه صادر گردد؟",
+                               OnSuccess = "successCreateRequest(data);",
+                               OnBegin = "$(this).attr('disabled', 'disabled');"
+                           }, new
+                           {
+                               @class = "btn btn-material-light-blue-A700 btn-xs"
+                           })
+                            }
+
+                            if (item.IsConfirm == false)
+                            {
+                                @Ajax.ActionLink("بستن تنخواه", "Confirm", "PettyCash", new
+                           {
+                               area = "payment",
+                               HeaderId = item.PettyCashTransactionHeaderID
+                           }, new AjaxOptions
+                           {
+                               Confirm = "آیا از بستن تنخواه مطمئن هستید؟",
+                               OnSuccess = "successAccept(data);",
+                               OnBegin = "$(this).attr('disabled', 'disabled');"
+                           }, new
+                           {
+                               @class = "btn btn-material-light-blue-A700 btn-xs"
+                           })
+
+                            }
+
+                        }
+                        if (!item.RequestID.HasValue && string.IsNullOrEmpty(item.ConfirmDate))
+                        {
+                            @Ajax.ActionLink("حذف تنخواه", "Delete", "PettyCash", new
+                       {
+                           area = "payment",
+                           HeaderId = item.PettyCashTransactionHeaderID
+                       }, new AjaxOptions
+                       {
+                           Confirm = "آیا از حذف تنخواه مطمئن هستید؟",
+                           OnSuccess = "successDelete(data);"
+                       }, new
+                       {
+                           @class = "btn btn-material-red-A700 btn-xs"
+                       })
+                        }
+                        //else
+                        //{
+
+                        //}
+                    }
+                    
+                    @if ((User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("AcceptPettyCash")) && item.IsConfirm == true && item.AccVoucherNo == null)
+                    {
+
+                        @Ajax.ActionLink("ارسال سند", "SendVoucherPettyCash", "PettyCash", new
+                 {
+                     Area = "payment",
+                     RefId = item.PettyCashTransactionHeaderID,
+                     ConfirmDate = item.ConfirmDate,
+
+                            }, new AjaxOptions
+                 {
+                     Confirm = "آیا از ارسال اسناد مطمئن هستید؟",
+                     OnSuccess = "successMessage(data);"
+                 }, new
+                 {
+                     @class = "btn btn-material-red-A700 btn-xs"
+                 })
+                    }
+                    @if ((User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("AcceptPettyCash")) && item.RequestID == null && item.IsConfirm == true && item.AccVoucherNo == null)
+                    {
+
+                        @Ajax.ActionLink("باز کردن تنخواه", "Open", "PettyCash", new
+                   {
+                       area = "payment",
+                       HeaderId = item.PettyCashTransactionHeaderID
+                   }, new AjaxOptions
+                   {
+                       Confirm = "آیا از باز کردن تنخواه مطمئن هستید؟",
+                       OnSuccess = "successOpen(data);"
+                   }, new
+                   {
+                       @class = "btn btn-material-light-blue-A700 btn-xs"
+                   })
+                    }
+
+                    @*@Ajax.ActionLink("نمایش سند", "ShowVocherList", "Vocher_Row",
+        new { Area = "Management",
+            IsPayment = false,
+            requestId = item.RequestID,
+            IsReturend = false,
+            Receipt_Pay_TypeID = 1,
+            BehalfGroupID = Utility.GetBehalfGroupBybehalfId(item.beha).BehalfGroupID,
+            StatusID = item.Pay_TypeDetailID_source,
+            ReferenceId = item.RequestID
+        }, new AjaxOptions
+                           {
+                                  OnSuccess = "modal(data, 'نمایش سند', 'lg.ang')"
+                              })*@
+                </td>
+
+                <td>
+                    @Html.ActionLink(Resources.Report, "PettyCashReport", "PettyCash", new { Area = "Report", headerId = item.PettyCashTransactionHeaderID }, new { title = Resources.Report, @calss = "btn btn-material-light-blue-A700 btn-xs", target = "_blank" })
+                </td>
+
+            </tr>
+        </tbody>
+    }
+</table>
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                (@Resources.Total : @Model.TotalItemCount)
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "GetHeaders", "PettyCash", Model,
+            new AjaxOptions
+            {
+                UpdateTargetId = "ShowDetails",
+                InsertionMode = InsertionMode.Replace,
+                HttpMethod = "post",
+
+            })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "GetHeaders", "PettyCash", Model,
+                new AjaxOptions
+                {
+                    UpdateTargetId = "ShowDetails",
+                    HttpMethod = "post",
+                    InsertionMode = InsertionMode.Replace,
+
+                })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "GetHeaders", "PettyCash", Model,
+            new AjaxOptions
+            {
+                UpdateTargetId = "ShowDetails",
+                HttpMethod = "post",
+                InsertionMode = InsertionMode.Replace,
+
+            })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+<script>
+    function successCreateRequest(result) {
+        if (result) {
+            alert("درخواست وجه با موفقیت ثبت گردید");
+            location.reload();
+        }
+        else {
+            alert("ایجاددرخواست وجه با خطا مواجه شد!");
+        }
+    }
+    function successAccept(result) {
+        alert(result.message);
+        location.reload();
+        //if (result) {
+        //    console.log(result.message);
+        //    alert(result+"تنخواه با موفقیت بسته شد");
+        //    location.reload();
+        //}
+        //else {
+        //    alert("بستن تنخواه با خطا مواجه شد!");
+        //}
+    }
+    function successOpen(result) {
+        if (result) {
+            alert("تنخواه با موفقیت باز شد");
+            location.reload();
+        }
+        else {
+            alert("باز کردن تنخواه با خطا مواجه شد!");
+        }
+    }
+
+    function successDelete(result) {
+        if (result) {
+            alert("تنخواه با موفقیت حذف شد");
+            location.reload();
+        }
+        else {
+            alert("حذف تنخواه با خطا مواجه شد!");
+        }
+    }
+</script>

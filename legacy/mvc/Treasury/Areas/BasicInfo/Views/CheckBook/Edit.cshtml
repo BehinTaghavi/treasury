@@ -1,0 +1,130 @@
+﻿@model CSD.Treasury.Service.ChequesService.Cheque
+
+@{
+    ViewBag.Title = "Edit";
+}
+
+@using (Ajax.BeginForm("Edit", "CheckBook", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTableChequeLs(" + Model.BankID + "," + Model.BasicBankID + ");;"
+
+}, new { enctype = "multipart/form-data", @class = "form-horizontal" }))
+{
+    @Html.AntiForgeryToken()
+
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true)
+        @Html.HiddenFor(model => model.ChequeID)
+        @Html.HiddenFor(model=>model.BankID)
+        @Html.HiddenFor(model=>model.ChequeFormatID)
+        @Html.HiddenFor(model=>model.BasicBankID)
+        @*@Html.HiddenFor(model=>model.LastUsedPaperNo)*@
+      
+            <div class="form-group">
+                <div class="col-md-10">
+                    @Html.DropDownListFor(model => model.FormatDescriptionID_Main, new SelectList(ViewBag.GetChequeFormatTypeLs, "ChequeFormatType_DescriptionID", "ChequeFormatType_Description1", new { Model.FormatDescriptionID_Main }), Resources.PleaseSelect, new { data_lang_number="fa", @class = "form-control floating-label", @placeholder = Resources.Type })
+                    @Html.ValidationMessageFor(model => model.FormatDescriptionID_Main, "", new { @class = "text-danger" })
+                </div>
+            </div>
+            <div class="form-group">
+                <div class="col-md-10">
+                    @Html.EditorFor(model => model.FormatDescription, new { htmlAttributes = new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Description } })
+                    @Html.ValidationMessageFor(model => model.FormatDescription)
+                </div>
+            </div>
+            @*<div class="col-sm-5">
+                @Html.DropDownList("BasicBankId", new SelectList(ViewBag.BasicBank, "BasicBankId", "BasicBankDescription", (int)ViewBag.BasicBankId), Resources.PleaseSelect, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.BasicBank })
+            </div>
+            <div class="col-sm-5">
+                @Html.DropDownListFor(model => model.BankID, new SelectList(ViewBag.Banks, "BankId", "BranchName", Model.BankID), new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Branch })
+                @Html.ValidationMessageFor(model => model.BankID)
+            </div>*@
+        @*<div class="form-group">
+            <div class="col-sm-5">
+                @Html.DropDownListFor(model => model.ChequeFormatID, new SelectList(ViewBag.ChequeFormat, "ChequeFormatID", "FormatDescription", Model.ChequeFormatID), new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.ChequeFormatType })
+                @Html.ValidationMessageFor(model => model.ChequeFormatID)
+            </div>
+        </div>*@
+        <div class="form-group">
+            <div class="clearfix">
+                <div class="col-md-4">
+                    @Html.TextBoxFor(model => model.TotalPageCount, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.TotalPageCount, type = "number", min = "1" })
+                    @Html.ValidationMessageFor(model => model.TotalPageCount)
+                </div>
+                <div class="col-md-4">
+                    @Html.TextBoxFor(model => model.FirstPageNumber, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.FirstPageNumber, type = "number", min = "1" })
+                    @Html.ValidationMessageFor(model => model.FirstPageNumber)
+                </div>
+                <div class="col-md-4">
+                    @Html.TextBoxFor(model => model.LastPageNumber, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.LastPageNumber, type = "number", @readonly= "readonly" })
+                    @Html.ValidationMessageFor(model => model.LastPageNumber)
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="clearfix">
+                <div class="col-md-4">
+                    @if (Model.LastUsedPaperNo != 0)
+                    {
+                        @Html.TextBoxFor(model => model.LastUsedPaperNo, new { data_lang_number = "fa", @readonly = "readonly", @class = "form-control floating-label", placeholder = "آخرین برگ استفاده شده", type = "number", min = "1" })
+                    }
+                    else
+                    {
+                        @Html.TextBoxFor(model => model.LastUsedPaperNo, new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = "آخرین برگ استفاده شده", type = "number", min = "1" })
+                    }
+                   
+                    @Html.ValidationMessageFor(model => model.LastUsedPaperNo)
+                </div>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="checkbox">
+                <label>
+                    @Html.CheckBoxFor(model => model.IsActive)
+                    @Resources.IsActive
+                </label>
+            </div>
+        </div>
+        <div class="form-group">
+            <div class="col-sm-12">
+                <div class="text-right">
+                    <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $("body").on("change", "#BasicBankId", function () {
+        var addressBankList = "@(Url.Action("GetBankList", "CheckBook", new { Area= "BasicInfo" }))";
+        $("#BankID").load(addressBankList, { id: $(this).val() }, function (data) {
+            $("#BankID").val($("#BankID option:first").val());
+        });
+
+        var addressChequeFormatType = "@(Url.Action("GetChequeFormatType", "CheckBook", new { Area= "BasicInfo" }))";
+        $("#ChequeFormatID").load(addressChequeFormatType, { id: $(this).val() }, function (data) {
+            $("#ChequeFormatID").val($("#ChequeFormatID option:first").val());
+        });
+    });
+    $("body").on("keyup", "#FirstPageNumber", function () {
+        if ($.isNumeric($(this).val())) {
+            if ($.isNumeric($("#TotalPageCount").val())) {
+                $("#LastPageNumber").removeClass("empty");
+                $("#LastPageNumber").val(parseInt($("#FirstPageNumber").val()) + parseInt($("#TotalPageCount").val()-1));
+            }
+        }
+    })
+    $("body").on("keyup", "#TotalPageCount", function () {
+        if ($.isNumeric($(this).val())) {
+            if ($.isNumeric($("#FirstPageNumber").val())) {
+                $("#LastPageNumber").removeClass("empty");
+                $("#LastPageNumber").val(parseInt($("#FirstPageNumber").val()) + parseInt($("#TotalPageCount").val()));
+            }
+        }
+    })
+</script>

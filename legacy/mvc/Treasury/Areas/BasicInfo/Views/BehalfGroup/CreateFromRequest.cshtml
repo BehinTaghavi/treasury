@@ -1,0 +1,138 @@
+﻿@model CSD.Treasury.Service.BehalfGroupService.BehalfGroup
+@using System.Configuration;
+
+@using (Ajax.BeginForm("Create", "BehalfGroup", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "closeModal('md');updateBehalfGroupFromRequest()"
+}, new { enctype = "multipart/form-data", id = "BehalfGroupCreate" }))
+{
+    @Html.AntiForgeryToken()
+   
+    <div class="form-horizontal">
+        @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+
+        <div class="clearfix">
+            <div class="col-sm-6">
+                <div class="form-group">
+                    <div class="col-xs-12">
+            
+                        @Html.EditorFor(model => model.BehalfGroupDescription, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BehalfGroup + "-" + Resources.Title } })
+                        @Html.ValidationMessageFor(model => model.BehalfGroupDescription)
+                        @*<div id="lblStatus" />*@
+                    </div>
+                </div>
+            </div>
+            @if (ConfigurationManager.AppSettings["bilingual"] == "True")
+            {
+                <div class="col-sm-6">
+                    <div class="form-group">
+                        <div class="col-xs-12">
+                            @Html.EditorFor(model => model.BehalfGroupDescription2, new { htmlAttributes = new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BehalfGroup + "-" + Resources.EN } })
+                            @Html.ValidationMessageFor(model => model.BehalfGroupDescription2, "", new { @class = "text-danger" })
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="form-group">
+            <div class="col-sm-6">
+                @Html.DropDownListFor(model => model.BehalfGroup_Account, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name"), " ", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.account_code })
+                @Html.ValidationMessageFor(model => model.BehalfGroup_Account)
+            </div>
+        </div>
+        @Html.Hidden("Receipt_Pay_TypeID", 1)
+        @*<div class="form-group">
+            <div class="col-md-6">
+                @Html.DropDownListFor(model => model.Receipt_Pay_TypeID, new SelectList(ViewBag.ReceiptPayTypeLS, "Receipt_Pay_TypeID", "Receipt_Pay_TypeDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Type })
+                @Html.ValidationMessageFor(model => model.Receipt_Pay_TypeID, "", new { @class = "text-danger" })
+            </div>
+        </div>*@
+        <div class="form-group">
+            <div class="col-lg-12">
+                @Html.DropDownListFor(model => model.Reference, new SelectList(ViewBag.Reference, "referenceTypeID", "referenceTypeDescription"), new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Reference, multiple = "multiple" })
+                @Html.ValidationMessageFor(model => model.Reference, "", new { @class = "text-danger" })
+            </div>
+        </div>
+
+        <div class="text-right">
+            <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+        </div>
+    </div>
+    
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+    $('#BehalfGroup_Account').select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+    $("#Reference").select2({
+        tags: true,
+        dir: "rtl",
+        containerCssClass: "form-control",
+        templateSelection: formatRepoSelection,
+    });
+    function formatRepoSelection(repo) {
+        return repo.full_name || repo.text;
+    }
+
+    $('#BehalfGroupCreate').keypress(function (e) {
+
+        if (e.which == 13) {
+
+            var $targ = $(e.target);
+
+            if (!$targ.is("textarea") && !$targ.is(":button,:submit")) {
+                var focusNext = false;
+                $(this).find(":input:visible:not([disabled],[readonly]), a").each(function () {
+                    if (this === e.target) {
+                        focusNext = true;
+                    }
+                    else if (focusNext) {
+                        $(this).focus();
+                        return false;
+                    }
+                });
+
+                return false;
+            }
+        }
+
+    });
+
+    @*$('#BehalfGroupDescription').on('change', function (e) {
+            $.ajax({
+                type: "POST",
+                url: '@Url.Action("CheckTitle", "Request", new { area = "Payment" })',
+                data: '{TableName:"BehalfGroup",FieldName:"BehalfGroupDescription",Title: "' + $("#BehalfGroupDescription").val() + '"}',
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: OnSuccess(e),
+                failure: function (response) {
+                    alert(response);
+                }
+            });
+        });
+
+
+    function OnSuccess(response) {
+        var msg = $("#lblStatus");
+
+        switch (response) {
+            case "true":
+                msg.show();
+                msg.css("color", "red");
+                msg.html('@Resources.BehalfGroup @Resources.Repetitive');
+                response.preventDefault();
+                break;
+
+        }
+    }*@
+
+</script>

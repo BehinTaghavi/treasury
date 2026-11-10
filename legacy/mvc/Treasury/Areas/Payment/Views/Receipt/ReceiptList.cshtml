@@ -1,0 +1,2107 @@
+﻿<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/Receipt/receiptListPlanController.js")"></script>
+
+@section PageHeader{
+    @switch ((int)ViewBag.State)
+    {
+        case -1:
+            <text>
+                واگذاری چک های دریافتی به حساب بانک
+            </text>
+
+            break;
+        case -2:
+            <text>
+                وصول / برگشت  چک های واگذاری
+            </text>
+            break;
+        case -2000:
+            <text>
+                عودت چک های واگذاری
+            </text>
+            break;
+
+        case -3:
+            < text >
+            وصول مستقیم - نقد
+            </ text >
+            break;
+        case -4:
+            <text>
+                وصول مستقیم چک نزدصندوق
+            </text>
+            break;
+        case -5:
+            <text>
+                خرج چک دریافتی
+            </text>
+            break;
+        @*case -18:
+                <text>
+               خرج چک های دریافتی - مشتری
+                </text>
+            break;*@
+        case -6:
+            <text>
+                عودت چک نزد صندوق
+            </text>
+            break;
+        case -7:
+            <text>
+                تبدیل چک انتظامی به چک دریافتنی
+            </text>
+            break;
+        case -8:
+            <text>
+                حقوقی کردن چک های برگشتی
+            </text>
+            break;
+        case -9:
+            <text>
+                عودت چک پس از برگشت از بانک
+            </text>
+            break;
+        case -10:
+            <text>
+                ابطال چک های نزد صندوق
+            </text>
+            break;
+        case -15:
+            <text>
+                تحویل لاشه چک های انتظامی
+            </text>
+            break;
+        @*case -14:
+            <text>
+                تحویل لاشه چک های انتظامی
+            </text>
+            break;*@
+        case -16:
+            <text>
+                عودت چک های خرج شده
+            </text>
+            break;
+        case -17:
+            <text>
+                ثبت وصول چک های برگشتی
+            </text>
+            break;
+        case -20:
+            <text>
+                تمدید چک سررسید شده دریافتنی
+            </text>
+            break;
+        case -21:
+            <text>
+                تعویض چک دریافتنی سررسیدشده
+            </text>
+            break;
+        case -22:
+            <text>
+                تنزیل اسناد دریافتنی واگذار شده به بانک
+            </text>
+            break;
+
+        case -24:
+            <text>
+                واگذاری چک های برگشتی به حساب بانک
+            </text>
+            break;
+        case -26:
+            <text>
+                واگذاري مجدد به بانک-چک برگشتي-اقدام حقوقي شده
+            </text>
+            break;
+
+
+    }
+}
+
+<div ng-app="treasury" ng-controller="receiptListPlanController">
+
+
+    <div loading class="mdc-bg-blue-grey-50" style="
+    padding: 15px;
+    margin: -15px -15px 15px -15px;
+    border-bottom: 1px solid #f8f8f8;">
+        <form ng-submit="ShowReceipt(0)">
+            <div class="clearfix">
+                <div class="col-sm-3" ng-if="(ReceiptPayTypeDetailLs | receiptPayTypeDetailsFilter:State).length > 0">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">نوع دریافت</label>
+                            <select class="form-control"
+                                    style="max-width: 150px"
+                                    ng-model="searchModel.RecieptType.Receipt_Pay_TypeDetailID"
+                                    ng-options="option.Receipt_Pay_TypeDetailID as option.Receipt_Pay_TypeDetailDescription for option in (ReceiptPayTypeDetailLs | receiptPayTypeDetailsFilter:State)"></select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تاریخ دریافت از</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control Date"
+                                       type="text"
+                                       ui-mask="9999/99/99"
+                                       ng-pattern="DatePattern"
+                                       autocomplete="off"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.RecieptDateFrom">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تا</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control Date"
+                                       type="text"
+                                       ui-mask="9999/99/99"
+                                       ng-pattern="DatePattern"
+                                       autocomplete="off"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.RecieptDateTo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">@Resources.ReceiptDetailId</label>
+                            <div class="input-append">
+                                <input class="form-control"
+                                       type="text"
+                                       ng-model="searchModel.ReceiptDetailId">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تاریخ سررسید از</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control Date"
+                                       type="text"
+                                       ui-mask="9999/99/99"
+                                       ng-pattern="DatePattern"
+                                       autocomplete="off"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.DueDateFrom">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">تا</label>
+                            <div class="input-append">
+                                <input date-p
+                                       class="form-control Date"
+                                       type="text"
+                                       ui-mask="9999/99/99"
+                                       ng-pattern="DatePattern"
+                                       autocomplete="off"
+                                       placeholder="____/__/__" lang="en"
+                                       ng-model="searchModel.DueDateTo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">صادر کننده چک</label>
+                            <div class="input-append">
+                                <a class="btn btn-sm"
+                                   ng-class="searchModel.UniqueAccount.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(searchModel.UniqueAccount)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='searchModel.UniqueAccount.Name != null ? searchModel.UniqueAccount.Name : "صادر کننده چک"'>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-3" ng-if="State == -2">
+                    <div class="clearfix custom-inline-control">
+                        <label class="control-label">شماره حساب واگذاری</label>
+                        <select ng-required="item.checked" name="BankAccountLs_{{$index}}" class="form-control" ng-model="searchModel.RecieptType.PlaningTypeReferenceID">
+                            <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <button id="searchFormButton" type="submit" class="btn btn-material-blue-500">جستجو</button>
+        </form>
+    </div>
+    <form name="form" novalidate>
+        <div style="padding: 20px; margin: -15px -15px 10px -15px; position: relative;">
+            <div class="table-responsive">
+                <div class="clearfix" ng-if="State != 11 && State != 12 && State != 7">
+                    <div class="pull-right">
+                        <ul uib-pagination total-items="bigTotalItems" items-per-page="maxSize" ng-change="pageChanged()" ng-model="currentPage" previous-text="قبل" next-text="بعد" max-size="maxSize" class="pagination-sm" boundary-link-numbers="true" rotate="false"></ul>
+                    </div>
+                    <div class="pull-left" ng-if="State != -21">
+                        <button class="btn btn-success btnSave"
+                                ng-model="button"
+                                ng-disabled="form.$invalid || !hasChecked()"
+                                ng-click="save($event)">
+                            اعمال برنامه ریزی
+                        </button>
+                    </div>
+                </div>
+                @*واگذاری چک های دریافتی به حساب بانک - چک های نزد صندوق
+                    State = -1, chequeState = 2*@
+                <table class="table table-striped" ng-if="State == -1">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ واگذاری</th>
+                            @*<th>@Resources.account_code</th>*@
+                            <th>تفصیل دوم</th>
+                            <th>صادر کننده چک</th>
+                            <th>شماره فیش واگذاری</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 2">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-if="item.ExchangeRate == 0"
+                                ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td ng-if="item.ExchangeRate != 0"
+                                ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLsArzi" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}"
+                                @*ng-init="minDate = 'item.LastStateDate';"*@>
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           @*maxDate="{{maxDate}}"*@
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td></td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره فیش واگذاری')">شماره فیش واگذاری</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*واگذاری چک های برگشتی به حساب بانک
+                    State = -24, chequeState = 24*@
+                <table class="table table-striped" ng-if=" State == -24 ">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ واگذاری</th>
+                            <th>صادر کننده چک</th>
+                            <th>شماره فیش واگذاری</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 24">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}"
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره فیش واگذاری')">شماره فیش واگذاری</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*واگذاری چک های برگشتی اقدام حقوق شده به حساب بانک
+                    State = -24, chequeState = 24*@
+                <table class="table table-striped" ng-if=" State == -26 ">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ واگذاری</th>
+                            <th>صادر کننده چک</th>
+                            <th>شماره فیش واگذاری</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 26">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره فیش واگذاری')">شماره فیش واگذاری</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                @*ثبت وصول /  برگشت چک های واگذاری - چک های واگذار شده*@
+                @*State = -2, chequeState = 11, chequeState = 6, chequeState = 12*@
+                <table class="table table-striped" ng-if="State == -2 || State == -17 ">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            @*<th>تاریخ واگذاری</th>*@
+                            <th>شماره حساب واگذاری</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>وصول</th>
+                            <th ng-if="State == -2 ">برگشت</th>
+                            <th></th>
+                            <th>تاریخ</th>
+                            <th>@*@Resources.account_code*@</th>
+                            <th>تفصیل دوم</th>
+                            <th>صادر کننده چک</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList | filterReceiptList">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>
+                                {{item.Unique_Account_No_One}}
+                                @*{{(BankAccountLs | filter: {'BankID': item.BankID})[0].Bank_AccountNumber}}*@
+                            </td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            @*&& item.ExchangeTypeID != 0*@
+                            <td ng-if="State == -2 " class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="11" ng-change="checkUA2(item, 1)" />
+                            </td>
+
+
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="12" ng-change="checkUA2(item, 3)" />
+                            </td>
+                            <td ng-if="item.ExchangeTypeID == 0"></td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append"
+                                     @*ng-init="minDatett = 'item.LastStateDate'"*@>
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.v_accountslS_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.v_accountslS_{{$index}}.$valid)}">
+                                <div ng-if="item.hasUniqueAccount2">
+                                    <a class="btn btn-sm"
+                                       ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                       style="margin: 4px 0;"
+                                       ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                    </a>
+                                    <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button ng-if="item.ChequeState == 9 || !item.ChequeState" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <button ng-if="item.ChequeState == 1" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره پيگيري')">شماره پيگيري</button>
+                                <button ng-if="item.ChequeState == 12" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="11" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <table class="table table-striped" ng-if="State == -2000">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            @*<th>تاریخ واگذاری</th>*@
+                            <th>شماره حساب واگذاری</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>عودت</th>*@
+                            <th>تاریخ</th>
+                            @*<th>@Resources.account_code</th>*@
+                            <th>تفصیل دوم</th>
+                            <th>صادر کننده چک</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>
+                                {{item.Unique_Account_No_One}}
+                                @*{{(BankAccountLs | filter: {'BankID': item.BankID})[0].Bank_AccountNumber}}*@
+                            </td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>
+                                {{item.DueDate}}
+                                @*<input type="hidden" value="9" name="{{$index}}" ng-model="item.ChequeState" />*@
+                            </td>
+                            @*<td class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                    <input type="checkbox"  name="{{$index}}" ng-model="item.ChequeState" value="9" ng-change="checkUA2(item, 3)" />
+                                </td>*@
+
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append"
+                                     @*ng-init="minDatett = 'item.LastStateDate'"*@>
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.v_accountslS_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.v_accountslS_{{$index}}.$valid)}">
+                                <div ng-if="item.hasUniqueAccount2">
+                                    <a class="btn btn-sm"
+                                       ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                       style="margin: 4px 0;"
+                                       ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                    </a>
+                                    <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button ng-if="item.ChequeState == 9 || !item.ChequeState" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <button ng-if="item.ChequeState == 1" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره پيگيري')">شماره پيگيري</button>
+                                <button ng-if="item.ChequeState == 12" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="11" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                @*وصول مسستقیم شده*@
+                @*State = -3, chequeState = 3*@
+                <table class="table table-striped" ng-if="State == -3">
+                    <thead>
+                        <tr>
+                            <th>
+
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>صندوق دار</th>
+                            <th>صادر کننده چک</th>
+                            <th>توضیحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList | filterReceiptList" ng-init="item.ChequeState = 3">
+                            <td>
+
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.Cashier_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Cashier_{{$index}}.$valid)}">
+                                <select ng-required="item.checked" name="Cashier_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.CashierID">
+                                    <option ng-repeat="chl in CashierLS" value="{{chl.CashierID}}">{{chl.CashierName}}</option>
+                                </select>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" ng-required="item.checked" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+                @*واریز به بانک*@
+                @*State = -28, chequeState = 4*@
+                <table class="table table-striped" ng-if="State == -4">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ</th>
+                            <th>صادر کننده چک</th>
+                            <th>شماره فيش واريزي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 4">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره فيش واريزي')">شماره فيش واريزي</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*واریز به بانک*@
+                @*State = -, chequeState = 8*@
+                <table class="table table-striped" ng-if="State == -28">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>@Resources.ReceiptDetailId</th>
+                            <th>بانک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ</th>
+                            <th>صادر کننده چک</th>
+                            <th>شماره فيش واريزي</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 28">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Bank}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && !item.BankId), 'mdc-bg-green-50':(item.checked && item.BankId)}">
+                                <select ng-required="item.checked" name="BankAccountLs_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-model="item.BankId" ng-change="checkUA2(item, 2)">
+                                    <option ng-repeat="uc in BankAccountLs" value="{{uc.BankID}}">{{uc.Bank_AccountNumber}}</option>
+                                </select>
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره فيش واريزي')">شماره فيش واريزي</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                @*ثبت خرج چک های دریافتی*@
+                @*State = -5, chequeState = 5*@
+                <table class="table table-striped" ng-if="State == -5">
+                    <thead>
+                        <tr>
+                            <th>
+                                @*<input type="checkbox" ng-model="checkedAll" ng-if="!checkedAll" ng-click="checkAll()" />
+                                    <input type="checkbox" ng-model="checkedAll" ng-if="checkedAll" checked ng-click="unCheckAll()" />*@
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب ذینفع</th>
+                            <th>گروه بابت</th>
+                            @*<th>بابت</th>*@
+                            <th>تاریخ</th>
+                            <th>صادر کننده چک</th>
+                            <th>توضیحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 5">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.UniqueAccount1_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.UniqueAccount1_{{$index}}.$valid)}">
+                                <a class="btn btn-sm"
+                                   ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                </a>
+                                <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                            </td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.BehalfGroup_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.BehalfGroup_{{$index}}.$valid)}">
+                                <select ng-required="item.checked" name="BehalfGroup_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfGroupID" ng-change="checkUA(item)">
+                                    <option ng-repeat="bg in BehalfGroupLs" value="{{bg.BehalfGroupID}}">{{bg.BehalfGroupDescription}}</option>
+                                </select>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.Behalf_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Behalf_{{$index}}.$valid)}">
+                                    <select ng-if="item.BehalfGroupID" ng-required="item.checked" name="Behalf_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfID">
+                                        <option ng-repeat="bl in BehlafLS" ng-if="bl.BehalfGroupID == item.BehalfGroupID" value="{{bl.BehalfID}}">{{bl.BehalfDescription}}</option>
+                                    </select>
+                                </td>*@
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <table class="table table-striped" ng-if="State == -18">
+                    <thead>
+                        <tr>
+                            <th>
+                                @*<input type="checkbox" ng-model="checkedAll" ng-if="!checkedAll" ng-click="checkAll()" />
+                                    <input type="checkbox" ng-model="checkedAll" ng-if="checkedAll" checked ng-click="unCheckAll()" />*@
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب ذینفع</th>
+                            <th>صادر کننده چک</th>
+                            <th>توضیحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState =18">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-class="{'mdc-bg-red-50':(item.checked && form.UniqueAccount1_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.UniqueAccount1_{{$index}}.$valid)}">
+                                <a class="btn btn-sm"
+                                   ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                   ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                   style="margin: 4px 0;"
+                                   ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                </a>
+                                <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*عودت چک نزد صندوق*@
+                @*State = -6, chequeState = 6*@
+                <table class="table table-striped" ng-if="State == -6">
+                    <thead>
+                        <tr>
+                            <th>
+                                @*<input type="checkbox" ng-model="checkedAll" ng-if="!checkedAll" ng-click="checkAll()" />
+                                    <input type="checkbox" ng-model="checkedAll" ng-if="checkedAll" checked ng-click="unCheckAll()" />*@
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>گروه بابت</th>
+                                <th>بابت</th>*@
+                            <th>تاریخ</th>
+                            @*<th>تفصیل اول</th>
+                                <th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 6">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.BehalfGroup_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.BehalfGroup_{{$index}}.$valid)}">
+                                    <select ng-required="item.checked" name="BehalfGroup_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfGroupID" ng-change="checkUA(item)">
+                                        <option ng-repeat="bg in BehalfGroupLs" value="{{bg.BehalfGroupID}}">{{bg.BehalfGroupDescription}}</option>
+                                    </select>
+                                </td>
+                                <td ng-class="{'mdc-bg-red-50':(item.checked && form.Behalf_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Behalf_{{$index}}.$valid)}">
+                                    <select ng-if="item.BehalfGroupID" ng-required="item.checked" name="Behalf_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfID">
+                                        <option ng-repeat="bl in BehlafLS" ng-if="bl.BehalfGroupID == item.BehalfGroupID" value="{{bl.BehalfID}}">{{bl.BehalfDescription}}</option>
+                                    </select>
+                                </td>*@
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    @*ng-init="minDateodate = 'item.LastStateDate'"*@
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            @*<td>
+                                    <div ng-if="item.hasUniqueAccount1">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>*@
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*عودت چک برگشتی*@
+                @*State = -29, chequeState = 12*@
+                <table class="table table-striped" ng-if="State == -29">
+                    <thead>
+                        <tr>
+                            <th>
+                                @*<input type="checkbox" ng-model="checkedAll" ng-if="!checkedAll" ng-click="checkAll()" />
+                                    <input type="checkbox" ng-model="checkedAll" ng-if="checkedAll" checked ng-click="unCheckAll()" />*@
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>گروه بابت</th>
+                                <th>بابت</th>*@
+                            <th>تاریخ</th>
+                            @*<th>تفصیل اول</th>
+                                <th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 29">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.BehalfGroup_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.BehalfGroup_{{$index}}.$valid)}">
+                                    <select ng-required="item.checked" name="BehalfGroup_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfGroupID" ng-change="checkUA(item)">
+                                        <option ng-repeat="bg in BehalfGroupLs" value="{{bg.BehalfGroupID}}">{{bg.BehalfGroupDescription}}</option>
+                                    </select>
+                                </td>
+                                <td ng-class="{'mdc-bg-red-50':(item.checked && form.Behalf_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Behalf_{{$index}}.$valid)}">
+                                    <select ng-if="item.BehalfGroupID" ng-required="item.checked" name="Behalf_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfID">
+                                        <option ng-repeat="bl in BehlafLS" ng-if="bl.BehalfGroupID == item.BehalfGroupID" value="{{bl.BehalfID}}">{{bl.BehalfDescription}}</option>
+                                    </select>
+                                </td>*@
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    @*ng-init="minDateodate = 'item.LastStateDate'"*@
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            @*<td>
+                                    <div ng-if="item.hasUniqueAccount1">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>*@
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="9" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                @*تبدیل چک انتظامی به چک دریافتی*@
+                @*State = -7, chequeState = 7*@
+                <table class="table table-striped" ng-if="State == -7">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>تاریخ سررسید</th>
+                            @*<th>گروه بابت</th>*@
+                            @* <th>بابت</th>
+                                <th>تفصیل اول</th>
+                                    <th>تفصیل دوم</th>*@
+                            <th>تاریخ</th>
+                            <th>صادر کننده چک</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 7">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.DueDate && item.checked), 'mdc-bg-red-50' : (!item.DueDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="DueDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.DueDate">
+                                </div>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.DueDate_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.DueDate_{{$index}}.$valid)}">
+                                    <button class="btn btn-sm" ng-class="{'btn-material-light-blue-A700':item.DueDate, 'btn-white' : !item.DueDate}" ng-click="convertCheque(item)">{{(item.DueDate) ? item.DueDate : "انتخاب تاریخ سررسید"}}</button>
+                                    <input type="hidden" ng-model="item.DueDate" ng-required="item.checked" name="DueDate_{{$index}}" />
+                                </td>*@
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.BehalfGroup_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.BehalfGroup_{{$index}}.$valid)}">
+                                    <select ng-required="item.checked" name="BehalfGroup_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfGroupID" ng-change="checkUA(item)">
+                                        <option ng-repeat="bg in BehalfGroupLs" value="{{bg.BehalfGroupID}}">{{bg.BehalfGroupDescription}}</option>
+                                    </select>
+                                </td>*@
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.Behalf_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Behalf_{{$index}}.$valid)}">
+                                    <select ng-if="item.BehalfGroupID && (BehlafLS | filter:{'BehalfGroupID':item.BehalfGroupID}).length > 0" ng-required="item.checked" name="Behalf_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfID">
+                                        <option ng-repeat="bl in BehlafLS | filter:{'BehalfGroupID':item.BehalfGroupID}" value="{{bl.BehalfID}}">{{bl.BehalfDescription}}</option>
+                                    </select>
+                                </td>*@
+                            @*<td>
+                                    <div ng-if="item.hasUniqueAccount1">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                                    </div>
+                                </td>
+                                <td>
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>
+                                                    <td class="text-center"
+                                                        ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                                        <div class="input-append">
+                                                            <input date-p
+                                                                   ng-required="item.checked"
+                                                                   readonly
+                                                                   name="StateDate_{{$index}}"
+                                                                   class="form-control"
+                                                                   minDate="{{item.LastStateDate}}"
+                                                                   type="text"
+                                                                   placeholder="____/__/__" lang="en"
+                                                                   ng-model="item.StateDate">
+                                                        </div>
+                                                    </td>*@
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    @*ng-init="minDateodate = 'item.LastStateDate'"*@
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+                @*حقوقی کردن چک های برگشتی*@
+                @*State = -8, chequeState = 8*@
+
+                <table class="table table-striped" ng-if="State == -8">
+                    <thead>
+                        <tr>
+                            <th></th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>گروه بابت</th>
+                                <th>بابت</th>*@
+                            <th>تفصیل اول</th>
+
+                            <th>تاریخ </th>
+                            <th>صادر کننده چک</th>
+                            <th>توضيحات / نام اقدام کننده</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList | filterReceiptList" ng-init="item.ChequeState = 8 ">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td>{{item.Unique_Account_No}}</td>
+
+
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                @*ng-init="minDate = 'item.LastStateDate';"*@
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           @*maxDate="{{maxDate}}"*@
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضيحات / نام اقدام کننده')">توضيحات / نام اقدام کننده</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="8" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*ابطال چک های نزد صندوق*@
+                @*State = -10, chequeState = 10*@
+                <table class="table table-striped" ng-if="State == -10">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>تاریخ</th>
+                            <th>صادر کننده چک</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 10">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" ng-required="item.checked" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+                @*ابطال چک های برگشتی*@
+                @*State = -10, chequeState = 10*@
+                <table class="table table-striped" ng-if="State == -25">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>صادر کننده چک</th>
+                            <th>تاریخ</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 25">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" ng-required="item.checked" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+                @*ابطال چک های برگشتی وحقوقی شده*@
+                @*State = -27, chequeState = 8*@
+                <table class="table table-striped" ng-if="State == -27">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>صادر کننده چک</th>
+                            <th>تاریخ</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 27">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" ng-required="item.checked" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+                @*تمدید چک دریافتنی سررسیدشده*@
+                @*State = -20, chequeState = 20*@
+                <table class="table table-striped" ng-if="State == -20">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید جدید</th>
+                            @*<th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            <th>تاریخ ثبت</th>
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 20">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.DueDate_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.DueDate_{{$index}}.$valid)}">
+                                    <button class="btn btn-sm" ng-class="{'btn-material-light-blue-A700':item.DueDate, 'btn-white' : !item.DueDate}" ng-click="convertCheque(item)">{{(item.DueDate) ? item.DueDate : "انتخاب تاریخ سررسید"}}</button>
+                                    <input type="hidden" ng-model="item.DueDate" ng-required="item.checked" name="DueDate_{{$index}}" />
+                                </td>*@
+                            <td class="text-center" ng-init="item.DueDate = ''"
+                                ng-class="{'mdc-bg-green-50' : (item.DueDate && item.checked), 'mdc-bg-red-50' : (!item.DueDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           @*name="StateDate_{{$index}}"*@
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.DueDate">
+
+                                </div>
+                            </td>
+                            @*<td></td>*@
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           minDate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue && Unique_Account_No), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-required="item.checked" ng-model="item.PlaningTypeValue" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*تعویض چک دریافتنی سررسیدشده*@
+                @*State = -21, chequeState = 21*@
+                <table class="table table-striped" ng-if="State == -21">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            @*<th>توضيحات</th>*@
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 21">
+                            <td>
+                                @*<input type="checkbox" ng-checked="all" ng-model="item.checked" />*@
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>
+                                {{item.DueDate}}
+                            </td>
+
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                @*<button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue && Unique_Account_No), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>*@
+                                @*<input type="hidden" ng-required="item.checked" ng-model="item.PlaningTypeValue" name="PlaningTypeValue_{{$index}}" />*@
+                                <a class="btn btn-success btnSave" ng-disabled="form.$invalid" ng-href="/Payment/Receipt/ShowReceiptForm?ReceiptDetailId={{item.ReceiptDetailId}} &ReceiptPayTypeId={{19}}&headerId=0">ورود چک جدید</a>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="2" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*تحویل لاشه چک های انتظامی*@
+                @*State = -15, chequeState = 15*@
+                <table class="table table-striped" ng-if="State == -15">
+                    <thead>
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>صادر کننده چک</th>
+                            <th>تاریخ</th>
+                            @*<th>گروه بابت</th>
+                                <th>بابت</th>
+                                <th>تفصیل اول</th>
+                                <th>تفصیل دوم</th>*@
+                            <th>توضيحات</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 15">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.Cheque_Number}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td>
+                                {{item.Unique_Account_No}}
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}">
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.BehalfGroup_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.BehalfGroup_{{$index}}.$valid)}">
+                                    <select ng-required="item.checked" name="BehalfGroup_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfGroupID" ng-change="checkUA(item)">
+                                        <option ng-repeat="bg in BehalfGroupLs" value="{{bg.BehalfGroupID}}">{{bg.BehalfGroupDescription}}</option>
+                                    </select>
+                                </td>
+                                <td ng-class="{'mdc-bg-red-50':(item.checked && form.Behalf_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.Behalf_{{$index}}.$valid)}">
+                                    <select ng-if="item.BehalfGroupID" ng-required="item.checked" name="Behalf_{{$index}}" style="max-width: 150px" class="form-control" ng-model="item.BehalfID">
+                                        <option ng-repeat="bl in BehlafLS" ng-if="bl.BehalfGroupID == item.BehalfGroupID" value="{{bl.BehalfID}}">{{bl.BehalfDescription}}</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <div ng-if="item.hasUniqueAccount1">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount1.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount1.Name != null ? item.UniqueAccount1.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount1_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount1.Code" />
+                                    </div>
+                                </td>
+                                                    <td>
+                                                        <div ng-if="item.hasUniqueAccount2">
+                                                            <a class="btn btn-sm"
+                                                               ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                                               ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                                               style="margin: 4px 0;"
+                                                               ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                                            </a>
+                                                            <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                                        </div>
+                                                    </td>*@
+                            <td>
+                                <button type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" ng-required="item.checked" name="PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="10" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+
+
+
+                @*ثبت عودت چک های خرج شده*@
+                @*State = -16, chequeState = 16*@
+
+
+                <table class="table table-striped" ng-if="State == -16  ">
+                    <thead>
+
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            @*<th>تاریخ واگذاری</th>*@
+                            <th>خرج شده به</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>وصول</th>
+                                <th ng-if="State == -2">برگشت</th>
+                                <th ng-if="State == -2">عودت</th>*@
+                            <th>تاریخ</th>
+                            @*<th>@Resources.account_code</th>*@
+                            @*<th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            <th></th>
+                        </tr>
+
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 16 ">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>
+                                {{item.Unique_Account_No_One}}
+                                @*{{(BankAccountLs | filter: {'BankID': item.BankID})[0].Bank_AccountNumber}}*@
+                            </td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-if="State == -17" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="17" ng-change="checkUA2(item, 1)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="11" ng-change="checkUA2(item, 1)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="12" ng-change="checkUA2(item, 3)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="9" />
+                                <input type="hidden" name="state_{{$index}}" ng-required="item.checked" ng-model="item.ChequeState" />
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}"
+                                @*ng-init="minDate = 'item.LastStateDate'"*@>
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.v_accountslS_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.v_accountslS_{{$index}}.$valid)}">
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>*@
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button ng-if="item.ChequeState == 9 || !item.ChequeState" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <button ng-if="item.ChequeState == 1" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره پيگيري')">شماره پيگيري</button>
+                                <button ng-if="item.ChequeState == 12" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="11" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+                @*ثبت عودت چک های خرج شده*@
+                @*State = -23, chequeState = 23*@
+
+
+                <table class="table table-striped" ng-if="State == -23 ">
+                    <thead>
+
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            @*<th>تاریخ واگذاری</th>*@
+                            <th>خرج شده به</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            @*<th>وصول</th>
+                                <th ng-if="State == -2">برگشت</th>
+                                <th ng-if="State == -2">عودت</th>*@
+                            <th>تاریخ</th>
+                            @*<th>@Resources.account_code</th>*@
+                            @*<th>تفصیل دوم</th>*@
+                            <th>صادر کننده چک</th>
+                            <th></th>
+                        </tr>
+
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 23 ">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>
+                                {{item.Unique_Account_No_One}}
+                                @*{{(BankAccountLs | filter: {'BankID': item.BankID})[0].Bank_AccountNumber}}*@
+                            </td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+                            <td ng-if="State == -17" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="17" ng-change="checkUA2(item, 1)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="11" ng-change="checkUA2(item, 1)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="12" ng-change="checkUA2(item, 3)" />
+                            </td>
+                            <td ng-if="State == -2" class="text-center" ng-class="{'mdc-bg-green-50' : (item.ChequeState && item.checked), 'mdc-bg-red-50' : (!item.ChequeState && item.checked)}">
+                                <input type="radio" name="{{$index}}" ng-model="item.ChequeState" value="9" />
+                                <input type="hidden" name="state_{{$index}}" ng-required="item.checked" ng-model="item.ChequeState" />
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}"
+                                @*ng-init="minDate = 'item.LastStateDate';"*@>
+
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           @*maxDate="{{maxDate}}"*@
+                                           mindate="{{item.LastStateDate}}"
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.v_accountslS_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.v_accountslS_{{$index}}.$valid)}">
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>*@
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>
+                                <button ng-if="item.ChequeState == 9 || !item.ChequeState" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <button ng-if="item.ChequeState == 1" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره پيگيري')">شماره پيگيري</button>
+                                <button ng-if="item.ChequeState == 12" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="11" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                @*ثبت تنزیل چک دریافتی*@
+                @*State = -22, chequeState = 22*@
+
+
+                <table class="table table-striped" ng-if="State == -22 ">
+                    <thead>
+
+                        <tr>
+                            <th>
+                            </th>
+                            <th>شماره رسید دریافت</th>
+                            @*<th>تاریخ واگذاری</th>*@
+                            <th>صادر کننده چک</th>
+                            <th>نوع چک</th>
+                            <th>مبلغ</th>
+                            <th>شماره چک</th>
+                            <th>سررسید</th>
+                            <th>شماره حساب واگذاری</th>
+                            <th>تاریخ</th>
+                            <th>مبلغ کسر شده</th>
+                            @*<th>@Resources.account_code</th>*@
+                            @*<th>تفصیل دوم</th>*@
+
+
+                            <th></th>
+                        </tr>
+
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in receiptList" ng-init="item.ChequeState = 22 ">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.ReceiptDetailId}}</td>
+                            <td>{{item.Unique_Account_No}}</td>
+                            <td>{{item.Receipt_Pay_TypeTitle}}</td>
+                            <td><b>{{item.Price | number}} {{item.ExchangeTypeTitle}}</b></td>
+                            <td>{{item.ChequeNumber}}</td>
+                            <td>{{item.DueDate}}</td>
+
+                            <td>
+                                {{item.Unique_Account_No_One}}
+                                @*{{(BankAccountLs | filter: {'BankID': item.BankID})[0].Bank_AccountNumber}}*@
+                            </td>
+                            <td class="text-center"
+                                ng-class="{'mdc-bg-green-50' : (item.StateDate && item.checked), 'mdc-bg-red-50' : (!item.StateDate && item.checked)}"
+                                @*ng-init="minDate = 'item.LastStateDate'"*@>
+                                @*ng-init="maxDate = 'new Date()'; minDate = ((model.Header.ReceiptPayTypeId==19 || model.Header.ReceiptPayTypeId==21) ? 'new Date() + 1' : '')">*@
+                                <div class="input-append">
+                                    <input date-p
+                                           ng-required="item.checked"
+                                           readonly
+                                           name="StateDate_{{$index}}"
+                                           class="form-control"
+                                           mindate="{{item.LastStateDate}}"
+                                           @*maxDate="{{maxDate}}"
+                                           minDate="{{item.DueDate}}"*@
+                                           type="text"
+                                           placeholder="____/__/__" lang="en"
+                                           ng-model="item.StateDate">
+                                </div>
+                            <td class="text-center" ng-class="{'mdc-bg-green-50' : (item.PlaningTypeValue && item.checked), 'mdc-bg-red-50' : (!item.PlaningTypeValue && item.checked)}">
+                                <div class="input-append">
+
+                                    <input class="form-control" ng-required="item.checked" type="number" ng-model="item.PlaningTypeValue" required name=" PlaningTypeValue_{{$index}}" min="1" max="{{item.Price}}" />
+                                </div>
+                            </td>
+                            @*<td ng-class="{'mdc-bg-red-50':(item.checked && form.v_accountslS_{{$index}}.$invalid), 'mdc-bg-green-50':(item.checked && form.v_accountslS_{{$index}}.$valid)}">
+                                    <div ng-if="item.hasUniqueAccount2">
+                                        <a class="btn btn-sm"
+                                           ng-class="item.UniqueAccount2.Name == null ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                                           ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                           style="margin: 4px 0;"
+                                           ng-bind-html='item.UniqueAccount2.Name != null ? item.UniqueAccount2.Name : "ذینفع"'>
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2_{{$index}}" ng-required="item.checked" ng-model="item.UniqueAccount2.Code" />
+                                    </div>
+                                </td>*@
+
+                            <td>
+                                <button ng-if="item.ChequeState == 9 || !item.ChequeState" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <button ng-if="item.ChequeState == 1" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'شماره پيگيري')">شماره پيگيري</button>
+                                <button ng-if="item.ChequeState == 12" type="button" class="btn btn-sm" ng-class="{'btn-white':(!item.checked), 'btn-material-light-green-A700':(item.checked && item.PlaningTypeValue), 'btn-material-blue-A700':(item.checked && !item.PlaningTypeValue)}" ng-click="setDescription(item, 'توضیحات')">توضیحات</button>
+                                <input type="hidden" ng-model="item.PlaningTypeValue" name=" PlaningTypeValue_{{$index}}" />
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="3" class="text-left"><h3>جمع کل</h3></td>
+                            <td colspan="11" class="text-right"><h3>{{sumPrice() | number}} ریال</h3></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <div class="clearfix" ng-if="State != 11 && State != 12 && State != 7">
+                    <div class="pull-right">
+                        <ul uib-pagination total-items="bigTotalItems" items-per-page="maxSize" ng-change="pageChanged()" ng-model="currentPage" previous-text="قبل" next-text="بعد" max-size="maxSize" class="pagination-sm" boundary-link-numbers="true" rotate="false"></ul>
+                    </div>
+                    <div class="pull-left" ng-if="State != -21">
+                        <button class="btn btn-success btnSave"
+                                ng-model="button"
+                                ng-disabled="form.$invalid || !hasChecked()"
+                                ng-click="save($event)">
+                            اعمال برنامه ریزی
+                        </button>
+                    </div>
+                </div>
+                <div ng-if="State != 11 && State != 12 && State != 7">
+                    <p ng-if="form.$invalid"><span class="mdc-text-red-A700">لطفا موارد فرم را به صورت کامل تکمیل نمایید</span></p>
+                    <p ng-if="!hasChecked()"><span class="mdc-text-red-A700">حداقل یک آیتم برای برنامه ریزی انتخاب نمایید</span></p>
+                </div>
+            </div>
+        </div>
+
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+        <div class="modal md ang fade" role="dialog" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                        <h4 class="modal-title"></h4>
+                    </div>
+
+                    <div class="modal-body">
+                        <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </form>
+    <script type="text/ng-template" id="myModalContent.html">
+
+        @*<div class="modal-header">
+                <h3 class="modal-title">I'm a modal!</h3>
+            </div>*@
+
+        <div class="modal-body">
+            <label for='DueDate' class='control-label'>تاریخ سررسید</label>
+            <input date-p
+                   class="form-control"
+                   type="text"
+                   placeholder="____/__/__" lang="en"
+                   ng-model="object.DueDate"
+                   mindate="'new Date()'"
+                   readonly
+                   autocomplete="off">
+        </div>
+        <div class="modal-footer">
+            @*<button class="btn btn-material-light-blue-A700" type="button" ng-click="ok()">تبدیل به چک روز</button>*@
+            <button class="btn btn-white" type="button" ng-click="cancel()">بستن</button>
+        </div>
+    </script>
+</div>
+<script type="text/javascript">
+    $(document).ready(function () {
+        jQuery(function ($) {
+            $(".Date").mask("9999/99/99");
+        });
+    });
+</script>
+<style>
+    .table tr th, .table tr td {
+        white-space: nowrap;
+    }
+</style>

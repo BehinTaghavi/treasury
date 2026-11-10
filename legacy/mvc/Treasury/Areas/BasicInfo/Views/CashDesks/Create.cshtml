@@ -1,0 +1,272 @@
+﻿@model CSD.Treasury.DataModel.CashDesk
+@using System.Configuration
+@{
+    ViewBag.Title = "Create";
+}
+
+@using (Ajax.BeginForm("Create", "CashDesks", new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data);closeModal('md');updateTable();"
+
+}, new { enctype = "multipart/form-data", @class = "form-horizontal", id = "CashierCreate" }))
+{
+    @Html.AntiForgeryToken()
+
+<div class="form-horizontal">
+
+    @Html.ValidationSummary(true, "", new { @class = "text-danger" })
+    <div class="form-group">
+        <label class="control-label" for="arzi">ارزی</label>
+        @Html.CheckBoxFor(model => model.arzi, new { @class = "form-check-input " })
+    </div>
+    <div class="form-group">
+        <label class="control-label" for="IsCheque">چک</label>
+        @Html.CheckBoxFor(model => model.IsCheque, new { @class = "form-check-input " })
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.Account_No, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-10">
+            @Html.DropDownListFor(model => model.Account_No, new SelectList(ViewBag.v_accounts, "account_code", "Account_Name", "-1"), new { data_lang_number = "fa", @class = "form-control" })
+            @*@Html.DropDownListFor(model => model.Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control" })*@
+            @Html.ValidationMessageFor(model => model.Account_No)
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.CashDeskDescription, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-10">
+            @Html.EditorFor(model => model.CashDeskDescription, new { htmlAttributes = new { @class = "form-control" } })
+            @Html.ValidationMessageFor(model => model.CashDeskDescription, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    @*<div class="form-group">
+            @Html.LabelFor(model => model.IsActive, htmlAttributes: new { @class = "control-label col-md-2" })
+            <div class="col-md-10">
+                <div class=" col-md-3">
+                    @Html.CheckBoxFor(model => model.IsActive, new { @class = "checkbox" })
+                    @Html.ValidationMessageFor(model => model.IsActive, "", new { @class = "text-danger" })
+                </div>
+            </div>
+        </div>*@
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.Unique_Account_No, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+        </div>
+        <div class="col-md-5">
+            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            @Html.ValidationMessageFor(model => model.Unique_Account_No, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.LabelFor(model => model.Unique_Account_No_two, htmlAttributes: new { @class = "control-label col-md-2" })
+
+        <div class="col-sm-5">
+            @Html.DropDownList("UniqueAccountType2", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", @placeholder = Resources.Type, data_bind = "Unique_Account_No_two", data_code_att = "Code2", data_name_att = "Name2", updatetargetid = "acc2" })
+        </div>
+        <div class="col-md-5">
+            @Html.DropDownListFor(model => model.Unique_Account_No_two, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+            @Html.ValidationMessageFor(model => model.Unique_Account_No_two, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.cmpBranchID, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            @Html.DropDownList("cmpBranchID", null, htmlAttributes: new { @class = "form-control" })
+            @Html.ValidationMessageFor(model => model.cmpBranchID, "", new { @class = "text-danger" })
+        </div>
+    </div>
+    <div class="form-group">
+        @Html.LabelFor(model => model.ExchangeTypeID, htmlAttributes: new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            @*@Html.DropDownList("ExchangeTypeID", null, htmlAttributes: new { @class = "form-control" })*@
+            @Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeTypeID, "ExchangeTypeID", "ExchangeTypeDescription"), Resources.PleaseSelect, new { @disabled = "disabled", data_lang_number = "fa", @class = "form-control" })
+            @Html.ValidationMessageFor(model => model.ExchangeTypeID, "", new { @class = "text-danger" })
+        </div>
+    </div>
+
+    <div class="form-group">
+        @Html.Label("ExchangeType1", "نوع نرخ ارز", new { @class = "control-label col-md-2" })
+        <div class="col-md-5">
+            <select class="form-control" id="ExchangeTypeValues" name="ExchangeTypeValues" disabled="disabled">
+                <option></option>
+                <option value="1">استاندارد</option>
+                <option value="2">رسمی</option>
+                <option value="3">غیررسمی</option>
+                <option value="4">واقعی</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <button type="submit" class="btn btn-primary btn-sm">@Resources.Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+}
+
+
+@Scripts.Render("~/bundles/jqueryval")
+<script type="text/javascript">
+    $("#arzi").change(function () {
+       
+        var address;
+        
+        if (this.checked) {
+            address = "@(Url.Action("GetAcount", "CashDesks", new { isarzi = true, Area = "BasicInfo" }))";
+            document.getElementById("ExchangeTypeID").selectedIndex = "0";
+            document.getElementById("ExchangeTypeValues").selectedIndex = "0";
+            document.getElementById("Account_No").selectedIndex = "-1";
+            $("#ExchangeTypeID").attr("disabled", false);
+            $("#ExchangeTypeValues").attr("disabled", false);
+            $("#Account_No").select2("val", "");
+            $("#Account_No").load(address, { id: $(this).val() }, function (data) {
+                $("#Account_No").val($("#Account_No option:first").val()).show();
+            });
+        }
+        else {
+            address = "@(Url.Action("GetAcount", "CashDesks", new { isarzi = false, Area = "BasicInfo" }))";
+            document.getElementById("ExchangeTypeID").selectedIndex = "0";
+            document.getElementById("ExchangeTypeValues").selectedIndex = "0";
+            document.getElementById("Account_No").selectedIndex = "-1";
+            $("#ExchangeTypeID").attr("disabled", true);
+            $("#ExchangeTypeValues").attr("disabled", true);
+            $("#Account_No").select2("val", "");
+            $("#Account_No").load(address, { id: $(this).val() }, function (data) {
+                $("#Account_No").val($("#Account_No option:first").val()).show();
+            });
+        }
+       
+    });
+    $("#Account_No").select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+
+
+        $('#Unique_Account_No_two').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No_two").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $("#UniqueAccountType2").change(function () {
+        $('#Unique_Account_No_two').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No_two").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+</script>

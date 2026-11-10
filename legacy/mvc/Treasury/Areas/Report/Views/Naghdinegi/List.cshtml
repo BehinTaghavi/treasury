@@ -1,0 +1,39 @@
+﻿@model List<CSD.Treasury.Service.ProceduresDB.GetAllBankBalance_Result>
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "Index";
+    var i = 1;
+
+}
+
+@if (Model != null && Model.Count > 0)
+{
+    <table class="table table-striped sortable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>@Resources.BankAccountNumber</th>
+                <th>@Resources.Bank</th>
+                <th>@Resources.BranchName</th>
+                <th>مانده روزقبل</th>
+                <th>جمع دریافت ها</th>
+                <th>جمع پرداخت ها</th>
+                <th>مانده تاروز</th>       
+            </tr>  
+        </thead>
+        @foreach (var item in Model)
+        {
+
+            <tr>
+                <td data-lang-number="fa">@(i++)</td>
+                <td data-lang-number="fa">@(item.Bank_AccountNumber)</td>
+                <td>@(item.BasicBankDescription)</td>
+                <td>@(item.BranchName)</td>
+                <td data-lang-number="fa">@Math.Truncate(item.MogodiAvalie.Value).ToString("N0")</td>
+                <td data-lang-number="fa">@Math.Truncate(item.Daryaft.Value).ToString("N0")</td>
+                <td data-lang-number="fa">@Math.Truncate(item.Pardakht.Value).ToString("N0")</td>
+                <td data-lang-number="fa">@Math.Truncate(item.balance.Value).ToString("N0")</td>
+            </tr>
+        }
+    </table>
+}

@@ -1,0 +1,157 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.MVCHelpers
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Payment";
+    int ix = Model.PageIndex;
+
+}
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+
+
+
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>
+<table class="table sortable">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+            <th>#</th>
+            <th>@Resources.ReceiptDetailId</th>
+            <th>@Resources.ChequeNo</th>
+            <th>@Resources.ChequeFormatType</th>
+            <th>@Resources.Bank</th>
+            <th>@Resources.Price</th>
+            <th>@Resources.DueDate</th>
+            <th>@Resources.Unique_Account_No</th>
+            <th></th>
+
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+           <tr>
+               <td data-lang-number="fa">
+                   @{i++;}
+                   @i
+               </td>
+               <td data-lang-number="fa">
+                   @(item.ReceiptDetailId)
+               </td>
+               <td data-lang-number="fa">
+                   @(item.ChequeNumber)
+               </td>
+               <td>
+                   @(item.Receipt_Pay_TypeTitle)
+               </td>
+               <td>
+                   @(item.Bank)
+               </td>        
+               <td data-lang-number="fa">
+                   @Math.Truncate(item.Price).ToString("N0")     
+               </td> 
+               <td data-lang-number="fa">
+                   @(item.DueDate)
+               </td>
+               <td data-lang-number="fa">
+                   @(item.Unique_Account_No)
+               </td>             
+         
+               <td>
+               @Ajax.IActionLink("", "ReceiptDetailsById", "Receipt", new { area = "Payment", ReceiptDetailId = item.ReceiptDetailId }, new AjaxOptions
+          {
+              OnSuccess = "modal(data,'" + Resources.Show + "', 'lg:not(.xlg)');"
+          }, new { title = Resources.Show, @class = "btn btn-material-blue-grey-600 btn-xs" }, "zmdi zmdi-hc-lg  zmdi-eye")
+               </td>
+           </tr>
+        }
+</table>
+
+<hr />
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "ShowFollowUpReceipt", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "ShowFollowUpReceipt", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "ShowFollowUpReceipt", "Receipt", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

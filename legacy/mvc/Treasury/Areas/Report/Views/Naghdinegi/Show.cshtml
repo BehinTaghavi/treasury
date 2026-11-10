@@ -1,0 +1,29 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.GardeshHesabSearchModel
+@using CSD.Treasury.Resourse
+@using CSD.Treasury.UI.Models
+@section PageHeader{
+ <span>گزارش نقدینگی در تاریخ</span>    <span data-lang-number="fa">@Utility.GetPersianDate(Utility.ToPersianDate(DateTime.Now)) </span>
+
+}
+@{
+    ViewBag.Title = "SearchView";
+}
+
+<div>@Html.Action("List", "Naghdinegi", new { Area = "Report", FromDate = Utility.ToPersianDate(DateTime.Now), ToDate = Utility.ToPersianDate(DateTime.Now) })</div>
+<script>
+
+    $(document).ready(function () {
+        $('.js-example-basic-multiple').select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+        });
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+
+</script>
+

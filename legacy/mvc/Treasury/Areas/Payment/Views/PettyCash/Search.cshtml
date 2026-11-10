@@ -1,0 +1,420 @@
+﻿@{
+    ViewBag.Title = "Index";
+    System.Globalization.PersianCalendar pc = new System.Globalization.PersianCalendar();
+    var str = string.Format("{2:0000}/{1:00}/{0:00}", pc.GetYear(DateTime.Now), pc.GetMonth(DateTime.Now), pc.GetDayOfMonth(DateTime.Now));
+}
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/pettyCashSearch.js")"></script>
+
+@section PageHeader{
+    <div class="clearfix">
+        <div class="pull-right">
+            ثبت پرداخت های تنخواه گردان
+        </div>
+        <div class="pull-left">
+            <div>@Html.ActionLink(Resources.Return, "_Index", "PettyCash", new { Area = "Payment" }, new { @class = "btn btn-default btn-sm" })</div>
+        </div>
+    </div>
+}
+
+<div ng-app="treasury" ng-controller="pettyCashSearchController" ng-init="init('@ViewBag.code', '@ViewBag.description')">
+    <form name="form" novalidate ng-submit="savePettyCash()">
+        <div class="clearfix">
+            <div class="col-sm-9">
+                <div ng-if="HeaderId == 0">
+                    <div class="row">
+                        <div class="col-sm-2">
+                            <label>دارنده تنخواه گردان: </label>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="form-group" ng-class="{'has-error mdc-bg-red-50': !form.ActivePetyCashId.$pristine && form.ActivePetyCashId.$invalid, 'has-success': form.ActivePetyCashId.$valid}">
+                                <select required class="form-control input-sm" name="ActivePetyCashId" ng-options="ptcn.PettyCashID as ptcn.UniqueAccountTitle for ptcn in model.Header.PettyCashLs " ng-model="model.ActivePetyCashId" ng-change="changePTCN(model.ActivePetyCashId)"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" ng-if="model.ActivePetyCashId > 0">
+                    <div class="col-sm-9">
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div class="form-group" ng-if="HeaderId != 0">
+                                    <h4> شماره سریال: {{HeaderId}}</h4>
+                                    <hr />
+                                </div>
+
+                                <div class="form-group">
+                                    <label>سقف پرداخت: <span ng-if="activeHeader.PayCeiling != null && activeHeader.PayCeiling != 0" class="mdc-text-blue-900">{{activeHeader.PayCeiling | number}} ریال</span></label>
+                                </div>
+                                <div class="form-group">
+                                    <label>حد واریز: <span ng-if="activeHeader.Settle_Limit != null && activeHeader.Settle_Limit != 0" class="mdc-text-blue-900">{{activeHeader.Settle_Limit | number}} ریال</span></label>
+                                </div>
+                                <div class="form-group">
+                                    <label>مانده نهایی: <span ng-if="activeHeader.PettyCash_Ammount != null && activeHeader.PettyCash_Ammount != 0" class="mdc-text-blue-900">{{activeHeader.PettyCash_Ammount | number}} ریال</span></label>
+                                </div>
+
+                            </div>
+                            <div class="col-sm-8">
+                                <div class="form-group" ng-if="HeaderId != 0">
+                                    <h4> دارنده تنخواه گردان: {{(model.Header.PettyCashLs | filter : {PettyCashID : model.ActivePetyCashId})[0].UniqueAccountTitle}}</h4>
+                                    <hr />
+                                </div>
+                                <div class="form-group">
+                                    <label>تفصیل اول: {{activeHeader.UniqueAccountTitle1}}</label>
+                                </div>
+                                <div class="form-group">
+                                    <label>
+                                        تفصیل دوم:
+                                        <a class="btn btn-sm"
+                                           style="margin: 0 10px 0 0"
+                                           ng-class="UniqueAccount2.Name ? 'btn-material-green-500' : 'btn-material-grey-500'"
+                                           ng-click="changeUniqueAccount(UniqueAccount2)"
+                                           ng-bind-html="UniqueAccount2.Name ? UniqueAccount2.Name : 'انتخاب تفصیل دوم'">
+                                        </a>
+                                        <input type="hidden" name="UniqueAccount2" ng-model="UniqueAccount2.Code" />
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-3">
+                <div class="row">
+                    <div class="col-xs-4"><label>شماره سریال:</label></div>
+                    <div class="col-xs-1 text-center"><a href="javascript:void(0)" ng-click="addSerialHeader()" title="بعدی"><i class="zmdi zmdi-caret-right zmdi-hc-2x"></i></a></div>
+                    <div class="col-xs-1 text-center"><a href="javascript:void(0)" ng-click="minusSerialHeader()" title="قبلی"><i class="zmdi zmdi-caret-left zmdi-hc-2x"></i></a></div>
+                    <div class="col-xs-4 text-center">
+                        <input type="text" class="form-control input-sm text-center" ng-model="activeHeader.PettyCashTransactionHeaderID" placeholder="شماره سریال" />
+                    </div>
+                    <div class="col-xs-1 text-center"><a href="javascript:void(0)" ng-click="getPettyCash(activeHeader.PettyCashTransactionHeaderID)"><i class="zmdi zmdi-search zmdi-hc-2x"></i></a></div>
+                </div>
+                <div class="row">
+                    <div class="col-xs-3"><label>تاریخ:</label></div>
+                    <div class="col-xs-9">
+                        <div class="input-append">
+                            <input date-p
+                                   class="form-control"
+                                   type="text"
+                                   placeholder="____/__/__" lang="en"
+                                   ui-mask="99/99/9999"
+                                   readonly
+                                   style="text-align: right"
+                                   ng-model="model.PettyCashTransactionDate">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        @*<hr ng-if="HeaderId != 0 || ActivePetyCashId != 0 && " />*@
+
+        <hr ng-if="HeaderId != 0 || model.ActivePetyCashId != 0" />
+        @*<div class="row" ng-if="HeaderId != 0 || ActivePetyCashId != 0">*@
+        <div class="row">
+            <div class="col-xs-12">
+                <div class="table-responsive">
+                    <table class="table petyCash">
+                        <thead>
+                            <tr>
+                                <th colspan="11">
+                                    <h3>لیست پرداخت های تنخواه گردان</h3>
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>#</th>
+                                <th></th>
+                                <th></th>
+                                <th>حساب معین / معین در معین</th>
+                                <th>تفصیل اول</th>
+                                <th>تفصیل دوم</th>
+                                <th>تاریخ پرداخت</th>
+                                <th>مبلغ</th>
+                                <th></th>
+                                <th colspan="2">توضیحات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr ng-repeat="item in model.PettyCash_TransactionLs | filter:{'IsVakhahi':false}" ng-class="{'mdc-bg-green-50':item.IsAccept}">
+                                <td class="mdc-bg-grey-100">{{$index + 1}}</td>
+                                <td class="mdc-bg-grey-100 text-center"><a ng-if="HeaderId == 0 || item.newItem || (!item.IsAccept && !item.IsVakhahi)" class="mdc-text-red-A700" href="javascript:void(0)" title="حذف" ng-click="deleteItem(item)"><i class="zmdi zmdi-hc-lg zmdi-close"></i></a></td>
+                                <td class="mdc-bg-grey-100 text-center"><a class="mdc-text-blue-A700" href="javascript:void(0)" title="کپی" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></a></td>
+                                <td>
+                                    <div class="form-group" ng-class="{'has-error mdc-bg-red-50': (form.uniqAccountType_{{$index}}.$pristine && form.uniqAccountType_{{$index}}.$invalid) || form.uniqAccountType_{{$index}}.$invalid, 'has-success': form.uniqAccountType_{{$index}}.$valid}">
+                                        <select ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" required name="uniqAccountType_{{$index}}" ui-select2="select2Options" style="max-width: 150px" class="form-control" ng-options="uniqAccountType.account_code as uniqAccountType.account_code + ' / ' + uniqAccountType.Account_Name for uniqAccountType in model.AccountNumLs" ng-model="item.uniqAccountType" title="{{item.uniqAccountType.Account_Name}}"></select>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a ng-if="getUniqueAccount(item).Has_Unique_Account" class="btn btn-sm"
+                                       ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)"
+                                       ng-class="item.UniqueAccount1.Name ? 'btn-material-green-500' : 'btn-material-red-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                       ng-bind-html='item.UniqueAccount1.Name ? item.UniqueAccount1.Name : "انتخاب تفصیل اول"'>
+                                    </a>
+                                    <input ng-if="getUniqueAccount(item).Has_Unique_Account" type="hidden" name="UniqueAccount1_{{$index}}" required ng-model="item.UniqueAccount1.Code" />
+                                </td>
+                                <td>
+                                    <a ng-if="getUniqueAccount(item).Has_Unique_Account_Two" class="btn btn-sm"
+                                       ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)"
+                                       ng-class="item.UniqueAccount2.Name ? 'btn-material-green-500' : 'btn-material-red-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                       ng-bind-html='item.UniqueAccount2.Name ? item.UniqueAccount2.Name : "انتخاب تفصیل دوم"'>
+                                    </a>
+                                    <input ng-if="getUniqueAccount(item).Has_Unique_Account_Two" type="hidden" name="UniqueAccount2_{{$index}}" required ng-model="item.UniqueAccount2.Code" />
+                                </td>
+                                <td>
+                                    <div class="form-group" ng-init="maxDate = 'new Date()'" ng-class="{'has-error mdc-bg-red-50': (form.PayDate_{{$index}}.$pristine && form.PayDate_{{$index}}.$invalid) || form.PayDate_{{$index}}.$invalid, 'has-success': form.PayDate_{{$index}}.$valid}">
+                                        <div class="input-append">
+                                            <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" date-p
+                                                   maxdate="{{maxDate}}"
+                                                   required
+                                                   name="PayDate_{{$index}}"
+                                                   class="form-control"
+                                                   type="text"
+                                                   placeholder="____/__/__" lang="en"
+                                                   ui-mask="99/99/9999"
+                                                   readonly
+                                                   style="text-align: right"
+                                                   ng-model="item.PayDate">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="form-group" ng-class="{'has-error mdc-bg-red-50': (form.Price_{{$index}}.$pristine && form.Price_{{$index}}.$invalid) || form.Price_{{$index}}.$invalid, 'has-success': form.Price_{{$index}}.$valid}">
+                                        <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" required name="Price_{{$index}}" type="number" ignore-mouse-wheel class="form-control input-sm" min="0" ng-model="item.Price" ng-change="updateSumPrice(); checkMaxPrice(item, activeHeader.PayCeiling)" placeholder="مبلغ" />
+                                        <label ng-if="item.Price" style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.Price | number}} ریال</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="clearfix" ng-if="model.AcceptPettyCash">
+                                        <div ng-if="!item.IsVakhahi">
+                                            <label>
+                                                <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" type="checkbox" ng-model="item.IsAccept" ng-change="updateSumPrice()" />&nbsp;&nbsp; تاییدیه
+                                            </label>
+                                        </div>
+                                        <div ng-if="!item.IsAccept">
+                                            <label>
+                                                <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" type="checkbox" ng-model="item.IsVakhahi" ng-change="updateSumPrice(); enterEllatVakhahi(item)" />&nbsp;&nbsp; واخواهی
+                                            </label>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td colspan="2">
+                                    <a ng-if="!(!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi))" href="javascript:void(0)" ng-click="enterDescription(item)">
+                                        <i ng-if="!item.Description" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-red-800" title="{{item.Description}}" style="line-height: 48px;display: flex;"></i>
+                                        <i ng-if="item.Description" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-green-800" title="{{item.Description}}" style="line-height: 48px;display: flex;"></i>
+                                    </a>
+                                    <input type="hidden" required ng-model="item.Description" name="Description_{{$index}}" />
+                                    <span ng-if="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)">{{item.Description}}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+
+                        <thead ng-if="(model.PettyCash_TransactionLs | filter:{'IsVakhahi':true}).length > 0">
+                            <tr>
+                                <th colspan="11">
+                                    <h3>لیست پرداخت های تنخواه گردان های واخواهی شده</h3>
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>#</th>
+                                <th></th>
+                                <th></th>
+                                @*<th>گروه بابت</th>
+                                    <th>عطف</th>
+                                    <th>بابت</th>*@
+                                <th>حساب معین / معین در معین</th>
+                                <th>تفصیل اول</th>
+                                <th>تفصیل دوم</th>
+                                <th>تاریخ پرداخت</th>
+                                <th>مبلغ</th>
+                                <th></th>
+                                <th>علت واخواهی</th>
+                                <th>توضیحات</th>
+                            </tr>
+                        </thead>
+                        <tbody ng-if="(model.PettyCash_TransactionLs | filter:{'IsVakhahi':true}).length > 0">
+                            <tr ng-repeat="item in model.PettyCash_TransactionLs | filter:{'IsVakhahi':true}" class="mdc-bg-red-50">
+                                <td class="mdc-bg-grey-100">{{$index + 1}}</td>
+                                <td class="mdc-bg-grey-100 text-center"><a ng-if="HeaderId == 0 || item.newItem" class="mdc-text-red-A700" href="javascript:void(0)" title="حذف" ng-click="deleteItem(item)"><i class="zmdi zmdi-hc-lg zmdi-close"></i></a></td>
+                                <td class="mdc-bg-grey-100 text-center"><a class="mdc-text-blue-A700" href="javascript:void(0)" title="کپی" ng-click="copyItem(item)" tooltip-placement="top" uib-tooltip="کپی"><i class="zmdi zmdi-hc-lg zmdi-copy"></i></a></td>
+                                <td>
+                                    <div class="form-group" ng-class="{'has-error mdc-bg-red-50': (form.uniqAccountType_{{$index}}.$pristine && form.uniqAccountType_{{$index}}.$invalid) || form.uniqAccountType_{{$index}}.$invalid , 'has-success': form.uniqAccountType_{{$index}}.$valid}">
+                                        <select ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" required ui-select2="select2Options" name="uniqAccountType_{{$index}}" style="max-width: 150px" class="form-control input-sm" ng-options="uniqAccountType.account_code as uniqAccountType.account_code + ' / ' + uniqAccountType.Account_Name for uniqAccountType in model.AccountNumLs" ng-model="item.uniqAccountType" title="{{item.uniqAccountType.Account_Name}}"></select>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" ng-if="getUniqueAccount(item).Has_Unique_Account" class="btn btn-sm"
+                                       ng-class="item.UniqueAccount1.Name ? 'btn-material-red-500' : 'btn-material-light-blue-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount1)"
+                                       ng-bind-html='item.UniqueAccount1.Name ? item.UniqueAccount1.Name : "انتخاب تفصیل اول"'>
+                                    </a>
+                                    <input ng-if="getUniqueAccount(item).Has_Unique_Account" type="hidden" name="UniqueAccount11_{{$index}}" required ng-model="item.UniqueAccount1.Code" />
+                                </td>
+                                <td>
+                                    <a ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" ng-if="getUniqueAccount(item).Has_Unique_Account_Two" class="btn btn-sm"
+                                       ng-class="item.UniqueAccount2.Name ? 'btn-material-red-500' : 'btn-material-light-blue-A700'"
+                                       ng-click="changeUniqueAccount(item.UniqueAccount2)"
+                                       ng-bind-html='item.UniqueAccount2.Name ? item.UniqueAccount2.Name : "انتخاب تفصیل دوم"'>
+                                        <input ng-if="getUniqueAccount(item).Has_Unique_Account_Two" type="hidden" name="UniqueAccount22_{{$index}}" required ng-model="item.UniqueAccount2.Code" />
+                                    </a>
+                                </td>
+                                <td>
+                                    <div class="form-group" ng-init="maxDate = 'new Date()'" ng-class="{'has-error mdc-bg-red-50': (form.PayDate_{{$index}}.$pristine && form.PayDate_{{$index}}.$invalid) || form.PayDate_{{$index}}.$invalid, 'has-success': form.PayDate_{{$index}}.$valid}">
+                                        <div class="input-append">
+                                            <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" date-p
+                                                   maxdate="{{maxDate}}"
+                                                   required
+                                                   style="text-align: right"
+                                                   name="PayDate_{{$index}}"
+                                                   class="form-control"
+                                                   type="text"
+                                                   placeholder="____/__/__" lang="en"
+                                                   ui-mask="99/99/9999"
+                                                   readonly
+                                                   ng-model="item.PayDate">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="form-group" ng-class="{'has-error mdc-bg-red-50': (form.Price_{{$index}}.$pristine && form.Price_{{$index}}.$invalid) || form.Price_{{$index}}.$invalid, 'has-success': form.Price_{{$index}}.$valid}">
+                                        <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" required name="Price_{{$index}}" type="number" ignore-mouse-wheel class="form-control input-sm" min="0" ng-model="item.Price" ng-change="updateSumPrice(); checkMaxPrice(item, activeHeader.PayCeiling)" placeholder="مبلغ" />
+                                        <label ng-if="item.Price" style="font-size: 11px; margin: 0; color: darkred;" class="help-block">{{item.Price | number}} ریال</label>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="clearfix">
+                                        <div class="col-xs-10">
+                                            <div>
+                                                <label>
+                                                    <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" type="checkbox" ng-model="item.IsVakhahi" ng-change="updateSumPrice()" />&nbsp;&nbsp; واخواهی
+                                                </label>
+                                            </div>
+                                            <div>
+                                                <label>
+                                                    <input ng-disabled="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)" type="checkbox" ng-model="item.IsAcceptVakhahi" />&nbsp;&nbsp; تایید واخواهی
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a ng-if="!(!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi))" href="javascript:void(0)" ng-click="enterEllatVakhahi(item)">
+                                        <i ng-if="!item.EllateVakhahi" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-red-800" title="{{item.EllateVakhahi}}" style="line-height: 48px;display: flex;"></i>
+                                        <i ng-if="item.EllateVakhahi" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-green-800" title="{{item.EllateVakhahi}}" style="line-height: 48px;display: flex;"></i>
+                                    </a>
+                                    <input type="hidden" required ng-model="item.EllateVakhahi" name="EllateVakhahi_{{$index}}" />
+                                    <span ng-if="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)">{{item.EllateVakhahi}}</span>
+
+
+                                </td>
+                                <td colspan="2">
+                                    <a ng-if="!(!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi))" href="javascript:void(0)" ng-click="enterDescription(item)">
+                                        <i ng-if="!item.Description" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-red-800" title="{{item.Description}}" style="line-height: 48px;display: flex;"></i>
+                                        <i ng-if="item.Description" class="zmdi zmdi-hc-2x zmdi-comment-text mdc-text-green-800" title="{{item.Description}}" style="line-height: 48px;display: flex;"></i>
+                                    </a>
+                                    <input type="hidden" required ng-model="item.Description" name="Description_{{$index}}" />
+                                    <span ng-if="!model.AcceptPettyCash && (item.IsAccept || item.IsVakhahi)">{{item.Description}}</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <tfoot>
+                            <tr class="mdc-bg-yellow-50">
+                                <th colspan="7" class="text-left">جمع کل پرداخت ها:</th>
+                                <th colspan="4">
+                                    <h4 class="mdc-text-grey-700" lang="en">
+                                        {{sumKol | number}} ریال
+                                    </h4>
+                                </th>
+                            </tr>
+                            <tr class="mdc-bg-yellow-50">
+                                <th colspan="7" class="text-left">جمع پرداخت های تایید شده:</th>
+                                <th colspan="4">
+                                    <h4 class="mdc-text-green-700" lang="en">
+                                        {{sumIsAccept | number}} ریال
+                                    </h4>
+                                </th>
+                            </tr>
+                            <tr class="mdc-bg-yellow-50">
+                                <th colspan="7" class="text-left">جمع واخواهی:</th>
+                                <th colspan="4">
+                                    <h4 class="mdc-text-red-A700" lang="en">
+                                        {{sumIsVakhahi | number}} ریال
+                                    </h4>
+                                </th>
+                            </tr>
+                            @*<tr class="mdc-bg-yellow-50">
+                                    <th colspan="4" class="text-left"><label class="label label-danger" ng-if="(activeHeader.PettyCash_Ammount - sumIsAccept < 0)">مانده نهایی کوچک تر از 0 شد</label></th>
+                                    <th colspan="3" class="text-left">مانده نهایی تنخواه:</th>
+                                    <th colspan="4">
+                                        <h4 lang="en">
+                                            {{activeHeader.PettyCash_Ammount - sumIsAccept | number}} ریال
+                                        </h4>
+                                    </th>
+                                </tr>*@
+                        </tfoot>
+                    </table>
+                </div>
+                @*<div class="clearfix" ng-if="!model.RequestId">*@
+                <div class="clearfix">
+                    <div class="pull-right" ng-if="model.ActivePetyCashId">
+
+                        <a ng-if="form.$invalid" title="فرم را تکمیل نمایید" class="btn btn-material-red-600"><i class="zmdi zmdi-plus"></i>&nbsp;&nbsp; افزودن رکورد جدید</a>
+                        <a ng-if="!form.$invalid" ng-click="addDetail()" class="btn btn-material-blue-600"><i class="zmdi zmdi-plus"></i>&nbsp;&nbsp; افزودن رکورد جدید</a>
+                    </div>
+                    <div class="pull-left">
+                        @Html.ActionLink(Resources.Cancel, "_Index", "PettyCash", new { Area = "Payment", PageIndex = ViewBag.pageIndex }, new { @class = "btn btn-default" })
+                    </div>
+                    <div class="pull-left" ng-if="(activeHeader.PettyCash_Ammount - sumIsAccept >= 0)">
+                        <button ng-class="{'btn-success': !(form.$invalid || model.PettyCash_TransactionLs.length == 0), 'btn-material-red-600': form.$invalid || model.PettyCash_TransactionLs.length == 0}" ng-disabled="(form.$invalid || model.PettyCash_TransactionLs.length == 0) || isDisable || !model.ActivePetyCashId" type="submit" class="btn btn-material-green-600">@Resources.Save</button>
+                        @*<a class="btn btn-material-blue-grey-600" ng-click="print()">@Resources.Print</a>*@
+                        @*<button type="button" class="btn btn-material-grey-600" ng-click="savePettyCash()">صدور سند حسابداری</button>*@
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </form>
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+    <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+    <div class="modal md ang fade" role="dialog" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <h4 class="modal-title"></h4>
+                </div>
+
+                <div class="modal-body">
+                    <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    .table.petyCash > tbody > tr > td, .table.petyCash > tbody > tr > th, .table.petyCash > tfoot > tr > td, .table.petyCash > tfoot > tr > th, .table.petyCash > thead > tr > td, .table.petyCash > thead > tr > th {
+        white-space: nowrap;
+    }
+
+    .datepcker .btn.btn-xs {
+        padding: 0px 5px;
+        font-size: 15px;
+        margin: 5px;
+    }
+</style>

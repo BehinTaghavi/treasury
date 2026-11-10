@@ -1,0 +1,376 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelExpiredCheque
+@using CSD.Treasury.Resourse
+
+@using (Ajax.BeginForm("ShowALLExpired", "ExpiredCheckPayable", new { Area = "Report" },
+                                                                                        new AjaxOptions()
+                                                                                        {
+                                                                                            UpdateTargetId = "Result",
+                                                                                            InsertionMode = InsertionMode.Replace,
+                                                                                        }, new { id = "SearchForm" }))
+{
+
+    <div class="clearfix">
+        <div class="col-sm-4">
+            @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+        </div>
+        <div class="col-md-8">
+            @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+        </div>
+
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.RequsetId, new { data_lang_number = "fa", @class = "form-control until floating-label", @placeholder = Resources.RequestId })
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.RequestDateFrom, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date })
+            </div>
+        </div>
+        <div class="col-sm-4">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.RequestDateTo, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date })
+            </div>
+        </div>
+
+    </div>
+
+    <div class="clearfix">
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.BehalfGroupID, new SelectList(ViewBag.BehalfsGroupLs, "BehalfGroupID", "BehalfGroupDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = @CSD.Treasury.Resourse.Resources.BehalfGroupID })
+            </div>
+        </div>
+        @*<div class="col-sm-3">
+                <div class="form-group">
+                    @Html.DropDownListFor(d=>d.BehalfID, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Behalf })
+                </div>
+            </div>*@
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d => d.ExchangeTypeID, new SelectList(ViewBag.ExchangeLs, "ExchangeTypeID", "ExchangeTypeDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.ExchangeType })
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(model => model.PayAmount, new { @type = "number", data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.Price, @Min = 0 })
+            </div>
+        </div>
+    </div>
+
+
+    <div class="clearfix">
+
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from floating-label datepicker", @placeholder = Resources.From + " " + Resources.DueDate })
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.DueDateTo, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.DueDate })
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-6">
+            <div class="form-group">
+                <div class="form-group">
+                    @Html.DropDownListFor(d => d.BankId, new SelectList(ViewBag.BankLS, "BankID", "Bank_AccountNumber"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.BankAccountNumber })
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ChequeNo, new { data_lang_number = "fa", @class = "form-control until floating-label", @placeholder = Resources.ChequeNo })
+            </div>
+        </div>
+    </div>
+    @*<div class="clearfix">
+            <div class="col-sm-4">
+                <div class="form-group">
+                    @Html.TextBoxFor(model => model.FiscalYear, new { @type = "number", data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.FiscalYear, @Value = ViewBag.FiscalYear })
+                </div>
+            </div>
+            <div class="col-sm-4">
+                <div class="form-group">
+                        @Html.DropDownListFor(d => d.Pay_TypeDetailID_source, new SelectList(ViewBag.Receipt_Pay_TypeDetailLs, "Receipt_Pay_TypeDetailID", "Receipt_Pay_TypeDetailDescription"), "", new { data_lang_number = "fa", @class = "form-control floating-label", @placeholder = Resources.PayType })
+                    </div>
+            </div>
+            <div class="col-sm-4">
+                <div class="form-group">
+                    <select id="ChequePassed" name="ChequePassed" class="form-control floating-label" placeholder ="@Resources.Status" >
+                        <option>---</option>
+                        <option value="true">پرداخت شده</option>
+                                       <option value="true">پرداخت نشده</option>
+                                   </select>
+                </div>
+            </div>
+        </div>*@
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                <button id="report" type="button" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+
+
+}
+<style>
+    .popover {
+        font-size: 13px;
+        background-color: #fff;
+        max-width: 500px;
+    }
+
+    .dropdown-menu nav {
+        background-color: #fff;
+    }
+
+    .dropdown-menu .pagination {
+        margin: 10px 0 0;
+    }
+
+    .popover, .tooltip-inner .dropdown {
+        color: #555;
+    }
+</style>
+<script>
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, //     term
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+
+
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        });
+    });
+    $(function () {
+        $.material.init();
+    });
+    //$('select').select2({
+    //    containerCssClass: "form-control",
+    //    dir: "rtl"
+    //});
+    //today
+    var today = new Date();
+    var day = today.getDate();
+    var month = today.getMonth() + 1; //January is 0!
+    var year = today.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    today = year + '-' + month + '-' + day;
+
+    //last month
+    var lstmonth = new Date();
+    var day = lstmonth.getDate();
+    var month = lstmonth.getMonth(); //January is 0!
+    var year = lstmonth.getFullYear();
+    if (day < 10) day = '0' + day
+    if (month < 10) month = '0' + month
+    lstmonth = year + '-' + month + '-' + day;
+
+    function toGargDate(date) {
+        var day = date.getDate();
+        var month = date.getMonth() + 1; //January is 0!
+        var year = date.getFullYear();
+        if (day < 10) day = '0' + day;
+        if (month < 10) month = '0' + month;
+        date = year + '-' + month + '-' + day;
+        return moment(date, 'jYYYY/jM/jD').format('YYYY/M/D');
+    }
+
+    $.each($(".datepicker"), function (i, e) {
+        $(e).after($("<input />").attr("type", "hidden").attr("name", $(e).attr("name")).attr("id", $(e).attr("id")).val($(e).val())).removeAttr("id").attr("data-name", $(e).attr("name")).removeAttr("name");
+
+    });
+
+    $("body").on("change", ".datepicker", function () {
+        var date = $(this);
+        $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        //$("#" + date.attr("data-name")).val(toGargDate(new Date(date.val())));
+    });
+    //val(moment(lstmonth, 'YYYY-M-D').format('jYYYY/jMM/jDD'))
+    $(".from.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+       // maxDate: new Date()
+    });
+
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        //maxDate: new Date()
+    });
+    $(function () {
+        $(".datepicker").each(function (index) {
+            var date = $(this);
+            $("#" + date.attr("data-name")).val(date.val().split('/').join(''));
+        });
+    })
+ 
+    $(function () {
+        $('body').on("click", "#report", function () {
+            //$('#SearchForm').get(0).setAttribute('action', 'ExpiredCheckPayableReport');
+            //var dataToPost = $(this).serialize()
+            //console.log(dataToPost);
+            //$.post("Report/ExpiredCheckPayable/ExpiredCheckPayableReport", dataToPost)
+            //    .done(function (response, status, jqxhr) {
+            //        // this is the "success" callback
+            //    })
+            //    .fail(function (jqxhr, status, error) {
+            //        // this is the ""error"" callback
+            //    })
+            //var formData = $('#SearchForm').serializeArray();
+            //console.log(formData);
+            @*var formData = JSON.stringify({
+                RequsetId: $('#RequsetId').val(),
+                Unique_Account_No: $('#Unique_Account_No').val(),
+                DueDateFrom: $('#DueDateFrom').val(),
+                RequestDateFrom: $('#RequestDateFrom').val(),
+                DueDateTo: $('#DueDateTo').val(),
+                RequestDateTo: $('#RequestDateTo').val(),
+                PayAmount: $('#PayAmount').val(),
+                ChequeNo: $('#ChequeNo').val(),
+                ExchangeTypeID: $('#ExchangeTypeID').val(),
+                BehalfGroupID: $('#BehalfGroupID').val(),
+                BankId: $('#BankId').val(),
+            });
+            console.log(formData);
+    $.ajax({
+        url: "@(Url.Action("ExpiredCheckPayableReport", "ExpiredCheckPayable", new { Area = "Report" }))",
+        type: "POST",
+        data: formData,
+        contentType: 'application/x-www-form-urlencoded; charset=UTF-8' // optional
+    });*@
+    //var data = $('#SearchForm').serializeArray();
+    //var formData = JSON.stringify({
+    //    RequsetId: $('#RequsetId').val(),
+    //    Unique_Account_No: $('#Unique_Account_No').val(),
+    //    DueDateFrom: $('#DueDateFrom').val(),
+    //    RequestDateFrom: $('#RequestDateFrom').val(),
+    //    DueDateTo: $('#DueDateTo').val(),
+    //    RequestDateTo: $('#RequestDateTo').val(),
+    //    PayAmount: $('#PayAmount').val(),
+    //    ChequeNo: $('#ChequeNo').val(),
+    //    ExchangeTypeID: $('#ExchangeTypeID').val(),
+    //    BehalfGroupID: $('#BehalfGroupID').val(),
+    //    BankId: $('#BankId').val(),
+    //});
+            //var form = document.getElementById('SearchForm');
+            //var formData = new FormData(form);
+            //console.log(formData);
+            //console.log(document.querySelector("#SearchForm"));
+          //  console.log(new FormData(document.querySelector("#SearchForm")));
+            var RequsetId = $('#RequsetId').val();
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function () {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                    document.open();
+                    document.write(xhttp.responseText);
+                    document.close();
+                }
+            };
+            console.log(RequsetId);
+            xhttp.open("POST", "@Url.Action("ExpiredCheckPayableReport", "ExpiredCheckPayable", new { Area = "Report" })", true);
+            xhttp.send("RequsetId=" + RequsetId);
+            //xhttp.send(new FormData(document.querySelector("#SearchForm")));
+
+        })
+    });
+    $("body").on("change", "#BehalfGropId", function () {
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBehalfs", "Request", new { Area = "Payment" }))";
+            $("#BehalfID").load(address, { id: $(this).val() }, function (data) {
+                $("#BehalfID").val($("#BehalfID option:first").val());
+                //$('#BehalfID').select2({
+                //    containerCssClass: "form-control",
+                //    dir: "rtl"
+                //});
+            });
+        }
+        else {
+            $("#BehalfID").html("");
+            //$('#BehalfID').select2({
+            //    containerCssClass: "form-control",
+            //    dir: "rtl"
+            //});
+        }
+    })
+    @*$("body").on("change", "#UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area = "Payment" }))";
+        if ($(this).val() != 0) {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind") });
+        }
+        else {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind") });
+        }
+    });
+    var lookup = document.querySelectorAll("[lookup]");
+    for (var i = 0; i < lookup.length; i++) {
+        lookup[i].onkeyup = function () {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                }
+            }
+            var type = document.getElementById("UniqueAccountType");
+            var address = "/Payment/Request/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+            xmlhttp.open("GET",
+                address
+                , true);
+            xmlhttp.send();
+        }
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));;
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");;
+        }
+    }*@
+</script>

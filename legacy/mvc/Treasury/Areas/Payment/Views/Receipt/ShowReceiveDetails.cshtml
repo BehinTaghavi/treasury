@@ -1,0 +1,62 @@
+﻿@model IEnumerable<CSD.Treasury.Service.BankCardsService.BankCard>
+
+<table class="table">
+    <tr>
+        <th>
+            @Html.DisplayNameFor(model => model.BankID)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.CVV2)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.CardID)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.Card_AccountNo)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.Card_NO)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.CreateDateTime)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.ExpiryDate)
+        </th>
+        <th>
+            @Html.DisplayNameFor(model => model.IsActive)
+        </th>
+    </tr>
+
+@foreach (var item in Model) {
+    <tr>
+        <td>
+            @Html.DisplayFor(modelItem => item.BankID)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.CVV2)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.CardID)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.Card_AccountNo)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.Card_NO)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.CreateDateTime)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.ExpiryDate)
+        </td>
+        <td>
+            @Html.DisplayFor(modelItem => item.IsActive)
+        </td>
+
+        
+    </tr>
+}
+
+</table>

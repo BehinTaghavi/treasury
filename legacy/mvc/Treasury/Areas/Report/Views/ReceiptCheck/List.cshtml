@@ -1,0 +1,162 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@using CSD.Treasury.MVCHelpers
+@using CSD.Treasury.Resourse
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "Report";
+    int ix = Model.PageIndex;
+}
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+
+            <th>@Resources.Number</th>
+
+            <th>@Resources.DueDate</th>
+
+            @if (Model.isCheck)
+            {
+                <th>@Resources.ReceiptDate</th>
+            }
+            <th>@Resources.Reference</th>
+            <th>@Resources.Type</th>
+            <th>@Resources.Price</th>
+            <th>@Resources.HasExchangeTransaction</th>
+            @if (Model.isCheck)
+            {
+                <th>@Resources.ChequeNo</th>
+            }
+            else
+            {
+                <th>@Resources.FishNo</th>
+            }
+            @if (Model.isCheck)
+            {
+                <th>@Resources.Beneficiaries</th>
+            }
+            else
+            {
+                <th>@Resources.Payer</th>
+            }
+            <th>@Resources.Behalf</th>
+            <th>@Resources.Status</th>
+            <th>شماره حساب واگذاری</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+        <tr>
+            <td data-lang-number="fa">
+                @{
+                    i++;
+                }
+                @(i)
+            </td>
+            <td data-lang-number="fa">@item.ReceiptDetailId</td>
+            <td data-lang-number="fa">
+                @(item.DueDate)
+            </td>
+            <td data-lang-number="fa" style="@(Model.isCheck?"display:block":"display:none")">
+                @(item.ReceiptDate)
+            </td>
+            <td>@Html.Raw(@Utility.GetRecieveReferenceTypeValue(item.ReceiptDetailId, true))</td>
+            <td>@item.Receipt_Pay_TypeTitle</td>
+            <td data-lang-number="fa">@Math.Truncate(item.Price).ToString("#,##0")</td>
+            <td>@item.ExchangeTypeTitle</td>
+            <td data-lang-number="fa">@item.ChequeNumber</td>
+            <td data-lang-number="fa">@item.Unique_Account_No</td>
+            <td>@item.BehalfTitle</td>
+            <td>@item.PlaningTypeDesc</td>
+            <td data-lang-number="fa">@item.AssignmentAccountNum</td>
+
+        </tr>
+                        }
+    </tbody>
+</table>
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                (@Resources.Total : @Model.TotalItemCount)
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "ReceiptCheck", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "ReceiptCheck", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "ReceiptCheck", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>

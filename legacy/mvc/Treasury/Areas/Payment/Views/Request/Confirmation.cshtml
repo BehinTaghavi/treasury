@@ -1,0 +1,97 @@
+﻿@*@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@using CSD.Treasury.UI.Helper
+
+@using (Ajax.BeginForm("Confirmation", "Request", new { requestId = Model.RequestID }, new AjaxOptions
+{
+    HttpMethod = "Post",
+    OnSuccess = "successMessage(data); OnSuccessConfirmation(data)"
+}, null))
+{
+    @Html.HiddenFor(model => model.RequestID)
+    <p>
+        <label>
+            @Html.CheckBoxFor(model => model.Is_Ok, new { data_lang_number="fa", @class = "status-check" })&nbsp;&nbsp;@Resources.ConfirmRequest
+        </label>
+    </p>
+    <p>
+        <label>
+            @Html.CheckBoxFor(model => model.Is_Paid, new { @disabled = "disabled", data_lang_number="fa", @class = "status-check" })&nbsp;&nbsp;@Resources.ConfirmPayment
+        </label>
+    </p>
+    <p>
+        <label>
+            @Html.CheckBoxFor(model => model.Is_Paid, new { @disabled = "disabled", data_lang_number="fa", @class = "status-check" })&nbsp;&nbsp;@Resources.Paid
+        </label>
+    </p>
+    <p>
+        <label>
+            @Html.CheckBoxFor(model => model.Is_delivered, new { @disabled = "disabled", data_lang_number="fa", @class = "status-check" })&nbsp;&nbsp;@Resources.ConfirmDelivered
+        </label>
+    </p>
+
+    <hr />
+    <button type="submit" class="btn btn-primary">@CSD.Treasury.Resourse.Resources.Save</button>
+    <button class="btn btn-primary" onclick="$('.modal.default').modal('hide')" type="button">@CSD.Treasury.Resourse.Resources.Cancel</button>
+
+}
+
+<script>
+    function OnSuccessConfirmation(data) {
+        updateRow('@Url.Action("RequestPaymentRow", "Request", new { area = "Payment", requestId = Model.RequestID })', '@Hash.GetHashString(Model.RequestID.ToString())')
+        $('.modal.default').modal('hide');
+    }
+    $(".status-check").click(function (e) {
+        var $this = $(this);
+        switch ($this.attr("name")) {
+            case "Is_Ok":
+                if (!$this.is(':checked')) {
+                    if (!$("#Is_Paid").is(':checked') && !$("#Is_delivered").is(':checked')) {
+                        return true;
+                    }
+                    else {
+                        e.preventDefault();
+                        if ($("#Is_delivered").is(':checked')) {
+                            alertify.error("@Resources.IsDeliveredMessage");
+                        }
+                        else if ($("#Is_Paid").is(':checked')) {
+                            alertify.error("@Resources.IsPaidMessage");
+                        }
+                    }
+                }
+                break;
+            case "Is_Paid":
+                if ($this.is(':checked')) {
+                    if ($("#Is_Ok").is(':checked')) {
+                        return true;
+                    }
+                    else {
+                        e.preventDefault();
+                        alertify.error("@Resources.IsNotConfirmMessage");
+                    }
+                }
+                else {
+                    if ($("#Is_delivered").is(':checked')) {
+                        e.preventDefault();
+                        alertify.error("@Resources.IsDeliveredMessage");
+                    }
+                    else {
+                        return true;
+                    }
+                }
+                break;
+            case "Is_delivered":
+                if ($this.is(':checked')) {
+                    if ($("#Is_Ok").is(':checked') && $("#Is_Paid").is(':checked')) {
+                        return true;
+                    }
+                    else {
+                        e.preventDefault();
+                        if (!$("#Is_Paid").is(':checked')) {
+                            alertify.error("@Resources.IsNotPaidMessage");
+                        }
+                    }
+                }
+                break;
+        }
+    })
+</script>*@

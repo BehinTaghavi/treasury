@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Fails the build when a layer references something it must not (Clean Architecture rule). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Api\Treasury.Cashflow.Api.csproj" />
+  </ItemGroup>
+</Project>

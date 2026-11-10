@@ -1,0 +1,131 @@
+@{
+    string id = Guid.NewGuid().ToString("N");
+}
+<div class="row">
+    <label class="control-label col-sm-2" for="UniqueAccountType">@Resources.UniqueAccountType</label>
+    <div class="col-sm-3">
+        @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), Resources.PleaseSelect, new { data_lang_number = "fa", @class = "form-control", data_bind = "Unique_Account_No" })
+    </div>
+    <div class="col-sm-7">
+        <select class="form-control" data-lang-number="fa" id="@id" placeholder="کدتفصیل/نام تفصیل" required="required"></select>
+    </div>
+</div>
+
+<script>
+    $(function () {
+        $("#Unique_Account_PName").val("");
+        $("#Unique_Account_No").val("");
+        $.material.init();
+        $("body").on("change", "#UniqueAccountType", function () {
+            var address = "@(Url.Action("UniqueAccount", "PettyCash", new { Area= "Payment" }))";
+            if ($(this).val() != 0) {
+
+                $("#UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind") });
+            }
+            else {
+                $("#UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind") });
+            }
+        });
+    });
+    var lookup = document.querySelectorAll("[lookup]");
+    for (var i = 0; i < lookup.length; i++) {
+        lookup[i].onkeyup = function () {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function () {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    document.getElementById("UniqueAccountList").innerHTML = xmlhttp.responseText;
+                }
+            }
+            var type = document.getElementById("UniqueAccountType");
+            var address = "/Payment/PettyCash/" + this.getAttribute("data-action") + "?UniqueAccountTypeId=" + type.value + "&Bind=" + type.getAttribute("data-bind") +
+                ((this.value != "") ? "&" + this.getAttribute("Name") + "=" + ((this.value != "") ? this.value : "") : "") +
+                ((document.getElementById(this.getAttribute("data-related")).value != "") ? "&" + this.getAttribute("data-related") + "=" + ((document.getElementById(this.getAttribute("data-related")).value != "") ? document.getElementById(this.getAttribute("data-related")).value : " ") : "");
+            xmlhttp.open("GET",
+                address
+                , true);
+            xmlhttp.send();
+        }
+        //lookup[i].onfocus = function () {
+        //    $(this).parents(".dropdown").addClass("open");
+        //}
+        //lookup[i].onblur = function (e) {
+        //    //  $(this).parents(".dropdown").addClass("open");
+        //}
+
+
+    }
+    function findAncestor(el, cls) {
+        while ((el = el.parentElement) && !el.classList.contains(cls));
+        return el;
+    }
+    function getLookupDataItem(e) {
+        document.getElementById(e.getAttribute("data-bind")).value = e.getAttribute("data-content");
+        document.getElementById("Unique_Account_PName").value = e.getAttribute("data-Name");
+
+        for (var j = 0; j < e.querySelectorAll("[data-target]").length; j++) {
+            var elm = document.getElementById(e.querySelectorAll("[data-target]")[j].getAttribute("data-target"));
+            elm.value = e.querySelectorAll("[data-target]")[j].innerHTML; elm.classList.remove("empty");
+        }
+        $("#" + e.getAttribute("data-bind")).trigger('change');
+        $("#Unique_Account_PName").trigger('change');
+    }
+    $('.dropdown.keep-open').on({
+        "click": function () { this.classList.add("open"); this.closable = true; },
+        "hide.bs.dropdown": function () { this.classList.remove("open"); return this.closable; }
+    });
+
+
+    var pageSize = 20;
+        
+   
+    $("body").on("change", "#UniqueAccountType", function () {
+        var typeid = $(this).val();
+        $("#@id").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/PettyCash/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term, // search term
+                    };
+                },
+                processResults: function (data, params) {
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+                        }
+                    };
+                },
+                cache: true
+            },
+            escapeMarkup: function (markup) { return markup; }, // let our custom formatter work
+            minimumInputLength: 1,
+            //templateResult: formatRepo, // omitted for brevity, see the source of this page
+            //templateSelection: formatRepoSelection // omitted for brevity, see the source of this page
+        }).on("change", function () {
+            var $this = $(this);
+            $("#Unique_Account_PName").val("").change();
+            $("#Unique_Account_PName").val($this.text()).change();
+            $("#Unique_Account_No").val("").change();
+            $("#Unique_Account_No").val($this.val()).change();
+         
+        }).on("select2:select", function (e) {
+            $(this).text("");
+            $("#@id").select2("data", e.choice);
+            $('.modal').modal('hide');
+        });
+        
+    });
+
+
+</script>

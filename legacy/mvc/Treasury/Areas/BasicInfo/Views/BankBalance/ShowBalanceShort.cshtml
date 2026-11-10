@@ -1,0 +1,32 @@
+﻿@model List<CSD.Treasury.Service.ProceduresDB.GetBankBalance_Result>
+@{
+
+    var BankBalanceModel = (BankBalanceModel)ViewBag.BankBalanceModel;
+}
+
+@if (Model != null && Model.Count > 0)
+{
+    <table class="table table-striped sortable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>@Resources.Bank</th>
+                <th>@Resources.Credit</th>
+                <th>@Resources.Debit</th>
+                <th>@Resources.Balance</th>
+                <th></th>
+
+            </tr>
+        </thead>
+        <tr>
+            <td></td>
+            <td>@Model.FirstOrDefault().bankName</td>
+            <td>@Math.Truncate(Model.Sum(d => d.Credit.Value)).ToString("#,##0")</td>
+            <td>@Math.Truncate(Model.Sum(d => d.Debit.Value)).ToString("#,##0")</td>
+            <td>@Math.Truncate(Model.Sum(d => d.Debit).Value - Model.Sum(d => d.Credit).Value).ToString("#,##0")</td>
+            <td>@Ajax.ActionLink(Resources.Details, "ShowBalance", "BankBalance", new { area = "BasicInfo", BankId = Model.FirstOrDefault().BankID, Date = @Utility.ToPersianDate(DateTime.Now), showSum = true }, new AjaxOptions { UpdateTargetId = "Details" })</td>
+        </tr>
+    </table>
+}
+
+<div id="Details"></div>

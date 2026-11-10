@@ -1,0 +1,37 @@
+﻿@model List<CSD.Treasury.Service.Beneficiaries_TELSService.Beneficiaries_TELS>
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+
+@foreach (var item in Model)
+{
+    <div class="form-group">
+        <div class="row">
+            @using (Ajax.BeginForm("EditTel", "Beneficiaries", new { area = "BasicInfo", BeneficiarID = ViewBag.BeneficiarID }, new AjaxOptions
+            {
+                OnSuccess = "updateTable("+item.BeneficiarTEL_ID+"); successMessage(data)"
+            }, null))
+            {
+                <input type="hidden" value="@ViewBag.BeneficiarID " name="BeneficiarTEL_ID" id="BeneficiarTEL_ID">
+                <div class="col-xs-2 col-sm-1">
+                    <a class="btn btn-danger btn-flat btn-xs"
+                       href="@Url.Action("DeleteTel", "Beneficiaries", new { area = "BasicInfo", ID = item.BeneficiarTEL_ID })"
+                       data-ajax-success="updateTable(@ViewBag.BeneficiarID); successMessage(data)"
+                       data-ajax="true"><i class="zmdi zmdi-close"></i></a>
+                </div>
+                <div class="col-xs-10 col-sm-6">
+                    @Html.TextBox("Beneficiar_TEL", item.Beneficiar_TEL, new { data_lang_number="fa", @class = "form-control floating-label", placeholder = Resources.Tel })
+                    @Html.ValidationMessage("Beneficiar_TEL","", new { @class = "text-danger" })
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@Scripts.Render("~/bundles/jqueryval")
+<script>
+    $(function () {
+        $.material.init();
+    });
+  
+</script>

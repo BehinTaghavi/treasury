@@ -1,0 +1,36 @@
+﻿@using Stimulsoft.Report.Mvc;
+@{
+    Layout = null;
+}
+<div>
+
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+
+{
+    Actions =
+    {
+        GetReportSnapshot = "Testi",
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+    },
+    Toolbar =
+    {
+        BackgroundColor= System.Drawing.Color.Silver,
+         ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+         ShowTooltips=false,
+
+    },
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+
+</div>
+
+

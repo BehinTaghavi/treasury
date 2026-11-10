@@ -1,0 +1,93 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+@using CSD.Treasury.Resourse
+@{
+    Layout = null;
+    var S = "LoadReport";
+}
+<div class="pull-left">
+    @Html.ActionLink(Resources.Back, "Index", "ReceiptCheck", new { Area = "Report", isCheck = true }, new { @class = "btn btn-default btn-sm" })
+</div>
+<div>
+    @if (!string.IsNullOrEmpty(Model.FiscalYear))
+    {
+        S = S + "/?FiscalYear=" + Model.FiscalYear + "";
+        if (Model.isCheck)
+        {
+            S = S + "&isCheck=" + Model.isCheck + "";
+        }
+    }
+    else
+    {
+        S = S + "/?isCheck=" + Model.isCheck + "";
+    }
+    @*@if (Model.isCheck)
+        {
+            S = S + "&isCheck=" + Model.isCheck + "";
+        }*@
+    @if (Model.State != 0)
+    {
+        S = S + "&State=" + Model.State + "";
+    }
+    @if (Model.RecieptTypeId != 0)
+    {
+        S = S + "&RecieptTypeId=" + Model.RecieptTypeId + "";
+    }
+
+    @if (!string.IsNullOrEmpty(Model.DueDateFrom) && !string.IsNullOrEmpty(Model.DueDateTo))
+    {
+        S = S + "&DueDateFrom=" + Model.DueDateFrom + "&DueDateTo=" + Model.DueDateTo + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.RecieptDateFrom) && !string.IsNullOrEmpty(Model.RecieptDateTo))
+    {
+        S = S + "&RecieptDateFrom=" + Model.RecieptDateFrom + "&RecieptDateTo=" + Model.RecieptDateTo + "";
+    }
+    @if (!string.IsNullOrEmpty(Model.Unique_Account_No))
+    {
+        S = S + "&Unique_Account_No=" + Model.Unique_Account_No  + "";
+    }
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+{
+    Actions =
+    {
+        GetReportSnapshot= S,
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+
+    },
+    Toolbar =
+    {
+        BackgroundColor= System.Drawing.Color.Silver,
+        ShowZoomButton =false,
+        ShowFindButton = true,
+        ShowAboutButton = false
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+
+    },
+
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+</div>
+<script type="text/javascript">
+    @*$(document).ready(function () {
+        window.history.back()  = "@Url.Action("ShowPayment", "RequestPayment", new { Area = "Report" })";
+       
+        //function noBack() { window.history.forward() }
+        //noBack();
+        //window.onload = noBack;
+        //window.onpageshow = function (evt) { if (evt.persisted) noBack() }
+        //window.onunload = function () { void (0) }
+        alert("hi");
+    });*@
+
+</script>
+  

@@ -1,0 +1,189 @@
+﻿@model List<CSD.Treasury.DataModel.GetAllRequestStatus_Result>
+
+<link href="@Url.Content("~/Content/css/bootstrap-datepicker.css")" rel="stylesheet" />
+<script src="@Url.Content("~/Scripts/angular.min.js")"></script>
+<script src="@Url.Content("~/Scripts/angular-sanitize.js")"></script>
+<script src="@Url.Content("~/Scripts/dateparser.js")"></script>
+<script src="@Url.Content("~/Scripts/position.js")"></script>
+<script src="@Url.Content("~/Scripts/datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/persiandate.js")"></script>
+<script src="@Url.Content("~/Scripts/persian-datepicker-tpls.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.js")"></script>
+<script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.js")"></script>
+<script src="@Url.Content("~/Scripts/ui-bootstrap-tpls-2.4.0.min.js")"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/angular-ui-utils/0.1.1/angular-ui-utils.min.js"></script>
+<script src="@Url.Content("~/Scripts/checklist-model.js")"></script>
+<script src="@Url.Content("~/Scripts/select2-angular.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/app.js")"></script>
+<script src="@Url.Content("~/Scripts/Resources/Controller/Aggregation/aggregationListController.js")"></script>
+
+
+<div ng-app="treasury" ng-controller="aggregationListController">
+
+    <form name="form" novalidate>
+        <div style="padding: 20px; margin: -15px -15px 10px -15px; position: relative;">
+            <div class="clearfix">
+                <div class="col-sm-5">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">در وجه:</label>
+                            <a class="btn btn-sm"
+                               ng-class="Unique_Account_No.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                               ng-click="changeUniqueAccount(Unique_Account_No)"
+                               style="margin: 4px 0;"
+                               ng-bind-html='Unique_Account_No.Name != "" ? Unique_Account_No.Name : "انتخاب"'>
+                            </a>
+                            <a class="btn btn-sm btn-material-grey-500"
+                               ng-click="Unique_Account_No = { Name: '', Code: '' }"
+                               style="margin: 4px 0;">
+                                <i class="zmdi zmdi-delete"></i>
+                            </a>
+                            <input type="hidden" name="UniqueAccount_{{$index}}" required ng-model="Unique_Account_No.Code" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-5">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">حامل چک:</label>
+                            <a class="btn btn-sm"
+                               ng-class="Main_Unique_Account_No.Name == '' ? 'btn-material-grey-500' : 'btn-material-light-blue-A700'"
+                               ng-click="changeUniqueAccount(Main_Unique_Account_No)"
+                               style="margin: 4px 0;"
+                               ng-bind-html='Main_Unique_Account_No.Name != "" ? Main_Unique_Account_No.Name : "انتخاب"'>
+                            </a>
+                            <a class="btn btn-sm btn-material-grey-500"
+                               ng-click="Main_Unique_Account_No = { Name: '', Code: '' }"
+                               style="margin: 4px 0;">
+                                <i class="zmdi zmdi-delete"></i>
+                            </a>
+                            <input type="hidden" name="Main_Unique_Account_No{{$index}}" required ng-model="Main_Unique_Account_No.Code" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-7">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">بانک:</label>
+                            @*<select class="form-control" ng-model="Source_PaymentValue" required name="Source_PaymentValue" style="width: 250px">
+                                <option ng-repeat="bank in banks" value="bank.BankID">بانک: {{bank.BasicBank}} / شعبه: {{bank.Branch}} / کد: {{bank.BranchCode}} </option>
+                            </select>*@
+                            <select class="form-control" name="Source_PaymentValue" required  style="width: 250px"
+                                    ng-options="bank.BankID as bank.Description for bank in banks"
+                                    ng-model="Source_PaymentValue"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="clearfix">
+                <div class="col-sm-7">
+                    <div class="form-group">
+                        <div class="clearfix custom-inline-control">
+                            <label class="control-label">بابت:</label>
+                            <select class="form-control" name="BehalfId" required style="width: 250px"
+                                    ng-options="behlf.BehalfID as behlf.BehalfDescription for behlf in behlfLs"
+                                    ng-model="BehalfId"></select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <hr />
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th width="2%">
+                                <input type="checkbox" ng-checked="all" ng-model="checkAll" />
+                            </th>
+                            <th width="14%">@Resources.RequestId</th>
+                            <th width="14%">@Resources.Behalf</th>
+                            <th width="25%">@Resources.Unique_Account_No</th>
+                            <th width="10%">@Resources.ReceiptPayType</th>
+                            <th width="25%">@Resources.From</th>
+                            <th width="10%">@Resources.PayAmount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr ng-repeat="item in aggrigateList" ng-class="{'success':item.checked}">
+                            <td>
+                                <input type="checkbox" ng-checked="all" ng-model="item.checked" />
+                            </td>
+                            <td>{{item.RequestID}}</td>
+                            <td>{{item.Behalf}}</td>                           
+                            <td>{{item.UniqueAccountNo}}</td>
+                            <td>{{item.PayTypeDetailIDSource}}</td>
+                            <td>{{item.SourcePaymentValue}}</td>
+                            <td><b>{{item.PayAmount | number}} ریال</b></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr class="mdc-bg-grey-200">
+                            <td colspan="7" class="text-left"><h4 style="padding: 0 10px">جمع کل درخواست های انتخاب شده: </h4></td>
+                            <td class="text-right"><h4>{{sumPrice() | number}} ریال</h4></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_No" ng-model="ucno" />
+        <input type="text" ng-change="setUC()" style="display: none" id="Unique_Account_PName" ng-model="ucname" />
+        <div class="modal md ang fade" role="dialog" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                        <h4 class="modal-title"></h4>
+                    </div>
+
+                    <div class="modal-body">
+                        <div ng-bind-html="thisCanBeusedInsideNgBindHtml"></div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <div class="clearfix" ng-if="State != 11 && State != 12 && State != 7">
+            <div class="pull-right">
+                <button class="btn btn-success"
+                        ng-disabled="form.$invalid || !hasChecked()"
+                        ng-click="save($event)">
+                    تجمیع درخواست ها
+                </button>
+                <p class="mdc-text-red-A700" ng-if="form.$invalid">لطفا موارد فرم را به صورت کامل تکمیل نمایید</p>
+                <p class="mdc-text-red-A700" ng-if="!hasChecked()">حداقل یک درخواست باید انتخاب شود</p>
+            </div>
+        </div>
+    </form>
+    <script type="text/ng-template" id="myModalContent.html">
+        @*<div class="modal-header">
+                <h3 class="modal-title">I'm a modal!</h3>
+            </div>*@
+        <div class="modal-body">
+            <label for='DueDate' class='control-label'>تاریخ سررسید</label>
+            <input date-p
+                   class="form-control"
+                   type="text"
+                   placeholder="____/__/__" lang="en"
+                   ng-model="object.DueDate"
+                   mindate="'new Date()'"
+                   readonly
+                   autocomplete="off">
+        </div>
+        <div class="modal-footer">
+            @*<button class="btn btn-material-light-blue-A700" type="button" ng-click="ok()">تبدیل به چک روز</button>*@
+            <button class="btn btn-white" type="button" ng-click="cancel()">بستن</button>
+        </div>
+    </script>
+</div>
+
+<style>
+    .table > tbody > tr > td, .table > tbody > tr > th, .table > tfoot > tr > td, .table > tfoot > tr > th, .table > thead > tr > td, .table > thead > tr > th {
+        white-space: nowrap;
+        padding: 5px;
+    }
+</style>
+

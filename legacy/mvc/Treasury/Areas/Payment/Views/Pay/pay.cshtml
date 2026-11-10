@@ -1,0 +1,183 @@
+﻿@model CSD.Treasury.Service.Request_PaymentService.Request_Payment
+@using CSD.Treasury.Service.Request_Payment_StatusDetailsService
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.Service.ChequeFormatTypesService
+@{
+    var checkFormatTypeLs = (List<CSD.Treasury.Service.ChequeFormatTypesService.ChequeFormatType>)ViewBag.checkFormatType;
+}
+<div class="row">
+    <div class="col-sm-7">
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Type
+                </label>
+                @Utility.GetUniqueAccount(Model.Unique_Account_No)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Unique_Account_No
+                </label>
+                @Utility.GetUniqueAccount(Model.Main_Unique_Account_No)
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.PayAmount
+                </label>
+                <span data-lang-number="fa">
+                    @Math.Truncate(Model.PayAmount).ToString("N0")
+                </span>
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.ExchangeType
+                </label>
+                @*@Model.ExchangeType*@
+            </p>
+        </div>
+        <blockquote class="row">
+            <p id="PayAmountText" class="mdc-text-orange-900"></p>
+        </blockquote>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.BehalfGroup
+                </label>
+                @Model.BehalfID
+            </p>
+        </div>
+        <div class="col-sm-6">
+            <p class="pardes">
+                <label>
+                    @Resources.Behalf
+                </label>
+                @Utility.GetBehalf(Model.BehalfID)
+            </p>
+        </div>
+
+        @*<div class="col-sm-12">
+
+            @using (Ajax.BeginForm("Issuance", "ChequePayment", new { area = "Payment", requestId = Model.RequestID, tableName = "ChequeFormatTypes" }, new AjaxOptions
+            {
+                OnSuccess = "modal(data,'" + Resources.CheckIssuance + "', 'xlg');"
+            }))
+            {
+                <div class="row">
+                    <div class="col-sm-3">
+                        <label for="" class="control-label">@Resources.DueDate</label>
+                    </div>
+                    <div class="col-sm-9">
+                        <div class="input-group">
+                            <input type="text" class="form-control datepicker" name="dueDate" placeholder="@Resources.DueDate">
+ 
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-sm-3">
+                        <label for="" class="control-label">@Resources.ChequeFormatType</label>
+                    </div>
+                    <div class="col-sm-9">
+                        <select class="form-control floating-label">
+                            @foreach (var item in checkFormatTypeLs)
+                            {
+                                var description = @Utility.GetChequeDesc(item.FormatDescriptionID_Main);
+                                <option id="@item.ChequeFormatID">@(description)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <span class="input-group-btn">
+                    <button type="submit" class="btn btn-material-green-500">@Resources.CheckIssuance</button>
+                </span>
+
+            }
+
+        </div>*@
+    </div>
+    <div class="col-sm-5">
+        <div class="col-xs-12">
+            <div class="panel panel-default">
+                <div class="panel-body mdc-bg-grey-100">
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p class="pardes">
+                                <label>
+                                    @Resources.Priority
+                                </label>
+                                @CSD.Treasury.Common.Enumeration.TreasuryEnums.GetTitleFromResource("", Model.Priority.ToString())
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-sm-6">
+                            <p class="pardes">
+                                <label>
+                                    @Resources.ExchangeRate
+                                </label>
+                                <span data-lang-number="fa">
+                                    @Math.Truncate(Convert.ToDecimal(Model.ExchangeRate)).ToString("N0")
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="panel panel-default">
+                <div class="panel-body  mdc-bg-grey-100">
+                    <p class="pardes">
+                        <label>
+                            @Resources.ReceiptPayType
+                        </label>
+                        @if (Model.Pay_TypeDetailID_source != null)
+                        {  @Utility.GetReceipt_Pay_TypeDetailTitle(Model.Pay_TypeDetailID_source.Value)}
+
+                    </p>
+                    <p class="pardes">
+                        <label>
+                            @Resources.From
+                        </label>
+                        @Model.Source_TypeID
+                    </p>
+                    <p class="pardes">
+                        <label>
+                            @Resources.Number  @Resources.Source
+                        </label>
+                        <span data-lang-number="fa">
+                            @Model.Source_PaymentValue
+                        </span>
+                    </p>
+                    <p class="pardes">
+                        <label>
+                            @Resources.To
+                        </label>
+                        @Model.Destination_TypesID
+                    </p>
+                    <p class="pardes">
+                        <label>
+                            @Resources.Number  @Resources.Destination
+                        </label>
+                        <span data-lang-number="fa">
+                            @Model.Destination_PaymentValue
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+    .modal-dialog {
+        width: 900px;
+    }
+</style>

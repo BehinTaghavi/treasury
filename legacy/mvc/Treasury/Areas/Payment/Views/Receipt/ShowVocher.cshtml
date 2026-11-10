@@ -1,0 +1,81 @@
+﻿@model List<CSD.Treasury.DataModel.Show_Voucher_Row_Reciept_Result>
+@{
+    ViewBag.Title = "ShowVocher";
+}
+<table class="table table-striped"> 
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>کد حساب معین</th>
+            <th>معین</th>
+            <th>تفصیل اول</th>
+            <th>تفصیل دوم</th>
+            <th>شرح</th>
+            <th>بدهکار</th>
+            <th>بستانکار</th>
+            <th>شماره چک</th>
+            <th>نرخ ارز</th>
+            <th>تاریخ</th>
+
+        </tr>
+
+    </thead>
+    <tbody>
+        @foreach(var item in Model)
+        {
+        <tr>
+            <td>
+                <span>
+
+                        @item.Account_No
+
+                </span>
+            </td>
+
+            <td>
+                <span>
+
+                    @if (!string.IsNullOrEmpty(item.Account_No))
+                    {
+
+                        @Utility.Getaccounts(item.Account_No)
+
+                    }
+                </span>
+            </td>
+            <td>
+                <span>
+                    @if (!string.IsNullOrEmpty(item.Unique_Account_No))
+                    {@(item.Unique_Account_No) @Utility.GetUniqueAccount(item.Unique_Account_No)
+                }
+
+                </span>
+
+            </td>
+            <td>
+                <span>
+                    @if (!string.IsNullOrEmpty(item.Unique_Account_No_Two))
+                    {@(item.Unique_Account_No_Two) @Utility.GetUniqueAccount(item.Unique_Account_No_Two)}
+
+                </span>
+            </td>
+            <td>
+                @(item.description)
+            </td>
+            <td>
+                @(item.debit)ریال
+            </td>
+            <td>
+                @(item.credit)ریال
+            </td>
+            <td>
+                @(item.value_Field)
+            </td>
+            <td>
+            </td>
+            <td>
+                @(item.Date_Field)
+            </td>
+        </tr>
+        }
+    </tbody>
+</table>

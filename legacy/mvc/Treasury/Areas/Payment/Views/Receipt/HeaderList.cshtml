@@ -1,0 +1,65 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelReceipt
+@using CSD.Treasury.MVCHelpers
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+<script>
+    $(function () {
+        $.material.init();
+    });
+</script>
+@{
+    int i = Model.PageIndex * Model.PageSize;
+    ViewBag.Title = "HeaderList";
+}
+
+<table class="table sortable">
+    <thead>
+        <tr class="mdc-bg-grey-100">
+
+            <th>#</th>
+            <th>@Resources.SerialNum</th>
+            <th>@Resources.Date</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+
+        @foreach (var item in Model.List)
+            {
+            <tr>
+                <td>
+                    @{i++;}
+                    @i
+                </td>
+                <td>
+                    @Ajax.ActionLink(item.ReceiptId.ToString(), "GetReceiptDetails", "Receipt", new { Area = "Payment" }, new AjaxOptions
+               {
+                   HttpMethod = "get",
+                   OnSuccess = ""
+
+
+               }, null)
+
+                </td>
+                <td>
+                    @Utility.GetPersianDate(item.ReceiptDate)
+             
+                </td>
+              
+                <td>
+                    @Ajax.IActionLink("", "List", "Attachment", new { area = "Payment", Id = item.ReceiptId, TableName = "Reciept_Header" }, new AjaxOptions
+               {
+                   InsertionMode = InsertionMode.Replace,
+                   OnSuccess = "modal(data,'" + Resources.AttachFile + "', 'md');"
+               }, new { title = Resources.AttachFile, @class = "btn btn-default btn-sm" }, "zmdi zmdi-hc-lg zmdi-file")
+
+                    @Html.ActionLink(Resources.ReceiptPlaning, "ReceiptPlaning", "Receipt",new { Area="Payment", ReceiptDetailId =item.ReceiptId},null)
+                </td>
+            </tr>
+            <tr>
+                <td colspan="4" id="ReceiptDetails">
+
+                </td>
+            </tr>   }
+
+    </tbody>
+</table>

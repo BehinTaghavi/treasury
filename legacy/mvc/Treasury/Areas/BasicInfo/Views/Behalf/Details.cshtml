@@ -1,0 +1,22 @@
+﻿@model CSD.Treasury.Service.BehalfsService.Behalf
+@{
+    ViewBag.Title = "Details";
+}
+
+<div class="row">
+    <div class="col-sm-12">
+        <p class="pardes">
+            <label>
+                @Resources.Title
+            </label>
+            @(Model.BehalfDescription)
+        </p>
+    </div>
+    <div class="form-group">
+        <div class="col-sm-12">
+            <div class="text-right">
+                <a class="btn btn-white btn-sm" data-ajax="true" data-ajax-success="modal(data,'@Resources.BehalfGroup / @ViewBag.BehalfGroupDescription', 'md')" href="@Url.Action("Index", "Behalf", new { area = "BasicInfo", BehalfGroupID = Model.BehalfGroupID, BehalfGroupDescription = ViewBag.BehalfGroupDescription })"><i class="zmdi zmdi-chevron-left zmdi-hc-lg"></i></a>
+            </div>
+        </div>
+    </div>
+</div>

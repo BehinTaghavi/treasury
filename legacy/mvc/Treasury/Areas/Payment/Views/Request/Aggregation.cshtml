@@ -1,0 +1,65 @@
+﻿@using CSD.Treasury.UI.Models
+@model List<Group>
+@{
+    ViewBag.Title = "Aggregation";
+}
+@foreach (var group in Model)
+{
+    if (group.Values.Count() != 1)
+    {
+        var oneRow=  group.Values.FirstOrDefault();
+        SearchModelRequestPayment obj = (SearchModelRequestPayment)ViewBag.SearchModelRequestPayment;
+        obj.BehalfID = oneRow.BehalfID;
+        obj.Unique_Account_No = oneRow.Unique_Account_No;
+        obj.Pay_TypeDetailID_source = oneRow.Pay_TypeDetailID_source;
+        var collapse = Guid.NewGuid().ToString("N");
+        var heading = Guid.NewGuid().ToString("N");
+        <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+            <div class="panel panel-default">
+                <div class="panel-heading" role="tab" id="@heading">
+                    <h4 class="panel-title">
+                        <a class="btn btn-sm btn-link" role="button" data-toggle="collapse" data-parent="#accordion" href="#@collapse" aria-expanded="true" aria-controls="@collapse">
+                            @Utility.GetBehalf(group.Key) - @Utility.GetUniqueAccount(group.Values.FirstOrDefault().Unique_Account_No)
+                        </a>
+                    </h4>
+                </div>
+                <div id="@collapse" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="@heading" aria-ajax="true" aria-ajax-url="@Url.Action("List", "Payment/Request", obj)">
+                    <div class="panel-body">
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<script>
+    $(function () {
+        $('.collapse').collapse({
+            toggle: false
+        }).on('show.bs.collapse', function () {
+            var $this = this;
+            if ($this.getAttribute("aria-ajax")) {
+                var xmlhttp = new XMLHttpRequest();
+                xmlhttp.onreadystatechange = function () {
+                    if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                        $this.children[0].innerHTML = xmlhttp.responseText;
+                    }
+                };
+                xmlhttp.open("GET", this.getAttribute("aria-ajax-url"), true);
+                xmlhttp.send();
+            }
+        })
+    });
+    $(function () {
+        $.material.init();
+    });
+    function updateTable() {
+        var url = '@(Url.Action("AggregationList", "Request", new { area = "Payment" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#listResult").html(data);
+            }
+        });
+    }
+</script>

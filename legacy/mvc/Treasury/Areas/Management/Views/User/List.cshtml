@@ -1,0 +1,108 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelUser
+@using CSD.Treasury.UI.Models
+@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Common.Enumeration
+@{ 
+    int I = 0;
+}
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>@Resources.UserName</th>
+            <th>@Resources.FullName</th>
+            @*<th>@Resources.CostCenter</th>*@
+            <th>@Resources.IsActive </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model.List)
+        {
+            <tr>
+                <td>
+                @{
+                    I = I + 1;
+                }@(I)
+                </td>            
+                <td>
+                    @(item.UserName)
+                </td>
+                <td>
+                    @(item.User_FullName)
+                </td>
+                @*  <td>
+                    @(item.LocationByCostCenter.Unique_Account_No)
+                                </td>*@
+                <td>
+                    @if (item.IsActive)
+                    {
+                        <i class="zmdi zmdi-check mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                    else
+                    {
+                        <i class="zmdi zmdi-minus mdc-text-green-900 zmdi-hc-lg"></i>
+                    }
+                </td>
+                <td>
+                    @Ajax.ActionLink(Resources.Edit, "Edit", "User", new { Area = "Management", id = item.UserID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Users + "', 'md');"
+               }, new { @class = "btn btn-success btn-xs" })
+
+                    @*@Html.ActionLink(Resources.Delete, "Delete", "User", new { Area = "Management", id = item.UserID }, new { @class = "btn btn-danger btn-xs delete" })*@
+                    @if (item.IsActive)
+                    {
+                        @Html.ActionLink(Resources.InActive, "InActive", "User", new { Area = "Management", UserId = item.UserID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+                    else
+                    {
+                        @Html.ActionLink(Resources.IsActive, "InActive", "User", new { Area = "Management", UserId = item.UserID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+<script src="@Url.Content("~/Scripts/material.min.js")"></script>
+
+<script>
+    $(function () {
+        $.material.init();
+    });
+
+    var deleteBtn = document.getElementsByClassName("delete");
+
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   updateTable();
+                                   //item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                   //    alertify.success(data.Message);
+                                   //})
+                               }
+                               else {
+                                   alertify.error(data.Message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>

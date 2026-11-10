@@ -1,0 +1,39 @@
+﻿@{
+    Layout = null;
+    string date = ViewBag.Date;
+}
+@using System.Web.UI.WebControls;
+@using Stimulsoft.Report.Mvc;
+<div>
+
+    @Html.Stimulsoft().StiMvcViewer("MyViewr", new StiMvcViewerOptions()
+
+{
+    Actions =
+    {
+        GetReportSnapshot = "List",
+        ViewerEvent = "ViewerEvent",
+        PrintReport = "PrintReport",
+        ExportReport = "ExportReport",
+
+    },
+    Toolbar =
+    {
+
+        BackgroundColor= System.Drawing.Color.Silver,
+        ShowAboutButton=false,
+
+    },
+    Appearance =
+    {
+        RightToLeft=true,
+        ShowTooltips=false,
+
+    },
+    Width = Unit.Percentage(100),
+    Theme = StiTheme.Office2007Silver,
+    Localization = Url.Content("~/Report/Localization/fa.xml")
+})
+
+
+</div>

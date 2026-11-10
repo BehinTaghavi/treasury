@@ -1,0 +1,4 @@
+﻿<div id="emailList" ls-action ="@Url.Action("ListEmail", "BranchInfo", new { area = "BasicInfo", ID = ViewBag.BranchId })">
+    @Html.Action("ListEmail", "BranchInfo", new { ID = ViewBag.BranchId })
+</div>
+@Html.Action("CreateEmail", "BranchInfo", new { ID = ViewBag.BranchId }) 

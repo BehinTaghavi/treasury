@@ -1,0 +1,85 @@
+﻿@model CSD.Treasury.UI.Areas.Report.Models.BehalfModel
+@using CSD.Treasury.Resourse
+@{
+    ViewBag.Title = "Index";
+}
+@section PageHeader{
+    گردش گروه بابت ها
+}
+
+@using (Html.BeginForm("Index", "BehalfGroupReport", new { Area = "Report" }, FormMethod.Post, new { id = "SearchForm" }))
+{
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.FromDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.From + " " + Resources.Date, @autocomplete = "off", @readonly = "readonly" })
+                @Html.ValidationMessageFor(model => model.FromDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.TextBoxFor(d => d.ToDate, null, new { data_lang_number = "fa", @class = "form-control until floating-label datepicker", @placeholder = Resources.To + " " + Resources.Date, @autocomplete = "off", @readonly = "readonly" })
+                @Html.ValidationMessageFor(model => model.ToDate)
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+              <select id="ExchangeTypeId" name="ExchangeTypeId" class="form-control until  ">
+                  <option value="1">حساب ریالی</option>
+                  <option value="2">حساب ارزی</option>
+              </select>
+            </div>
+        </div>
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-3">
+            <div class="form-group">
+                <select id="type" name="type" class="form-control until  ">
+                    <option value="0">---</option>
+                    <option value="1">دریافت</option>
+                    <option value="2">پرداخت</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-sm-3">
+            <div class="form-group">
+                @Html.DropDownListFor(d=>d.BehalfGroupId, Enumerable.Empty<SelectListItem>(),string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.BehalfGroup })
+           </div>
+        </div>
+
+    </div>
+    <div class="clearfix">
+        <div class="col-sm-12">
+            <div class="text-left">
+                <button id="report" type="submit" class="btn btn-info btn-sm">@Resources.Report</button>
+            </div>
+        </div>
+    </div>
+}
+@Scripts.Render("~/bundles/jqueryval")
+<script type="text/javascript">
+    $(".until.datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+        // maxDate: new Date()
+    });
+    $("#BehalfGroupId").select2({
+        dir: "rtl",
+        containerCssClass: "form-control"
+    });
+      $("#type").change( function () {
+         
+        if ($(this).val() != "") {
+            var address = "@(Url.Action("GetBehalfGroup", "BehalfGroupReport", new { Area = "Report" }))";
+         
+            $("#BehalfGroupId").load(address, { id: $(this).val() }, function (data) {
+                $("#BehalfGroupId").val($("#BehalfGroupId option:first").val()); 
+            });
+            
+        }
+        else {
+            $("#BehalfGroupId").html("");
+        }
+    })
+      
+</script>

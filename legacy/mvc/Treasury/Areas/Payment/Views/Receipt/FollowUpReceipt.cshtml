@@ -1,0 +1,188 @@
+﻿@model CSD.Treasury.UI.Models.ReceiptSearch
+@{
+    ViewBag.Title = Resources.List + " " + Resources.RequestPayment;
+}
+
+@section PageHeader{
+    @Resources.List @Resources.FollowUp @Resources.Status @Resources.Receive
+}
+@section btnToolbar{
+
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+                <div class="col-sm-1">
+                    <div id="progroup" data-has-content="empty">
+                    </div>
+                </div>
+                <div class="col-sm-11">
+                    @using (Ajax.BeginForm("ShowFollowUpReceipt", "Receipt", new { Area = "Payment" },
+new AjaxOptions()
+{
+    UpdateTargetId = "Result",
+    InsertionMode = InsertionMode.Replace,
+}, new { id = "SearchForm" }))
+                    {
+
+                        <div class="clearfix">
+                            <div class="col-sm-4">
+                                <div class="form-group">
+                                    @Html.DropDownList("UniqueAccountType", new SelectList(ViewBag.unique_account_type, "Code", "Description"), string.Empty, new { data_lang_number = "fa", @class = "form-control floating-label UniqueAccountType", placeholder = Resources.Type, data_bind = "Unique_Account_No", data_code_att = "Code", data_name_att = "Name", updatetargetid = "acc1" })
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    @Html.DropDownListFor(model => model.Unique_Account_No, Enumerable.Empty<SelectListItem>(), new { data_lang_number = "fa", @class = "form-control floating-label", placeholder = Resources.Unique_Account_Code + "/" + Resources.Unique_Account_No })
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                            
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDate" class="control-label">@Resources.ChequeNo</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.ChequeNo, new { data_lang_number = "fa", @class = "form-control from", @placeholder = Resources.ChequeNo })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="clearfix">
+
+                            <div class="col-sm-4">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDate" class="control-label">@Resources.DueDate @Resources.From</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.DueDateFrom, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.DueDate, @readonly = "readonly" })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-4">
+                                            <label for="DueDate" class="control-label">@Resources.DueDate @Resources.To</label>
+                                        </div>
+                                        <div class="col-xs-8">
+                                            @Html.TextBoxFor(d => d.DueDateTo, new { data_lang_number = "fa", @class = "form-control from datepicker", @placeholder = Resources.DueDate, @readonly = "readonly" })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-sm-3">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.ReceiptDetailId</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.TextBoxFor(model => model.ReceiptId, new { data_lang_number = "fa", @class = "form-control from", @placeholder = Resources.RequestId, @autocomplete = "off" })
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+
+
+
+                        </div>
+                        <div class="clearfix">
+
+                            <div class="col-xs-4">
+                                <div style="padding: 6px 0;">
+                                    <div class="clearfix">
+                                        <div class="col-xs-6">
+                                            <label for="RequsetId" class="control-label">@Resources.ChequeFormatType</label>
+                                        </div>
+                                        <div class="col-xs-6">
+                                            @Html.DropDownListFor(model => model.RecieptTypeId, new SelectList(ViewBag.Receipt_Pay_TypeDetailLs, "Receipt_Pay_TypeDetailID", "Receipt_Pay_TypeDetailDescription"), new { @class = "form-control" })
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-xs-4 col-sm-offset-3">
+                                <div class="text-left">
+                                    <button type="submit" class="btn btn-info btn-sm" onclick="$('#DueDateFrom,#DueDateTo,#ReceiptId,#ChequeNo').val('');">@Resources.Empty</button>
+                                    <button type="submit" class="btn btn-info btn-sm" onclick="$('.modal.default').modal('hide')">@Resources.Search</button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+
+            </div>
+
+
+        </div>
+    </div>
+
+}
+@section list{
+    <div id="Result">
+        @Html.Action("ShowFollowUpReceipt", "Receipt", new { Area = "Payment", Model })
+    </div>
+}
+
+<script>
+    var pageSize = 20;
+    $("#UniqueAccountType").change(function () {
+        $('#Unique_Account_No').val('');
+        var typeid = $(this).val();
+        $("#Unique_Account_No").select2({
+            dir: "rtl",
+            containerCssClass: "form-control",
+            ajax: {
+                url: "/Payment/Request/UniqueAccountLs",
+                dataType: 'json',
+                delay: 250,
+
+                data: function (params) {
+                    params.page = params.page || 1;
+                    return {
+                        pageSize: pageSize,
+                        page: params.page,
+                        pageLimit: 10,
+                        typeid: typeid,
+                        q: params.term,
+
+                    };
+                },
+                processResults: function (data, params) {
+
+                    params.page = params.page || 1;
+                    return {
+                        results: data.query,
+                        pagination: {
+                            more: (params.page * pageSize < data.total_count)
+
+                        }
+                    };
+                },
+
+                cache: true
+            },
+
+            escapeMarkup: function (markup) { return markup; },
+            minimumInputLength: 1,
+        });
+    });
+    $(document).ready(function () {
+        $("#payTypeLs").select2({
+            dir: "rtl",
+        });
+    });
+    $(".datepicker").datepicker({
+        isRTL: true,
+        dateFormat: "yy/mm/dd",
+    });
+</script>

@@ -1,0 +1,138 @@
+﻿@using CSD.Treasury.UI.Helper
+@using CSD.Treasury.Resourse
+
+@{
+    var culture = System.Threading.Thread.CurrentThread.CurrentUICulture.Name.ToLowerInvariant();
+}
+@helper selected(string c, string culture)
+{
+if (c == culture)
+{
+        @:checked="checked"
+
+}
+}
+<!DOCTYPE html>
+<html lang="@CultureHelper.GetCurrentNeutralCulture()">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@ViewBag.Title - CSD - Treasury</title>
+    @*@System.Web.Optimization.Styles.Render("~/Content/css")*@
+    <link href="@Url.Content("~/Content/css/spinner.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-datepicker.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/bootstrap-timepicker.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-fullpalette.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/ripples.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/roboto.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/snackbar.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/custom-bootstrap.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-iconic-font.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/animate.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/material-design-color-palette.min.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/alertify.rtl.css")" rel="stylesheet" />
+    <link href="@Url.Content("~/Content/css/style.css")" rel="stylesheet" />
+
+    @Scripts.Render("~/bundles/modernizr")
+</head>
+<body>
+    <div class="container">
+        @RenderBody()
+    </div>
+    @*@Scripts.Render("~/bundles/jquery")*@
+    <script src="@Url.Content("~/Scripts/jquery-1.10.2.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery-2.0.3.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery.unobtrusive-ajax.js")"></script>
+
+    @*@Scripts.Render("~/bundles/jqueryextend"))*@
+    @*@Scripts.Render("~/bundles/bootstrap")*@
+
+    <script src="@Url.Content("~/Scripts/moment.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/moment-with-locales.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-datepicker.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-datepicker.fa.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-timepicker.js")"></script>
+    <script src="@Url.Content("~/Scripts/moment-jalaali.js")"></script>
+    <script src="@Url.Content("~/Scripts/material.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/ripples.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/snackbar.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/respond.js")"></script>
+    <script src="@Url.Content("~/Scripts/bootstrap-sortable.js")"></script>
+    <script src="@Url.Content("~/Scripts/alertify.min.js")"></script>
+
+    @*@Scripts.Render("~/bundles/bootstrap-rtl")*@
+    <script src="@Url.Content("~/Scripts/bootstrap-rtl.js")"></script>
+    @*@Scripts.Render("~/bundles/bootstrap" + (CultureHelper.IsRighToLeft() ? "-rtl" : ""))*@
+
+    <script>
+        (function () {
+            var $button = $("<div id='source-button' class='btn btn-primary btn-xs'>&lt; &gt;</div>").click(function () {
+                var index = $('.bs-component').index($(this).parent());
+                $.get(window.location.href, function (data) {
+                    var html = $(data).find('.bs-component').eq(index).html();
+                    html = cleanSource(html);
+                    $("#source-modal pre").text(html);
+                    $("#source-modal").modal();
+                })
+
+            });
+
+            $('.bs-component [data-toggle="popover"]').popover();
+            $('.bs-component [data-toggle="tooltip"]').tooltip();
+
+            $(".bs-component").hover(function () {
+                $(this).append($button);
+                $button.show();
+            }, function () {
+                $button.hide();
+            });
+
+            function cleanSource(html) {
+                var lines = html.split(/\n/);
+
+                lines.shift();
+                lines.splice(-1, 1);
+
+                var indentSize = lines[0].length - lines[0].trim().length,
+                    re = new RegExp(" {" + indentSize + "}");
+
+                lines = lines.map(function (line) {
+                    if (line.match(re)) {
+                        line = line.substring(indentSize);
+                    }
+
+                    return line;
+                });
+
+                lines = lines.join("\n");
+
+                return lines;
+            }
+
+            $(".icons-material .icon").each(function () {
+                $(this).after("<br><br><code>" + $(this).attr("class").replace("icon ", "") + "</code>");
+            });
+
+        })();
+
+    </script>
+    <script>
+        $(function () {
+            $.material.init();
+            $("input[type=text], input[type=password]").val("");
+        });
+
+    </script>
+
+    @RenderSection("scripts", required: false)
+</body>
+</html>
+
+
+
+
+

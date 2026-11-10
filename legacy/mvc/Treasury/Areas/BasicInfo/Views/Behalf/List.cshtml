@@ -1,0 +1,196 @@
+﻿@model CSD.Treasury.UI.Models.SearchModelBehalf
+
+@{
+    ViewBag.Title = "List";
+    int i = Model.PageIndex * Model.PageSize;
+    Model.Area = "BasicInfo";
+    int ix = Model.PageIndex;
+    var related=false;
+}
+
+
+<table class="table table-striped sortable">
+    <thead>
+        <tr class="mdc-bg-grey-200">
+            <th>#</th>
+            <th>
+                @Resources.Behalf
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+     
+        @foreach (var item in Model.List)
+        {
+
+            if (Model.Receipt_Pay_TypeID == 2 )
+            {
+                //بابت دریافت
+                related = Utility.HasRelation("Behalfs", "BehalfID", item.BehalfID.ToString(), "Receipt_Detail", "BehalfID");
+            }
+            else if(Model.Receipt_Pay_TypeID == 1 || Model.Receipt_Pay_TypeID == 4)
+            {
+                //بابت پرداخت
+                related = Utility.HasRelation("Behalfs", "BehalfID", item.BehalfID.ToString(), "Request_Payment", "BehalfID");
+            }
+
+            var related3 = Utility.HasRelation("Behalfs", "BehalfID", item.BehalfID.ToString(), "PettyCash_TransactionDetail", "BehalfID");
+            <tr id="@Hash.GetHashString(item.BehalfID.ToString())">
+                <td>
+                    @(i = i + 1)
+                </td>
+                <td>
+                    @{
+                        if (item.BehalfDescription.Count() >= 35)
+                        {
+                            @(item.BehalfDescription.Substring(0, 15) + "...")
+                        }
+                        else
+                        {
+                            @Html.DisplayFor(modelItem => item.BehalfDescription)
+                        }
+                    }
+
+                </td>
+                <td>
+
+
+                    @if (related || related3)
+                    {
+                        <button class="btn  btn-material-grey btn-xs " disabled title="@Resources.RelationsError">@Resources.Edit</button>
+                        <button class="btn  btn-material-grey btn-xs delete " disabled title="@Resources.RelationsError">@Resources.Delete</button>
+                    }
+                    else
+                    {
+                        @Ajax.ActionLink(Resources.Edit, "Edit", "Behalf", new { Area = "BasicInfo", id = item.BehalfID }, new AjaxOptions
+                   {
+                       OnSuccess = "modal(data,'" + Resources.Edit + " " + Resources.Behalf + "', 'md');"
+                   }, new { @class = "btn btn-material-light-blue-A700 btn-xs" })
+
+                        @Html.ActionLink(Resources.Delete, "Delete", "Behalf", new { Area = "BasicInfo", id = item.BehalfID }, new { @class = "btn btn-danger btn-xs delete" })
+                    }
+
+                    @Ajax.ActionLink(Resources.Details, "Details", "Behalf", new { Area = "BasicInfo", BehalfId = item.BehalfID }, new AjaxOptions
+               {
+                   OnSuccess = "modal(data,'" + Resources.Details + " " + Resources.Behalf + "', 'md');"
+               }, new { @class = "btn btn-material-blue-700 btn-xs" })
+                </td>
+            </tr>
+                        }
+    </tbody>
+</table>
+<div class="container-fluid">
+    <div class="clearfix">
+        <div class="pull-right">
+            <span class="pagination pagination-total">
+                @Resources.Total : @Model.TotalItemCount
+                @Resources.Page @(ix + 1)
+                @Resources.From @Model.TotalPageCount
+            </span>
+        </div>
+        <div class="pull-left">
+            <nav class="text-center">
+                <ul class="pagination  pagination-sm">
+                    @{
+                        var start = ix;
+                        if (start > 0)
+                        {
+                            int c = 0;
+                            while (start > 0 && c < 4)
+                            {
+                                c++;
+                                start--;
+                            }
+                        }
+                        if (ix != 0)
+                        {
+                            Model.PageIndex = 0;
+                            <li>
+                                @Ajax.ActionLink("<<", "List", "Behalf", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result2",
+        InsertionMode = InsertionMode.Replace,
+        HttpMethod = "post",
+
+    })
+
+                            </li>
+                        }
+                        for (int j = start; j < Model.TotalPageCount && j < start + 10; j++)
+                        {
+                            if (ix != j)
+                            {
+                                Model.PageIndex = j;
+                                <li>
+                                    @Ajax.ActionLink((j + 1).ToString(), "List", "Behalf", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result2",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                                </li>
+                            }
+                            else
+                            {
+                                <li class="active">
+                                    <span>@(j + 1) <span class="sr-only">(current)</span></span>
+                                </li>
+                            }
+                        }
+                        if (start + 9 < Model.TotalPageCount)
+                        {
+                            <li>
+                                @Ajax.ActionLink(">>", "List", "Behalf", Model,
+    new AjaxOptions
+    {
+        UpdateTargetId = "Result2",
+        HttpMethod = "post",
+        InsertionMode = InsertionMode.Replace,
+
+    })
+                            </li>
+                        }
+                    }
+                </ul>
+            </nav>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    var deleteBtn = document.getElementsByClassName("delete");
+    for (var i = 0; i < deleteBtn.length; i++) {
+        deleteBtn[i].addEventListener("click", deleteItem);
+    }
+    function deleteItem(e) {
+        e.preventDefault();
+        var item = this;
+        alertify.confirm("", '@Resources.AreYouSure',
+                   function () {
+                       var xmlhttp = new XMLHttpRequest();
+                       xmlhttp.onreadystatechange = function () {
+                           if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                               var data = JSON.parse(xmlhttp.responseText);
+                               if (data.result == true) {
+                                   item.deleteParentByTagName("tr", "danger", 1500, function () {
+                                       alertify.success(data.message);
+                                   })
+                               }
+                               else {
+                                   alertify.error(data.message);
+                               }
+                           }
+                       };
+                       xmlhttp.open("POST", item.href, true);
+                       xmlhttp.send();
+                   },
+  function () {
+  }).set('labels', { ok: 'بله', cancel: 'خیر' }).set({ transition: 'zoom' }).set('modal', false);
+    }
+
+</script>

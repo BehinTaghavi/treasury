@@ -1,0 +1,266 @@
+﻿@using CSD.Treasury.MVCHelpers
+@{
+    ViewBag.Title = Resources.List + " " + Resources.RequestPayment;
+}
+
+@section PageHeader{
+   @Resources.List @Resources.RequestPayment
+} 
+@section btnToolbar{
+    <div class="mdc-bg-grey-50">
+        <div class="btn-toolbar">
+            <div class="clearfix">
+               
+                <div class="pull-right">
+                    @Html.IActionLink(Resources.Create, "create", "request", new { area = "payment" }, new { @class = "btn btn-default btn-sm" }, "zmdi zmdi-hc-lg zmdi-plus")
+                </div>
+                <div class="pull-right">
+                    <a class="btn btn-default btn-sm" id="search" data-poload="@Url.Action("Search", "Request", new { area = "Payment" })">
+                        <i class="zmdi zmdi-search zmdi-hc-lg"></i>&nbsp;&nbsp;&nbsp;&nbsp;@Resources.Search
+                    </a>
+                </div>
+                @*<div class="pull-right">
+                    @Ajax.ActionLink(Resources.Aggregation, "Aggregation", "Request", new AjaxOptions
+           {
+               UpdateTargetId = "Result"
+           }, new { @class = "btn btn-default btn-sm" })
+                </div>*@
+                <div class="pull-right">
+                    <div id="progroup" data-has-content="empty"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+@section list{
+    <div id="Result">
+        @Html.Action("List", "Request", new { Area = "Payment", Model })
+    </div>
+}
+
+
+<style>
+    #filedrag {
+        font-weight: bold;
+        text-align: center;
+        padding: 1em 0;
+        margin: 1em 0;
+        color: #555;
+        border: 2px dashed #555;
+        border-radius: 7px;
+        cursor: default;
+    }
+
+        #filedrag.hover {
+            color: #f00;
+            border-color: #f00;
+            border-style: solid;
+            box-shadow: inset 0 3px 4px #888;
+        }
+</style>
+
+<script>
+    function updateTable() {
+        var url = '@(Url.Action("List", "Request", new { area = "Payment" }))';
+        $.ajax({
+            url: url, type: 'get',
+            success: function (data, status) {
+                $("#Result").html(data);
+            }
+        });
+
+    }
+
+
+    var progroup = document.getElementById("progroup");
+    function generateGUID() {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+    function unMarkList() {
+        $.each($(".fa-check-square-o"), function (i, element) {
+            $(this).removeClass("fa-check-square-o").addClass("fa-square-o");
+        });
+        $.each($(".prop input[type=hidden]"), function (i, index) {
+            $("#" + $(this).val()).remove();
+        })
+        $(".prop").remove();
+    }
+    var guid = generateGUID();
+    $(function () {
+        $(".dataprop, .datapropfull").attr("checked", false);
+        var SelectedCount = 0
+        $("body").on("click", ".dataprop", function () {
+            if ($(this).is(':checked')) {
+                $(this).parents("tr").addClass("rowchecked");
+                SelectedCount++;
+            }
+            else {
+                $(".datapropfull").prop('checked', false);
+                $(this).parents("tr").removeClass("rowchecked");
+                SelectedCount--;
+            }
+            if (SelectedCount == 0) {
+                $("#_delPrdS").remove();
+                $("#_disPrdS").remove();
+                progroup.setAttribute("data-has-content", "empty");
+            }
+            else {
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    @*$("#progroup").append('<button id="_delPrdS" onclick="DeleteSelectedItem()" class="btn btn-default btn-sm" title="@Resources.Delete" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')*@
+                    $("#progroup").append('<button id="_disPrdS" onclick="AcceptRequest()" class="btn btn-material-green-600 btn-sm btn btn-default btn-sm">@Resources.ConfirmRequest</button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+            }
+        });
+
+        $("body").on("click", ".datapropfull", function () {
+            if ($(this).is(':checked')) {
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', true);
+                    $(this).parents("tr").addClass("rowchecked");
+                });
+                if (progroup.getAttribute("data-has-content") == "empty") {
+                    //$("#progroup").append('<button id="_delPrdS" onclick="DeleteSelectedItem()" class="btn btn-default btn-sm" title="@Resources.Delete" ><i class="zmdi zmdi-delete zmdi-hc-lg zmdi-hc-fw"></i></button>')
+                    $("#progroup").append('<button id="_disPrdS" onclick="AcceptRequest()" class="btn btn-default btn-sm">@Resources.ConfirmRequest</button>')
+                    progroup.setAttribute("data-has-content", "has");
+                }
+                SelectedCount = document.getElementsByClassName("dataprop").length;
+            }
+            else {
+                $("#_delPrdS").remove();
+                $("#_disPrdS").remove();
+                progroup.setAttribute("data-has-content", "empty");
+                $.each($(".dataprop"), function (index, element) {
+                    $(this).prop('checked', false);
+                    $(this).parents("tr").removeClass("rowchecked");
+                });
+                SelectedCount = 0;
+            }
+        });
+    });
+    @*function DeleteSelectedItem() {
+        alertify.confirm('@Resources.AreYouSure',
+            function () {
+                var deletedList = [];
+                $.each($(".dataprop"), function (i, element) {
+                    if ($(this).is(':checked')) {
+                        deletedList.push($(this).val());
+                    }
+                });
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("Delete", "Request", new { area = "Payment" })',
+                    data: $.param({ requestIds: deletedList }, true),
+                    success: function (data) {
+                        //alertify.success(data.Message);
+                        var rowChecked = document.getElementsByClassName("rowchecked");
+                        for (var i = 0; i < rowChecked.length; i++) {
+                            deleteRow(rowChecked[i].getAttribute("id"));
+                        }
+                        $("#_delPrdS").remove();
+                        progroup.setAttribute("data-has-content", "empty");
+                        successMessage(data);
+                        updateTable();
+                    },
+                    datatype: "json",
+                    traditional: true,
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alertify.error(xhr.status);
+                        alertify.error(thrownError);
+                    }
+                })
+            })
+    }*@
+    function AcceptRequest() {
+        alertify.confirm('@Resources.AreYouSure',
+            function () {
+                var RequestList = [];
+       
+                $.each($(".dataprop"), function (i, element) {
+                    if ($(this).is(':checked')) {
+                        RequestList.push($(this).val());
+                    }
+                });
+                $.ajax({
+                    type: "POST",
+                    url: '@Url.Action("Confirmation", "Request", new { area = "Payment" })',
+                    data: $.param({ requestIds: RequestList, Status: 1}, true),
+                    success: function (data) {
+                        //alertify.success(data.Message);
+                        var rowChecked = document.getElementsByClassName("rowchecked");
+                        for (var i = 0; i < rowChecked.length; i++) {
+                            deleteRow(rowChecked[i].getAttribute("id"));
+                        }
+                        $("#_disPrdS").remove();
+                        progroup.setAttribute("data-has-content", "empty");
+                        successMessage(data);
+                        updateTable();
+                    },
+                    datatype: "json",
+                    traditional: true,
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        alertify.error(xhr.status);
+                        alertify.error(thrownError);
+                    }
+                })
+            })
+    }
+
+    $("body").on("change", "#UniqueAccountType", function () {
+        var address = "@(Url.Action("UniqueAccount", "Request", new { Area= "Payment" }))";
+        if ($(this).val() != 0) {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: $(this).val(), Bind: $(this).attr("data-bind") });
+        }
+        else {
+            $("#UniqueAccountList").load(address, { UniqueAccountTypeId: 0, Bind: $(this).attr("data-bind") });
+        }
+    });
+
+
+
+
+
+
+    @*function DiscountSelectedProduct() {
+            var discountList = [];
+            var storeId = "";
+            $.each($(".dataprop"), function (i, element) {
+                if ($(this).is(':checked')) {
+                    discountList.push($(this).val());
+                }
+                if (i == 0) {
+                    storeId = $(this).attr("data-st-val")
+                }
+            });
+            $.ajax({
+                type: "POST",
+                url: '@Url.Action("ApplyDiscountForm", "Product", new { area = "Management" })',
+                data: $.param({ ProductIds: discountList, storeId: storeId }, true),
+                success: function (data) {
+                    $("#modal-content").html(data);
+                    $(".modal").modal("show");
+                },
+                datatype: "json",
+                traditional: true,
+                error: function (xhr, ajaxOptions, thrownError) {
+                    alertify.error(xhr.status);
+                    alertify.error(thrownError);
+                }
+            })
+        }*@
+
+
+    document.getElementById("search").addEventListener("click", showSearchPanel);
+    function showSearchPanel() {
+        var e = this;
+        $.get(this.getAttribute("data-poload"), function (d) {
+            $("#modal-content").html(d);
+            //$('.modal.default').modal('show');
+            //modal(data, '" + Resources.Show + " " + Resources.RequestPayment + "', 'md');
+            modal(d, '@Resources.Search', 'md');
+        });
+    }
+</script>
