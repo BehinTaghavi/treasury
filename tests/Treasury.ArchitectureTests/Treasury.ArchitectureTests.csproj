@@ -2,5 +2,6 @@
   <!-- Fails the build when a layer references something it must not (Clean Architecture rule). -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Api\Treasury.Cashflow.Api.csproj" />
+    <ProjectReference Include="..\..\src\Services\Reference\Treasury.Reference.Api\Treasury.Reference.Api.csproj" />
   </ItemGroup>
 </Project>

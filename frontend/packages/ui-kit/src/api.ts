@@ -39,7 +39,7 @@ export function createApi(options: ApiOptions = {}) {
     return { ok: false, code, status: res.status }
   }
 
-  async function call<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<ApiResult<T>> {
+  async function call<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<ApiResult<T>> {
     try {
       const res = await doFetch(base + path, { method, headers: headers(method !== 'GET'), body: body === undefined ? undefined : JSON.stringify(body) })
       return await handle<T>(res)
@@ -51,6 +51,7 @@ export function createApi(options: ApiOptions = {}) {
   return {
     get: <T>(path: string) => call<T>('GET', path),
     post: <T>(path: string, body: unknown) => call<T>('POST', path, body),
+    put: <T>(path: string, body: unknown) => call<T>('PUT', path, body),
   }
 }
 

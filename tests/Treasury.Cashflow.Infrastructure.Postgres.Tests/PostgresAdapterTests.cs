@@ -3,6 +3,7 @@ using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
+using Treasury.Tests.Support;
 using Xunit;
 
 namespace Treasury.Cashflow.Infrastructure.Postgres.Tests;

@@ -44,14 +44,39 @@ public sealed class LayerTests
     [Fact]
     public void No_infrastructure_assembly_depends_on_the_web_layer()
     {
-        var assemblies = Directory.GetFiles(AppContext.BaseDirectory, "Treasury.Cashflow.Infrastructure*.dll")
+        var assemblies = Directory.GetFiles(AppContext.BaseDirectory, "Treasury.*.Infrastructure*.dll")
             .Select(f => Assembly.LoadFrom(f))
             .ToList();
         Assert.NotEmpty(assemblies);
         foreach (var assembly in assemblies)
         {
-            var offending = References(assembly).Where(r => r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) || r == "Treasury.Cashflow.Api").ToList();
+            var offending = References(assembly).Where(r => r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) || r.EndsWith(".Api", StringComparison.Ordinal)).ToList();
             Assert.True(offending.Count == 0, $"{assembly.GetName().Name} references {string.Join(", ", offending)}");
+        }
+    }
+
+    private static readonly string[] Services = ["Cashflow", "Reference"];
+
+    /// <summary>Every service follows the same layer rules (one folder per service, CLAUDE.md). Services do not reference each other.</summary>
+    [Theory]
+    [InlineData("Cashflow")]
+    [InlineData("Reference")]
+    public void Each_service_keeps_its_layers_and_does_not_reference_another_service(string service)
+    {
+        Assembly Load(string layer) => Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"Treasury.{service}.{layer}.dll"));
+        var domain = References(Load("Domain"));
+        var application = References(Load("Application"));
+        Assert.True(domain.All(r => r.StartsWith("System.", StringComparison.Ordinal) || r == "System" || r == "Treasury.BuildingBlocks.Domain"),
+            $"{service}.Domain references {string.Join(", ", domain)}");
+        Assert.Contains($"Treasury.{service}.Domain", application);
+        Assert.True(application.All(r => !r.Contains(".Infrastructure", StringComparison.Ordinal) && !r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal)));
+
+        var others = Services.Where(s => s != service).ToList();
+        foreach (var file in Directory.GetFiles(AppContext.BaseDirectory, $"Treasury.{service}.*.dll"))
+        {
+            var refs = References(Assembly.LoadFrom(file));
+            Assert.True(refs.All(r => others.All(o => !r.StartsWith($"Treasury.{o}.", StringComparison.Ordinal))),
+                $"{Path.GetFileName(file)} references another service: {string.Join(", ", refs)}");
         }
     }
 

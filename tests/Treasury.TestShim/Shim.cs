@@ -13,9 +13,10 @@ public class FactAttribute : Attribute
 public sealed class TheoryAttribute : FactAttribute;
 
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
-public sealed class InlineDataAttribute(params object?[] data) : Attribute
+public sealed class InlineDataAttribute(params object?[]? data) : Attribute
 {
-    public object?[] Data { get; } = data;
+    /// <summary>As in xUnit, [InlineData(null)] means one null argument.</summary>
+    public object?[] Data { get; } = data ?? [null];
 }
 
 public sealed class AssertException(string message) : Exception(message);
@@ -92,6 +93,18 @@ public static class Assert
     {
         if (!collection.Contains(expected)) throw new AssertException($"Collection does not contain {expected}.");
     }
+
+    public static void Contains<T>(IEnumerable<T> collection, Predicate<T> filter)
+    {
+        if (!collection.Any(i => filter(i))) throw new AssertException("No item matches the condition.");
+    }
+
+    public static void DoesNotContain<T>(IEnumerable<T> collection, Predicate<T> filter)
+    {
+        if (collection.Any(i => filter(i))) throw new AssertException("An item matches the condition but should not.");
+    }
+
+    public static T Single<T>(IEnumerable<T> collection, Predicate<T> filter) => Single(collection.Where(i => filter(i)));
 
     public static void Contains(string expected, string? actual)
     {

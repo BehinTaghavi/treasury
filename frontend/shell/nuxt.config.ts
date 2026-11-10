@@ -15,12 +15,16 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       // Where each remote's manifest lives. Overridden per deployment: NUXT_PUBLIC_REMOTES_RECEIPTS=https://...
-      remotes: { receipts: 'http://localhost:5174/mf-manifest.json' },
+      remotes: { receipts: 'http://localhost:5174/mf-manifest.json', basicinfo: 'http://localhost:5175/mf-manifest.json' },
       apiBase: '',
       keycloakUrl: '',
     },
   },
   nitro: {
-    devProxy: { '/api': { target: 'http://localhost:5081/api', changeOrigin: true } },
+    // Development only (pnpm dev): the gateway's routes. The more specific path comes first.
+    devProxy: {
+      '/api/reference': { target: 'http://localhost:5082/api/reference', changeOrigin: true },
+      '/api': { target: 'http://localhost:5081/api', changeOrigin: true },
+    },
   },
 })
