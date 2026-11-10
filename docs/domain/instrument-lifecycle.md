@@ -46,3 +46,8 @@ Received: D1 receipt, D3 sent for collection / returned / endorsed, D4 collected
 Issued: D1 issue, D2 delivery (or cancellation), D3 maturity reclassification, D4 paid or returned by our bank.
 
 Every step belongs to the fiscal year in which it happens; the instrument belongs to the year it was created in (doc 7.4).
+
+## Date rules for new operations
+- **N1** (new, Q6): a step may not be dated before the previous step of the same instrument.
+- **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. The same applies to **bounces** (`Instrument.BouncedBeforeDueDate`; answer to Q11, 10 Nov 2026).
+

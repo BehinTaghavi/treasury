@@ -106,6 +106,45 @@ public sealed class ReceivedInstrumentTests
     }
 
     [Fact]
+    public void A_cheque_cannot_be_cleared_before_its_due_date_N2()
+    {
+        // Rule N2, CEO 10 Nov 2026: "تاریخ وصول چک نمیتواند کوچکتر از تاریخ سررسید چک باشد"
+        var cheque = ReceivedCheque(due: "1405/09/01");
+        cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User); // depositing before the due date stays allowed
+        var ex = Assert.Throws<DomainException>(() => cheque.RecordCleared(D("1405/08/30"), User));
+        Assert.Equal("Instrument.ClearedBeforeDueDate", ex.Code);
+        Assert.Equal(InstrumentState.DepositedForCollection, cheque.State);
+        Assert.Equal(2, cheque.History.Count);
+    }
+
+    [Fact]
+    public void A_cheque_can_be_cleared_on_its_due_date_N2()
+    {
+        var cheque = ReceivedCheque(due: "1405/09/01");
+        cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
+        cheque.RecordCleared(D("1405/09/01"), User);
+        Assert.Equal(InstrumentState.Cleared, cheque.State);
+    }
+
+    [Fact]
+    public void A_cheque_cannot_bounce_before_its_due_date_N2_Q11()
+    {
+        // Answer to Q11 (CEO, 10 Nov 2026): rule N2 applies to bounces too.
+        var cheque = ReceivedCheque(due: "1405/09/01");
+        cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
+        Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => cheque.RecordBounced(D("1405/08/30"), User, "کسری موجودی")).Code);
+        cheque.RecordBounced(D("1405/09/01"), User, "کسری موجودی");
+        Assert.Equal(InstrumentState.Bounced, cheque.State);
+    }
+
+    [Fact]
+    public void An_invalid_transition_is_reported_before_the_due_date_rule_N2()
+    {
+        var cheque = ReceivedCheque(due: "1405/09/01");
+        Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => cheque.RecordCleared(D("1405/08/05"), User)).Code);
+    }
+
+    [Fact]
     public void A_cheque_received_in_one_year_keeps_its_origin_year_when_cleared_in_the_next()
     {
         var cheque = ReceivedCheque(receivedOn: "1404/12/20", due: "1405/01/15");
