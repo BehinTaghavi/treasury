@@ -2,12 +2,11 @@
   <!-- PostgreSQL 17 adapters (Npgsql). Needs NuGet; skipped in offline builds (-p:Offline=true). Schema: db/postgres. -->
   <PropertyGroup>
     <RootNamespace>Treasury.Cashflow.Infrastructure.Postgres</RootNamespace>
-    <!-- Not yet compiled with NuGet access: switch back to true after the first clean build. -->
-    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Npgsql" Version="10.0.3" />
-    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <!-- Only the DI abstractions for AddCashflowPostgres: infrastructure must not depend on the web framework. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Treasury.Cashflow.Infrastructure\Treasury.Cashflow.Infrastructure.csproj" />

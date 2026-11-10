@@ -1,7 +1,7 @@
 # Compact profile for one client's own server (doc 8.4). Also the local "everything running" setup for developers.
 #   cp deploy/.env.example deploy/.env   # then set real passwords
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
-# Not yet run: the workspace where this file was written had no Docker daemon. First run belongs to the technical reviewer.
+# Checked end to end by deploy/smoke-test.sh (also on every pull request, CI job "compose").
 name: treasury
 
 services:

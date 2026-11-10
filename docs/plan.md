@@ -16,10 +16,10 @@ Update this file when a task finishes (what is done, what is next). Months count
 | G · Reports and full pilot | months 9–12 | `reporting-svc`: the reports in both manuals, dashboard, cash-flow forecast | **Gate: Iran Nazho Co. signs off after two parallel month-ends**, then wider rollout | Planned |
 
 ## Next tasks (Phase A)
-1. Install the .NET 10 SDK in the cloud environment (setup script), build `Treasury.slnx` with real packages, run all tests with real xUnit; fix what fails. Give the owner the setup script to save in the environment.
-2. Integration tests for the PostgreSQL adapters against a real PostgreSQL 17 (Docker).
-3. Run `deploy/docker-compose.yml` end to end; fix what fails.
-4. Make `.github/workflows/ci.yml` the required status check: .NET build + tests, DB tests, migration tests, frontend tests.
+1. ~~Install the .NET 10 SDK in the cloud environment (setup script), build `Treasury.slnx` with real packages, run all tests with real xUnit; fix what fails. Give the owner the setup script to save in the environment.~~ Done 10 Nov 2026.
+2. ~~Integration tests for the PostgreSQL adapters against a real PostgreSQL 17 (Docker).~~ Done 10 Nov 2026 (14 tests; found and fixed: reading an instrument outside a transaction).
+3. ~~Run `deploy/docker-compose.yml` end to end; fix what fails.~~ Done 10 Nov 2026 (`deploy/smoke-test.sh`; fixed: ports lost behind the gateway, host files copied into images).
+4. ~~Make `.github/workflows/ci.yml` the required status check: .NET build + tests, DB tests, migration tests, frontend tests.~~ CI green 10 Nov 2026, with a new `compose` job. **Remaining (owner, in GitHub settings):** mark the checks `dotnet`, `database-and-migration`, `frontend`, `compose` as required for `main`.
 5. Migration preflight and dry run on an anonymised copy of `Cashnajoo86` (the owner provides it outside GitHub); share the reconciliation report.
 6. Deployment notes for the test server (for the reviewer).
 
@@ -28,3 +28,4 @@ Update this file when a task finishes (what is done, what is next). Months count
 |---|---|
 | 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
 | 2026-11-09 | Phase 0 first package delivered |
+| 2026-11-10 | Phase A tasks 1–4: first build with NuGet (0 warnings), 81 .NET tests incl. 14 PostgreSQL adapter tests, Docker Compose runs end to end, CI green with a `compose` job; environment setup script |

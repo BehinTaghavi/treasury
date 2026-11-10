@@ -34,6 +34,8 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 |---|---|---|
 | Build | `dotnet build Treasury.slnx` | `dotnet build Treasury.Offline.slnf -p:Offline=true` |
 | .NET tests | `dotnet test` | `dotnet run -p:Offline=true --project tests/<TestProject>` |
+| PostgreSQL adapter tests | `TREASURY_TEST_PG="Host=localhost;Username=postgres;Password=..." dotnet test` (skipped without it; required on CI) | not available |
+| Whole system in Docker | `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build && deploy/smoke-test.sh` | same |
 | Run API (in-memory) | `dotnet run --project src/Services/Cashflow/Treasury.Cashflow.Api` | add `-p:Offline=true` |
 | DB schema tests | `TREASURY_TEST_DSN="host=localhost user=postgres dbname=treasury_test" pytest db/postgres/tests` | same |
 | Migration tests | `cd tools/migration && TREASURY_TEST_DSN=... pytest` | same |

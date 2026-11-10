@@ -5,19 +5,19 @@ PostgreSQL 17 partitioned by fiscal year, and Nuxt 4 micro-frontends. Pilot clie
 
 **Start here:** `CLAUDE.md` (rules and commands) → `docs/plan.md` (what is next) → `docs/decisions.md` → `docs/architecture.md` → `docs/getting-started.md`. Design document: `docs/assessment.md` (Farsi: `docs/assessment.fa.md`). Old systems for reference: `legacy/`.
 
-## Status — Phase 0, first package (9 Nov 2026)
+## Status — Phase A, first real build (10 Nov 2026)
 
 | Part | State | Verified how |
 |---|---|---|
 | Instrument lifecycle + cheque book (domain) | Built | 49 unit tests, each tied to the old program's behaviour |
 | Use cases (receive, state changes, issue cheque with sheet reservation) | Built | 12 tests incl. 40 parallel issues from one book |
-| Clean Architecture rules | Enforced | 6 architecture tests |
-| Cashflow HTTP API (in-memory storage) | Built | Run and called over HTTP |
-| PostgreSQL schema, fiscal-year partitions, closed-year freeze, roles | Built | 10 tests on PostgreSQL 16 (same partitioning features as 17) |
-| PostgreSQL adapters (Npgsql) | Written, type-checked against an API stub | **Not yet compiled with the real package or run against a database** |
-| Keycloak token validation in the API | Written | **Not yet run** (needs NuGet + a Keycloak realm) |
+| Clean Architecture rules | Enforced | 7 architecture tests (incl. the PostgreSQL adapter assembly) |
+| Cashflow HTTP API | Built | In memory and with PostgreSQL, called over HTTP through the gateway |
+| PostgreSQL schema, fiscal-year partitions, closed-year freeze, roles | Built | 10 tests on PostgreSQL 17 |
+| PostgreSQL adapters (Npgsql) | Built | 14 integration tests on PostgreSQL 17 as the `cashflow_svc` role, incl. 25 parallel issues from one book |
+| Keycloak token validation in the API | Compiled | **Not yet run** (needs the `treasury` realm, Phase B); Keycloak itself runs in Docker Compose |
 | Migration of old cheques + reconciliation report | Built | 21 tests incl. end-to-end load into PostgreSQL; Jalali dates checked day by day against .NET for 1380–1420 |
 | Nuxt 4 shell + receipts micro-frontend (Module Federation) | Built | 7 UI-kit tests; browser test: receive, send for collection, duplicate warning, invalid date |
-| Docker Compose (compact on-premises profile) | Written | **Not yet run** (no Docker daemon where it was written) |
+| Docker Compose (compact on-premises profile) | Runs | `deploy/smoke-test.sh` + browser check; CI job `compose` on every pull request |
 
 Open business questions: `docs/domain/open-questions.md`.

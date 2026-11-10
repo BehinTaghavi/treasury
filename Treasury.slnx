@@ -15,6 +15,7 @@
     <Project Path="tests/Treasury.ArchitectureTests/Treasury.ArchitectureTests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Application.Tests/Treasury.Cashflow.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Domain.Tests/Treasury.Cashflow.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.Cashflow.Infrastructure.Postgres.Tests/Treasury.Cashflow.Infrastructure.Postgres.Tests.csproj" />
     <Project Path="tests/Treasury.TestShim/Treasury.TestShim.csproj" />
   </Folder>
 </Solution>
