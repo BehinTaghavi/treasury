@@ -15,12 +15,16 @@ Only your PC can open it. The system has no login yet, so it is deliberately not
 Docker Desktop is the free program that runs the system's parts (database, login server, program, screens) on your PC.
 
 1. Open https://docs.docker.com/desktop/setup/install/windows-install/ and click **Docker Desktop for Windows – x86_64**.
-2. Run the downloaded installer. Keep the ticks it suggests (including **Use WSL 2**) and click **OK**.
+2. Run the downloaded installer. If it asks how to install, choose **All-users installation** and click **Yes** when Windows asks for permission
+   (it needs to switch on the Windows feature *Virtual Machine Platform*; a per-user installation cannot).
+   Keep the other ticks it suggests (including **Use WSL 2**) and click **OK**.
 3. Restart the PC when it asks.
 4. Open **Docker Desktop** from the Start menu. Accept the agreement. You can **skip** signing in and the survey.
 5. Wait until the bottom-left corner of Docker Desktop says **Engine running** (green).
 
-If Docker Desktop shows a message about *WSL* or *virtualization*, take a screenshot and send it to Claude. These are one-time Windows settings, and Claude will tell you exactly what to click.
+If the installer says the *Virtual Machine Platform* feature is not enabled: open the Start menu, type **PowerShell**, right-click
+**Windows PowerShell → Run as administrator**, type `wsl --install`, press Enter, restart the PC and run the installer again.
+If Docker Desktop shows another message about *WSL* or *virtualization*, take a screenshot and send it to Claude. These are one-time Windows settings, and Claude will tell you exactly what to click.
 
 *Licence:* Docker Desktop is free for companies with fewer than 250 employees **and** less than USD 10 million yearly revenue.
 If the company is bigger, use **Rancher Desktop** instead (free, open source, https://rancherdesktop.io).
