@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- HTTP API of reference-svc (Basic Information lists). -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Reference.Infrastructure\Treasury.Reference.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- With NuGet (normal build): PostgreSQL storage and Keycloak token validation.
+       Offline build (-p:Offline=true): in-memory storage and development identity only. -->
+  <PropertyGroup Condition="'$(Offline)' != 'true'">
+    <DefineConstants>$(DefineConstants);WITH_PACKAGES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(Offline)' != 'true'">
+    <ProjectReference Include="..\Treasury.Reference.Infrastructure.Postgres\Treasury.Reference.Infrastructure.Postgres.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+  </ItemGroup>
+</Project>

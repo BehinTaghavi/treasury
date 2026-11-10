@@ -64,19 +64,40 @@ function Wait-ForDocker {
 
 function New-Password { return ([guid]::NewGuid().ToString('N') + [guid]::NewGuid().ToString('N').Substring(0, 8)) }
 
+# Every setting the current version needs. A newer version may need more (e.g. a new service's password):
+# missing ones are added to the existing file, existing ones are never changed (the database is locked with them).
+function Get-RequiredSettings {
+    return [ordered]@{
+        'POSTGRES_PASSWORD'       = (New-Password)
+        'CASHFLOW_DB_PASSWORD'    = (New-Password)
+        'REFERENCE_DB_PASSWORD'   = (New-Password)
+        'KEYCLOAK_ADMIN_PASSWORD' = (New-Password)
+        'GATEWAY_PORT'            = '8080'
+        'GATEWAY_ADDRESS'         = '127.0.0.1'
+    }
+}
+
 function Initialize-Settings {
-    if (Test-Path $envFile) { return }
-    New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
-    $lines = @(
-        '# Treasury test server settings. Created once; keep this file (the test database is locked with these passwords).',
-        "POSTGRES_PASSWORD=$(New-Password)",
-        "CASHFLOW_DB_PASSWORD=$(New-Password)",
-        "KEYCLOAK_ADMIN_PASSWORD=$(New-Password)",
-        'GATEWAY_PORT=8080',
-        'GATEWAY_ADDRESS=127.0.0.1'
-    )
-    Set-Content -Path $envFile -Value $lines -Encoding ASCII
-    Say "Settings created: $envFile"
+    $isNew = -not (Test-Path $envFile)
+    if ($isNew) {
+        New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
+        Set-Content -Path $envFile -Value '# Treasury test server settings. Keep this file: the test database is locked with these passwords.' -Encoding ASCII
+        Say "Settings created: $envFile"
+    }
+
+    $existing = @{}
+    foreach ($line in (Get-Content -Path $envFile)) {
+        if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)=') { $existing[$Matches[1]] = $true }
+    }
+    $settings = Get-RequiredSettings
+    $added = @()
+    foreach ($name in $settings.Keys) {
+        if (-not $existing.ContainsKey($name)) {
+            Add-Content -Path $envFile -Value "$name=$($settings[$name])" -Encoding ASCII
+            $added += $name
+        }
+    }
+    if ($added.Count -gt 0 -and -not $isNew) { Say ('Settings added for this version: ' + ($added -join ', ')) }
 }
 
 function Get-Status([string]$url) {

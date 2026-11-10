@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adapters with no external packages: in-memory store for local runs and tests, outbox messages.
+       The PostgreSQL adapters are in Treasury.Reference.Infrastructure.Postgres (needs NuGet: Npgsql). -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Reference.Application\Treasury.Reference.Application.csproj" />
+  </ItemGroup>
+</Project>

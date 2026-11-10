@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Integration tests of reference-svc's PostgreSQL adapters against a real PostgreSQL 17 (same setup as the cashflow ones).
+       Needs NuGet (Npgsql); not part of the offline build. Set TREASURY_TEST_PG; without it skipped locally, failed on CI. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Reference\Treasury.Reference.Infrastructure.Postgres\Treasury.Reference.Infrastructure.Postgres.csproj" />
+    <Compile Include="..\Support\PostgresDatabase.cs" Link="PostgresDatabase.cs" />
+  </ItemGroup>
+</Project>

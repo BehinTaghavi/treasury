@@ -1,0 +1,21 @@
+{
+  "name": "@treasury/remote-basic-info",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5175 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5175 --strictPort"
+  },
+  "dependencies": {
+    "vue": "3.5.45",
+    "@treasury/ui-kit": "workspace:*"
+  },
+  "devDependencies": {
+    "@module-federation/vite": "1.23.11",
+    "@vitejs/plugin-vue": "6.0.10",
+    "typescript": "~5.9.3",
+    "vite": "8.3.7"
+  }
+}

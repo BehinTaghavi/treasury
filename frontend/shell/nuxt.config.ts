@@ -15,7 +15,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       // Where each remote's manifest lives. Overridden per deployment: NUXT_PUBLIC_REMOTES_RECEIPTS=https://...
-      remotes: { receipts: 'http://localhost:5174/mf-manifest.json' },
+      remotes: { receipts: 'http://localhost:5174/mf-manifest.json', basicinfo: 'http://localhost:5175/mf-manifest.json' },
       apiBase: '',
       keycloakUrl: '',
     },

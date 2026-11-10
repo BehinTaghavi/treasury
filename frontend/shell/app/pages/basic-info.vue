@@ -1,7 +1,9 @@
 <script setup lang="ts">
-const { t } = useShell()
+const { locale } = useShell()
+const { $apiBase } = useNuxtApp()
 </script>
 
 <template>
-  <p class="muted">{{ t('این بخش در فازهای بعدی به‌صورت یک micro-frontend جداگانه اضافه می‌شود.', 'This area will be added as a separate micro-frontend in a later phase.') }}</p>
+  <!-- Basic Information is a separate micro-frontend (frontend/remotes/basic-info), loaded at run time. -->
+  <RemoteArea module="basicinfo/BasicInfo" :component-props="{ locale, apiBase: $apiBase }" :key="locale" />
 </template>

@@ -41,4 +41,14 @@ describe('api client', () => {
     const api = createApi({ fetchImpl: (async () => { throw new TypeError('offline') }) as unknown as typeof fetch })
     expect(await api.get('/api/x')).toEqual({ ok: false, code: 'Network.Error', status: 0 })
   })
+
+  it('sends an idempotency key on updates too', async () => {
+    let seen: RequestInit | undefined
+    const fetchImpl = async (_: string, init: RequestInit) => { seen = init; return new Response(JSON.stringify({ value: 'x' }), { status: 201 }) }
+    const api = createApi({ fetchImpl: fetchImpl as unknown as typeof fetch })
+    const r = await api.put('/api/reference/banks/1', { name: 'ملت', version: 1 })
+    expect(r.ok).toBe(true)
+    expect(seen?.method).toBe('PUT')
+    expect((seen?.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()
+  })
 })
