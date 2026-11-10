@@ -13,3 +13,7 @@ reports/
 deploy/.env
 *.bak
 *.mdb
+# Client exports (chart of accounts, تفصیل lists) never belong in the repository; test fixtures are the exception.
+*.xls
+*.xlsx
+!tests/**/Fixtures/*.xls
