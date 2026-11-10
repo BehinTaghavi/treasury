@@ -8,6 +8,6 @@
     <PackageReference Include="ExcelDataReader" Version="3.9.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Treasury.Reference.Domain\Treasury.Reference.Domain.csproj" />
+    <ProjectReference Include="..\Treasury.Reference.Application\Treasury.Reference.Application.csproj" />
   </ItemGroup>
 </Project>

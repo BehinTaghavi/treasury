@@ -158,3 +158,11 @@ public static class ErpExportReader
         _ => null,
     };
 }
+
+/// <summary>The <see cref="Treasury.Reference.Application.Abstractions.ILedgerExportReader"/> port over <see cref="ErpExportReader"/>.</summary>
+public sealed class ExcelLedgerExportReader : Treasury.Reference.Application.Abstractions.ILedgerExportReader
+{
+    public IReadOnlyList<ChartRow> ReadChart(Stream file) => ErpExportReader.ReadChart(file);
+
+    public IReadOnlyList<DetailRow> ReadDetails(Stream file) => ErpExportReader.ReadDetails(file);
+}

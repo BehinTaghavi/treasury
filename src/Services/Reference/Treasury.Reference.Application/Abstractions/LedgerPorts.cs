@@ -31,3 +31,11 @@ public interface ILedgerQueries
 
     Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken);
 }
+
+/// <summary>Turns an export file of the accounting system into rows (Excel adapter; a stand-in in offline builds).</summary>
+public interface ILedgerExportReader
+{
+    IReadOnlyList<Treasury.Reference.Domain.Ledger.ChartRow> ReadChart(Stream file);
+
+    IReadOnlyList<Treasury.Reference.Domain.Ledger.DetailRow> ReadDetails(Stream file);
+}
