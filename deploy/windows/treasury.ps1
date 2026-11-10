@@ -86,7 +86,17 @@ function Get-Status([string]$url) {
     return [string]$code
 }
 
+# A ZIP that was only partly extracted (stopped by antivirus or an error) gives an obscure Docker message; say it plainly.
+function Test-Download {
+    $missing = @('src', 'db', 'frontend', 'deploy') | Where-Object { -not (Test-Path ([IO.Path]::Combine($root, $_))) }
+    if ($missing) {
+        Fail ("The download was not completely extracted: the folder(s) " + ($missing -join ', ') + " are missing in $root. " +
+            "Delete this folder, extract the ZIP again (guide: docs\test-server-windows.md, step 3) and check that 'src' is there.")
+    }
+}
+
 function Start-Treasury {
+    Test-Download
     Wait-ForDocker
     Initialize-Settings
     Say 'Building and starting the Treasury system. The first time this downloads about 2 GB and takes 10-20 minutes...'
