@@ -128,3 +128,10 @@ def test_lifecycle_matches_dotnet():
     pattern = r"new\(InstrumentDirection\.(\w+), InstrumentState\.(\w+), InstrumentAction\.(\w+), InstrumentState\.(\w+),"
     dotnet = {(d, f, a): t for d, f, a, t in re.findall(pattern, cs.read_text())}
     assert dotnet == TRANSITIONS
+
+
+def test_old_cheque_cleared_before_its_due_date_is_kept_with_a_warning_n2():
+    # Rule N2 (CEO, 10 Nov 2026) applies to new clearings; old history is kept as recorded but reported.
+    m = ok(map_cheque(received(13, d3="13860720", d4="13860725", maturity="13860801"), SRC))
+    assert m.state == "Cleared" and m.steps[-1].event_date == date(2007, 10, 17)
+    assert any("rule N2" in w for w in m.warnings)

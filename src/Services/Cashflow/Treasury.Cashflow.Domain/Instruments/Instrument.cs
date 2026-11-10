@@ -161,8 +161,18 @@ public sealed class Instrument : AggregateRoot<Guid>
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
     }
 
+    /// <summary>
+    /// The bank collected the cheque. Rule N2 (CEO, 10 Nov 2026, docs/decisions.md): it cannot be cleared before its due date.
+    /// Not in the old program: Form_D_Check_vos_m only checks that a date is given ("تاريخ نامشخص است").
+    /// </summary>
     public void RecordCleared(FiscalDate date, string userId, string? reference = null) =>
-        Apply(InstrumentAction.RecordCleared, date, userId, reference, null);
+        Apply(InstrumentAction.RecordCleared, date, userId, reference, null, validate: () =>
+        {
+            if (DueDate is { } due && date < due)
+            {
+                throw new DomainException("Instrument.ClearedBeforeDueDate", $"Clearing date {date} is earlier than the due date ({due}).");
+            }
+        });
 
     public void RecordBounced(FiscalDate date, string userId, string? reason, string? reference = null) =>
         Apply(InstrumentAction.RecordBounced, date, userId, reference, reason);
@@ -253,7 +263,8 @@ public sealed class Instrument : AggregateRoot<Guid>
         return instrument;
     }
 
-    private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null)
+    /// <param name="validate">Extra rule of this action, checked after the transition and date rules, before anything changes.</param>
+    private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         var transition = InstrumentLifecycle.Find(Direction, State, action)
@@ -274,6 +285,7 @@ public sealed class Instrument : AggregateRoot<Guid>
                 $"Date {date} is earlier than the previous step ({lastDate})."); // N1 (new rule, to be confirmed)
         }
 
+        validate?.Invoke();
         var from = State;
         changeDetails?.Invoke();
         State = transition.To;

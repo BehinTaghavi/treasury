@@ -213,6 +213,10 @@ def map_cheque(row: LegacyCheque, source_db: str, currency_by_curid: dict[int, s
                 b.apply("DepositForCollection", d3, "D3 (sent for collection)")
                 if row.stcode == 13:
                     b.apply("RecordCleared", d4, "D4 (collected)")
+                    # Rule N2 (CEO, 10 Nov 2026): new clearings may not be dated before the due date. Old history is kept as
+                    # recorded, but listed so the reconciliation shows how often the old system allowed it.
+                    if due is not None and b.last_date < due:
+                        warnings.append(f"cleared on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
                 elif row.stcode == 14:
                     b.apply("RecordBounced", d4, "D4 (bounced)", "legal action (GoInlaw)" if row.goinlaw else None)
             elif row.stcode == 15:
