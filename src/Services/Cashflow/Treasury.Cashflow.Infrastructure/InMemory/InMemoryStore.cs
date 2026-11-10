@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using System.Collections.Concurrent;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Domain.ChequeBooks;
