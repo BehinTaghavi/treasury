@@ -1,4 +1,4 @@
-using Treasury.Reference.Application.Abstractions;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Domain.Catalogue;
 

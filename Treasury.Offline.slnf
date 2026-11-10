@@ -2,6 +2,7 @@
   "solution": {
     "path": "Treasury.slnx",
     "projects": [
+      "src/BuildingBlocks/Treasury.BuildingBlocks.Application/Treasury.BuildingBlocks.Application.csproj",
       "src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Treasury.BuildingBlocks.Domain.csproj",
       "src/Services/Cashflow/Treasury.Cashflow.Domain/Treasury.Cashflow.Domain.csproj",
       "src/Services/Cashflow/Treasury.Cashflow.Application/Treasury.Cashflow.Application.csproj",

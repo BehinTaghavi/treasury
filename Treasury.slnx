@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Treasury.BuildingBlocks.Application/Treasury.BuildingBlocks.Application.csproj" />
     <Project Path="src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Treasury.BuildingBlocks.Domain.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />

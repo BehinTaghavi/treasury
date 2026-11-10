@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Plumbing shared by every service's application layer: results, unit of work, idempotency, the command runner.
+       Depends only on Treasury.BuildingBlocks.Domain; never on a service or a framework package. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.BuildingBlocks.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.BuildingBlocks.Domain\Treasury.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+</Project>

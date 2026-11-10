@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;
