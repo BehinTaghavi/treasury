@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reads the accounting system's Excel exports (chart of accounts, تفصیل list). ExcelDataReader (MIT).
+       Needs NuGet; skipped in offline builds (-p:Offline=true), like the PostgreSQL adapters. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Infrastructure.Excel</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ExcelDataReader" Version="3.9.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Reference.Application\Treasury.Reference.Application.csproj" />
+  </ItemGroup>
+</Project>

@@ -14,6 +14,7 @@
   </PropertyGroup>
   <ItemGroup Condition="'$(Offline)' != 'true'">
     <ProjectReference Include="..\Treasury.Reference.Infrastructure.Postgres\Treasury.Reference.Infrastructure.Postgres.csproj" />
+    <ProjectReference Include="..\Treasury.Reference.Infrastructure.Excel\Treasury.Reference.Infrastructure.Excel.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
   </ItemGroup>
 </Project>

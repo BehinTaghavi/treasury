@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reader tests with MADE-UP fixtures (Fixtures/make_fixtures.py). Needs NuGet (ExcelDataReader); not in the offline build.
+       Optional: TREASURY_REAL_EXPORTS=<folder with a client's real exports> also checks those (local only, never committed). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Reference\Treasury.Reference.Infrastructure.Excel\Treasury.Reference.Infrastructure.Excel.csproj" />
+    <None Include="Fixtures\*.xls" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -48,8 +48,22 @@ export function createApi(options: ApiOptions = {}) {
     }
   }
 
+  /** Sends one file as multipart/form-data (field "file"); the browser sets the boundary. Carries an Idempotency-Key like any write. */
+  async function upload<T>(path: string, file: Blob, fileName: string): Promise<ApiResult<T>> {
+    const h = headers(true) as Record<string, string>
+    delete h['Content-Type']
+    const form = new FormData()
+    form.append('file', file, fileName)
+    try {
+      return await handle<T>(await doFetch(base + path, { method: 'POST', headers: h, body: form }))
+    } catch {
+      return { ok: false, code: 'Network.Error', status: 0 }
+    }
+  }
+
   return {
     get: <T>(path: string) => call<T>('GET', path),
+    upload,
     post: <T>(path: string, body: unknown) => call<T>('POST', path, body),
     put: <T>(path: string, body: unknown) => call<T>('PUT', path, body),
   }

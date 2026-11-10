@@ -6,6 +6,8 @@
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
 import CatalogueList from './CatalogueList.vue'
+import ChartAccounts from './ledger/ChartAccounts.vue'
+import DetailAccounts from './ledger/DetailAccounts.vue'
 import type { ListSpec } from './types'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), {
@@ -25,6 +27,12 @@ const lists: ListSpec[] = [
   { list: 'banks', title: ['نام بانک‌ها', 'Bank names'], singular: ['بانک', 'bank'] },
 ]
 
+// Copy of the accounting system's accounts (imported from its Excel exports); bank accounts and purpose groups use them.
+const ledgerSections: { id: string; title: [string, string] }[] = [
+  { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
+  { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
+]
+
 // Next pull requests (docs/plan.md, Phase B). Shown so the owner sees the whole menu.
 const comingNext: [string, string][] = [
   ['حساب‌های بانکی', 'Bank accounts'],
@@ -35,7 +43,7 @@ const comingNext: [string, string][] = [
 ]
 
 const selected = ref(lists[0]!.list)
-const current = computed(() => lists.find(l => l.list === selected.value)!)
+const current = computed(() => lists.find(l => l.list === selected.value))
 </script>
 
 <template>
@@ -51,9 +59,19 @@ const current = computed(() => lists.find(l => l.list === selected.value)!)
           :aria-current="l.list === selected ? 'page' : undefined"
           @click="selected = l.list"
         >{{ fa ? l.title[0] : l.title[1] }}</button>
+        <button
+          v-for="l in ledgerSections"
+          :key="l.id"
+          type="button"
+          :class="{ active: l.id === selected }"
+          :aria-current="l.id === selected ? 'page' : undefined"
+          @click="selected = l.id"
+        >{{ fa ? l.title[0] : l.title[1] }}</button>
         <span v-for="c in comingNext" :key="c[0]" class="tr-soon">{{ fa ? c[0] : c[1] }} <small>{{ t('(به‌زودی)', '(next)') }}</small></span>
       </nav>
-      <CatalogueList :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
+      <CatalogueList v-if="current" :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
+      <ChartAccounts v-else-if="selected === 'chart'" :key="'chart' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>
 </template>

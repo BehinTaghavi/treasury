@@ -94,6 +94,14 @@ public static class Assert
         if (!collection.Contains(expected)) throw new AssertException($"Collection does not contain {expected}.");
     }
 
+    public static void All<T>(IEnumerable<T> collection, Action<T> check)
+    {
+        foreach (var item in collection)
+        {
+            check(item);
+        }
+    }
+
     public static void Contains<T>(IEnumerable<T> collection, Predicate<T> filter)
     {
         if (!collection.Any(i => filter(i))) throw new AssertException("No item matches the condition.");
