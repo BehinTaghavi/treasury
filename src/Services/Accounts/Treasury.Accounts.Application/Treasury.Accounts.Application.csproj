@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Application layer of accounts-svc: use cases and ports. Depends only on the domain. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Accounts.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Accounts.Domain\Treasury.Accounts.Domain.csproj" />
+  </ItemGroup>
+</Project>

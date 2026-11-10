@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain layer of accounts-svc (Treasury Accounts: bank accounts, later cash desks and cheque books). No frameworks. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Accounts.Domain</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Treasury.BuildingBlocks.Domain\Treasury.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+</Project>

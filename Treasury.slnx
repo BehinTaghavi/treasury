@@ -4,6 +4,10 @@
     <Project Path="src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Treasury.BuildingBlocks.Domain.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Accounts/">
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Application/Treasury.Accounts.Application.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Domain/Treasury.Accounts.Domain.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Cashflow/">
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Api/Treasury.Cashflow.Api.csproj" />
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Application/Treasury.Cashflow.Application.csproj" />
@@ -20,6 +24,7 @@
     <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure/Treasury.Reference.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Treasury.Accounts.Domain.Tests/Treasury.Accounts.Domain.Tests.csproj" />
     <Project Path="tests/Treasury.ArchitectureTests/Treasury.ArchitectureTests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Application.Tests/Treasury.Cashflow.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Domain.Tests/Treasury.Cashflow.Domain.Tests.csproj" />
