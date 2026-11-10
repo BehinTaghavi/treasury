@@ -7,6 +7,7 @@
   <Folder Name="/src/Services/Accounts/">
     <Project Path="src/Services/Accounts/Treasury.Accounts.Application/Treasury.Accounts.Application.csproj" />
     <Project Path="src/Services/Accounts/Treasury.Accounts.Domain/Treasury.Accounts.Domain.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Infrastructure.Postgres/Treasury.Accounts.Infrastructure.Postgres.csproj" />
     <Project Path="src/Services/Accounts/Treasury.Accounts.Infrastructure/Treasury.Accounts.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Services/Cashflow/">
@@ -27,6 +28,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Treasury.Accounts.Application.Tests/Treasury.Accounts.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Accounts.Domain.Tests/Treasury.Accounts.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.Accounts.Infrastructure.Postgres.Tests/Treasury.Accounts.Infrastructure.Postgres.Tests.csproj" />
     <Project Path="tests/Treasury.ArchitectureTests/Treasury.ArchitectureTests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Application.Tests/Treasury.Cashflow.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Domain.Tests/Treasury.Cashflow.Domain.Tests.csproj" />

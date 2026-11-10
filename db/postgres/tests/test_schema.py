@@ -191,3 +191,22 @@ def test_the_reference_service_role_cannot_read_the_cashflow_schema(db):
         c.execute("SET ROLE reference_svc")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("SELECT count(*) FROM cashflow.instrument")
+
+
+def test_the_accounts_service_role_owns_bank_accounts_and_sees_no_other_schema(db):
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        main = uuid.uuid4()
+        add = """INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, main_account_id, ledger_account,
+                     collection_priority, is_facility, is_active) VALUES (%s, %s, %s, %s, 'IRR', %s, '1103', false, false, true)"""
+        c.execute(add, (main, "0101-1", "01011", uuid.uuid4(), None))
+        c.execute(add, (uuid.uuid4(), "0101-2", "01012", uuid.uuid4(), main))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "0101 1", "01011", uuid.uuid4(), None))  # same number, other spelling
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "0101-3", "01013", uuid.uuid4(), main))  # second backup of the same main
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("SELECT count(*) FROM reference.catalogue_item")
