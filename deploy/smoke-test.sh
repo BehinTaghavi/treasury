@@ -28,6 +28,13 @@ done
 curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank names list (reference-svc) is missing or empty"
 curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
 
+# Bank accounts (accounts-svc -> PostgreSQL as accounts_svc).
+for _ in $(seq 1 60); do
+  [[ "$(status "$base/api/accounts/bank-accounts?includeInactive=true")" == 200 ]] && break
+  sleep 2
+done
+[[ "$(status "$base/api/accounts/bank-accounts?includeInactive=true")" == 200 ]] || fail "bank account list (accounts-svc) does not answer"
+
 # Keycloak must advertise the address users actually use (host and port), or logins and token checks fail.
 for _ in $(seq 1 60); do
   issuer="$(curl -s "$base/auth/realms/master/.well-known/openid-configuration" | grep -o '"issuer":"[^"]*"' || true)"
@@ -46,4 +53,4 @@ curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheq
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 
-echo "OK: shell, receipts and basic information micro-frontends, Keycloak, and the cashflow and reference APIs with PostgreSQL work at $base"
+echo "OK: shell, receipts and basic information micro-frontends, Keycloak, and the cashflow, reference and accounts APIs with PostgreSQL work at $base"
