@@ -105,6 +105,13 @@ public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository led
             ct => queries.SearchDetailsAsync(PersianText.Key(search), string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct),
             cancellationToken);
 
+    /// <summary>One account by code (asked by accounts-svc when a bank account names it).</summary>
+    public Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(ct => queries.AccountAsync(code.Trim(), ct), cancellationToken);
+
+    public Task<DetailAccountView?> DetailAsync(string code, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(ct => queries.DetailAsync(code.Trim(), ct), cancellationToken);
+
     public Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(ct => queries.DetailTypesAsync(ct), cancellationToken);
 

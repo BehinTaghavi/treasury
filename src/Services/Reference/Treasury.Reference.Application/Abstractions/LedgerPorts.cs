@@ -30,6 +30,10 @@ public interface ILedgerQueries
     Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken);
+
+    Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken);
+
+    Task<DetailAccountView?> DetailAsync(string code, CancellationToken cancellationToken);
 }
 
 /// <summary>Turns an export file of the accounting system into rows (Excel adapter; a stand-in in offline builds).</summary>

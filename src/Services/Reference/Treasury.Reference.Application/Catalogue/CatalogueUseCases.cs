@@ -86,6 +86,10 @@ public sealed class CatalogueUseCases(IUnitOfWork unitOfWork, ICatalogueReposito
             return list.OrderBy(i => i.Name, PersianOrder).Select(CatalogueItemView.From).ToList();
         }, cancellationToken);
 
+    /// <summary>One entry of any list, active or not (asked by other services, e.g. the bank of a bank account).</summary>
+    public Task<CatalogueItemView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct => await items.GetAsync(id, ct).ConfigureAwait(false) is { } i ? CatalogueItemView.From(i) : null, cancellationToken);
+
     private Task<Result<Guid>> ChangeAsync(
         string idempotencyKey, Guid id, long expectedVersion, Func<CatalogueItem, CancellationToken, Task<Result<Guid>?>> change, CancellationToken cancellationToken) =>
         RunAsync(idempotencyKey, async ct =>
