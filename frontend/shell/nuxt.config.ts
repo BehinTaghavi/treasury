@@ -21,6 +21,10 @@ export default defineNuxtConfig({
     },
   },
   nitro: {
-    devProxy: { '/api': { target: 'http://localhost:5081/api', changeOrigin: true } },
+    // Development only (pnpm dev): the gateway's routes. The more specific path comes first.
+    devProxy: {
+      '/api/reference': { target: 'http://localhost:5082/api/reference', changeOrigin: true },
+      '/api': { target: 'http://localhost:5081/api', changeOrigin: true },
+    },
   },
 })
