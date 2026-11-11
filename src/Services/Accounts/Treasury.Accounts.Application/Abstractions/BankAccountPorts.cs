@@ -38,4 +38,10 @@ public interface IReferenceLookup
     Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
     Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tells reference-svc that a bank account is about to name this entry (<paramref name="list"/>: banks, cities, currencies),
+    /// so it can no longer be deleted there. Called before the save; false when the entry no longer exists.
+    /// </summary>
+    Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }

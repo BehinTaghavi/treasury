@@ -26,7 +26,7 @@ public sealed class BankAccountPostgresTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private BankAccountForm Form(string suffix, string? d1 = "100000", bool priority = false) =>
+    private BankAccountForm Form(string suffix, string? d1 = "100000", int? priority = null) =>
         new($"0101-{_tag}-{suffix}", FakeReference.Mellat, "شعبه بازار", "1234", FakeReference.Tehran, "1400/01/15", false, null,
             "1103", d1, null, "130100", "130101", priority, IsFacility: true);
 
@@ -45,6 +45,17 @@ public sealed class BankAccountPostgresTests : IDisposable
         var v = (await _useCases.ListAsync(true, CancellationToken.None)).Single(x => x.Id == r.Value);
         Assert.Equal(("1400/01/15", "IRR", "100000", "130101", true, 1L), (v.OpeningDate, v.CurrencyCode, v.Detail1Code, v.BouncedAccountCode, v.IsFacility, v.Version));
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE payload->>'BankAccountId' = @id", ("id", r.Value.ToString())));
+    }
+
+    [Fact]
+    public async Task The_collection_priority_is_stored_as_a_number_or_none()
+    {
+        var first = await _useCases.RegisterAsync(new(Key(), Form("p1", priority: 3)), CancellationToken.None);
+        var none = await _useCases.RegisterAsync(new(Key(), Form("p2")), CancellationToken.None);
+        Assert.True(first.IsSuccess && none.IsSuccess, first.ErrorCode ?? none.ErrorCode);
+        var views = await _useCases.ListAsync(true, CancellationToken.None);
+        Assert.Equal((int?)3, views.Single(v => v.Id == first.Value).CollectionPriority);
+        Assert.Null(views.Single(v => v.Id == none.Value).CollectionPriority);
     }
 
     [Fact]

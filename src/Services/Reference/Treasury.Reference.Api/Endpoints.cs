@@ -6,7 +6,8 @@ namespace Treasury.Reference.Api;
 
 public sealed record AddItemRequest(string Name, Guid? ParentId, string? Code);
 
-public sealed record RenameItemRequest(string Name, long Version);
+/// <summary>Edit of an entry; ParentId (province / country) and Code (currency) only when they change.</summary>
+public sealed record RenameItemRequest(string Name, long Version, Guid? ParentId = null, string? Code = null);
 
 public sealed record VersionRequest(long Version);
 
@@ -51,7 +52,19 @@ public static class Endpoints
 
         api.MapPut("/{list}/{id:guid}", async (string list, Guid id, RenameItemRequest r, HttpRequest http, CatalogueUseCases useCases, CancellationToken ct) =>
             Lists.ContainsKey(list)
-                ? ToHttp(await useCases.RenameAsync(new RenameCatalogueItemCommand(Key(http), id, r.Name, r.Version), ct).ConfigureAwait(false), list)
+                ? ToHttp(await useCases.EditAsync(new EditCatalogueItemCommand(Key(http), id, r.Name, r.Version, r.ParentId, r.Code), ct).ConfigureAwait(false), list)
+                : Results.NotFound());
+
+        // Delete an entry typed by mistake; refused (Catalogue.InUse, Catalogue.HasChildren) when anything refers to it.
+        api.MapPost("/{list}/{id:guid}/delete", async (string list, Guid id, VersionRequest r, HttpRequest http, CatalogueUseCases useCases, CancellationToken ct) =>
+            Lists.ContainsKey(list)
+                ? ToHttp(await useCases.DeleteAsync(new DeleteCatalogueItemCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), list)
+                : Results.NotFound());
+
+        // Called by other services (accounts-svc) before they save data naming the entry; afterwards it can no longer be deleted.
+        api.MapPost("/{list}/{id:guid}/in-use", async (string list, Guid id, HttpRequest http, CatalogueUseCases useCases, CancellationToken ct) =>
+            Lists.ContainsKey(list)
+                ? ToHttp(await useCases.MarkInUseAsync(new MarkCatalogueItemInUseCommand(Key(http), id), ct).ConfigureAwait(false), list)
                 : Results.NotFound());
 
         api.MapPost("/{list}/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (string list, Guid id, string change, VersionRequest r, HttpRequest http, CatalogueUseCases useCases, CancellationToken ct) =>

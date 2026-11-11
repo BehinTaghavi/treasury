@@ -18,5 +18,8 @@ public interface ICatalogueRepository
     /// <summary>Saves changes and pending events. Throws <see cref="ConcurrencyConflictException"/> if someone else saved first.</summary>
     Task SaveAsync(CatalogueItem item, CancellationToken cancellationToken);
 
+    /// <summary>Removes the entry and writes its pending events. Throws <see cref="ConcurrencyConflictException"/> if someone else saved first.</summary>
+    Task DeleteAsync(CatalogueItem item, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<CatalogueItem>> ListAsync(CatalogueKind kind, Guid? parentId, bool includeInactive, CancellationToken cancellationToken);
 }

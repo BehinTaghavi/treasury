@@ -198,7 +198,7 @@ def test_the_accounts_service_role_owns_bank_accounts_and_sees_no_other_schema(d
         c.execute("SET ROLE accounts_svc")
         main = uuid.uuid4()
         add = """INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, main_account_id, ledger_account,
-                     collection_priority, is_facility, is_active) VALUES (%s, %s, %s, %s, 'IRR', %s, '1103', false, false, true)"""
+                     collection_priority, is_facility, is_active) VALUES (%s, %s, %s, %s, 'IRR', %s, '1103', NULL, false, true)"""
         c.execute(add, (main, "0101-1", "01011", uuid.uuid4(), None))
         c.execute(add, (uuid.uuid4(), "0101-2", "01012", uuid.uuid4(), main))
         with pytest.raises(psycopg.errors.UniqueViolation):
@@ -210,3 +210,70 @@ def test_the_accounts_service_role_owns_bank_accounts_and_sees_no_other_schema(d
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             with c.transaction():
                 c.execute("SELECT count(*) FROM reference.catalogue_item")
+
+
+def test_collection_priority_is_a_number_from_1_to_5(db):
+    # Owner's report of 11 Nov 2026, item 15 (008_accounts_collection_priority.sql).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        add = """INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account,
+                     collection_priority, is_facility, is_active) VALUES (%s, %s, %s, %s, 'IRR', '1103', %s, false, true)"""
+        c.execute(add, (uuid.uuid4(), "777-1", "7771", uuid.uuid4(), 1))
+        c.execute(add, (uuid.uuid4(), "777-5", "7775", uuid.uuid4(), 5))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "777-6", "7776", uuid.uuid4(), 6))
+
+
+def test_an_old_yes_no_priority_becomes_priority_1(db):
+    # A database created before 008 (e.g. the owner's test PC) has a boolean column; the script turns "yes" into 1, "no" into none.
+    # Runs inside one transaction that is rolled back (DDL is transactional in PostgreSQL).
+    script = (HERE / "008_accounts_collection_priority.sql").read_text(encoding="utf-8")
+    with psycopg.connect(db) as c:
+        c.execute("ALTER TABLE accounts.bank_account DROP CONSTRAINT bank_account_collection_priority_range")
+        c.execute("ALTER TABLE accounts.bank_account ALTER COLUMN collection_priority TYPE boolean USING collection_priority IS NOT NULL")
+        yes, no = uuid.uuid4(), uuid.uuid4()
+        add = """INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account,
+                     collection_priority, is_facility, is_active) VALUES (%s, %s, %s, %s, 'IRR', '1103', %s, false, true)"""
+        c.execute(add, (yes, "888-1", "8881", uuid.uuid4(), True))
+        c.execute(add, (no, "888-2", "8882", uuid.uuid4(), False))
+        c.execute(script)
+        c.execute(script)  # safe to run again
+        got = dict(c.execute("SELECT id, collection_priority FROM accounts.bank_account WHERE id IN (%s, %s)", (yes, no)).fetchall())
+        assert got == {yes: 1, no: None}
+        c.rollback()
+
+
+def test_the_reference_service_may_delete_an_unused_entry_but_not_one_with_entries_under_it(db):
+    # Owner's report of 11 Nov 2026, items 6 and 9 (007_reference_catalogue_corrections.sql).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        add = "INSERT INTO reference.catalogue_item (id, kind, parent_id, name, name_key, code) VALUES (%s, %s, %s, %s, %s, %s)"
+        country, province, bank = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (country, "Country", None, "کشور آزمایشی", "کشورآزمایشی", None))
+        c.execute(add, (province, "Province", country, "استان آزمایشی", "استانآزمایشی", None))
+        c.execute(add, (bank, "Bank", None, "بانک آزمایشی", "بانکآزمایشی", None))
+        assert c.execute("SELECT in_use FROM reference.catalogue_item WHERE id = %s", (bank,)).fetchone()[0] is False
+        c.execute("DELETE FROM reference.catalogue_item WHERE id = %s", (bank,))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM reference.catalogue_item WHERE id = %s", (country,))
+
+
+def test_entries_named_by_existing_bank_accounts_are_marked_in_use_by_the_upgrade(db):
+    # 007 catches up databases where bank accounts were saved before in_use existed. Rolled back afterwards.
+    script = (HERE / "007_reference_catalogue_corrections.sql").read_text(encoding="utf-8")
+    with psycopg.connect(db) as c:
+        add = "INSERT INTO reference.catalogue_item (id, kind, parent_id, name, name_key, code) VALUES (%s, %s, %s, %s, %s, %s)"
+        bank, other, eur = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (bank, "Bank", None, "بانک قدیمی", "بانکقدیمی", None))
+        c.execute(add, (other, "Bank", None, "بانک بی‌حساب", "بانکبیحساب", None))
+        c.execute("DELETE FROM reference.catalogue_item WHERE code = 'EUR'")
+        c.execute(add, (eur, "Currency", None, "یورو", "یورو", "EUR"))
+        c.execute("""INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account,
+                     collection_priority, is_facility, is_active) VALUES (%s, '999-1', '9991', %s, 'EUR', '1103', NULL, false, true)""",
+                  (uuid.uuid4(), bank))
+        c.execute(script)
+        got = dict(c.execute("SELECT id, in_use FROM reference.catalogue_item WHERE id IN (%s, %s, %s)", (bank, other, eur)).fetchall())
+        assert got == {bank: True, other: False, eur: True}
+        c.rollback()

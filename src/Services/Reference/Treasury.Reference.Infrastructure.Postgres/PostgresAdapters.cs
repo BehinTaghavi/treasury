@@ -8,7 +8,7 @@ using Treasury.Reference.Domain.Catalogue;
 
 namespace Treasury.Reference.Infrastructure.Postgres;
 
-// Written against Npgsql 10 and db/postgres/004_reference_catalogue.sql.
+// Written against Npgsql 10 and db/postgres/004_reference_catalogue.sql, 007_reference_catalogue_corrections.sql.
 // Integration tests against PostgreSQL 17: tests/Treasury.Reference.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
@@ -59,6 +59,12 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
                 ? new DomainException("Catalogue.CodeTaken", "This currency already exists.")
                 : new DomainException("Catalogue.NameTaken", "This name is already in the list.");
         }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.TableName == "catalogue_item")
+        {
+            // A province or city was added under the entry while it was being deleted.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Catalogue.HasChildren", "Entries under this one must be deleted first.");
+        }
         catch
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
@@ -73,7 +79,7 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
 
 public sealed class PostgresCatalogueRepository : ICatalogueRepository
 {
-    private const string Columns = "id, kind, parent_id, name, code, is_active, version";
+    private const string Columns = "id, kind, parent_id, name, code, is_active, version, in_use";
 
     public async Task<CatalogueItem?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -129,10 +135,13 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
         ArgumentNullException.ThrowIfNull(item);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE reference.catalogue_item SET name = @name, name_key = @key, is_active = @active, version = version + 1, updated_at = now() " +
-            "WHERE id = @id AND version = @expected"))
+            "UPDATE reference.catalogue_item SET name = @name, name_key = @key, parent_id = @parent, code = @code, is_active = @active, " +
+            "in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
         {
             cmd.Parameters.AddWithValue("name", item.Name);
+            cmd.Parameters.Add(new NpgsqlParameter("parent", NpgsqlDbType.Uuid) { Value = (object?)item.ParentId ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("code", NpgsqlDbType.Char) { Value = (object?)item.Code ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("in_use", item.IsInUse);
             cmd.Parameters.AddWithValue("key", item.NameKey);
             cmd.Parameters.AddWithValue("active", item.IsActive);
             cmd.Parameters.AddWithValue("id", item.Id);
@@ -145,6 +154,25 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
 
         await PostgresOutbox.WriteAsync(tx, item.PendingEvents, cancellationToken).ConfigureAwait(false);
         item.MarkSaved(item.Version + 1);
+    }
+
+    public async Task DeleteAsync(CatalogueItem item, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var tx = PostgresUnitOfWork.Current;
+        // "NOT in_use": another service may have marked the entry in the meantime; then the delete is refused like a conflict.
+        await using (var cmd = tx.Command("DELETE FROM reference.catalogue_item WHERE id = @id AND version = @expected AND NOT in_use"))
+        {
+            cmd.Parameters.AddWithValue("id", item.Id);
+            cmd.Parameters.AddWithValue("expected", item.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Entry {item.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, item.PendingEvents, cancellationToken).ConfigureAwait(false);
+        item.MarkSaved(item.Version);
     }
 
     public async Task<IReadOnlyList<CatalogueItem>> ListAsync(CatalogueKind kind, Guid? parentId, bool includeInactive, CancellationToken cancellationToken)
@@ -170,7 +198,8 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
                 r.GetString(3),
                 r.IsDBNull(4) ? null : r.GetString(4).Trim(),
                 r.GetBoolean(5),
-                r.GetInt64(6)));
+                r.GetInt64(6),
+                r.GetBoolean(7)));
         }
 
         return list;

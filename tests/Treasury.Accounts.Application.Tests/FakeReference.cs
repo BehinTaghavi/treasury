@@ -35,13 +35,28 @@ public sealed class FakeReference : IReferenceLookup
 
     public bool Down { get; set; }
 
+    /// <summary>Entries marked in use, as (list, id).</summary>
+    public List<(string List, Guid Id)> MarkedInUse { get; } = [];
+
+    public async Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
+    {
+        await Answer<object>(true);
+        MarkedInUse.Add((list, id));
+        return true;
+    }
+
     public Task<ReferenceEntry?> BankAsync(Guid id, CancellationToken cancellationToken) => Answer(_banks.GetValueOrDefault(id));
 
     public Task<ReferenceEntry?> CityAsync(Guid id, CancellationToken cancellationToken) =>
         Answer(id == Tehran ? new ReferenceEntry(Tehran, "تهران", null, true) : null);
 
     public Task<ReferenceEntry?> CurrencyAsync(string code, CancellationToken cancellationToken) =>
-        Answer(code is "IRR" or "USD" or "EUR" ? new ReferenceEntry(Guid.NewGuid(), code, code, true) : null);
+        Answer(code is "IRR" or "USD" or "EUR" ? new ReferenceEntry(CurrencyIds[code], code, code, true) : null);
+
+    public static readonly IReadOnlyDictionary<string, Guid> CurrencyIds = new Dictionary<string, Guid>
+    {
+        ["IRR"] = Guid.NewGuid(), ["USD"] = Guid.NewGuid(), ["EUR"] = Guid.NewGuid(),
+    };
 
     public Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Answer(_accounts.GetValueOrDefault(code));
 

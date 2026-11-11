@@ -3,7 +3,7 @@ using Treasury.BuildingBlocks.Application;
 
 namespace Treasury.Accounts.Api;
 
-public sealed record RegisterBankAccountRequest(BankAccountForm Form, Guid? MainAccountId);
+public sealed record RegisterBankAccountRequest(BankAccountForm Form, Guid? MainAccountId, bool IsBackup = false);
 
 public sealed record ChangeBankAccountRequest(BankAccountForm Form, long Version);
 
@@ -24,7 +24,7 @@ public static class Endpoints
             Results.Ok(await useCases.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
 
         api.MapPost("/", async (RegisterBankAccountRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.RegisterAsync(new RegisterBankAccountCommand(Key(http), r.Form, r.MainAccountId), ct).ConfigureAwait(false)));
+            ToHttp(await useCases.RegisterAsync(new RegisterBankAccountCommand(Key(http), r.Form, r.MainAccountId, r.IsBackup), ct).ConfigureAwait(false)));
 
         api.MapPut("/{id:guid}", async (Guid id, ChangeBankAccountRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeAsync(new ChangeBankAccountCommand(Key(http), id, r.Form, r.Version), ct).ConfigureAwait(false)));

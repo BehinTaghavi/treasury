@@ -40,6 +40,29 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
         return d is null ? null : new DetailFact(d.Code, d.Type, d.IsActive);
     }
 
+    public async Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
+    {
+        var path = $"api/reference/{list}/{id}/in-use";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+            // Marking is the same every time, so one fixed key per entry is enough.
+            request.Headers.Add("Idempotency-Key", $"in-use:{id}");
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            throw new DomainException("Reference.Unavailable", $"reference-svc could not answer ({path}): {ex.Message}");
+        }
+    }
+
     private async Task<ReferenceEntry?> EntryAsync(string path, CancellationToken ct)
     {
         var e = await GetAsync<Entry>(path, ct).ConfigureAwait(false);

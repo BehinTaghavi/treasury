@@ -4,11 +4,13 @@ using Xunit;
 
 namespace Treasury.Accounts.Domain.Tests;
 
-/// <summary>Bank accounts: manual section 5, Access Form_Bankacc, MVC BanksController; allowed تفصیل types (owner, 10 Nov 2026).</summary>
+/// <summary>Bank accounts: manual section 5, Access Form_Bankacc, MVC BanksController; allowed تفصیل types (owner, 10 Nov 2026);
+/// owner's report of 11 Nov 2026 (items 10, 12, 14, 15).</summary>
 public sealed class BankAccountTests
 {
     private static readonly Guid Mellat = Guid.NewGuid();
     private static readonly Guid Melli = Guid.NewGuid();
+    private static readonly Guid Tehran = Guid.NewGuid();
 
     private static readonly LedgerFacts Ledger = new(
         new Dictionary<string, LedgerAccountFact>
@@ -27,9 +29,9 @@ public sealed class BankAccountTests
             ["100099"] = new("100099", "بانكها", false),
         });
 
-    private static BankAccountData Data(string number = "0101-123-456", Guid? bank = null, string account = "1103", string? d1 = "100000", string currency = "IRR") =>
-        new(number, bank ?? Mellat, "شعبه نمونه", "1234", null, FiscalDate.ParseJalali("1400/01/15"), currency,
-            new BankLedger(account, d1, null, "130100", "130101"), HasCollectionPriority: true, IsFacility: false);
+    private static BankAccountData Data(string number = "0101-123-456", Guid? bank = null, string account = "1103", string? d1 = "100000", string currency = "IRR", int? priority = 1) =>
+        new(number, bank ?? Mellat, "شعبه نمونه", "1234", Tehran, FiscalDate.ParseJalali("1400/01/15"), currency,
+            new BankLedger(account, d1, null, "130100", "130101"), CollectionPriority: priority, IsFacility: false);
 
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
 
@@ -65,9 +67,42 @@ public sealed class BankAccountTests
     [Fact]
     public void The_collection_and_bounced_accounts_must_take_entries_too()
     {
-        var data = Data() with { Ledger = new BankLedger("1103", "100000", null, "1301", null) };
+        var data = Data() with { Ledger = new BankLedger("1103", "100000", null, "1301", "130101") };
         Assert.Equal("BankAccount.LedgerAccountNotPostable", Code(() => BankAccount.Register(Guid.NewGuid(), data, Ledger)));
     }
+
+    [Fact]
+    public void Branch_branch_code_city_detail_collection_and_bounced_accounts_are_required_owner_item_12()
+    {
+        Assert.Equal("BankAccount.BranchNameRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data() with { BranchName = " " }, Ledger)));
+        Assert.Equal("BankAccount.BranchCodeRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data() with { BranchCode = null }, Ledger)));
+        Assert.Equal("BankAccount.CityRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data() with { CityId = null }, Ledger)));
+        Assert.Equal("BankAccount.DetailRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data(account: "130100", d1: null), Ledger)));
+        Assert.Equal("BankAccount.CollectionAccountRequired",
+            Code(() => BankAccount.Register(Guid.NewGuid(), Data() with { Ledger = new BankLedger("1103", "100000", null, null, "130101") }, Ledger)));
+        Assert.Equal("BankAccount.BouncedAccountRequired",
+            Code(() => BankAccount.Register(Guid.NewGuid(), Data() with { Ledger = new BankLedger("1103", "100000", null, "130100", " ") }, Ledger)));
+    }
+
+    [Fact]
+    public void The_collection_account_may_be_the_bank_account_itself_owner_item_14()
+    {
+        var data = Data() with { Ledger = new BankLedger("1103", "100000", null, "1103", "130101") };
+        Assert.Equal("1103", BankAccount.Register(Guid.NewGuid(), data, Ledger).Data.Ledger.CollectionAccountCode);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    [InlineData(null)]
+    public void The_collection_priority_is_none_or_1_to_5_owner_item_15(int? priority) =>
+        Assert.Equal(priority, BankAccount.Register(Guid.NewGuid(), Data(priority: priority), Ledger).Data.CollectionPriority);
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(6)]
+    public void A_collection_priority_outside_1_to_5_is_refused(int priority) =>
+        Assert.Equal("BankAccount.CollectionPriorityInvalid", Code(() => BankAccount.Register(Guid.NewGuid(), Data(priority: priority), Ledger)));
 
     [Fact]
     public void The_detail_must_be_of_an_allowed_type_and_is_required_when_types_are_listed()
@@ -80,11 +115,8 @@ public sealed class BankAccountTests
     }
 
     [Fact]
-    public void An_account_without_listed_types_takes_any_active_detail_or_none()
-    {
-        BankAccount.Register(Guid.NewGuid(), Data(account: "130100", d1: null), Ledger);
+    public void An_account_without_listed_types_takes_any_active_detail() =>
         BankAccount.Register(Guid.NewGuid(), Data(account: "130100", d1: "111078"), Ledger);
-    }
 
     [Theory]
     [InlineData("US")]
@@ -106,6 +138,10 @@ public sealed class BankAccountTests
         main.Deactivate();
         Assert.Equal("BankAccount.MainAccountInactive", Code(() => BankAccount.Register(Guid.NewGuid(), Data(number: "0101-996"), Ledger, main)));
     }
+
+    [Fact]
+    public void A_backup_account_is_never_saved_without_its_main_account_owner_item_10() =>
+        Assert.Equal("BankAccount.MainAccountRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data(), Ledger, main: null, isBackup: true)));
 
     [Fact]
     public void A_backup_account_stays_at_the_bank_of_its_main_account()

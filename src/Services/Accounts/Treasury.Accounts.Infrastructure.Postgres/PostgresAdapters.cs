@@ -9,7 +9,7 @@ using Treasury.BuildingBlocks.Domain;
 
 namespace Treasury.Accounts.Infrastructure.Postgres;
 
-// Written against Npgsql 10 and db/postgres/006_accounts.sql.
+// Written against Npgsql 10 and db/postgres/006_accounts.sql, 008_accounts_collection_priority.sql.
 // Integration tests against PostgreSQL 17: tests/Treasury.Accounts.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
@@ -165,7 +165,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         cmd.Parameters.Add(Nullable("d2", NpgsqlDbType.Text, d.Ledger.Detail2Code));
         cmd.Parameters.Add(Nullable("collection", NpgsqlDbType.Text, d.Ledger.CollectionAccountCode));
         cmd.Parameters.Add(Nullable("bounced", NpgsqlDbType.Text, d.Ledger.BouncedAccountCode));
-        cmd.Parameters.AddWithValue("priority", d.HasCollectionPriority);
+        cmd.Parameters.Add(new NpgsqlParameter("priority", NpgsqlTypes.NpgsqlDbType.Smallint) { Value = d.CollectionPriority is { } p ? (object)(short)p : DBNull.Value });
         cmd.Parameters.AddWithValue("facility", d.IsFacility);
         cmd.Parameters.AddWithValue("active", a.IsActive);
     }
@@ -182,7 +182,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             var data = new BankAccountData(
                 r.GetString(1), r.GetGuid(2), S(3), S(4), r.IsDBNull(5) ? null : r.GetGuid(5),
                 r.IsDBNull(6) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(6)), r.GetString(7).Trim(),
-                new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.GetBoolean(14), r.GetBoolean(15));
+                new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.IsDBNull(14) ? null : r.GetInt16(14), r.GetBoolean(15));
             list.Add(BankAccount.Restore(r.GetGuid(0), data, r.IsDBNull(8) ? null : r.GetGuid(8), r.GetBoolean(16), r.GetInt64(17)));
         }
 

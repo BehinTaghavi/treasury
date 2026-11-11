@@ -5,11 +5,11 @@ using Treasury.Reference.Domain.Catalogue;
 namespace Treasury.Reference.Infrastructure.InMemory;
 
 /// <summary>Stored form of an entry.</summary>
-public sealed record CatalogueSnapshot(Guid Id, CatalogueKind Kind, Guid? ParentId, string Name, string NameKey, string? Code, bool IsActive, long Version)
+public sealed record CatalogueSnapshot(Guid Id, CatalogueKind Kind, Guid? ParentId, string Name, string NameKey, string? Code, bool IsActive, long Version, bool IsInUse)
 {
-    public static CatalogueSnapshot From(CatalogueItem i, long version) => new(i.Id, i.Kind, i.ParentId, i.Name, i.NameKey, i.Code, i.IsActive, version);
+    public static CatalogueSnapshot From(CatalogueItem i, long version) => new(i.Id, i.Kind, i.ParentId, i.Name, i.NameKey, i.Code, i.IsActive, version, i.IsInUse);
 
-    public CatalogueItem ToDomain() => CatalogueItem.Restore(Id, Kind, ParentId, Name, Code, IsActive, Version);
+    public CatalogueItem ToDomain() => CatalogueItem.Restore(Id, Kind, ParentId, Name, Code, IsActive, Version, IsInUse);
 }
 
 /// <summary>
@@ -44,6 +44,8 @@ internal sealed class PendingChanges
 {
     public Dictionary<Guid, CatalogueSnapshot> Items { get; } = [];
 
+    public HashSet<Guid> DeletedItems { get; } = [];
+
     public Dictionary<string, string> Idempotency { get; } = [];
 
     public List<OutboxMessage> Outbox { get; } = [];
@@ -73,6 +75,11 @@ public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWo
                 foreach (var (id, s) in pending.Items)
                 {
                     db.Items[id] = s;
+                }
+
+                foreach (var id in pending.DeletedItems)
+                {
+                    db.Items.Remove(id);
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -114,6 +121,23 @@ public sealed class InMemoryCatalogueRepository(InMemoryReferenceDatabase db) : 
         return Write(item, item.Version + 1, expected: item.Version);
     }
 
+    public Task DeleteAsync(CatalogueItem item, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var pending = InMemoryUnitOfWork.Pending;
+        var stored = Visible().FirstOrDefault(s => s.Id == item.Id);
+        if (stored is null || stored.Version != item.Version)
+        {
+            throw new ConcurrencyConflictException($"Entry {item.Id} was changed by someone else.");
+        }
+
+        pending.Items.Remove(item.Id);
+        pending.DeletedItems.Add(item.Id);
+        pending.Outbox.AddRange(item.PendingEvents.Select(OutboxMessage.From));
+        item.MarkSaved(item.Version);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<CatalogueItem>> ListAsync(CatalogueKind kind, Guid? parentId, bool includeInactive, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<CatalogueItem>>(Visible()
             .Where(s => s.Kind == kind && (parentId is null || s.ParentId == parentId) && (includeInactive || s.IsActive))
@@ -130,6 +154,11 @@ public sealed class InMemoryCatalogueRepository(InMemoryReferenceDatabase db) : 
             foreach (var (id, s) in pending.Items)
             {
                 all[id] = s;
+            }
+
+            foreach (var id in pending.DeletedItems)
+            {
+                all.Remove(id);
             }
 
             return [.. all.Values];

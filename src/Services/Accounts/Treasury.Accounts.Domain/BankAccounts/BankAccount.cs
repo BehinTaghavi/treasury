@@ -28,17 +28,24 @@ public sealed record BankAccountData(
     FiscalDate? OpeningDate,
     string CurrencyCode,
     BankLedger Ledger,
-    bool HasCollectionPriority,
+    int? CollectionPriority,
     bool IsFacility);
 
 /// <summary>
 /// One of the company's bank accounts. Sources: new-version manual section 5; Access Form_Bankacc (required number, bank and
 /// معین; number not twice; accounts without a lower level only; Rial by default); MVC BanksController (backup accounts).
 /// A backup account (حساب پشتیبان) belongs to a main current account of the same bank, defined first.
+/// Owner's report of 11 Nov 2026: branch, branch code, city, تفصیل, collection and bounced-cheque accounts are required too
+/// (item 12); collection priority is a number 1–5, 1 the highest (item 15); a backup needs its main account (item 10).
 /// </summary>
 public sealed partial class BankAccount : AggregateRoot<Guid>
 {
     public const string Rial = "IRR";
+
+    /// <summary>Collection priority (اولویت واگذاری): 1 is the highest, 5 the lowest; none for an account not used for collection.</summary>
+    public const int HighestPriority = 1;
+
+    public const int LowestPriority = 5;
 
     private BankAccount(Guid id, BankAccountData data, Guid? mainAccountId)
         : base(id)
@@ -62,9 +69,12 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
 
     /// <param name="main">The main account when registering a backup account, as loaded by the use case.</param>
     /// <param name="mainAlreadyHasBackup">Whether another backup account already points to <paramref name="main"/>.</param>
+    /// <param name="isBackup">The user ticked "پشتیبان"; then <paramref name="main"/> is required.</param>
     public static BankAccount Register(
-        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false)
+        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false, bool isBackup = false)
     {
+        // Owner, 11 Nov 2026 (item 10): "ابتدا حسابجاری مربوط به این حساب پشتیبان را تعریف نموده ..." – never saved as an ordinary account.
+        Require(!isBackup || main is not null, "BankAccount.MainAccountRequired", "A backup account needs its main current account, defined first.");
         var clean = Validate(data, ledger);
         if (main is not null)
         {
@@ -128,6 +138,11 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         var number = PersianText.Clean(data.AccountNumber);
         Require(NumberKeyOf(number).Length > 0, "BankAccount.NumberRequired", "The account number is required."); // "شماره حساب نامشخص است"
         Require(data.BankId != Guid.Empty, "BankAccount.BankRequired", "The bank is required."); // "نام بانك نامشخص است"
+        Require(Clean(data.BranchName) is not null, "BankAccount.BranchNameRequired", "The branch name is required.");
+        Require(Clean(data.BranchCode) is not null, "BankAccount.BranchCodeRequired", "The branch code is required.");
+        Require(data.CityId is { } city && city != Guid.Empty, "BankAccount.CityRequired", "The city is required.");
+        Require(data.CollectionPriority is null or (>= HighestPriority and <= LowestPriority), "BankAccount.CollectionPriorityInvalid",
+            $"The collection priority is a number from {HighestPriority} (highest) to {LowestPriority}.");
         var currency = (data.CurrencyCode ?? string.Empty).Trim().ToUpperInvariant();
         Require(CurrencyPattern().IsMatch(currency), "BankAccount.CurrencyInvalid", "The currency is a three-letter code; the Rial is IRR.");
 
@@ -138,20 +153,15 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         Require(d2 is null || d1 is not null, "BankAccount.Detail2WithoutDetail1", "تفصیل دوم needs تفصیل اول.");
 
         var account = Postable(ledger.Account(accountCode), accountCode);
+        Require(d1 is not null, "BankAccount.DetailRequired", "تفصیل اول (usually the bank account's own تفصیل) is required.");
         CheckDetail(1, account.Detail1Types, d1, d1 is null ? null : ledger.Detail(d1), accountCode);
         CheckDetail(2, account.Detail2Types, d2, d2 is null ? null : ledger.Detail(d2), accountCode);
 
-        var collection = Clean(l.CollectionAccountCode);
-        var bounced = Clean(l.BouncedAccountCode);
-        if (collection is not null)
-        {
-            Postable(ledger.Account(collection), collection);
-        }
-
-        if (bounced is not null)
-        {
-            Postable(ledger.Account(bounced), bounced);
-        }
+        // The collection account may be the bank's own account (owner, 11 Nov 2026, item 14); nothing compares them.
+        var collection = Clean(l.CollectionAccountCode) ?? throw new DomainException("BankAccount.CollectionAccountRequired", "The collection account (معین واگذاری) is required.");
+        var bounced = Clean(l.BouncedAccountCode) ?? throw new DomainException("BankAccount.BouncedAccountRequired", "The bounced-cheque account (معین برگشتی) is required.");
+        Postable(ledger.Account(collection), collection);
+        Postable(ledger.Account(bounced), bounced);
 
         return data with
         {
@@ -217,10 +227,10 @@ public sealed class LedgerFacts(IReadOnlyDictionary<string, LedgerAccountFact> a
 /// <summary>A bank account was registered, edited, switched off or on. Cashflow and posting keep their copies from it.</summary>
 public sealed record BankAccountChanged(
     Guid BankAccountId, string AccountNumber, Guid BankId, string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode,
-    string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode, bool HasCollectionPriority, bool IsActive) : DomainEvent
+    string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsActive) : DomainEvent
 {
     public static BankAccountChanged From(BankAccount a) => new(
         a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode,
         a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code, a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode,
-        a.Data.HasCollectionPriority, a.IsActive);
+        a.Data.CollectionPriority, a.IsActive);
 }

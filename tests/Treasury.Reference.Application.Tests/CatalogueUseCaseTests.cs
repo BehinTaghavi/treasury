@@ -128,6 +128,76 @@ public sealed class CatalogueUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_bank_already_in_the_list_with_the_word_bank_is_refused_owner_item_8()
+    {
+        await Add(CatalogueKind.Bank, "بانک آینده");
+        var r = await _useCases.AddAsync(new AddCatalogueItemCommand(Key(), CatalogueKind.Bank, "آینده"), CancellationToken.None);
+        Assert.Equal("Catalogue.SimilarBankName", r.ErrorCode);
+        var other = await Add(CatalogueKind.Bank, "بانک دی");
+        Assert.Equal("Catalogue.SimilarBankName", (await _useCases.RenameAsync(new(Key(), other, "آينده", 1), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_city_can_be_renamed_and_moved_to_another_province_in_one_edit_owner_item_6()
+    {
+        var iran = await Add(CatalogueKind.Country, "ایران");
+        var isfahan = await Add(CatalogueKind.Province, "اصفهان", iran);
+        var tehranProvince = await Add(CatalogueKind.Province, "تهران", iran);
+        var city = await Add(CatalogueKind.City, "اصفهان", isfahan);
+        await Add(CatalogueKind.City, "تهران", tehranProvince);
+
+        Assert.Equal("Catalogue.NameTaken", (await _useCases.EditAsync(new(Key(), city, "تهران", 1, tehranProvince), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.EditAsync(new(Key(), city, "ری", 1, tehranProvince), CancellationToken.None)).IsSuccess);
+        var view = await Get(CatalogueKind.City, city);
+        Assert.Equal(("ری", tehranProvince), (view.Name, view.ParentId));
+        Assert.Equal("Catalogue.ParentNotFound", (await _useCases.EditAsync(new(Key(), city, "ری", 2, Guid.NewGuid()), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_currency_code_is_corrected_only_to_a_free_code_and_only_while_unused_owner_item_2()
+    {
+        await Add(CatalogueKind.Currency, "دلار", code: "USD");
+        var qatar = await Add(CatalogueKind.Currency, "ریال قطر", code: "QAR");
+        Assert.Equal("Catalogue.CodeTaken", (await _useCases.EditAsync(new(Key(), qatar, "دینار کویت", 1, Code: "USD"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.EditAsync(new(Key(), qatar, "دینار کویت", 1, Code: "KWD"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("KWD", (await Get(CatalogueKind.Currency, qatar)).Code);
+
+        Assert.True((await _useCases.MarkInUseAsync(new(Key(), qatar), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Catalogue.CodeInUse", (await _useCases.EditAsync(new(Key(), qatar, "دینار کویت", 3, Code: "QAR"), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task An_unused_entry_is_deleted_a_used_one_or_one_with_entries_under_it_is_not_owner_item_9()
+    {
+        var mistake = await Add(CatalogueKind.Bank, "بانک اشتباهی");
+        Assert.True((await _useCases.DeleteAsync(new(Key(), mistake, 1), CancellationToken.None)).IsSuccess);
+        Assert.Empty(await _useCases.ListAsync(CatalogueKind.Bank, null, true, CancellationToken.None));
+        Assert.Equal(nameof(CatalogueItemDeleted), _db.OutboxMessages[^1].Type);
+        Assert.Equal("Catalogue.NotFound", (await _useCases.DeleteAsync(new(Key(), mistake, 1), CancellationToken.None)).ErrorCode);
+
+        var used = await Add(CatalogueKind.Bank, "بانک ملت");
+        Assert.True((await _useCases.MarkInUseAsync(new(Key(), used), CancellationToken.None)).IsSuccess);
+        Assert.True((await Get(CatalogueKind.Bank, used)).IsInUse);
+        Assert.Equal("Catalogue.InUse", (await _useCases.DeleteAsync(new(Key(), used, 2), CancellationToken.None)).ErrorCode);
+
+        var iran = await Add(CatalogueKind.Country, "ایران");
+        var province = await Add(CatalogueKind.Province, "فارس", iran);
+        Assert.Equal("Catalogue.HasChildren", (await _useCases.DeleteAsync(new(Key(), iran, 1), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.DeleteAsync(new(Key(), province, 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.DeleteAsync(new(Key(), iran, 1), CancellationToken.None)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task Marking_in_use_twice_changes_the_entry_once_and_an_unknown_entry_is_reported()
+    {
+        var bank = await Add(CatalogueKind.Bank, "بانک سینا");
+        Assert.True((await _useCases.MarkInUseAsync(new(Key(), bank), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.MarkInUseAsync(new(Key(), bank), CancellationToken.None)).IsSuccess);
+        Assert.Equal(2L, (await Get(CatalogueKind.Bank, bank)).Version);
+        Assert.Equal("Catalogue.NotFound", (await _useCases.MarkInUseAsync(new(Key(), Guid.NewGuid()), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task A_write_without_an_idempotency_key_is_refused() =>
         Assert.Equal("Request.IdempotencyKeyRequired", (await _useCases.AddAsync(new AddCatalogueItemCommand(" ", CatalogueKind.Bank, "بانک دی"), CancellationToken.None)).ErrorCode);
 }
