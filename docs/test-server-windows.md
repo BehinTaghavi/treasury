@@ -43,6 +43,8 @@ In its first-start screen, choose the container engine **dockerd (moby)** and un
 1. In the extracted folder, open **deploy → windows**.
 2. Double-click **Start Treasury**. A black window opens and shows progress.
    - **The first time takes 10–20 minutes.** It downloads about 2 GB and builds the system. Later starts take under a minute.
+   - On a slow internet connection a download can break off. The window then says *Trying again* and continues where it stopped;
+     you do not need to do anything. If it still fails after 3 tries, just double-click **Start Treasury** again later. What was already downloaded is kept.
    - If Windows asks *"Do you want to allow…"* for Docker, click **Allow**.
 3. When the window says **Treasury is running at http://localhost:8080**, your browser opens the Receipts screen.
    You can close the black window; the system keeps running.
@@ -78,6 +80,7 @@ Your test data is kept. It is stored inside Docker, not in the folder, and the p
 - The black window shows a **red message**: take a screenshot of the whole window and send it to Claude.
 - **"Docker Desktop is not installed"**: do step 2.
 - **"Docker is not running"**: open Docker Desktop, wait for *Engine running*, and try again.
+- **"Docker could not build the system after 3 attempts"**: usually the internet connection. Check it, then double-click **Start Treasury** again. Each try continues from what was already downloaded.
 - The browser says **"This site can't be reached"**: the system is not started. Double-click **Start Treasury**.
 - The PC becomes slow: use **Stop Treasury** when you are not testing.
 
@@ -85,3 +88,6 @@ Your test data is kept. It is stored inside Docker, not in the folder, and the p
 `deploy/windows/treasury.ps1` (Windows PowerShell 5.1) wraps `docker compose -f deploy/docker-compose.yml`. Its `.env` lives in
 `%LOCALAPPDATA%\Treasury\treasury.env` with generated passwords and `GATEWAY_ADDRESS=127.0.0.1`. It waits for the API (404 on an
 unknown id) and the shell (200) before opening the browser. `reset` is `down -v`.
+`start` runs `compose build` up to 3 times, then `up -d`. Builds keep downloads in BuildKit cache mounts (`treasury-pnpm-store`,
+`treasury-nuget`, `sharing=locked`), so a retry after a broken download continues where it stopped. The frontend install step comes before
+`ARG APP`, so the shell and remote images share one install layer.

@@ -34,6 +34,21 @@ function Invoke-Compose([string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { Fail "Docker reported a problem (see the lines above). Take a screenshot of this window and send it to Claude." }
 }
 
+# On a slow or unreliable internet connection a download can break off in the middle of a build.
+# Downloaded packages are kept (Docker build cache), so trying again only fetches what is missing.
+function Invoke-Build {
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        & docker compose -f $compose --env-file $envFile build
+        if ($LASTEXITCODE -eq 0) { return }
+        if ($attempt -lt $attempts) {
+            Write-Host ''
+            Say "The build stopped, usually because a download broke off. Trying again (attempt $($attempt + 1) of $attempts); what was already downloaded is kept..."
+        }
+    }
+    Fail "Docker could not build the system after $attempts attempts (see the lines above). Check the internet connection, then take a screenshot of this window and send it to Claude."
+}
+
 # Windows PowerShell 5.1 turns a program's error output into a script-stopping error when it is redirected,
 # so the checks below run with 'Continue'.
 function Test-Docker {
@@ -122,7 +137,8 @@ function Start-Treasury {
     Wait-ForDocker
     Initialize-Settings
     Say 'Building and starting the Treasury system. The first time this downloads about 2 GB and takes 10-20 minutes...'
-    Invoke-Compose @('up', '-d', '--build')
+    Invoke-Build
+    Invoke-Compose @('up', '-d')
 
     Say 'Waiting for the system to answer...'
     $ready = $false
