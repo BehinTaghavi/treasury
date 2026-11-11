@@ -6,4 +6,6 @@ export interface ListSpec {
   singular: [string, string]
   hasCode?: boolean
   parent?: { list: string; label: [string, string] }
+  /** The parent's parent (the country on the city screen): chosen first, it narrows the parent list. */
+  grandparent?: { list: string; label: [string, string] }
 }

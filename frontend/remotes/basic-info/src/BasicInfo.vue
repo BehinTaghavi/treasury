@@ -23,7 +23,10 @@ const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const lists: ListSpec[] = [
   { list: 'countries', title: ['کشور', 'Countries'], singular: ['کشور', 'country'] },
   { list: 'provinces', title: ['استان / ایالت', 'Provinces'], singular: ['استان', 'province'], parent: { list: 'countries', label: ['کشور', 'Country'] } },
-  { list: 'cities', title: ['شهر', 'Cities'], singular: ['شهر', 'city'], parent: { list: 'provinces', label: ['استان', 'Province'] } },
+  {
+    list: 'cities', title: ['شهر', 'Cities'], singular: ['شهر', 'city'],
+    parent: { list: 'provinces', label: ['استان', 'Province'] }, grandparent: { list: 'countries', label: ['کشور', 'Country'] },
+  },
   { list: 'currencies', title: ['نوع ارز', 'Currencies'], singular: ['ارز', 'currency'], hasCode: true },
   { list: 'banks', title: ['نام بانک‌ها', 'Bank names'], singular: ['بانک', 'bank'] },
 ]
