@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using Treasury.Reference.Domain.Catalogue;
 
 namespace Treasury.Reference.Application.Catalogue;
@@ -36,6 +37,12 @@ public static class DefaultLists
         "بانک اقتصاد نوین", "بانک پارسیان", "بانک پاسارگاد", "بانک سامان", "بانک سینا", "بانک کارآفرین",
         "بانک خاورمیانه", "بانک شهر", "بانک دی", "بانک گردشگری", "بانک ایران زمین", "بانک سرمایه", "بانک آینده",
         "بانک قرض‌الحسنه مهر ایران", "بانک قرض‌الحسنه رسالت", "موسسه اعتباری ملل",
+    ];
+
+    /// <summary>The references (عطف) the new-version manual lists as fixed ones (item 8 "تعریف عطف های ثابت").</summary>
+    public static readonly IReadOnlyList<string> References =
+    [
+        "شماره قرارداد", "شماره سفارش فروش", "شماره صورتحساب فروش", "شماره سفارش اسنادی",
     ];
 
     /// <summary>Fills every list that has no entry at all (active or not). Safe to run on every start: idempotency keys are fixed.</summary>
@@ -78,5 +85,86 @@ public static class DefaultLists
                 await Add(CatalogueKind.Bank, bank).ConfigureAwait(false);
             }
         }
+
+        if (await IsEmpty(CatalogueKind.Reference).ConfigureAwait(false))
+        {
+            foreach (var reference in References)
+            {
+                await Add(CatalogueKind.Reference, reference).ConfigureAwait(false);
+            }
+        }
+
+        await AddIranCitiesAsync(useCases, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Iran's cities by province (embedded IranCities.csv: 1,354 cities with their Statistical Centre code).</summary>
+    public static IReadOnlyList<(string Province, string City, string Code)> IranCities { get; } = ReadIranCities();
+
+    /// <summary>
+    /// Adds the cities of <see cref="IranCities"/> that are missing under Iran's provinces (owner, 11 Nov 2026: "لطفا فهرست شهر های
+    /// ایران را اضافه فرمایید"). Runs on every start and also fills databases created before the list existed. Each city is added
+    /// with a fixed idempotency key, so a city the client deleted or renamed is never added again; a city already typed by the
+    /// client (same name in the same province) is left as it is; a province or country the client renamed is skipped.
+    /// </summary>
+    public static async Task<int> AddIranCitiesAsync(CatalogueUseCases useCases, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(useCases);
+        var iranKey = PersianText.Key("ایران");
+        var iran = (await useCases.ListAsync(CatalogueKind.Country, null, includeInactive: true, cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(c => PersianText.Key(c.Name) == iranKey);
+        if (iran is null)
+        {
+            return 0;
+        }
+
+        var provinces = (await useCases.ListAsync(CatalogueKind.Province, iran.Id, includeInactive: true, cancellationToken).ConfigureAwait(false))
+            .GroupBy(p => PersianText.Key(p.Name))
+            .ToDictionary(g => g.Key, g => g.First());
+        var added = 0;
+        foreach (var byProvince in IranCities.GroupBy(c => PersianText.Key(c.Province)))
+        {
+            if (!provinces.TryGetValue(byProvince.Key, out var province) || !province.IsActive)
+            {
+                continue;
+            }
+
+            var existing = (await useCases.ListAsync(CatalogueKind.City, province.Id, includeInactive: true, cancellationToken).ConfigureAwait(false))
+                .Select(c => PersianText.Key(c.Name))
+                .ToHashSet(StringComparer.Ordinal);
+            var missing = byProvince.Where(c => !existing.Contains(PersianText.Key(c.City))).ToList();
+            foreach (var (_, city, code) in missing)
+            {
+                // A key used before (city later deleted or renamed) only returns the old answer; any refusal leaves the city out.
+                await useCases.AddAsync(
+                    new AddCatalogueItemCommand($"seed:iran-city:{code}", CatalogueKind.City, city, province.Id), cancellationToken).ConfigureAwait(false);
+            }
+
+            if (missing.Count > 0)
+            {
+                added += (await useCases.ListAsync(CatalogueKind.City, province.Id, includeInactive: true, cancellationToken).ConfigureAwait(false)).Count - existing.Count;
+            }
+        }
+
+        return added;
+    }
+
+    private static List<(string Province, string City, string Code)> ReadIranCities()
+    {
+        using var stream = typeof(DefaultLists).Assembly.GetManifestResourceStream("Treasury.Reference.IranCities.csv")
+            ?? throw new InvalidOperationException("The embedded list of Iran's cities is missing.");
+        using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+        var list = new List<(string, string, string)>();
+        while (reader.ReadLine() is { } line)
+        {
+            if (line.Length == 0 || line.StartsWith('#') || line.StartsWith("province,", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var parts = line.Split(',');
+            list.Add((parts[0], parts[1], parts[2]));
+        }
+
+        return list;
     }
 }

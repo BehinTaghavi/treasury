@@ -277,3 +277,27 @@ def test_entries_named_by_existing_bank_accounts_are_marked_in_use_by_the_upgrad
         got = dict(c.execute("SELECT id, in_use FROM reference.catalogue_item WHERE id IN (%s, %s, %s)", (bank, other, eur)).fetchall())
         assert got == {bank: True, other: False, eur: True}
         c.rollback()
+
+
+def test_a_purpose_group_keeps_its_reference_and_its_purposes(db):
+    # 009_reference_purposes.sql: a reference named by a group and a group with purposes cannot be deleted; same description once per direction.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        ref, group, purpose = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        c.execute("INSERT INTO reference.catalogue_item (id, kind, name, name_key) VALUES (%s, 'Reference', 'شماره آزمایشی', 'شمارهآزمایشی')", (ref,))
+        add = """INSERT INTO reference.purpose_group (id, number, direction, name, name_key, ledger_account, reference1_id)
+                 VALUES (%s, %s, %s, %s, %s, '2101', %s)"""
+        c.execute(add, (group, 900001, "Receipt", "گروه آزمایشی", "گروهآزمایشی", ref))
+        c.execute(add, (uuid.uuid4(), 900002, "Payment", "گروه آزمایشی", "گروهآزمایشی", None))  # other direction: allowed
+        c.execute("INSERT INTO reference.purpose (id, group_id, name, name_key) VALUES (%s, %s, 'بابت آزمایشی', 'بابتآزمایشی')", (purpose, group))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), 900003, "Receipt", "گروه  آزمایشی", "گروهآزمایشی", None))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM reference.catalogue_item WHERE id = %s", (ref,))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM reference.purpose_group WHERE id = %s", (group,))
+        c.execute("DELETE FROM reference.purpose WHERE id = %s", (purpose,))
+        c.execute("DELETE FROM reference.purpose_group WHERE id = %s", (group,))

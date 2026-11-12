@@ -23,6 +23,7 @@ public static class Endpoints
         ["provinces"] = CatalogueKind.Province,
         ["cities"] = CatalogueKind.City,
         ["banks"] = CatalogueKind.Bank,
+        ["references"] = CatalogueKind.Reference,
     };
 
     public static void MapCatalogueEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)

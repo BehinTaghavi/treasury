@@ -20,6 +20,8 @@ public sealed class InMemoryReferenceDatabase : IDisposable
 {
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, CatalogueSnapshot> Items = [];
+    internal readonly Dictionary<Guid, PurposeGroupSnapshot> Groups = [];
+    internal readonly Dictionary<Guid, PurposeSnapshot> Purposes = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -46,6 +48,10 @@ internal sealed class PendingChanges
 
     public HashSet<Guid> DeletedItems { get; } = [];
 
+    public Dictionary<Guid, PurposeGroupSnapshot?> Groups { get; } = []; // null: deleted
+
+    public Dictionary<Guid, PurposeSnapshot?> Purposes { get; } = []; // null: deleted
+
     public Dictionary<string, string> Idempotency { get; } = [];
 
     public List<OutboxMessage> Outbox { get; } = [];
@@ -57,6 +63,22 @@ internal sealed class PendingChanges
 
 public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWork
 {
+    private static void Apply<T>(Dictionary<Guid, T> committed, Dictionary<Guid, T?> pending)
+        where T : class
+    {
+        foreach (var (id, s) in pending)
+        {
+            if (s is null)
+            {
+                committed.Remove(id);
+            }
+            else
+            {
+                committed[id] = s;
+            }
+        }
+    }
+
     private static readonly AsyncLocal<PendingChanges?> Current = new();
 
     internal static PendingChanges Pending => Current.Value ?? throw new InvalidOperationException("Database access must run inside IUnitOfWork.ExecuteAsync.");
@@ -81,6 +103,9 @@ public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWo
                 {
                     db.Items.Remove(id);
                 }
+
+                Apply(db.Groups, pending.Groups);
+                Apply(db.Purposes, pending.Purposes);
 
                 foreach (var (key, value) in pending.Idempotency)
                 {

@@ -11,6 +11,7 @@ namespace Treasury.Reference.Infrastructure.Postgres.Tests;
 /// The ledger copy through the real PostgreSQL adapters, as reference_svc. The chart and the تفصیل list are single
 /// aggregates per database, so the steps run as one scenario on one shared state.
 /// </summary>
+[Collection(SharedChartTests.Name)]
 public sealed class LedgerPostgresTests : IDisposable
 {
     private readonly PostgresDatabase _db;

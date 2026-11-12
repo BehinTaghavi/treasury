@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Domain.Catalogue;
 using Treasury.Reference.Infrastructure.InMemory;
@@ -222,9 +223,54 @@ public sealed class DefaultListTests : IDisposable
         Assert.Equal(8, await Count(CatalogueKind.Currency));
         Assert.Equal(1, await Count(CatalogueKind.Country));
         Assert.Equal(31, await Count(CatalogueKind.Province));
-        Assert.Equal(31, await Count(CatalogueKind.City));
+        Assert.Equal(DefaultLists.IranCities.Count, await Count(CatalogueKind.City)); // every capital is in the city list too
         Assert.Equal(DefaultLists.Banks.Count, await Count(CatalogueKind.Bank));
+        Assert.Equal(4, await Count(CatalogueKind.Reference)); // manual item 8: the fixed references
         Assert.Contains(await _useCases.ListAsync(CatalogueKind.Currency, null, false, CancellationToken.None), v => v.Code == "IRR" && v.Name == "ریال");
+    }
+
+    [Fact]
+    public void The_list_of_iran_cities_covers_the_31_provinces_with_1354_cities_unique_per_province()
+    {
+        Assert.Equal(1354, DefaultLists.IranCities.Count);
+        Assert.Equal(
+            DefaultLists.IranProvinces.Select(p => PersianText.Key(p.Province)).Order(),
+            DefaultLists.IranCities.Select(c => PersianText.Key(c.Province)).Distinct().Order());
+        Assert.DoesNotContain(DefaultLists.IranCities.GroupBy(c => (PersianText.Key(c.Province), PersianText.Key(c.City))), g => g.Count() > 1);
+        Assert.All(DefaultLists.IranProvinces, p => Assert.Contains(DefaultLists.IranCities, c => c.Province == p.Province && PersianText.Key(c.City) == PersianText.Key(p.Capital)));
+        Assert.Contains(DefaultLists.IranCities, c => c.City == "کاشان" && c.Province == "اصفهان");
+    }
+
+    [Fact]
+    public async Task An_older_database_gets_the_missing_cities_and_a_deleted_or_renamed_city_does_not_come_back()
+    {
+        await DefaultLists.SeedAsync(_useCases, CancellationToken.None);
+        var isfahan = (await _useCases.ListAsync(CatalogueKind.Province, null, true, CancellationToken.None)).Single(p => p.Name == "اصفهان");
+        var cities = await _useCases.ListAsync(CatalogueKind.City, isfahan.Id, true, CancellationToken.None);
+        var kashan = cities.Single(c => c.Name == "کاشان");
+        var natanz = cities.Single(c => c.Name == "نطنز");
+        Assert.True((await _useCases.DeleteAsync(new("del", kashan.Id, kashan.Version), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.RenameAsync(new("ren", natanz.Id, "نطنز جدید", natanz.Version), CancellationToken.None)).IsSuccess);
+
+        Assert.Equal(0, await DefaultLists.AddIranCitiesAsync(_useCases, CancellationToken.None));
+        var after = (await _useCases.ListAsync(CatalogueKind.City, isfahan.Id, true, CancellationToken.None)).Select(c => c.Name).ToList();
+        Assert.DoesNotContain("کاشان", after);
+        Assert.DoesNotContain("نطنز", after);
+        Assert.Contains("نطنز جدید", after);
+    }
+
+    [Fact]
+    public async Task A_city_the_client_typed_before_is_kept_and_not_added_twice()
+    {
+        var iran = (await _useCases.AddAsync(new AddCatalogueItemCommand("c", CatalogueKind.Country, "ايران"), CancellationToken.None)).Value;
+        var fars = (await _useCases.AddAsync(new AddCatalogueItemCommand("p", CatalogueKind.Province, "فارس", iran), CancellationToken.None)).Value;
+        await _useCases.AddAsync(new AddCatalogueItemCommand("k", CatalogueKind.City, "كازرون", fars), CancellationToken.None);
+
+        var added = await DefaultLists.AddIranCitiesAsync(_useCases, CancellationToken.None);
+        var farsCities = await _useCases.ListAsync(CatalogueKind.City, fars, true, CancellationToken.None);
+        Assert.Equal(DefaultLists.IranCities.Count(c => c.Province == "فارس"), farsCities.Count);
+        Assert.Equal(farsCities.Count - 1, added); // only Fars exists here; کازرون was there already
+        Assert.Single(farsCities, c => PersianText.Key(c.Name) == PersianText.Key("کازرون"));
     }
 
     [Fact]

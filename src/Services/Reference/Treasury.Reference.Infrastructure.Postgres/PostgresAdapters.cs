@@ -19,6 +19,7 @@ public static class PostgresRegistration
         services.AddSingleton(NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<IUnitOfWork, PostgresUnitOfWork>();
         services.AddSingleton<ICatalogueRepository, PostgresCatalogueRepository>();
+        services.AddSingleton<IPurposeRepository, PostgresPurposeRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         services.AddSingleton<PostgresLedgerRepository>();
         services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<PostgresLedgerRepository>());
@@ -50,6 +51,28 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             var result = await work(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName is "purpose_group" or "purpose")
+        {
+            // Two users saved the same description (or got the same next group number) at the same moment.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName switch
+            {
+                "purpose_group_unique_number" => new DomainException("PurposeGroup.NumberTaken", "Another group got this number at the same moment; save again."),
+                "purpose_group_unique_name" => new DomainException("PurposeGroup.NameTaken", "This description is already a group of this kind."),
+                _ => new DomainException("Purpose.NameTaken", "This purpose is already in the group."),
+            };
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName is "purpose_group_reference1" or "purpose_group_reference2")
+        {
+            // A reference was deleted while a group was being saved with it (normally refused earlier: the group marks it in use first).
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Catalogue.InUse", "This entry is used by a purpose group.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName == "purpose_group")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("PurposeGroup.HasPurposes", "Delete the purposes of this group first.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "catalogue_item")
         {

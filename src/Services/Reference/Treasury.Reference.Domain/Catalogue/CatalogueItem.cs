@@ -4,8 +4,8 @@ using Treasury.BuildingBlocks.Domain;
 namespace Treasury.Reference.Domain.Catalogue;
 
 /// <summary>
-/// The simple lists of Basic Information (اطلاعات پایه), new-version manual items 1–4 and the bank-name list:
-/// currencies, countries, provinces, cities and bank names. Old tables: Bank (Access), BasicBanks, City, ExchangeTypes (MVC).
+/// The simple lists of Basic Information (اطلاعات پایه), new-version manual items 1–4 and 8 and the bank-name list:
+/// currencies, countries, provinces, cities, bank names and references (عطف). Old tables: Bank (Access), BasicBanks, City, ExchangeTypes (MVC).
 /// </summary>
 public enum CatalogueKind
 {
@@ -14,6 +14,12 @@ public enum CatalogueKind
     Province,
     City,
     Bank,
+
+    /// <summary>
+    /// A reference (عطف): an extra number a receipt or payment of a purpose group carries, e.g. "شماره قرارداد"
+    /// (new-version manual item 8; MVC ReferenceType). Each purpose group names up to two of them.
+    /// </summary>
+    Reference,
 }
 
 public static class CatalogueKindRules
