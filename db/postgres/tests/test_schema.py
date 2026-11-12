@@ -301,3 +301,64 @@ def test_a_purpose_group_keeps_its_reference_and_its_purposes(db):
                 c.execute("DELETE FROM reference.purpose_group WHERE id = %s", (group,))
         c.execute("DELETE FROM reference.purpose WHERE id = %s", (purpose,))
         c.execute("DELETE FROM reference.purpose_group WHERE id = %s", (group,))
+
+
+def test_departments_requesters_and_beneficiaries_keep_their_rules(db):
+    # 012_reference_organization.sql: numbers once, a department with requesters stays, Sheba shape, account number needs a bank.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        dep = uuid.uuid4()
+        c.execute("INSERT INTO reference.department (id, number, name, name_key, cost_centers) VALUES (%s, 990001, 'بخش آزمایشی', 'بخشآزمایشی', '{770100}')", (dep,))
+        c.execute("INSERT INTO reference.requester (id, number, full_name, department_id, cost_center) VALUES (%s, 990001, 'شخص', %s, '770100')", (uuid.uuid4(), dep))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute("INSERT INTO reference.department (id, number, name, name_key) VALUES (%s, 990001, 'دیگر', 'دیگر')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM reference.department WHERE id = %s", (dep,))
+        add = "INSERT INTO reference.beneficiary (id, detail_code, legal_name, account_number, sheba) VALUES (%s, %s, 'ذینفع', %s, %s)"
+        c.execute(add, (uuid.uuid4(), "990001", None, "IR460120000000003123456789"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "990002", None, "IR4601"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "990003", "0101-55", None))  # account number without its bank
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "990001", None, None))  # one beneficiary per تفصیل
+
+
+def test_petty_cash_amounts_fit_together_and_one_per_holder(db):
+    # 013_accounts_petty_cash.sql
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        add = """INSERT INTO accounts.petty_cash (id, holder_detail, ledger_account, amount, settle_limit, pay_ceiling, recovery)
+                 VALUES (%s, %s, '1102', %s, %s, %s, 'Cash')"""
+        c.execute(add, (uuid.uuid4(), "880001", 1000, 800, 100))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "880002", 1000, 1001, 100))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "880003", 1000, 800, 1001))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "880001", 1000, 800, 100))
+
+
+def test_a_cheque_type_once_per_account_and_kept_while_a_book_uses_it(db):
+    # 014_cashflow_cheque_formats.sql
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        account, fmt = uuid.uuid4(), uuid.uuid4()
+        add = "INSERT INTO cashflow.cheque_format (id, number, bank_account_id, print_type) VALUES (%s, %s, %s, %s)"
+        c.execute(add, (fmt, 970001, account, "NewLarge"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), 970002, account, "NewLarge"))
+        c.execute("INSERT INTO cashflow.cheque_format_image (format_id, data) VALUES (%s, %s)", (fmt, b"\x89PNG"))
+        c.execute("INSERT INTO cashflow.cheque_book (id, bank_account_id, first_sheet, last_sheet, format_id) VALUES (%s, %s, 1, 10, %s)", (uuid.uuid4(), account, fmt))
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM cashflow.cheque_format WHERE id = %s", (fmt,))

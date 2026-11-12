@@ -15,7 +15,12 @@ interface BankAccount { id: string; accountNumber: string; bankId: string; branc
 interface Entry { id: string; name: string }
 interface Book {
   id: string; bankAccountId: string; serial: string; firstSheet: number; lastSheet: number; sheetCount: number; usedSheets: number
-  remainingSheets: number; nextSheet: number | null; isActive: boolean; isInUse: boolean; version: number
+  remainingSheets: number; nextSheet: number | null; isActive: boolean; isInUse: boolean; version: number; formatId: string | null
+}
+interface Format { id: string; number: number; bankAccountId: string; printType: string; isActive: boolean }
+const PRINT_TYPES: Record<string, [string, string]> = {
+  NewLarge: ['جدید – قطع بزرگ', 'New – large'], NewestLarge: ['جدیدترین – قطع بزرگ', 'Newest – large'], OldLarge: ['قدیمی – قطع بزرگ', 'Old – large'],
+  NewSmall: ['جدید – قطع کوچک', 'New – small'], NewestSmall: ['جدیدترین – قطع کوچک', 'Newest – small'], OldSmall: ['قدیمی – قطع کوچک', 'Old – small'],
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
@@ -28,13 +33,14 @@ const base = '/api/cashflow/cheque-books'
 const books = ref<Book[]>([])
 const accounts = ref<BankAccount[]>([])
 const banks = ref<Entry[]>([])
+const formats = ref<Format[]>([])
 const accountFilter = ref('')
 const search = ref('')
 const editing = ref<Book | null>(null)
 const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
-const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', lastSheet: '' })
+const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', lastSheet: '', formatId: '' })
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
 const account = (id: string) => accounts.value.find(a => a.id === id)
@@ -44,6 +50,14 @@ const accountChoices = computed<Choice[]>(() =>
   accounts.value.filter(a => a.isActive || a.id === form.bankAccountId).map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber, muted: !a.isActive })))
 const filterChoices = computed<Choice[]>(() => accounts.value.map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber })))
 const chosen = computed(() => account(form.bankAccountId))
+const formatLabel = (f: Format | undefined) => (f ? `${fa.value ? PRINT_TYPES[f.printType]?.[0] : PRINT_TYPES[f.printType]?.[1]} (${num(f.number)})` : '')
+const formatName = (id: string | null) => formatLabel(formats.value.find(f => f.id === id))
+/** Manual item 6 "شماره / نوع چک": a cheque type of the chosen account (manual item 7). */
+const formatChoices = computed<Choice[]>(() => formats.value
+  .filter(f => f.bankAccountId === form.bankAccountId && (f.isActive || f.id === form.formatId))
+  .map(f => ({ value: f.id, label: formatLabel(f) })))
+/** Sheets were used: only the cheque type can still change. */
+const locked = computed(() => !!editing.value?.isInUse)
 /** Digits typed in Persian or Arabic are accepted. */
 const sheet = (s: string) => {
   const latin = searchKey(s).replace(/\D/g, '')
@@ -68,23 +82,25 @@ async function load() {
 }
 
 async function loadLists() {
-  const [a, b] = await Promise.all([
+  const [a, b, f] = await Promise.all([
     api.get<BankAccount[]>('/api/accounts/bank-accounts?includeInactive=true'),
     api.get<Entry[]>('/api/reference/banks?includeInactive=true'),
+    api.get<Format[]>('/api/cashflow/cheque-formats?includeInactive=true'),
   ])
   if (a.ok) accounts.value = a.value
   if (b.ok) banks.value = b.value
+  if (f.ok) formats.value = f.value
 }
 
 function startNew() {
-  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', lastSheet: '' })
+  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', lastSheet: '', formatId: '' })
   editing.value = null
   showForm.value = true
   message.value = null
 }
 
 function startEdit(b: Book) {
-  Object.assign(form, { bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), lastSheet: String(b.lastSheet) })
+  Object.assign(form, { bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), lastSheet: String(b.lastSheet), formatId: b.formatId ?? '' })
   editing.value = b
   showForm.value = true
   message.value = null
@@ -98,8 +114,8 @@ async function save() {
   if (!Number.isFinite(first) || !Number.isFinite(last)) return fail('ChequeBook.InvalidRange')
   busy.value = true
   const r = editing.value
-    ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version })
-    : await api.post<string>(base, { bankAccountId: form.bankAccountId, serial: form.serial, firstSheet: first, lastSheet: last })
+    ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version, formatId: form.formatId || null })
+    : await api.post<string>(base, { bankAccountId: form.bankAccountId, serial: form.serial, firstSheet: first, lastSheet: last, formatId: form.formatId || null })
   busy.value = false
   if (!r.ok) return fail(r.code)
   message.value = { kind: 'ok', text: t('دسته چک ثبت شد.', 'Cheque book saved.') }
@@ -137,10 +153,15 @@ onMounted(async () => {
         </label>
         <label>{{ t('بانک', 'Bank') }}<input :value="bankName(chosen?.bankId)" readonly tabindex="-1" class="ro" /></label>
         <label>{{ t('شعبه', 'Branch') }}<input :value="chosen ? `${chosen.branchName ?? ''} ${chosen.branchCode ? '(' + chosen.branchCode + ')' : ''}` : ''" readonly tabindex="-1" class="ro" /></label>
-        <label>{{ t('سری', 'Series') }}<input v-model="form.serial" maxlength="20" autocomplete="off" /></label>
-        <label class="req"><span>{{ t('اولین برگ', 'First sheet') }} <span class="star">*</span></span><input v-model="form.firstSheet" dir="ltr" inputmode="numeric" autocomplete="off" /></label>
-        <label class="req"><span>{{ t('آخرین برگ', 'Last sheet') }} <span class="star">*</span></span><input v-model="form.lastSheet" dir="ltr" inputmode="numeric" autocomplete="off" /></label>
+        <label>{{ t('سری', 'Series') }}<input v-model="form.serial" maxlength="20" autocomplete="off" :disabled="locked" /></label>
+        <label class="req"><span>{{ t('اولین برگ', 'First sheet') }} <span class="star">*</span></span><input v-model="form.firstSheet" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" /></label>
+        <label class="req"><span>{{ t('آخرین برگ', 'Last sheet') }} <span class="star">*</span></span><input v-model="form.lastSheet" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" /></label>
         <label>{{ t('تعداد برگ', 'Sheets') }}<input :value="count === null ? '' : num(count)" readonly tabindex="-1" class="ro" /></label>
+        <label>{{ t('شماره / نوع چک', 'Cheque type') }}
+          <SearchSelect v-model="form.formatId" :options="formatChoices" :empty-label="t('تعیین نشده', 'Not chosen')" :aria-label="t('نوع چک', 'Cheque type')"
+                        :none-text="t('برای این حساب نوع چکی تعریف نشده است', 'No cheque type for this account')" />
+        </label>
+        <p v-if="locked" class="muted small wide-note">{{ t('از برگ‌های این دسته چک استفاده شده؛ فقط نوع چک قابل تغییر است.', 'Sheets were used; only the cheque type can change.') }}</p>
       </fieldset>
       <div class="tr-buttons">
         <button type="submit" :disabled="busy">{{ t('ذخیره', 'Save') }}</button>
@@ -162,7 +183,7 @@ onMounted(async () => {
             <tr>
               <th>{{ t('شماره حساب', 'Account') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('سری', 'Series') }}</th><th>{{ t('از برگ', 'From') }}</th>
               <th>{{ t('تا برگ', 'To') }}</th><th>{{ t('تعداد', 'Sheets') }}</th><th>{{ t('استفاده‌شده', 'Used') }}</th><th>{{ t('باقی‌مانده', 'Left') }}</th>
-              <th>{{ t('برگ بعدی', 'Next') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
+              <th>{{ t('برگ بعدی', 'Next') }}</th><th>{{ t('نوع چک', 'Type') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
             </tr>
           </thead>
           <tbody>
@@ -173,14 +194,15 @@ onMounted(async () => {
               <td dir="ltr">{{ b.firstSheet }}</td><td dir="ltr">{{ b.lastSheet }}</td>
               <td>{{ num(b.sheetCount) }}</td><td>{{ num(b.usedSheets) }}</td><td>{{ num(b.remainingSheets) }}</td>
               <td dir="ltr">{{ b.nextSheet ?? '' }}</td>
+              <td>{{ formatName(b.formatId) }}</td>
               <td>{{ b.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
               <td class="tr-actions">
-                <button v-if="!b.isInUse" type="button" class="tr-link" @click="startEdit(b)">{{ t('اصلاح', 'Correct') }}</button>
+                <button type="button" class="tr-link" @click="startEdit(b)">{{ t('اصلاح', 'Correct') }}</button>
                 <button type="button" class="tr-link" :disabled="!b.isActive && !b.remainingSheets" @click="change(b, b.isActive ? 'deactivate' : 'activate')">{{ b.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
                 <button v-if="!b.isInUse" type="button" class="tr-link danger" @click="change(b, 'delete')">{{ t('حذف', 'Delete') }}</button>
               </td>
             </tr>
-            <tr v-if="!shown.length"><td colspan="11" class="muted">{{ t('دسته چکی پیدا نشد.', 'No cheque book found.') }}</td></tr>
+            <tr v-if="!shown.length"><td colspan="12" class="muted">{{ t('دسته چکی پیدا نشد.', 'No cheque book found.') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -216,4 +238,7 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-table tr.inactive td { color: #9aa5b1; }
 .tr-actions { white-space: nowrap; }
 .muted { color: #7b8794; }
+.small { font-size: .8rem; }
+.wide-note { grid-column: 1 / -1; margin: 0; }
+input:disabled { background: #f5f7fa; color: #7b8794; }
 </style>

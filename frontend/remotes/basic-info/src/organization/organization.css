@@ -1,0 +1,35 @@
+/* Shared by the Basic Information screens of departments, requesters, beneficiaries and petty cash. */
+h3 { margin-top: 0; }
+.tr-form { display: grid; gap: .75rem; margin: 1rem 0; }
+fieldset { border: 1px solid #e4e7eb; border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .75rem; align-items: start; padding: .75rem; }
+legend { font-weight: 600; padding: 0 .25rem; }
+label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
+.wide { grid-column: span 2; }
+.tr-check { flex-direction: row; align-items: center; gap: .35rem; }
+input:not([type=checkbox]):not([type=radio]), select { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
+input.ro { background: #f5f7fa; color: #52606d; }
+.req > input, .req > select { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+.star { color: #d64545; font-weight: 700; }
+button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+.tr-secondary { background: #fff; color: #1d4ed8; }
+.tr-link { background: transparent; color: #1d4ed8; border-color: transparent; padding: .2rem .4rem; }
+.tr-link.danger { color: #b42318; }
+.tr-buttons { display: flex; gap: .5rem; }
+.tr-msg { padding: .5rem .75rem; border-radius: 6px; }
+.tr-msg.error { background: #fdecea; color: #8a1c1c; }
+.tr-msg.ok { background: #e6f4ea; color: #1e5631; }
+.tr-warn { color: #b42318; }
+.tr-search { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; margin-top: 1rem; }
+.tr-search label { width: 18rem; max-width: 100%; }
+.tr-table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
+.tr-table th, .tr-table td { padding: .4rem .5rem; border-bottom: 1px solid #e4e7eb; text-align: start; vertical-align: middle; }
+.tr-table tr.inactive td { color: #9aa5b1; }
+.tr-actions { white-space: nowrap; }
+.tr-tag { display: inline-block; margin: .1rem; padding: 0 .4rem; border-radius: 4px; background: #eef2f7; color: #52606d; font-size: .8rem; }
+.tr-chips { list-style: none; padding: 0; margin: .5rem 0 0; display: flex; flex-wrap: wrap; gap: .35rem; }
+.tr-chips li { display: flex; align-items: center; gap: .35rem; padding: .2rem .5rem; border-radius: 6px; background: #eef4ff; font-size: .85rem; }
+.tr-chips li button { padding: 0 .35rem; background: transparent; color: #b42318; border: 0; font-size: 1rem; }
+.muted { color: #7b8794; }
+.small { font-size: .8rem; }
+@media (max-width: 720px) { .wide { grid-column: auto; } }

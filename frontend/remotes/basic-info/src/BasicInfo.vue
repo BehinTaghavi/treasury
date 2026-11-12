@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /**
  * Basic Information (اطلاعات پایه), in the order of the new-version manual.
- * The simple lists share one editor (CatalogueList). Petty-cash holders, departments, requesters and beneficiaries (manual
- * items 11–14) come with petty cash and payment requests (docs/plan.md).
+ * The simple lists share one editor (CatalogueList). All 14 items of the manual's Basic Information are here (owner, 12 Nov 2026:
+ * finish Basic Information so it is reviewed at once).
  */
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
@@ -12,6 +12,11 @@ import DetailAccounts from './ledger/DetailAccounts.vue'
 import BankAccounts from './accounts/BankAccounts.vue'
 import CashDesks from './accounts/CashDesks.vue'
 import ChequeBooks from './accounts/ChequeBooks.vue'
+import ChequeFormats from './accounts/ChequeFormats.vue'
+import PettyCash from './accounts/PettyCash.vue'
+import Beneficiaries from './organization/Beneficiaries.vue'
+import Departments from './organization/Departments.vue'
+import Requesters from './organization/Requesters.vue'
 import PurposeGroups from './purposes/PurposeGroups.vue'
 import type { ListSpec } from './types'
 
@@ -43,9 +48,14 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
   { id: 'bank-accounts', title: ['حساب‌های بانکی', 'Bank accounts'] },
   { id: 'cheque-books', title: ['دسته چک‌ها', 'Cheque books'] },
+  { id: 'cheque-formats', title: ['انواع چک و چاپ', 'Cheque types and printing'] },
   { id: 'references', title: ['عطف‌ها', 'References'] },
   { id: 'purposes', title: ['گروه بابت‌ها و بابت‌ها', 'Purpose groups and purposes'] },
   { id: 'cash-desks', title: ['صندوق‌ها', 'Cash desks'] },
+  { id: 'petty-cash', title: ['تنخواه گردان‌ها', 'Petty cash'] },
+  { id: 'departments', title: ['بخش‌ها (واحد سازمانی)', 'Departments'] },
+  { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
+  { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
 ]
 
 const selected = ref(sections[0]!.id)
@@ -73,6 +83,11 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <ChequeBooks v-else-if="selected === 'cheque-books'" :key="'cheque-books' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <PurposeGroups v-else-if="selected === 'purposes'" :key="'purposes' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <CashDesks v-else-if="selected === 'cash-desks'" :key="'cash-desks' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <ChequeFormats v-else-if="selected === 'cheque-formats'" :key="'cheque-formats' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <PettyCash v-else-if="selected === 'petty-cash'" :key="'petty-cash' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <Departments v-else-if="selected === 'departments'" :key="'departments' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>
 </template>
