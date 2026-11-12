@@ -2,6 +2,7 @@ using Treasury.BuildingBlocks.Domain;
 using Npgsql;
 using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
+using Treasury.Cashflow.Application.ChequeBooks;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
@@ -22,6 +23,7 @@ public sealed class PostgresAdapterTests : IDisposable
     private readonly PostgresUnitOfWork _unitOfWork;
     private readonly PostgresInstrumentRepository _instruments = new();
     private readonly InstrumentUseCases _useCases;
+    private readonly ChequeBookUseCases _books;
     private readonly Guid _account = Guid.NewGuid();
     private readonly string _bank = "بانک ملی " + Guid.NewGuid().ToString("N")[..8]; // unique per test: duplicate checks stay local
 
@@ -40,9 +42,33 @@ public sealed class PostgresAdapterTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"));
+        _books = new ChequeBookUseCases(_unitOfWork, new PostgresChequeBookRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource));
+    }
+
+    /// <summary>accounts-svc stand-in: every bank account exists and is active.</summary>
+    private sealed class AnyBankAccount : IBankAccountLookup
+    {
+        public Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<BankAccountFact?>(new(id, "0101", true));
     }
 
     public void Dispose() => _dataSource.Dispose();
+
+    [Fact]
+    public async Task A_cheque_book_is_corrected_listed_and_deleted_while_unused_and_kept_once_a_sheet_is_used()
+    {
+        var unused = await RegisterBook(5001, 5050);
+        Assert.True((await _books.CorrectAsync(new(Key(), unused, "A", 6001, 6010, 1), CancellationToken.None)).IsSuccess);
+        var view = (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == unused);
+        Assert.Equal((6001L, 6010L, 10L, 2L), (view.FirstSheet, view.LastSheet, view.RemainingSheets, view.Version));
+        Assert.True((await _books.ChangeStateAsync(new(Key(), unused, "delete", 2), CancellationToken.None)).IsSuccess);
+        Assert.Equal(0L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.cheque_book WHERE id = @id", ("id", unused)));
+
+        var used = await RegisterBook(7001, 7010);
+        Assert.True((await Issue(used, Approved(), 7001)).IsSuccess);
+        var usedView = (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == used);
+        Assert.Equal((1L, (long?)7002, true), (usedView.UsedSheets, usedView.NextSheet, usedView.IsInUse));
+        Assert.Equal("ChequeBook.InUse", (await _books.ChangeStateAsync(new(Key(), used, "delete", usedView.Version), CancellationToken.None)).ErrorCode);
+    }
 
     [Fact]
     public async Task The_adapters_work_as_the_cashflow_service_role()
@@ -245,7 +271,7 @@ public sealed class PostgresAdapterTests : IDisposable
 
     private async Task<Guid> RegisterBook(long first, long last)
     {
-        var result = await _useCases.RegisterChequeBookAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None);
+        var result = await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None);
         Assert.True(result.IsSuccess, result.ErrorMessage);
         return result.Value;
     }

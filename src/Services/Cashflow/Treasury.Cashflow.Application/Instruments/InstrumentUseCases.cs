@@ -37,7 +37,6 @@ public sealed record ChangeInstrumentStateCommand(
     string? Note = null,
     string? Reference = null);
 
-public sealed record RegisterChequeBookCommand(string IdempotencyKey, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet);
 
 public sealed record IssueChequeCommand(
     string IdempotencyKey,
@@ -195,14 +194,6 @@ public sealed class InstrumentUseCases(
 
             await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(instrument.Id);
-        }, id => id.ToString(), Guid.Parse, cancellationToken);
-
-    public Task<Result<Guid>> RegisterChequeBookAsync(RegisterChequeBookCommand command, CancellationToken cancellationToken) =>
-        _runner.RunAsync(command.IdempotencyKey, async ct =>
-        {
-            var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet);
-            await chequeBooks.AddAsync(book, ct).ConfigureAwait(false);
-            return Result<Guid>.Ok(book.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
 
     /// <summary>

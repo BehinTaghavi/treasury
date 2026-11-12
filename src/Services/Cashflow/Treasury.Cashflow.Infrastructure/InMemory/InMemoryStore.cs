@@ -42,6 +42,8 @@ internal sealed class PendingChanges
 
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
 
+    public HashSet<Guid> DeletedChequeBooks { get; } = [];
+
     public Dictionary<string, string> Idempotency { get; } = [];
 
     public List<OutboxMessage> Outbox { get; } = [];
@@ -72,6 +74,11 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var (id, s) in pending.ChequeBooks)
                 {
                     db.ChequeBooks[id] = s;
+                }
+
+                foreach (var id in pending.DeletedChequeBooks)
+                {
+                    db.ChequeBooks.Remove(id);
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -204,6 +211,49 @@ public sealed class InMemoryChequeBookRepository(InMemoryDatabase db) : IChequeB
 
         Stage(book, book.Version + 1);
         return Task.CompletedTask;
+    }
+
+    public Task DeleteAsync(ChequeBook book, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        lock (db.Gate)
+        {
+            if (!db.ChequeBooks.TryGetValue(book.Id, out var s) || s.Version != book.Version)
+            {
+                throw new ConcurrencyConflictException($"Cheque book {book.Id} was changed by someone else.");
+            }
+        }
+
+        pending.DeletedChequeBooks.Add(book.Id);
+        pending.Outbox.AddRange(book.PendingEvents.Select(OutboxMessage.From));
+        book.MarkSaved(book.Version);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken)
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, ChequeBookSnapshot>(db.ChequeBooks);
+            if (pending is not null)
+            {
+                foreach (var (id, s) in pending.ChequeBooks)
+                {
+                    all[id] = s;
+                }
+
+                foreach (var id in pending.DeletedChequeBooks)
+                {
+                    all.Remove(id);
+                }
+            }
+
+            return Task.FromResult<IReadOnlyList<ChequeBook>>(all.Values
+                .Where(s => (bankAccountId is null || s.BankAccountId == bankAccountId) && (includeInactive || s.IsActive))
+                .Select(s => s.ToDomain()).ToList());
+        }
     }
 
     private static void Stage(ChequeBook book, long newVersion)

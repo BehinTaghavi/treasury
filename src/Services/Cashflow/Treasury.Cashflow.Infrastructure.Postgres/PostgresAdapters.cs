@@ -324,8 +324,12 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ArgumentNullException.ThrowIfNull(book);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE cashflow.cheque_book SET is_active = @active, version = version + 1 WHERE id = @id AND version = @expected"))
+            "UPDATE cashflow.cheque_book SET serial = @serial, first_sheet = @first, last_sheet = @last, is_active = @active, version = version + 1 " +
+            "WHERE id = @id AND version = @expected"))
         {
+            cmd.Parameters.AddWithValue("serial", book.Serial);
+            cmd.Parameters.AddWithValue("first", book.FirstSheet);
+            cmd.Parameters.AddWithValue("last", book.LastSheet);
             cmd.Parameters.AddWithValue("active", book.IsActive);
             cmd.Parameters.AddWithValue("id", book.Id);
             cmd.Parameters.AddWithValue("expected", book.Version);
@@ -338,6 +342,58 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         await InsertNewSheetsAsync(tx, book, cancellationToken).ConfigureAwait(false);
         await PostgresOutbox.WriteAsync(tx, book.PendingEvents, cancellationToken).ConfigureAwait(false);
         book.MarkSaved(book.Version + 1);
+    }
+
+    public async Task DeleteAsync(ChequeBook book, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        var tx = PostgresUnitOfWork.Current;
+        // "NOT EXISTS": a sheet issued since the book was loaded refuses the delete (the book row lock normally prevents that).
+        await using (var cmd = tx.Command(
+            "DELETE FROM cashflow.cheque_book b WHERE id = @id AND version = @expected AND NOT EXISTS (SELECT 1 FROM cashflow.cheque_sheet s WHERE s.cheque_book_id = b.id)"))
+        {
+            cmd.Parameters.AddWithValue("id", book.Id);
+            cmd.Parameters.AddWithValue("expected", book.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Cheque book {book.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, book.PendingEvents, cancellationToken).ConfigureAwait(false);
+        book.MarkSaved(book.Version);
+    }
+
+    public async Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken)
+    {
+        var tx = PostgresUnitOfWork.Current;
+        var heads = new List<ChequeBookSnapshot>();
+        await using (var cmd = tx.Command(
+            "SELECT id, bank_account_id, serial, first_sheet, last_sheet, is_active, version FROM cashflow.cheque_book " +
+            "WHERE (@account::uuid IS NULL OR bank_account_id = @account) AND (@all OR is_active)"))
+        {
+            cmd.Parameters.Add(new NpgsqlParameter("account", NpgsqlDbType.Uuid) { Value = (object?)bankAccountId ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("all", includeInactive);
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                heads.Add(new ChequeBookSnapshot(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetBoolean(5), new Dictionary<long, SheetUse>(), r.GetInt64(6)));
+            }
+        }
+
+        var sheets = heads.ToDictionary(h => h.Id, _ => new Dictionary<long, SheetUse>());
+        if (heads.Count > 0)
+        {
+            await using var cmd = tx.Command("SELECT cheque_book_id, sheet, sheet_use FROM cashflow.cheque_sheet WHERE cheque_book_id = ANY(@ids)");
+            cmd.Parameters.AddWithValue("ids", heads.Select(h => h.Id).ToArray());
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                sheets[r.GetGuid(0)][r.GetInt64(1)] = Enum.Parse<SheetUse>(r.GetString(2));
+            }
+        }
+
+        return heads.Select(h => (h with { UsedSheets = sheets[h.Id] }).ToDomain()).ToList();
     }
 
     private static async Task InsertNewSheetsAsync(TransactionContext tx, ChequeBook book, CancellationToken ct)

@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
+using Treasury.Cashflow.Application.ChequeBooks;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
@@ -12,6 +13,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     private readonly InMemoryDatabase _db = new();
     private readonly DevelopmentPolicies _policies = new DevelopmentPolicies().OpenYear(1405);
     private readonly InstrumentUseCases _useCases;
+    private readonly ChequeBookUseCases _books;
     private readonly Guid _account = Guid.NewGuid();
 
     public InstrumentUseCaseTests()
@@ -25,6 +27,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"));
+        _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), new FakeBankAccounts(), new InMemoryIdempotencyStore(_db));
     }
 
     public void Dispose() => _db.Dispose();
@@ -171,7 +174,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     }
 
     private async Task<Guid> RegisterBook(long first, long last) =>
-        (await _useCases.RegisterChequeBookAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None)).Value;
+        (await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None)).Value;
 
     private Task<Result<IssuedChequeView>> Issue(Guid book, Guid payment, long? sheet, InstrumentKind kind = InstrumentKind.OrdinaryCheque, string due = "1405/08/10") =>
         _useCases.IssueChequeAsync(

@@ -64,4 +64,37 @@ public sealed class ChequeBookTests
     [InlineData(1L, 2000L)]
     public void Rejects_invalid_ranges(long first, long last) =>
         Assert.Throws<DomainException>(() => ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "x", first, last));
+
+    [Fact]
+    public void An_exhausted_book_cannot_be_switched_on_again()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "A", 1, 1);
+        book.ReserveNext();
+        Assert.False(book.IsActive);
+        Assert.Equal("ChequeBook.Exhausted", Assert.Throws<DomainException>(book.Activate).Code);
+    }
+
+    [Fact]
+    public void Books_overlap_only_for_the_same_account_and_series()
+    {
+        var account = Guid.NewGuid();
+        var a = ChequeBook.Register(Guid.NewGuid(), account, "الف", 100, 150);
+        Assert.True(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, " الف ", 150, 200)));
+        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "الف", 151, 200)));
+        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "ب", 120, 130)));
+        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "الف", 120, 130)));
+        Assert.False(a.Overlaps(a));
+    }
+
+    [Fact]
+    public void Correcting_raises_one_event_and_an_unchanged_book_none()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "A", 1, 50);
+        book.MarkSaved(1);
+        book.Correct("A", 1, 50);
+        Assert.Empty(book.PendingEvents);
+        book.Correct("B", 11, 60);
+        Assert.Equal(("B", 11L, 60L), (book.Serial, book.FirstSheet, book.LastSheet));
+        Assert.IsType<ChequeBookCorrected>(Assert.Single(book.PendingEvents));
+    }
 }

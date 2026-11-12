@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
+using Treasury.Cashflow.Application.ChequeBooks;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
@@ -12,6 +13,10 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference);
 
 public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet);
+
+public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version);
+
+public sealed record ChequeBookVersion(long Version);
 
 public sealed record IssueRequest(Guid PaymentId, Guid BankAccountId, Guid ChequeBookId, long? SheetNumber, InstrumentKind Kind, MoneyInput Amount, string IssueDate, string? DueDate, Guid PayeeId, string PayeeName, string Purpose);
 
@@ -40,10 +45,22 @@ public static class Endpoints
                 new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
-        api.MapPost("/cheque-books", async (ChequeBookRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.RegisterChequeBookAsync(
+        // Cheque books screen (Basic Information, manual item 6).
+        api.MapGet("/cheque-books", async (Guid? bankAccountId, bool? includeInactive, ChequeBookUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListAsync(bankAccountId, includeInactive ?? false, ct).ConfigureAwait(false)));
+
+        api.MapPost("/cheque-books", async (ChequeBookRequest r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RegisterAsync(
                 new RegisterChequeBookCommand(Key(http), r.BankAccountId, r.Serial, r.FirstSheet, r.LastSheet), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/cheque-books/{id}"));
+
+        api.MapPut("/cheque-books/{id:guid}", async (Guid id, ChequeBookCorrection r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectAsync(new CorrectChequeBookCommand(Key(http), id, r.Serial, r.FirstSheet, r.LastSheet, r.Version), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/cheque-books/{id}"));
+
+        api.MapPost("/cheque-books/{id:guid}/{change:regex(^(activate|deactivate|delete)$)}", async (Guid id, string change, ChequeBookVersion r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ChangeStateAsync(new ChangeChequeBookStateCommand(Key(http), id, change, r.Version), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/cheque-books/{id}"));
 
         api.MapPost("/payments/issue-cheque", async (IssueRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.IssueChequeAsync(
@@ -73,9 +90,10 @@ public static class Endpoints
 
         var status = result.ErrorCode switch
         {
-            "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
+            "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
             "Instrument.NotFound" or "ChequeBook.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
+            "Accounts.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,
         };
         return Results.Problem(

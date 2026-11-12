@@ -66,6 +66,7 @@ services:
       ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Development}
       Keycloak__Authority: ${KEYCLOAK_AUTHORITY:-}
       Keycloak__Audience: treasury
+      Services__Accounts: http://accounts-api:8080/
       Development__OpenFiscalYears__0: "1404"
       Development__OpenFiscalYears__1: "1405"
 

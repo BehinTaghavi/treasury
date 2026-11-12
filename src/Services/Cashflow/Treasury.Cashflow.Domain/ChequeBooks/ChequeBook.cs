@@ -31,11 +31,14 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     public Guid BankAccountId { get; }
 
     /// <summary>Series printed on the book (سری).</summary>
-    public string Serial { get; }
+    public string Serial { get; private set; }
 
-    public long FirstSheet { get; }
+    public long FirstSheet { get; private set; }
 
-    public long LastSheet { get; }
+    public long LastSheet { get; private set; }
+
+    /// <summary>A sheet has been issued or voided: from then on the book can no longer be corrected or deleted.</summary>
+    public bool IsInUse => _usedSheets.Count > 0;
 
     public bool IsActive { get; private set; }
 
@@ -47,19 +50,52 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 
     public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet)
     {
-        if (firstSheet <= 0 || lastSheet < firstSheet)
-        {
-            throw new DomainException("ChequeBook.InvalidRange", "Last sheet must be greater than or equal to the first sheet.");
-        }
-
-        if (lastSheet - firstSheet + 1 > 1000)
-        {
-            throw new DomainException("ChequeBook.TooManySheets", "A cheque book cannot have more than 1000 sheets.");
-        }
-
-        var book = new ChequeBook(id, bankAccountId, serial?.Trim() ?? string.Empty, firstSheet, lastSheet);
+        CheckRange(firstSheet, lastSheet);
+        var book = new ChequeBook(id, bankAccountId, CleanSerial(serial), firstSheet, lastSheet);
         book.Raise(new ChequeBookRegistered(id, bankAccountId, book.Serial, firstSheet, lastSheet));
         return book;
+    }
+
+    /// <summary>
+    /// Corrects a book typed wrongly (series, first or last sheet), only while none of its sheets has been used
+    /// (owner, 11 Nov 2026: corrections and deletions only for data nothing depends on yet).
+    /// </summary>
+    public void Correct(string serial, long firstSheet, long lastSheet)
+    {
+        if (IsInUse)
+        {
+            throw new DomainException("ChequeBook.InUse", "Sheets of this cheque book have been used; it can no longer be corrected.");
+        }
+
+        CheckRange(firstSheet, lastSheet);
+        var cleaned = CleanSerial(serial);
+        if ((cleaned, firstSheet, lastSheet) == (Serial, FirstSheet, LastSheet))
+        {
+            return;
+        }
+
+        (Serial, FirstSheet, LastSheet) = (cleaned, firstSheet, lastSheet);
+        Raise(new ChequeBookCorrected(Id, Serial, FirstSheet, LastSheet));
+    }
+
+    /// <summary>Do two books of the same account and series share sheet numbers? (same cheque number twice on one account)</summary>
+    public bool Overlaps(ChequeBook other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return other.Id != Id && other.BankAccountId == BankAccountId
+            && string.Equals(PersianText.Key(other.Serial), PersianText.Key(Serial), StringComparison.Ordinal)
+            && other.FirstSheet <= LastSheet && FirstSheet <= other.LastSheet;
+    }
+
+    /// <summary>Deletes a book registered by mistake: only while none of its sheets has been used.</summary>
+    public void Delete()
+    {
+        if (IsInUse)
+        {
+            throw new DomainException("ChequeBook.InUse", "Sheets of this cheque book have been used; it can only be switched off.");
+        }
+
+        Raise(new ChequeBookDeleted(Id));
     }
 
     /// <summary>The number the screen should suggest. Old system: Max(Checkno) + 1, here the lowest unused sheet.</summary>
@@ -127,6 +163,23 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         }
     }
 
+    /// <summary>Manual item 6: "امکان ابطال دسته چک ها" and re-activation; a book with no unused sheet stays off.</summary>
+    public void Activate()
+    {
+        if (IsActive)
+        {
+            return;
+        }
+
+        if (RemainingSheets == 0)
+        {
+            throw new DomainException("ChequeBook.Exhausted", "No unused sheets remain in this cheque book.");
+        }
+
+        IsActive = true;
+        Raise(new ChequeBookActivated(Id));
+    }
+
     public static ChequeBook Restore(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, bool isActive, IEnumerable<KeyValuePair<long, SheetUse>> usedSheets, long version)
     {
         var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive };
@@ -138,6 +191,21 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         book.SetLoadedVersion(version);
         return book;
     }
+
+    private static void CheckRange(long firstSheet, long lastSheet)
+    {
+        if (firstSheet <= 0 || lastSheet < firstSheet)
+        {
+            throw new DomainException("ChequeBook.InvalidRange", "Last sheet must be greater than or equal to the first sheet.");
+        }
+
+        if (lastSheet - firstSheet + 1 > 1000)
+        {
+            throw new DomainException("ChequeBook.TooManySheets", "A cheque book cannot have more than 1000 sheets.");
+        }
+    }
+
+    private static string CleanSerial(string? serial) => PersianText.Clean(serial);
 
     private void EnsureUsable(long sheet)
     {
@@ -181,3 +249,9 @@ public sealed record ChequeSheetReserved(Guid ChequeBookId, long Sheet) : Domain
 public sealed record ChequeSheetVoided(Guid ChequeBookId, long Sheet, string Reason) : DomainEvent;
 
 public sealed record ChequeBookDeactivated(Guid ChequeBookId) : DomainEvent;
+
+public sealed record ChequeBookActivated(Guid ChequeBookId) : DomainEvent;
+
+public sealed record ChequeBookCorrected(Guid ChequeBookId, string Serial, long FirstSheet, long LastSheet) : DomainEvent;
+
+public sealed record ChequeBookDeleted(Guid ChequeBookId) : DomainEvent;

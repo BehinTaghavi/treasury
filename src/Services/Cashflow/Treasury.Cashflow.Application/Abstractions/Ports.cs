@@ -26,7 +26,23 @@ public interface IChequeBookRepository
 
     Task AddAsync(ChequeBook book, CancellationToken cancellationToken);
 
+    /// <summary>Saves the book (series, range, active) and its newly used sheets. Version-checked.</summary>
     Task SaveAsync(ChequeBook book, CancellationToken cancellationToken);
+
+    /// <summary>Removes a book none of whose sheets was used. Version-checked.</summary>
+    Task DeleteAsync(ChequeBook book, CancellationToken cancellationToken);
+
+    /// <summary>Books with their used sheets; of one bank account or all.</summary>
+    Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken);
+}
+
+/// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
+public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive);
+
+/// <summary>Answered by accounts-svc. Failure to reach it: DomainException "Accounts.Unavailable".</summary>
+public interface IBankAccountLookup
+{
+    Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>Answered by the Fiscal Periods context: may operations be recorded on this date? (rule R2)</summary>

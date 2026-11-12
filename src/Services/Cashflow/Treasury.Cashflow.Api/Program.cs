@@ -70,6 +70,15 @@ builder.Services.AddSingleton<IPaymentApprovalQuery>(policies);
 
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<InstrumentUseCases>();
+builder.Services.AddScoped<Treasury.Cashflow.Application.ChequeBooks.ChequeBookUseCases>();
+
+// accounts-svc answers whether a bank account exists and is active (ADR 0001: through its API, never its tables).
+var accountsUrl = builder.Configuration["Services:Accounts"] ?? throw new InvalidOperationException("Services:Accounts (accounts-svc address) is not configured.");
+builder.Services.AddHttpClient<IBankAccountLookup, Treasury.Cashflow.Infrastructure.HttpBankAccountLookup>(c =>
+{
+    c.BaseAddress = new Uri(accountsUrl.EndsWith('/') ? accountsUrl : accountsUrl + "/");
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
 
 var app = builder.Build();
 
