@@ -205,6 +205,10 @@ public sealed class PurposeUseCases(
             return Result<Guid>.Ok(purpose.Id);
         }, cancellationToken);
 
+    /// <summary>One group, active or not (asked by accounts-svc for the purpose groups of a petty cash).</summary>
+    public Task<PurposeGroupView?> GetGroupAsync(Guid id, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct => await purposes.GetGroupAsync(id, ct).ConfigureAwait(false) is { } g ? PurposeGroupView.From(g) : null, cancellationToken);
+
     /// <summary>Groups by number; inactive ones only when asked (forms ask without).</summary>
     public Task<IReadOnlyList<PurposeGroupView>> ListGroupsAsync(PurposeDirection? direction, bool includeInactive, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<PurposeGroupView>>(async ct =>

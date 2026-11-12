@@ -28,7 +28,8 @@ public interface ILedgerQueries
     Task<IReadOnlyList<LedgerAccountView>> AccountsAsync(bool postableOnly, bool includeInactive, CancellationToken cancellationToken);
 
     /// <param name="searchKey">PersianText.Key of the search text; matched against code and name. Empty: no filter.</param>
-    Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken);
+    /// <param name="costCentersOnly">Only تفصیل marked as cost centres (departments and requesters choose from them).</param>
+    Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false);
 
     Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken);
 

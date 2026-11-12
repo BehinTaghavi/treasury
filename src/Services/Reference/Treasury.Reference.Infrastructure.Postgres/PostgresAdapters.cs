@@ -20,6 +20,7 @@ public static class PostgresRegistration
         services.AddSingleton<IUnitOfWork, PostgresUnitOfWork>();
         services.AddSingleton<ICatalogueRepository, PostgresCatalogueRepository>();
         services.AddSingleton<IPurposeRepository, PostgresPurposeRepository>();
+        services.AddSingleton<IOrganizationRepository, PostgresOrganizationRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         services.AddSingleton<PostgresLedgerRepository>();
         services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<PostgresLedgerRepository>());
@@ -51,6 +52,25 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             var result = await work(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName is "department" or "requester" or "beneficiary")
+        {
+            // Two users saved the same number, name or تفصیل at the same moment: the indexes decide.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName switch
+            {
+                "department_unique_number" => new DomainException("Department.NumberTaken", "This department number is already used."),
+                "department_unique_name" => new DomainException("Department.NameTaken", "This department already exists."),
+                "requester_unique_number" => new DomainException("Requester.NumberTaken", "This requester number is already used."),
+                _ => new DomainException("Beneficiary.DetailTaken", "This تفصیل is already a beneficiary."),
+            };
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName is "requester_department" or "beneficiary_bank")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName == "beneficiary_bank"
+                ? new DomainException("Catalogue.InUse", "This bank is named by a beneficiary.")
+                : new DomainException("Department.HasRequesters", "Requesters belong to this department.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName is "purpose_group" or "purpose")
         {

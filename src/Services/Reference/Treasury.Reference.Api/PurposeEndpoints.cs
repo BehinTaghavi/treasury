@@ -30,6 +30,9 @@ public static class PurposeEndpoints
         api.MapGet("/purpose-groups", async (PurposeDirection? direction, bool? includeInactive, PurposeUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.ListGroupsAsync(direction, includeInactive ?? false, ct).ConfigureAwait(false)));
 
+        api.MapGet("/purpose-groups/{id:guid}", async (Guid id, PurposeUseCases useCases, CancellationToken ct) =>
+            await useCases.GetGroupAsync(id, ct).ConfigureAwait(false) is { } g ? Results.Ok(g) : Results.NotFound());
+
         api.MapPost("/purpose-groups", async (PurposeGroupForm form, HttpRequest http, PurposeUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.AddGroupAsync(new AddPurposeGroupCommand(Key(http), form), ct).ConfigureAwait(false)));
 

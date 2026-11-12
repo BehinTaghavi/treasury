@@ -185,16 +185,17 @@ public sealed class PostgresLedgerRepository : ILedgerRepository, ILedgerQueries
         return list;
     }
 
-    public async Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(
             "SELECT code, name, type, is_cost_center, is_active FROM reference.detail_account " +
-            "WHERE (@all OR is_active) AND (@type::text IS NULL OR type = @type) " +
+            "WHERE (@all OR is_active) AND (@type::text IS NULL OR type = @type) AND (NOT @centers OR is_cost_center) " +
             "AND (@pattern = '%%' OR code LIKE @pattern OR name_key LIKE @pattern) ORDER BY code LIMIT @take");
         cmd.Parameters.AddWithValue("all", includeInactive);
         cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = (object?)type ?? DBNull.Value });
         cmd.Parameters.AddWithValue("pattern", "%" + searchKey.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%");
         cmd.Parameters.AddWithValue("take", take);
+        cmd.Parameters.AddWithValue("centers", costCentersOnly);
         var list = new List<DetailAccountView>();
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))

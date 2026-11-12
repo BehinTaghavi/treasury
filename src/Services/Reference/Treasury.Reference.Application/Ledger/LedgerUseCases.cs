@@ -101,9 +101,9 @@ public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository led
         unitOfWork.ExecuteAsync(ct => queries.AccountsAsync(postableOnly, includeInactive, ct), cancellationToken);
 
     /// <summary>Search by code or name (Arabic/Persian letters alike), optionally of one type; at most <see cref="MaxSearchResults"/> rows.</summary>
-    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false) =>
         unitOfWork.ExecuteAsync(
-            ct => queries.SearchDetailsAsync(PersianText.Key(search), string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct),
+            ct => queries.SearchDetailsAsync(PersianText.Key(search), string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct, costCentersOnly),
             cancellationToken);
 
     /// <summary>One account by code (asked by accounts-svc when a bank account names it).</summary>

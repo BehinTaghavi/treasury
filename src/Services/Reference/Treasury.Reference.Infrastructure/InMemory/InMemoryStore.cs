@@ -22,6 +22,7 @@ public sealed class InMemoryReferenceDatabase : IDisposable
     internal readonly Dictionary<Guid, CatalogueSnapshot> Items = [];
     internal readonly Dictionary<Guid, PurposeGroupSnapshot> Groups = [];
     internal readonly Dictionary<Guid, PurposeSnapshot> Purposes = [];
+    internal readonly Dictionary<string, Dictionary<Guid, object>> Tables = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -51,6 +52,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, PurposeGroupSnapshot?> Groups { get; } = []; // null: deleted
 
     public Dictionary<Guid, PurposeSnapshot?> Purposes { get; } = []; // null: deleted
+
+    public Dictionary<string, Dictionary<Guid, object?>> Tables { get; } = []; // row null: deleted
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -106,6 +109,16 @@ public sealed class InMemoryUnitOfWork(InMemoryReferenceDatabase db) : IUnitOfWo
 
                 Apply(db.Groups, pending.Groups);
                 Apply(db.Purposes, pending.Purposes);
+                foreach (var (table, rows) in pending.Tables)
+                {
+                    if (!db.Tables.TryGetValue(table, out var committed))
+                    {
+                        committed = [];
+                        db.Tables[table] = committed;
+                    }
+
+                    Apply(committed, rows);
+                }
 
                 foreach (var (key, value) in pending.Idempotency)
                 {

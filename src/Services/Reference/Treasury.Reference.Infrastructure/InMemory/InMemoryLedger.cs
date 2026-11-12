@@ -70,9 +70,9 @@ public sealed class InMemoryLedgerRepository(InMemoryReferenceDatabase db) : ILe
             .Select(a => new LedgerAccountView(a.Code, a.Name, a.Level.ToString(), a.ParentCode, a.IsPostable, a.IsActive, a.Detail1Types, a.Detail2Types))
             .ToList());
 
-    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken) =>
+    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false) =>
         Task.FromResult<IReadOnlyList<DetailAccountView>>((Details()?.Details ?? [])
-            .Where(d => (includeInactive || d.IsActive) && (type is null || d.Type == type)
+            .Where(d => (includeInactive || d.IsActive) && (type is null || d.Type == type) && (!costCentersOnly || d.IsCostCenter)
                 && (searchKey.Length == 0 || d.Code.Contains(searchKey, StringComparison.Ordinal) || PersianText.Key(d.Name).Contains(searchKey, StringComparison.Ordinal)))
             .OrderBy(d => d.Code, StringComparer.Ordinal)
             .Take(take)
