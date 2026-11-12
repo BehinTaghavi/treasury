@@ -35,7 +35,7 @@ public sealed class ChequeBookUseCaseTests : IDisposable
 
     private async Task<Guid> Register(string serial, long first, long last, Guid? account = null)
     {
-        var r = await _books.RegisterAsync(new(Key(), account ?? _account, serial, first, last, null, "12345678", "1"), CancellationToken.None);
+        var r = await _books.RegisterAsync(new(Key(), account ?? _account, serial, first, last, null, "12345678", "1", PartlyUsed: true), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         return r.Value;
     }
@@ -70,8 +70,8 @@ public sealed class ChequeBookUseCaseTests : IDisposable
     public async Task The_same_sheet_numbers_twice_for_one_account_are_refused_whatever_the_series()
     {
         await Register("1234", 101001, 101050);
-        Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, "1234", 101040, 101060, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, "5678", 101040, 101060, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, "1234", 101040, 101060, null, "12345678", "1", PartlyUsed: true), CancellationToken.None)).ErrorCode);
+        Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, "5678", 101040, 101060, null, "12345678", "1", PartlyUsed: true), CancellationToken.None)).ErrorCode);
         await Register("1234", 101040, 101060, Guid.NewGuid());          // other account
         await Register("1234", 101051, 101100);                          // right after
     }
@@ -108,4 +108,16 @@ public sealed class ChequeBookUseCaseTests : IDisposable
         Assert.True((await _books.ChangeStateAsync(new(Key(), id, "activate", 3), CancellationToken.None)).IsSuccess);
         Assert.Equal((long?)100001, (await View(id)).NextSheet);
     }
+
+    [Fact]
+    public async Task A_new_book_has_25_50_or_100_sheets_and_a_partly_used_one_any_count_owner_12_nov()
+    {
+        Assert.Equal("ChequeBook.SheetCountInvalid", (await _books.RegisterAsync(new(Key(), _account, "1234", 100001, 100030, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
+        var r = await _books.RegisterAsync(new(Key(), _account, "1234", 100018, 100050, null, "12345678", "18", PartlyUsed: true), CancellationToken.None);
+        var v = await View(r.Value);
+        Assert.Equal((33L, true, (int?)18, (int?)50), (v.SheetCount, v.PartlyUsed, v.SayadFirstSerial, v.SayadLastSerial));
+        Assert.True((await _books.CorrectAsync(new(Key(), r.Value, "1234", 100001, 100050, 1, null, null, null, PartlyUsed: false), CancellationToken.None)).IsSuccess);
+        Assert.False((await View(r.Value)).PartlyUsed);
+    }
 }
+

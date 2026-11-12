@@ -54,16 +54,26 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     /// <summary>The Sayad numbers (شماره صیادی) of the book; null only for books from before Sayad cheques (old data).</summary>
     public ChequeBookSayad? Sayad { get; private set; }
 
+    /// <summary>Banks issue books of 25, 50 or 100 sheets (owner, 12 Nov 2026).</summary>
+    public static readonly IReadOnlySet<int> BookSizes = new HashSet<int> { 25, 50, 100 };
+
+    /// <summary>
+    /// The book was already partly used when the company started with Treasury: only its unused sheets are entered, any number of
+    /// them (owner, 12 Nov 2026: "در آغاز کار تعداد برگهای دسته چک استفاده نشده هر تعداد باشد"). A new book has 25, 50 or 100 sheets.
+    /// </summary>
+    public bool PartlyUsed { get; private set; }
+
     /// <summary>A book registered without Sayad numbers: only for old books brought over from the old system.</summary>
     public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet) =>
-        Register(id, bankAccountId, serial, firstSheet, lastSheet, null);
+        Register(id, bankAccountId, serial, firstSheet, lastSheet, null, partlyUsed: true);
 
     /// <summary>A book entered on the cheque books screen: series, serials and Sayad numbers (owner, 12 Nov 2026).</summary>
-    public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad)
+    public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad, bool partlyUsed = false)
     {
         CheckRange(firstSheet, lastSheet);
+        CheckSize(firstSheet, lastSheet, partlyUsed);
         sayad?.CheckFits(lastSheet - firstSheet + 1);
-        var book = new ChequeBook(id, bankAccountId, CleanSerial(serial), firstSheet, lastSheet) { Sayad = sayad };
+        var book = new ChequeBook(id, bankAccountId, CleanSerial(serial), firstSheet, lastSheet) { Sayad = sayad, PartlyUsed = partlyUsed };
         book.Raise(new ChequeBookRegistered(id, bankAccountId, book.Serial, firstSheet, lastSheet, sayad?.Middle, sayad?.FirstSerial));
         return book;
     }
@@ -90,7 +100,8 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     /// (owner, 11 Nov 2026: corrections and deletions only for data nothing depends on yet).
     /// </summary>
     /// <param name="sayad">The Sayad numbers; null keeps the current ones.</param>
-    public void Correct(string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad = null)
+    /// <param name="partlyUsed">Whether only the unused sheets of a partly used book are entered; null keeps the current answer.</param>
+    public void Correct(string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad = null, bool? partlyUsed = null)
     {
         if (IsInUse)
         {
@@ -98,15 +109,17 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         }
 
         CheckRange(firstSheet, lastSheet);
+        var partly = partlyUsed ?? PartlyUsed;
+        CheckSize(firstSheet, lastSheet, partly);
         var cleaned = CleanSerial(serial);
         var newSayad = sayad ?? Sayad;
         newSayad?.CheckFits(lastSheet - firstSheet + 1);
-        if ((cleaned, firstSheet, lastSheet, newSayad) == (Serial, FirstSheet, LastSheet, Sayad))
+        if ((cleaned, firstSheet, lastSheet, newSayad, partly) == (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed))
         {
             return;
         }
 
-        (Serial, FirstSheet, LastSheet, Sayad) = (cleaned, firstSheet, lastSheet, newSayad);
+        (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed) = (cleaned, firstSheet, lastSheet, newSayad, partly);
         Raise(new ChequeBookCorrected(Id, Serial, FirstSheet, LastSheet, Sayad?.Middle, Sayad?.FirstSerial));
     }
 
@@ -249,9 +262,9 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 
     public static ChequeBook Restore(
         Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, bool isActive, IEnumerable<KeyValuePair<long, SheetUse>> usedSheets, long version,
-        Guid? formatId = null, ChequeBookSayad? sayad = null)
+        Guid? formatId = null, ChequeBookSayad? sayad = null, bool partlyUsed = false)
     {
-        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive, FormatId = formatId, Sayad = sayad };
+        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive, FormatId = formatId, Sayad = sayad, PartlyUsed = partlyUsed };
         foreach (var (sheet, use) in usedSheets)
         {
             book._usedSheets[sheet] = use;
@@ -271,6 +284,14 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 
     /// <summary>The serial of a sheet as printed: series and serial separated by a slash, e.g. 1234/567801.</summary>
     public string SheetLabel(long sheet) => Serial.Length > 0 ? $"{Serial}/{sheet}" : sheet.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static void CheckSize(long firstSheet, long lastSheet, bool partlyUsed)
+    {
+        if (!partlyUsed && !BookSizes.Contains((int)(lastSheet - firstSheet + 1)))
+        {
+            throw new DomainException("ChequeBook.SheetCountInvalid", "A new cheque book has 25, 50 or 100 sheets; for a partly used book tick 'partly used'.");
+        }
+    }
 
     private static void CheckRange(long firstSheet, long lastSheet)
     {

@@ -174,7 +174,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     }
 
     private async Task<Guid> RegisterBook(long first, long last) =>
-        (await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "1234", Base + first, Base + last, null, "12345678", "1"), CancellationToken.None)).Value;
+        (await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "1234", Base + first, Base + last, null, "12345678", "1", PartlyUsed: true), CancellationToken.None)).Value;
 
     /// <summary>Serials have 6 to 8 digits (owner, 12 Nov 2026): the tests count sheets from here.</summary>
     private const long Base = 100_000;

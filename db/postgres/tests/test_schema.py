@@ -375,3 +375,19 @@ def test_sayad_numbers_of_a_cheque_book_come_together_or_not_at_all(db):
             with pytest.raises(psycopg.errors.CheckViolation):
                 with c.transaction():
                     c.execute(add, (uuid.uuid4(), uuid.uuid4(), middle, first))
+
+
+def test_books_registered_before_the_size_rule_with_another_size_become_partly_used(db):
+    # 016_cashflow_cheque_book_partly_used.sql: a new book has 25, 50 or 100 sheets (owner, 12 Nov 2026); an older 30-sheet book is
+    # marked partly used so that it can still be corrected. Rolled back at the end.
+    script = (HERE / "016_cashflow_cheque_book_partly_used.sql").read_text(encoding="utf-8")
+    with psycopg.connect(db) as c:
+        add = "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet) VALUES (%s, %s, '1234', 567801, %s)"
+        full, odd = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (full, uuid.uuid4(), 567850))
+        c.execute(add, (odd, uuid.uuid4(), 567830))
+        c.execute(script)
+        c.execute(script)  # safe to run again
+        got = dict(c.execute("SELECT id, partly_used FROM cashflow.cheque_book WHERE id IN (%s, %s)", (full, odd)).fetchall())
+        assert got == {full: False, odd: True}
+        c.rollback()

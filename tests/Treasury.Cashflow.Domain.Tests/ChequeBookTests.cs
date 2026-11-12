@@ -145,4 +145,48 @@ public sealed class ChequeBookTests
     public void The_sayad_serials_of_a_book_stay_within_four_digits() =>
         Assert.Equal("ChequeBook.SayadSerialInvalid", Assert.Throws<DomainException>(() =>
             ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_850, ChequeBookSayad.Create("12345678", "9990"))).Code);
+
+    private static readonly ChequeBookSayad Sayad = ChequeBookSayad.Create("12345678", "1");
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(50)]
+    [InlineData(100)]
+    public void A_new_book_has_25_50_or_100_sheets_owner_12_nov(int sheets) =>
+        Assert.Equal(sheets, ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_800 + sheets, Sayad).SheetCount);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(24)]
+    [InlineData(30)]
+    [InlineData(99)]
+    public void A_new_book_of_another_size_is_refused_owner_12_nov(int sheets) =>
+        Assert.Equal("ChequeBook.SheetCountInvalid", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_800 + sheets, Sayad)).Code);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(17)]
+    [InlineData(100)]
+    public void A_partly_used_book_at_go_live_has_any_number_of_unused_sheets_up_to_100_owner_12_nov(int sheets)
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_834, 567_833 + sheets, ChequeBookSayad.Create("12345678", "34"), partlyUsed: true);
+        Assert.Equal((sheets, true, 567_834L), ((int)book.SheetCount, book.PartlyUsed, book.ReserveNext()));
+    }
+
+    [Fact]
+    public void A_partly_used_book_still_has_at_most_100_sheets() =>
+        Assert.Equal("ChequeBook.TooManySheets", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_901, null, partlyUsed: true)).Code);
+
+    [Fact]
+    public void Correcting_keeps_or_changes_the_partly_used_answer()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_811, 567_850, Sayad, partlyUsed: true);
+        book.Correct("1234", 567_811, 567_830);
+        Assert.True(book.PartlyUsed);
+        Assert.Equal("ChequeBook.SheetCountInvalid", Assert.Throws<DomainException>(() => book.Correct("1234", 567_811, 567_830, null, partlyUsed: false)).Code);
+        book.Correct("1234", 567_801, 567_850, null, partlyUsed: false);
+        Assert.Equal((50L, false), (book.SheetCount, book.PartlyUsed));
+    }
 }

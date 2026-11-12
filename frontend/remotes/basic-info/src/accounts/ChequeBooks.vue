@@ -19,8 +19,10 @@ interface Entry { id: string; name: string }
 interface Book {
   id: string; bankAccountId: string; serial: string; firstSheet: number; lastSheet: number; sheetCount: number; usedSheets: number
   remainingSheets: number; nextSheet: number | null; isActive: boolean; isInUse: boolean; version: number; formatId: string | null
-  sayadMiddle: string | null; sayadFirstSerial: number | null; sayadLastSerial: number | null
+  sayadMiddle: string | null; sayadFirstSerial: number | null; sayadLastSerial: number | null; partlyUsed: boolean
 }
+/** Banks issue books of 25, 50 or 100 sheets; a book partly used before go-live is entered with any number of unused sheets (owner, 12 Nov 2026). */
+const BOOK_SIZES = ['25', '50', '100']
 interface Format { id: string; number: number; bankAccountId: string; printType: string; isActive: boolean }
 const PRINT_TYPES: Record<string, [string, string]> = {
   NewLarge: ['جدید – قطع بزرگ', 'New – large'], NewestLarge: ['جدیدترین – قطع بزرگ', 'Newest – large'], OldLarge: ['قدیمی – قطع بزرگ', 'Old – large'],
@@ -44,7 +46,7 @@ const editing = ref<Book | null>(null)
 const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
-const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', sheetCount: '', formatId: '', sayadA: '', sayadB: '', sayadFirst: '' })
+const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', sheetCount: '50', formatId: '', sayadA: '', sayadB: '', sayadFirst: '', partlyUsed: false })
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
 const account = (id: string) => accounts.value.find(a => a.id === id)
@@ -98,16 +100,22 @@ async function loadLists() {
 }
 
 function startNew() {
-  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', sheetCount: '', formatId: '', sayadA: '', sayadB: '', sayadFirst: '' })
+  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', sheetCount: '50', formatId: '', sayadA: '', sayadB: '', sayadFirst: '', partlyUsed: false })
   editing.value = null
   showForm.value = true
   message.value = null
 }
 
+/** Switching back to a new book puts the count on one of the three sizes. */
+function choosePartlyUsed(partly: boolean) {
+  form.partlyUsed = partly
+  if (!partly && !BOOK_SIZES.includes(String(count.value ?? ''))) form.sheetCount = '50'
+}
+
 function startEdit(b: Book) {
   Object.assign(form, {
     bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), sheetCount: String(b.sheetCount), formatId: b.formatId ?? '',
-    sayadA: b.sayadMiddle?.slice(0, 4) ?? '', sayadB: b.sayadMiddle?.slice(4) ?? '', sayadFirst: pad4(b.sayadFirstSerial),
+    sayadA: b.sayadMiddle?.slice(0, 4) ?? '', sayadB: b.sayadMiddle?.slice(4) ?? '', sayadFirst: pad4(b.sayadFirstSerial), partlyUsed: b.partlyUsed,
   })
   editing.value = b
   showForm.value = true
@@ -121,7 +129,7 @@ async function save() {
   const last = lastSheet.value
   if (!Number.isFinite(first)) return fail('ChequeBook.SerialInvalid')
   if (last === null) return fail('ChequeBook.InvalidRange')
-  const sayad = { sayadMiddle: digitsOnly(form.sayadA) + digitsOnly(form.sayadB), sayadFirstSerial: digitsOnly(form.sayadFirst) }
+  const sayad = { sayadMiddle: digitsOnly(form.sayadA) + digitsOnly(form.sayadB), sayadFirstSerial: digitsOnly(form.sayadFirst), partlyUsed: form.partlyUsed }
   busy.value = true
   const r = editing.value
     ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version, formatId: form.formatId || null, ...sayad })
@@ -163,14 +171,26 @@ onMounted(async () => {
         </label>
         <label>{{ t('بانک', 'Bank') }}<input :value="bankName(chosen?.bankId)" readonly tabindex="-1" class="ro" /></label>
         <label>{{ t('شعبه', 'Branch') }}<input :value="chosen ? `${chosen.branchName ?? ''} ${chosen.branchCode ? '(' + chosen.branchCode + ')' : ''}` : ''" readonly tabindex="-1" class="ro" /></label>
+        <div class="kind wide-note" role="radiogroup" :aria-label="t('نوع دسته چک', 'Kind of book')">
+          <label class="choice"><input type="radio" name="kind" :checked="!form.partlyUsed" :disabled="locked" @change="choosePartlyUsed(false)" />
+            {{ t('دسته چک نو (۲۵، ۵۰ یا ۱۰۰ برگ)', 'New book (25, 50 or 100 sheets)') }}</label>
+          <label class="choice"><input type="radio" name="kind" :checked="form.partlyUsed" :disabled="locked" @change="choosePartlyUsed(true)" />
+            {{ t('دسته چک نیمه‌مصرف (از پیش از شروع کار با نرم‌افزار)', 'Partly used book (from before the company started with this software)') }}</label>
+          <small v-if="form.partlyUsed" class="muted">{{ t('فقط برگ‌های استفاده‌نشده را وارد کنید: سریال اولین برگ استفاده‌نشده، تعداد برگ‌های باقی‌مانده (هر تعداد تا ۱۰۰) و سریال صیادی همان برگ.', 'Enter only the unused sheets: the serial of the first unused sheet, how many are left (any number up to 100) and the Sayad serial of that sheet.') }}</small>
+        </div>
         <label class="req"><span>{{ t('شماره سری (۴ رقم)', 'Series (4 digits)') }} <span class="star">*</span></span>
           <input v-model="form.serial" maxlength="4" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="1234" />
         </label>
-        <label class="req"><span>{{ t('شماره سریال آغازین', 'First serial') }} <span class="star">*</span></span>
+        <label class="req"><span>{{ form.partlyUsed ? t('سریال اولین برگ استفاده‌نشده', 'Serial of the first unused sheet') : t('شماره سریال آغازین', 'First serial') }} <span class="star">*</span></span>
           <input v-model="form.firstSheet" maxlength="8" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="567801" />
         </label>
-        <label class="req"><span>{{ t('تعداد برگ دسته چک', 'Number of sheets') }} <span class="star">*</span></span>
-          <input v-model="form.sheetCount" maxlength="3" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="50" />
+        <label v-if="form.partlyUsed" class="req"><span>{{ t('تعداد برگ‌های استفاده‌نشده', 'Unused sheets') }} <span class="star">*</span></span>
+          <input v-model="form.sheetCount" maxlength="3" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="17" />
+        </label>
+        <label v-else class="req"><span>{{ t('تعداد برگ دسته چک', 'Number of sheets') }} <span class="star">*</span></span>
+          <select v-model="form.sheetCount" :disabled="locked">
+            <option v-for="s in BOOK_SIZES" :key="s" :value="s">{{ t(`${num(Number(s))} برگی`, `${s} sheets`) }}</option>
+          </select>
         </label>
         <label>{{ t('شماره سریال پایانی', 'Last serial') }}<input :value="lastSheet ?? ''" dir="ltr" readonly tabindex="-1" class="ro" /></label>
         <div class="req sayad">
@@ -179,9 +199,9 @@ onMounted(async () => {
             <input value="" disabled class="ro" :placeholder="t('هنگام صدور', 'at issue')" :aria-label="t('چهار رقم اول (هنگام صدور چک)', 'First 4 digits (typed at issue)')" />
             <input v-model="form.sayadA" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('رقم‌های ۵ تا ۸', 'Digits 5 to 8')" />
             <input v-model="form.sayadB" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('رقم‌های ۹ تا ۱۲', 'Digits 9 to 12')" />
-            <input v-model="form.sayadFirst" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('سریال صیادی برگ اول', 'Sayad serial of the first sheet')" placeholder="0001" />
+            <input v-model="form.sayadFirst" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="form.partlyUsed ? t('سریال صیادی اولین برگ استفاده‌نشده', 'Sayad serial of the first unused sheet') : t('سریال صیادی برگ اول', 'Sayad serial of the first sheet')" placeholder="0001" />
           </div>
-          <small class="muted">{{ t('۴ رقم اول در هنگام صدور هر چک وارد می‌شود؛ ۸ رقم وسط در همهٔ برگ‌ها یکسان است؛ ۴ رقم آخر سریال صیادی برگ اول است.', 'First 4: typed when each cheque is issued; middle 8: the same on every sheet; last 4: the Sayad serial of the first sheet.') }}
+          <small class="muted">{{ t(form.partlyUsed ? '۴ رقم اول در هنگام صدور هر چک وارد می‌شود؛ ۸ رقم وسط در همهٔ برگ‌ها یکسان است؛ ۴ رقم آخر سریال صیادی اولین برگ استفاده‌نشده است.' : '۴ رقم اول در هنگام صدور هر چک وارد می‌شود؛ ۸ رقم وسط در همهٔ برگ‌ها یکسان است؛ ۴ رقم آخر سریال صیادی برگ اول است.', form.partlyUsed ? 'First 4: typed when each cheque is issued; middle 8: the same on every sheet; last 4: the Sayad serial of the first unused sheet.' : 'First 4: typed when each cheque is issued; middle 8: the same on every sheet; last 4: the Sayad serial of the first sheet.') }}
             <template v-if="sayadLast"> {{ t(`سریال صیادی برگ آخر: ${sayadLast}`, `Last sheet: ${sayadLast}`) }}</template>
           </small>
         </div>
@@ -220,7 +240,7 @@ onMounted(async () => {
               <td>{{ bankName(account(b.bankAccountId)?.bankId) }}</td>
               <td dir="ltr">{{ b.serial }}/{{ b.firstSheet }} – {{ b.lastSheet }}</td>
               <td dir="ltr" class="small">{{ b.sayadMiddle ? `____ ${b.sayadMiddle.slice(0, 4)} ${b.sayadMiddle.slice(4)} ${pad4(b.sayadFirstSerial)}–${pad4(b.sayadLastSerial)}` : '' }}</td>
-              <td>{{ num(b.sheetCount) }}</td><td>{{ num(b.usedSheets) }}</td><td>{{ num(b.remainingSheets) }}</td>
+              <td>{{ num(b.sheetCount) }} <small v-if="b.partlyUsed" class="tr-badge" :title="t('دسته چک نیمه‌مصرف از پیش از شروع کار؛ فقط برگ‌های استفاده‌نشده ثبت شده است.', 'Partly used before go-live; only its unused sheets are registered.')">{{ t('نیمه‌مصرف', 'partly used') }}</small></td><td>{{ num(b.usedSheets) }}</td><td>{{ num(b.remainingSheets) }}</td>
               <td dir="ltr">{{ b.nextSheet ?? '' }}</td>
               <td>{{ formatName(b.formatId) }}</td>
               <td>{{ b.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
@@ -273,4 +293,9 @@ button:disabled { opacity: .5; cursor: default; }
 .sayad-boxes input { text-align: center; letter-spacing: .15em; min-width: 0; }
 .req .sayad-boxes input:not(.ro) { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 input:disabled { background: #f5f7fa; color: #7b8794; }
+select { padding: .45rem .5rem; border: 1px solid #d64545; border-radius: 6px; font: inherit; background: #fff; }
+.kind { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; }
+.kind small { flex-basis: 100%; }
+.choice { flex-direction: row; align-items: center; gap: .4rem; font-size: .9rem; }
+.tr-badge { background: #fff4e5; color: #8a4b00; border-radius: 4px; padding: 0 .3rem; font-size: .75rem; white-space: nowrap; }
 </style>
