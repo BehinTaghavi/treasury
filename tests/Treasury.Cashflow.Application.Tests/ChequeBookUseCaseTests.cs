@@ -27,7 +27,7 @@ public sealed class ChequeBookUseCaseTests : IDisposable
     private readonly Guid _account = Guid.NewGuid();
 
     public ChequeBookUseCaseTests() =>
-        _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), _accounts, new InMemoryIdempotencyStore(_db));
+        _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), _accounts, new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
 
     public void Dispose() => _db.Dispose();
 
@@ -55,11 +55,11 @@ public sealed class ChequeBookUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task The_same_sheet_numbers_twice_for_one_account_and_series_are_refused()
+    public async Task The_same_sheet_numbers_twice_for_one_account_are_refused_whatever_the_series()
     {
         await Register("A", 1001, 1050);
         Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, " a ", 1040, 1060), CancellationToken.None)).ErrorCode);
-        await Register("B", 1040, 1060);                         // other series
+        Assert.Equal("ChequeBook.Overlaps", (await _books.RegisterAsync(new(Key(), _account, "B", 1040, 1060), CancellationToken.None)).ErrorCode);
         await Register("A", 1040, 1060, Guid.NewGuid());          // other account
         await Register("A", 1051, 1100);                          // right after
     }

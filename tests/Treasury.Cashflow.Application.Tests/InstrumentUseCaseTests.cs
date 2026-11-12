@@ -27,7 +27,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"));
-        _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), new FakeBankAccounts(), new InMemoryIdempotencyStore(_db));
+        _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), new FakeBankAccounts(), new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
     }
 
     public void Dispose() => _db.Dispose();

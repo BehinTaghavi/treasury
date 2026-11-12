@@ -37,6 +37,9 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 
     public long LastSheet { get; private set; }
 
+    /// <summary>The cheque type (print design) the book is printed with (manual item 6 "شماره / نوع چک"); null: not chosen yet.</summary>
+    public Guid? FormatId { get; private set; }
+
     /// <summary>A sheet has been issued or voided: from then on the book can no longer be corrected or deleted.</summary>
     public bool IsInUse => _usedSheets.Count > 0;
 
@@ -78,13 +81,48 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         Raise(new ChequeBookCorrected(Id, Serial, FirstSheet, LastSheet));
     }
 
-    /// <summary>Do two books of the same account and series share sheet numbers? (same cheque number twice on one account)</summary>
+    /// <summary>
+    /// Names the cheque type the book is printed with: a type of the same bank account. Allowed at any time, also after sheets were
+    /// used (a type kept from before may have been switched off since).
+    /// </summary>
+    public void UseFormat(ChequeFormat? format)
+    {
+        if (format is null)
+        {
+            if (FormatId is not null)
+            {
+                FormatId = null;
+                Raise(new ChequeBookFormatChosen(Id, null));
+            }
+
+            return;
+        }
+
+        if (format.BankAccountId != BankAccountId)
+        {
+            throw new DomainException("ChequeBook.FormatOtherAccount", "The cheque type belongs to another bank account.");
+        }
+
+        if (!format.IsActive && format.Id != FormatId)
+        {
+            throw new DomainException("ChequeBook.FormatInactive", "The cheque type is switched off.");
+        }
+
+        if (format.Id != FormatId)
+        {
+            FormatId = format.Id;
+            Raise(new ChequeBookFormatChosen(Id, format.Id));
+        }
+    }
+
+    /// <summary>
+    /// Do two books of the same bank account share sheet numbers, whatever their series? Owner, 12 Nov 2026: "دو دسته چک از یک
+    /// حساب بانک نمی‌توانند شماره برگ چک مشترک یا مشابه داشته باشند".
+    /// </summary>
     public bool Overlaps(ChequeBook other)
     {
         ArgumentNullException.ThrowIfNull(other);
-        return other.Id != Id && other.BankAccountId == BankAccountId
-            && string.Equals(PersianText.Key(other.Serial), PersianText.Key(Serial), StringComparison.Ordinal)
-            && other.FirstSheet <= LastSheet && FirstSheet <= other.LastSheet;
+        return other.Id != Id && other.BankAccountId == BankAccountId && other.FirstSheet <= LastSheet && FirstSheet <= other.LastSheet;
     }
 
     /// <summary>Deletes a book registered by mistake: only while none of its sheets has been used.</summary>
@@ -180,9 +218,9 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         Raise(new ChequeBookActivated(Id));
     }
 
-    public static ChequeBook Restore(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, bool isActive, IEnumerable<KeyValuePair<long, SheetUse>> usedSheets, long version)
+    public static ChequeBook Restore(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, bool isActive, IEnumerable<KeyValuePair<long, SheetUse>> usedSheets, long version, Guid? formatId = null)
     {
-        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive };
+        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive, FormatId = formatId };
         foreach (var (sheet, use) in usedSheets)
         {
             book._usedSheets[sheet] = use;
@@ -255,3 +293,5 @@ public sealed record ChequeBookActivated(Guid ChequeBookId) : DomainEvent;
 public sealed record ChequeBookCorrected(Guid ChequeBookId, string Serial, long FirstSheet, long LastSheet) : DomainEvent;
 
 public sealed record ChequeBookDeleted(Guid ChequeBookId) : DomainEvent;
+
+public sealed record ChequeBookFormatChosen(Guid ChequeBookId, Guid? ChequeFormatId) : DomainEvent;

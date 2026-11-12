@@ -42,7 +42,7 @@ public sealed class PostgresAdapterTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"));
-        _books = new ChequeBookUseCases(_unitOfWork, new PostgresChequeBookRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource));
+        _books = new ChequeBookUseCases(_unitOfWork, new PostgresChequeBookRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource), new PostgresChequeFormatRepository());
     }
 
     /// <summary>accounts-svc stand-in: every bank account exists and is active.</summary>
@@ -52,6 +52,24 @@ public sealed class PostgresAdapterTests : IDisposable
     }
 
     public void Dispose() => _dataSource.Dispose();
+
+    [Fact]
+    public async Task A_cheque_type_with_its_scan_round_trips_and_a_book_keeps_it()
+    {
+        var formats = new ChequeFormatUseCases(_unitOfWork, new PostgresChequeFormatRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource));
+        var id = await formats.RegisterAsync(Key(), _account, Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType.NewLarge, CancellationToken.None);
+        Assert.True(id.IsSuccess, id.ErrorCode);
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 1, 2, 3, 4];
+        Assert.True((await formats.AttachImageAsync(Key(), id.Value, jpeg, 1, CancellationToken.None)).IsSuccess);
+        var image = (await formats.GetImageAsync(id.Value, CancellationToken.None))!.Value;
+        Assert.Equal("image/jpeg", image.ContentType);
+        Assert.Equal(jpeg, image.Data);
+
+        var book = await _books.RegisterAsync(new(Key(), _account, "B", 8001, 8010, id.Value), CancellationToken.None);
+        Assert.True(book.IsSuccess, book.ErrorCode);
+        Assert.Equal(id.Value, (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == book.Value).FormatId);
+        Assert.Equal("ChequeFormat.InUse", (await formats.ChangeStateAsync(Key(), id.Value, "delete", 2, CancellationToken.None)).ErrorCode);
+    }
 
     [Fact]
     public async Task A_cheque_book_is_corrected_listed_and_deleted_while_unused_and_kept_once_a_sheet_is_used()

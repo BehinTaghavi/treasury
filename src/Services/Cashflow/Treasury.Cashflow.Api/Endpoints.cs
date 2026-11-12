@@ -12,9 +12,13 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 
 public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference);
 
-public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet);
+public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null);
 
-public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version);
+public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null);
+
+public sealed record ChequeFormatRequest(Guid BankAccountId, Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType);
+
+public sealed record ChequeFormatChange(Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType, long Version);
 
 public sealed record ChequeBookVersion(long Version);
 
@@ -51,12 +55,41 @@ public static class Endpoints
 
         api.MapPost("/cheque-books", async (ChequeBookRequest r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RegisterAsync(
-                new RegisterChequeBookCommand(Key(http), r.BankAccountId, r.Serial, r.FirstSheet, r.LastSheet), ct).ConfigureAwait(false),
+                new RegisterChequeBookCommand(Key(http), r.BankAccountId, r.Serial, r.FirstSheet, r.LastSheet, r.FormatId), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/cheque-books/{id}"));
 
         api.MapPut("/cheque-books/{id:guid}", async (Guid id, ChequeBookCorrection r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.CorrectAsync(new CorrectChequeBookCommand(Key(http), id, r.Serial, r.FirstSheet, r.LastSheet, r.Version), ct).ConfigureAwait(false),
+            ToHttp(await useCases.CorrectAsync(new CorrectChequeBookCommand(Key(http), id, r.Serial, r.FirstSheet, r.LastSheet, r.Version, r.FormatId), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/cheque-books/{id}"));
+
+        // Cheque types (Basic Information, manual item 7) with the scan of each cheque.
+        api.MapGet("/cheque-formats", async (Guid? bankAccountId, bool? includeInactive, ChequeFormatUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListAsync(bankAccountId, includeInactive ?? false, ct).ConfigureAwait(false)));
+
+        api.MapPost("/cheque-formats", async (ChequeFormatRequest r, HttpRequest http, ChequeFormatUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RegisterAsync(Key(http), r.BankAccountId, r.PrintType, ct).ConfigureAwait(false), id => $"/api/cashflow/cheque-formats/{id}"));
+
+        api.MapPut("/cheque-formats/{id:guid}", async (Guid id, ChequeFormatChange r, HttpRequest http, ChequeFormatUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ChangePrintTypeAsync(Key(http), id, r.PrintType, r.Version, ct).ConfigureAwait(false), _ => $"/api/cashflow/cheque-formats/{id}"));
+
+        api.MapPost("/cheque-formats/{id:guid}/{change:regex(^(activate|deactivate|delete)$)}", async (Guid id, string change, ChequeBookVersion r, HttpRequest http, ChequeFormatUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ChangeStateAsync(Key(http), id, change, r.Version, ct).ConfigureAwait(false), _ => $"/api/cashflow/cheque-formats/{id}"));
+
+        // The scan: multipart form with "file" and "version"; at most 2 MB (checked again by the domain).
+        api.MapPost("/cheque-formats/{id:guid}/image", async (Guid id, IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] long version, HttpRequest http, ChequeFormatUseCases useCases, CancellationToken ct) =>
+        {
+            if (file.Length > Treasury.Cashflow.Domain.ChequeBooks.ChequeFormat.MaxImageBytes)
+            {
+                return ToHttp(Result<Guid>.Fail("ChequeFormat.ImageTooLarge", "The scan file is larger than 2 MB."), _ => string.Empty);
+            }
+
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            return ToHttp(await useCases.AttachImageAsync(Key(http), id, buffer.ToArray(), version, ct).ConfigureAwait(false), _ => $"/api/cashflow/cheque-formats/{id}/image");
+        }).DisableAntiforgery();
+
+        api.MapGet("/cheque-formats/{id:guid}/image", async (Guid id, ChequeFormatUseCases useCases, CancellationToken ct) =>
+            await useCases.GetImageAsync(id, ct).ConfigureAwait(false) is { } image ? Results.File(image.Data, image.ContentType) : Results.NotFound());
 
         api.MapPost("/cheque-books/{id:guid}/{change:regex(^(activate|deactivate|delete)$)}", async (Guid id, string change, ChequeBookVersion r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(new ChangeChequeBookStateCommand(Key(http), id, change, r.Version), ct).ConfigureAwait(false),
@@ -91,7 +124,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "Instrument.NotFound" or "ChequeBook.NotFound" => StatusCodes.Status404NotFound,
+            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Accounts.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

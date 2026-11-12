@@ -18,6 +18,8 @@ public sealed class InMemoryDatabase : IDisposable
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, InstrumentSnapshot> Instruments = [];
     internal readonly Dictionary<Guid, ChequeBookSnapshot> ChequeBooks = [];
+    internal readonly Dictionary<Guid, ChequeFormatSnapshot> ChequeFormats = [];
+    internal readonly Dictionary<Guid, (string Type, byte[] Data)> ChequeImages = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -43,6 +45,10 @@ internal sealed class PendingChanges
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
 
     public HashSet<Guid> DeletedChequeBooks { get; } = [];
+
+    public Dictionary<Guid, ChequeFormatSnapshot?> ChequeFormats { get; } = []; // null: deleted
+
+    public Dictionary<Guid, (string Type, byte[] Data)> ChequeImages { get; } = [];
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -79,6 +85,24 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var id in pending.DeletedChequeBooks)
                 {
                     db.ChequeBooks.Remove(id);
+                }
+
+                foreach (var (id, s) in pending.ChequeFormats)
+                {
+                    if (s is null)
+                    {
+                        db.ChequeFormats.Remove(id);
+                        db.ChequeImages.Remove(id);
+                    }
+                    else
+                    {
+                        db.ChequeFormats[id] = s;
+                    }
+                }
+
+                foreach (var (id, image) in pending.ChequeImages)
+                {
+                    db.ChequeImages[id] = image;
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -262,6 +286,104 @@ public sealed class InMemoryChequeBookRepository(InMemoryDatabase db) : IChequeB
         pending.ChequeBooks[book.Id] = ChequeBookSnapshot.From(book, newVersion);
         pending.Outbox.AddRange(book.PendingEvents.Select(OutboxMessage.From));
         book.MarkSaved(newVersion);
+    }
+}
+
+public sealed class InMemoryChequeFormatRepository(InMemoryDatabase db) : IChequeFormatRepository
+{
+    public Task<ChequeFormat?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Visible().GetValueOrDefault(id)?.ToDomain());
+
+    public Task<IReadOnlyList<ChequeFormat>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ChequeFormat>>(Visible().Values
+            .Where(s => (bankAccountId is null || s.BankAccountId == bankAccountId) && (includeInactive || s.IsActive)).Select(s => s.ToDomain()).ToList());
+
+    public Task<int> NextNumberAsync(CancellationToken cancellationToken) => Task.FromResult(Visible().Values.Select(s => s.Number).DefaultIfEmpty(0).Max() + 1);
+
+    public Task<bool> IsUsedAsync(Guid id, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            var staged = InMemoryUnitOfWork.Pending?.ChequeBooks.Values ?? Enumerable.Empty<ChequeBookSnapshot>();
+            return Task.FromResult(db.ChequeBooks.Values.Concat(staged).Any(b => b.FormatId == id));
+        }
+    }
+
+    public Task AddAsync(ChequeFormat format, CancellationToken cancellationToken) => Write(format, 1, null, null);
+
+    public Task SaveAsync(ChequeFormat format, CancellationToken cancellationToken, byte[]? image = null)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        return Write(format, format.Version + 1, format.Version, image);
+    }
+
+    public Task DeleteAsync(ChequeFormat format, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        Check(format.Id, format.Version);
+        var pending = Pending();
+        pending.ChequeFormats[format.Id] = null;
+        pending.Outbox.AddRange(format.PendingEvents.Select(OutboxMessage.From));
+        format.MarkSaved(format.Version);
+        return Task.CompletedTask;
+    }
+
+    public Task<(string ContentType, byte[] Data)?> GetImageAsync(Guid id, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            return Task.FromResult<(string, byte[])?>(db.ChequeImages.TryGetValue(id, out var i) ? (i.Type, i.Data) : null);
+        }
+    }
+
+    private Task Write(ChequeFormat format, long newVersion, long? expected, byte[]? image)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        if (expected is { } v)
+        {
+            Check(format.Id, v);
+        }
+
+        var pending = Pending();
+        pending.ChequeFormats[format.Id] = ChequeFormatSnapshot.From(format, newVersion);
+        if (image is not null && format.ImageType is { } type)
+        {
+            pending.ChequeImages[format.Id] = (type, image);
+        }
+
+        pending.Outbox.AddRange(format.PendingEvents.Select(OutboxMessage.From));
+        format.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+
+    private void Check(Guid id, long expected)
+    {
+        if (Visible().GetValueOrDefault(id)?.Version != expected)
+        {
+            throw new ConcurrencyConflictException($"Cheque type {id} was changed by someone else.");
+        }
+    }
+
+    private static PendingChanges Pending() => InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+
+    private Dictionary<Guid, ChequeFormatSnapshot> Visible()
+    {
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, ChequeFormatSnapshot>(db.ChequeFormats);
+            foreach (var (id, s) in InMemoryUnitOfWork.Pending?.ChequeFormats ?? [])
+            {
+                if (s is null)
+                {
+                    all.Remove(id);
+                }
+                else
+                {
+                    all[id] = s;
+                }
+            }
+
+            return all;
+        }
     }
 }
 

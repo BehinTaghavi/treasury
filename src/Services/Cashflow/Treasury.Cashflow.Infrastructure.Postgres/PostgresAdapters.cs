@@ -22,6 +22,7 @@ public static class PostgresRegistration
         services.AddSingleton<IUnitOfWork>(sp => sp.GetRequiredService<PostgresUnitOfWork>());
         services.AddSingleton<IInstrumentRepository, PostgresInstrumentRepository>();
         services.AddSingleton<IChequeBookRepository, PostgresChequeBookRepository>();
+        services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -61,6 +62,17 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             var result = await work(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cheque_format")
+        {
+            // Two users added a type at the same moment: the indexes decide.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("ChequeFormat.Taken", "This bank account already has this cheque type (or the print number was taken; save again).");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName == "cheque_book_format")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("ChequeFormat.InUse", "Cheque books are printed with this type.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cheque_sheet")
         {
@@ -267,13 +279,14 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ChequeBookSnapshot? head = null;
         // Row lock: a second user issuing from the same book waits here until the first transaction ends.
         await using (var cmd = tx.Command(
-            "SELECT bank_account_id, serial, first_sheet, last_sheet, is_active, version FROM cashflow.cheque_book WHERE id = @id FOR UPDATE"))
+            "SELECT bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id FROM cashflow.cheque_book WHERE id = @id FOR UPDATE"))
         {
             cmd.Parameters.AddWithValue("id", id);
             await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                head = new ChequeBookSnapshot(id, r.GetGuid(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetBoolean(4), new Dictionary<long, SheetUse>(), r.GetInt64(5));
+                head = new ChequeBookSnapshot(id, r.GetGuid(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetBoolean(4), new Dictionary<long, SheetUse>(), r.GetInt64(5),
+                    r.IsDBNull(6) ? null : r.GetGuid(6));
             }
         }
 
@@ -302,8 +315,9 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ArgumentNullException.ThrowIfNull(book);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, is_active, version) VALUES (@id, @account, @serial, @first, @last, @active, 1)"))
+            "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id) VALUES (@id, @account, @serial, @first, @last, @active, 1, @format)"))
         {
+            cmd.Parameters.Add(new NpgsqlParameter("format", NpgsqlDbType.Uuid) { Value = (object?)book.FormatId ?? DBNull.Value });
             cmd.Parameters.AddWithValue("id", book.Id);
             cmd.Parameters.AddWithValue("account", book.BankAccountId);
             cmd.Parameters.AddWithValue("serial", book.Serial);
@@ -324,9 +338,10 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ArgumentNullException.ThrowIfNull(book);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE cashflow.cheque_book SET serial = @serial, first_sheet = @first, last_sheet = @last, is_active = @active, version = version + 1 " +
+            "UPDATE cashflow.cheque_book SET serial = @serial, first_sheet = @first, last_sheet = @last, is_active = @active, format_id = @format, version = version + 1 " +
             "WHERE id = @id AND version = @expected"))
         {
+            cmd.Parameters.Add(new NpgsqlParameter("format", NpgsqlDbType.Uuid) { Value = (object?)book.FormatId ?? DBNull.Value });
             cmd.Parameters.AddWithValue("serial", book.Serial);
             cmd.Parameters.AddWithValue("first", book.FirstSheet);
             cmd.Parameters.AddWithValue("last", book.LastSheet);
@@ -369,7 +384,7 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         var tx = PostgresUnitOfWork.Current;
         var heads = new List<ChequeBookSnapshot>();
         await using (var cmd = tx.Command(
-            "SELECT id, bank_account_id, serial, first_sheet, last_sheet, is_active, version FROM cashflow.cheque_book " +
+            "SELECT id, bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id FROM cashflow.cheque_book " +
             "WHERE (@account::uuid IS NULL OR bank_account_id = @account) AND (@all OR is_active)"))
         {
             cmd.Parameters.Add(new NpgsqlParameter("account", NpgsqlDbType.Uuid) { Value = (object?)bankAccountId ?? DBNull.Value });
@@ -377,7 +392,8 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
             await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                heads.Add(new ChequeBookSnapshot(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetBoolean(5), new Dictionary<long, SheetUse>(), r.GetInt64(6)));
+                heads.Add(new ChequeBookSnapshot(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetBoolean(5), new Dictionary<long, SheetUse>(), r.GetInt64(6),
+                    r.IsDBNull(7) ? null : r.GetGuid(7)));
             }
         }
 

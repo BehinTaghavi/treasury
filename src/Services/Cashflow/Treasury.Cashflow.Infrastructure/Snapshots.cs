@@ -50,12 +50,19 @@ public sealed record InstrumentSnapshot(
 
 public sealed record HistorySnapshot(InstrumentAction Action, InstrumentState? From, InstrumentState To, DateOnly Date, string UserId, string? Reference, string? Note);
 
-public sealed record ChequeBookSnapshot(Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, bool IsActive, IReadOnlyDictionary<long, SheetUse> UsedSheets, long Version)
+public sealed record ChequeBookSnapshot(Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, bool IsActive, IReadOnlyDictionary<long, SheetUse> UsedSheets, long Version, Guid? FormatId = null)
 {
     public static ChequeBookSnapshot From(ChequeBook b, long version) =>
-        new(b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.IsActive, new Dictionary<long, SheetUse>(b.UsedSheets), version);
+        new(b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.IsActive, new Dictionary<long, SheetUse>(b.UsedSheets), version, b.FormatId);
 
-    public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version);
+    public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version, FormatId);
+}
+
+public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)
+{
+    public static ChequeFormatSnapshot From(ChequeFormat f, long version) => new(f.Id, f.Number, f.BankAccountId, f.PrintType, f.ImageType, f.IsActive, version);
+
+    public ChequeFormat ToDomain() => ChequeFormat.Restore(Id, Number, BankAccountId, PrintType, ImageType, IsActive, Version);
 }
 
 /// <summary>A domain event waiting in the outbox. Saved in the same transaction as the aggregate; published afterwards.</summary>

@@ -75,13 +75,13 @@ public sealed class ChequeBookTests
     }
 
     [Fact]
-    public void Books_overlap_only_for_the_same_account_and_series()
+    public void Books_of_one_account_never_share_sheet_numbers_whatever_their_series()
     {
         var account = Guid.NewGuid();
         var a = ChequeBook.Register(Guid.NewGuid(), account, "الف", 100, 150);
         Assert.True(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, " الف ", 150, 200)));
         Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "الف", 151, 200)));
-        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "ب", 120, 130)));
+        Assert.True(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "ب", 120, 130)));
         Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "الف", 120, 130)));
         Assert.False(a.Overlaps(a));
     }

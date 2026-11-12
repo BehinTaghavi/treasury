@@ -5,9 +5,11 @@ using Treasury.Cashflow.Domain.ChequeBooks;
 
 namespace Treasury.Cashflow.Application.ChequeBooks;
 
-public sealed record RegisterChequeBookCommand(string IdempotencyKey, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet);
+/// <param name="FormatId">The cheque type (print design) of the book; null: not chosen yet.</param>
+public sealed record RegisterChequeBookCommand(string IdempotencyKey, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null);
 
-public sealed record CorrectChequeBookCommand(string IdempotencyKey, Guid Id, string Serial, long FirstSheet, long LastSheet, long ExpectedVersion);
+/// <summary>Series and range change only while no sheet is used; the cheque type can always be chosen.</summary>
+public sealed record CorrectChequeBookCommand(string IdempotencyKey, Guid Id, string Serial, long FirstSheet, long LastSheet, long ExpectedVersion, Guid? FormatId = null);
 
 /// <summary><paramref name="Change"/>: "activate", "deactivate" or "delete".</summary>
 public sealed record ChangeChequeBookStateCommand(string IdempotencyKey, Guid Id, string Change, long ExpectedVersion);
@@ -15,18 +17,20 @@ public sealed record ChangeChequeBookStateCommand(string IdempotencyKey, Guid Id
 /// <param name="NextSheet">The sheet the issue form will suggest; null when none is left or the book is off.</param>
 public sealed record ChequeBookView(
     Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, long SheetCount, long UsedSheets, long RemainingSheets,
-    long? NextSheet, bool IsActive, bool IsInUse, long Version)
+    long? NextSheet, bool IsActive, bool IsInUse, long Version, Guid? FormatId)
 {
     public static ChequeBookView From(ChequeBook b) => new(
         b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.SheetCount, b.UsedSheets.Count, b.RemainingSheets, b.SuggestNext(),
-        b.IsActive, b.IsInUse, b.Version);
+        b.IsActive, b.IsInUse, b.Version, b.FormatId);
 }
 
 /// <summary>
-/// The cheque books screen (new-version manual item 6 "معرفی دسته چک ها"): register for one of our active bank accounts, correct or
+/// The cheque books screen (new-version manual item 6 "معرفی دسته چک ها"): register for one of our active bank accounts (no two books
+/// of one account share a sheet number, owner 12 Nov 2026), correct or
 /// delete while no sheet has been used, switch off and on. Sheets are handed out only by InstrumentUseCases.IssueChequeAsync.
 /// </summary>
-public sealed class ChequeBookUseCases(IUnitOfWork unitOfWork, IChequeBookRepository books, IBankAccountLookup bankAccounts, IIdempotencyStore idempotency)
+public sealed class ChequeBookUseCases(
+    IUnitOfWork unitOfWork, IChequeBookRepository books, IBankAccountLookup bankAccounts, IIdempotencyStore idempotency, IChequeFormatRepository formats)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -58,9 +62,10 @@ public sealed class ChequeBookUseCases(IUnitOfWork unitOfWork, IChequeBookReposi
         return await RunAsync(command.IdempotencyKey, async ct =>
         {
             var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet);
+            book.UseFormat(await FormatAsync(command.FormatId, ct).ConfigureAwait(false));
             if (await OverlapsAsync(book, ct).ConfigureAwait(false))
             {
-                return Result<Guid>.Fail("ChequeBook.Overlaps", "Another cheque book of this account and series already has these sheet numbers.");
+                return Result<Guid>.Fail("ChequeBook.Overlaps", "Another cheque book of this bank account already has these sheet numbers.");
             }
 
             await books.AddAsync(book, ct).ConfigureAwait(false);
@@ -72,10 +77,15 @@ public sealed class ChequeBookUseCases(IUnitOfWork unitOfWork, IChequeBookReposi
         RunAsync(command.IdempotencyKey, async ct =>
         {
             var book = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
-            book.Correct(command.Serial, command.FirstSheet, command.LastSheet);
+            book.UseFormat(await FormatAsync(command.FormatId, ct).ConfigureAwait(false));
+            if (!book.IsInUse || (PersianText.Clean(command.Serial), command.FirstSheet, command.LastSheet) != (book.Serial, book.FirstSheet, book.LastSheet))
+            {
+                book.Correct(command.Serial, command.FirstSheet, command.LastSheet);
+            }
+
             if (await OverlapsAsync(book, ct).ConfigureAwait(false))
             {
-                return Result<Guid>.Fail("ChequeBook.Overlaps", "Another cheque book of this account and series already has these sheet numbers.");
+                return Result<Guid>.Fail("ChequeBook.Overlaps", "Another cheque book of this bank account already has these sheet numbers.");
             }
 
             await books.SaveAsync(book, ct).ConfigureAwait(false);
@@ -113,6 +123,11 @@ public sealed class ChequeBookUseCases(IUnitOfWork unitOfWork, IChequeBookReposi
                 .OrderByDescending(b => b.IsActive).ThenBy(b => b.Serial, StringComparer.Ordinal).ThenBy(b => b.FirstSheet)
                 .Select(ChequeBookView.From).ToList(),
             cancellationToken);
+
+    private async Task<ChequeFormat?> FormatAsync(Guid? id, CancellationToken ct) =>
+        id is { } formatId
+            ? await formats.GetAsync(formatId, ct).ConfigureAwait(false) ?? throw new DomainException("ChequeFormat.NotFound", "The cheque type was not found.")
+            : null;
 
     private async Task<bool> OverlapsAsync(ChequeBook book, CancellationToken ct) =>
         (await books.ListAsync(book.BankAccountId, includeInactive: true, ct).ConfigureAwait(false)).Any(book.Overlaps);

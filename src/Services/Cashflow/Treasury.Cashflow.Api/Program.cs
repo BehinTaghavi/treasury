@@ -32,6 +32,7 @@ if (!usePostgres)
     builder.Services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
     builder.Services.AddSingleton<IInstrumentRepository, InMemoryInstrumentRepository>();
     builder.Services.AddSingleton<IChequeBookRepository, InMemoryChequeBookRepository>();
+    builder.Services.AddSingleton<IChequeFormatRepository, InMemoryChequeFormatRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 }
 
@@ -71,6 +72,7 @@ builder.Services.AddSingleton<IPaymentApprovalQuery>(policies);
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddScoped<InstrumentUseCases>();
 builder.Services.AddScoped<Treasury.Cashflow.Application.ChequeBooks.ChequeBookUseCases>();
+builder.Services.AddScoped<Treasury.Cashflow.Application.ChequeBooks.ChequeFormatUseCases>();
 
 // accounts-svc answers whether a bank account exists and is active (ADR 0001: through its API, never its tables).
 var accountsUrl = builder.Configuration["Services:Accounts"] ?? throw new InvalidOperationException("Services:Accounts (accounts-svc address) is not configured.");

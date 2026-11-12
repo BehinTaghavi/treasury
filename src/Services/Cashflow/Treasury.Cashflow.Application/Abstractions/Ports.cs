@@ -36,6 +36,29 @@ public interface IChequeBookRepository
     Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken);
 }
 
+/// <summary>Cheque types (print designs) of our bank accounts, with their scans.</summary>
+public interface IChequeFormatRepository
+{
+    Task<ChequeFormat?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ChequeFormat>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken);
+
+    /// <summary>One more than the highest print number so far.</summary>
+    Task<int> NextNumberAsync(CancellationToken cancellationToken);
+
+    /// <summary>Does a cheque book name this type?</summary>
+    Task<bool> IsUsedAsync(Guid id, CancellationToken cancellationToken);
+
+    Task AddAsync(ChequeFormat format, CancellationToken cancellationToken);
+
+    /// <summary>Saves the type; with <paramref name="image"/> also replaces its scan, in the same transaction.</summary>
+    Task SaveAsync(ChequeFormat format, CancellationToken cancellationToken, byte[]? image = null);
+
+    Task DeleteAsync(ChequeFormat format, CancellationToken cancellationToken);
+
+    Task<(string ContentType, byte[] Data)?> GetImageAsync(Guid id, CancellationToken cancellationToken);
+}
+
 /// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
 public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive);
 
