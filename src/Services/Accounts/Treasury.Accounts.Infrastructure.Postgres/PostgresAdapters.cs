@@ -21,6 +21,7 @@ public static class PostgresRegistration
         services.AddSingleton<IUnitOfWork, PostgresUnitOfWork>();
         services.AddSingleton<IBankAccountRepository, PostgresBankAccountRepository>();
         services.AddSingleton<ICashDeskRepository, PostgresCashDeskRepository>();
+        services.AddSingleton<IPettyCashRepository, PostgresPettyCashRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -49,6 +50,11 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             var result = await work(cancellationToken).ConfigureAwait(false);
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "petty_cash")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("PettyCash.HolderTaken", "This holder already has a petty cash.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cash_desk")
         {

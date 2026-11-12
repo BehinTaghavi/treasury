@@ -62,6 +62,25 @@ public sealed class BankAccountPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_petty_cash_round_trips_with_its_amounts_and_purpose_groups()
+    {
+        var funds = new Treasury.Accounts.Application.PettyCash.PettyCashUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresPettyCashRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        // One petty cash per holder and the test database is kept between runs: register once, then change.
+        var form = new Treasury.Accounts.Application.PettyCash.PettyCashForm(
+            "111078", "130100", 75_000_000_000, 60_000_000_000, 1_000_000_000, [FakeReference.Expenses], Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.Cheque);
+        var existing = (await funds.ListAsync(true, CancellationToken.None)).FirstOrDefault(f => f.HolderDetailCode == "111078");
+        var r = existing is null
+            ? await funds.RegisterAsync(Key(), form, CancellationToken.None)
+            : await funds.ChangeAsync(Key(), existing.Id, form, existing.Version, CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await funds.ListAsync(true, CancellationToken.None)).Single(f => f.Id == r.Value);
+        Assert.Equal((75_000_000_000m, 60_000_000_000m, 1_000_000_000m), (v.Amount, v.SettleLimit, v.PayCeiling));
+        Assert.Equal([FakeReference.Expenses], v.AllowedPurposeGroupIds);
+        Assert.Equal("PettyCash.HolderTaken", (await funds.RegisterAsync(Key(), form, CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task The_collection_priority_is_stored_as_a_number_or_none()
     {
         var first = await _useCases.RegisterAsync(new(Key(), Form("p1", priority: 3)), CancellationToken.None);

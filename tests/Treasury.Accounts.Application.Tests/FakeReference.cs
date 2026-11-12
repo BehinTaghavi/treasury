@@ -62,6 +62,16 @@ public sealed class FakeReference : IReferenceLookup
 
     public Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken) => Answer(_details.GetValueOrDefault(code));
 
+    public static readonly Guid Expenses = Guid.NewGuid();
+    public static readonly Guid Advances = Guid.NewGuid();
+    public static readonly Guid SalesReceipts = Guid.NewGuid();
+
+    public Task<Treasury.Accounts.Domain.PettyCash.PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
+        Answer(id == Expenses ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, true, true)
+            : id == Advances ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, true, true)
+            : id == SalesReceipts ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, false, true)
+            : null);
+
     public Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
         Answer(_details.ContainsKey(code) ? $"تفصیل {code}" : null);
 

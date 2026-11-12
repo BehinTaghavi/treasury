@@ -1,5 +1,6 @@
 using Treasury.Accounts.Domain.BankAccounts;
 using Treasury.Accounts.Domain.CashDesks;
+using Treasury.Accounts.Domain.PettyCash;
 
 namespace Treasury.Accounts.Application.Abstractions;
 
@@ -34,6 +35,20 @@ public interface ICashDeskRepository
     Task<IReadOnlyList<CashDesk>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 }
 
+public interface IPettyCashRepository
+{
+    Task<PettyCashFund?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Does another petty cash have this holder? (one petty cash per holder)</summary>
+    Task<bool> HolderTakenAsync(string holderDetailCode, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task AddAsync(PettyCashFund fund, CancellationToken cancellationToken);
+
+    Task SaveAsync(PettyCashFund fund, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PettyCashFund>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+}
+
 /// <summary>An entry of a reference-svc list (bank name, city, currency) as reference-svc returns it.</summary>
 public sealed record ReferenceEntry(Guid Id, string Name, string? Code, bool IsActive);
 
@@ -53,6 +68,9 @@ public interface IReferenceLookup
     Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
     Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>A purpose group of reference-svc; null when unknown.</summary>
+    Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>Name of a تفصیل (e.g. the holder of a cash desk); null when unknown.</summary>
     Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken);

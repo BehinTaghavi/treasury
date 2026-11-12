@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.Accounts.Domain.PettyCash;
 using Treasury.BuildingBlocks.Domain;
 
 namespace Treasury.Accounts.Infrastructure;
@@ -15,6 +16,8 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
     private sealed record Entry(Guid Id, string Name, string? Code, bool IsActive);
 
     private sealed record Account(string Code, bool IsActive, bool IsPostable, string[] Detail1Types, string[] Detail2Types);
+
+    private sealed record Group(Guid Id, string Direction, bool IsActive);
 
     private sealed record Detail(string Code, string? Type, bool IsActive, string? Name = null);
 
@@ -39,6 +42,11 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
         var d = await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false);
         return d is null ? null : new DetailFact(d.Code, d.Type, d.IsActive);
     }
+
+    public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
+        await GetAsync<Group>($"api/reference/purpose-groups/{id}", cancellationToken).ConfigureAwait(false) is { } g
+            ? new PurposeGroupFact(g.Id, g.Direction == "Payment", g.IsActive)
+            : null;
 
     public async Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
         (await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false))?.Name;

@@ -9,6 +9,8 @@ public sealed record ChangeBankAccountRequest(BankAccountForm Form, long Version
 
 public sealed record VersionRequest(long Version);
 
+public sealed record PettyCashChangeRequest(Treasury.Accounts.Application.PettyCash.PettyCashForm Form, long Version);
+
 public sealed record CashDeskChangeRequest(Treasury.Accounts.Application.CashDesks.CashDeskForm Form, long Version);
 
 public static class Endpoints
@@ -60,6 +62,25 @@ public static class Endpoints
             ToHttp(await useCases.SetActiveAsync(new(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
     }
 
+    /// <summary>Petty cash holders (manual item 11) under /api/accounts/petty-cash.</summary>
+    public static void MapPettyCashEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/petty-cash");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (bool? includeInactive, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+        api.MapPost("/", async (Treasury.Accounts.Application.PettyCash.PettyCashForm form, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RegisterAsync(Key(http), form, ct).ConfigureAwait(false)));
+        api.MapPut("/{id:guid}", async (Guid id, PettyCashChangeRequest r, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ChangeAsync(Key(http), id, r.Form, r.Version, ct).ConfigureAwait(false)));
+        api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SetActiveAsync(Key(http), id, change == "activate", r.Version, ct).ConfigureAwait(false)));
+    }
+
     private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();
 
     /// <summary>Rule violations become 422 with the stable code (503 when reference-svc cannot answer); never exception text for users.</summary>
@@ -73,7 +94,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
-            "BankAccount.NotFound" or "CashDesk.NotFound" => StatusCodes.Status404NotFound,
+            "BankAccount.NotFound" or "CashDesk.NotFound" or "PettyCash.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

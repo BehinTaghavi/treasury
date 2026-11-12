@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
 using Treasury.Accounts.Domain.CashDesks;
+using Treasury.Accounts.Domain.PettyCash;
 using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 
@@ -36,12 +37,21 @@ public sealed record CashDeskSnapshot(Guid Id, CashDeskData Data, bool IsActive,
     public CashDesk ToDomain() => CashDesk.Restore(Id, Data, IsActive, Version);
 }
 
+/// <summary>Stored form of a petty cash.</summary>
+public sealed record PettyCashSnapshot(Guid Id, PettyCashData Data, bool IsActive, long Version)
+{
+    public static PettyCashSnapshot From(PettyCashFund f, long version) => new(f.Id, f.Data, f.IsActive, version);
+
+    public PettyCashFund ToDomain() => PettyCashFund.Restore(Id, Data, IsActive, Version);
+}
+
 /// <summary>In-memory storage for local runs and tests: one transaction at a time, all-or-nothing commit, version checks, outbox.</summary>
 public sealed class InMemoryAccountsDatabase : IDisposable
 {
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, BankAccountSnapshot> BankAccounts = [];
     internal readonly Dictionary<Guid, CashDeskSnapshot> CashDesks = [];
+    internal readonly Dictionary<Guid, PettyCashSnapshot> PettyCash = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -65,6 +75,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, BankAccountSnapshot> BankAccounts { get; } = [];
 
     public Dictionary<Guid, CashDeskSnapshot> CashDesks { get; } = [];
+
+    public Dictionary<Guid, PettyCashSnapshot> PettyCash { get; } = [];
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -96,6 +108,11 @@ public sealed class InMemoryUnitOfWork(InMemoryAccountsDatabase db) : IUnitOfWor
                 foreach (var (id, s) in pending.CashDesks)
                 {
                     db.CashDesks[id] = s;
+                }
+
+                foreach (var (id, s) in pending.PettyCash)
+                {
+                    db.PettyCash[id] = s;
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -215,6 +232,55 @@ public sealed class InMemoryCashDeskRepository(InMemoryAccountsDatabase db) : IC
         pending.CashDesks[desk.Id] = CashDeskSnapshot.From(desk, newVersion);
         pending.Outbox.AddRange(desk.PendingEvents.Select(OutboxMessage.From));
         desk.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class InMemoryPettyCashRepository(InMemoryAccountsDatabase db) : IPettyCashRepository
+{
+    public Task<PettyCashFund?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Visible().FirstOrDefault(s => s.Id == id)?.ToDomain());
+
+    public Task<bool> HolderTakenAsync(string holderDetailCode, Guid? exceptId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Any(s => s.Id != exceptId && s.Data.HolderDetailCode == holderDetailCode));
+
+    public Task AddAsync(PettyCashFund fund, CancellationToken cancellationToken) => Write(fund, 1, null);
+
+    public Task SaveAsync(PettyCashFund fund, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(fund);
+        return Write(fund, fund.Version + 1, fund.Version);
+    }
+
+    public Task<IReadOnlyList<PettyCashFund>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<PettyCashFund>>(Visible().Where(s => includeInactive || s.IsActive).Select(s => s.ToDomain()).ToList());
+
+    private List<PettyCashSnapshot> Visible()
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, PettyCashSnapshot>(db.PettyCash);
+            foreach (var (id, s) in pending.PettyCash)
+            {
+                all[id] = s;
+            }
+
+            return [.. all.Values];
+        }
+    }
+
+    private Task Write(PettyCashFund fund, long newVersion, long? expected)
+    {
+        ArgumentNullException.ThrowIfNull(fund);
+        if (expected is { } v && Visible().FirstOrDefault(s => s.Id == fund.Id)?.Version != v)
+        {
+            throw new ConcurrencyConflictException($"Petty cash {fund.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.PettyCash[fund.Id] = PettyCashSnapshot.From(fund, newVersion);
+        pending.Outbox.AddRange(fund.PendingEvents.Select(OutboxMessage.From));
+        fund.MarkSaved(newVersion);
         return Task.CompletedTask;
     }
 }
