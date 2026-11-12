@@ -107,8 +107,8 @@ public sealed class InstrumentUseCaseTests : IDisposable
         var first = await Issue(book, Approved(), null);
         var second = await Issue(book, Approved(), null);
         Assert.True(first.IsSuccess, first.ErrorMessage);
-        Assert.Equal("1001", first.Value!.SheetNumber);
-        Assert.Equal("1002", second.Value!.SheetNumber);
+        Assert.Equal("101001", first.Value!.SheetNumber);
+        Assert.Equal("101002", second.Value!.SheetNumber);
         Assert.Equal(1L, second.Value.RemainingSheets);
         var cheque = await _useCases.GetAsync(first.Value.InstrumentId, CancellationToken.None);
         Assert.Equal("Issued", cheque!.State);
@@ -142,7 +142,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
 
         _policies.SetBalance(_account, 1_000_000_000);
         var next = await Issue(book, Approved(), null);
-        Assert.Equal("1", next.Value!.SheetNumber);
+        Assert.Equal("100001", next.Value!.SheetNumber);
     }
 
     [Fact]
@@ -159,7 +159,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     public async Task A_typed_sheet_number_outside_the_book_is_refused()
     {
         var book = await RegisterBook(1, 5);
-        var result = await Issue(book, Approved(), 99);
+        var result = await Issue(book, Approved(), Base + 99);
         Assert.Equal("ChequeBook.SheetOutOfRange", result.ErrorCode);
     }
 
@@ -174,7 +174,10 @@ public sealed class InstrumentUseCaseTests : IDisposable
     }
 
     private async Task<Guid> RegisterBook(long first, long last) =>
-        (await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None)).Value;
+        (await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "1234", Base + first, Base + last, null, "12345678", "1"), CancellationToken.None)).Value;
+
+    /// <summary>Serials have 6 to 8 digits (owner, 12 Nov 2026): the tests count sheets from here.</summary>
+    private const long Base = 100_000;
 
     private Task<Result<IssuedChequeView>> Issue(Guid book, Guid payment, long? sheet, InstrumentKind kind = InstrumentKind.OrdinaryCheque, string due = "1405/08/10") =>
         _useCases.IssueChequeAsync(

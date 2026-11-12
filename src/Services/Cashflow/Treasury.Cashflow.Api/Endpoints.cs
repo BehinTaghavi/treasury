@@ -12,9 +12,9 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 
 public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference);
 
-public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null);
+public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null);
 
-public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null);
+public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null);
 
 public sealed record ChequeFormatRequest(Guid BankAccountId, Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType);
 
@@ -55,11 +55,11 @@ public static class Endpoints
 
         api.MapPost("/cheque-books", async (ChequeBookRequest r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RegisterAsync(
-                new RegisterChequeBookCommand(Key(http), r.BankAccountId, r.Serial, r.FirstSheet, r.LastSheet, r.FormatId), ct).ConfigureAwait(false),
+                new RegisterChequeBookCommand(Key(http), r.BankAccountId, r.Serial, r.FirstSheet, r.LastSheet, r.FormatId, r.SayadMiddle, r.SayadFirstSerial), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/cheque-books/{id}"));
 
         api.MapPut("/cheque-books/{id:guid}", async (Guid id, ChequeBookCorrection r, HttpRequest http, ChequeBookUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.CorrectAsync(new CorrectChequeBookCommand(Key(http), id, r.Serial, r.FirstSheet, r.LastSheet, r.Version, r.FormatId), ct).ConfigureAwait(false),
+            ToHttp(await useCases.CorrectAsync(new CorrectChequeBookCommand(Key(http), id, r.Serial, r.FirstSheet, r.LastSheet, r.Version, r.FormatId, r.SayadMiddle, r.SayadFirstSerial), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/cheque-books/{id}"));
 
         // Cheque types (Basic Information, manual item 7) with the scan of each cheque.

@@ -362,3 +362,16 @@ def test_a_cheque_type_once_per_account_and_kept_while_a_book_uses_it(db):
         with pytest.raises(psycopg.errors.ForeignKeyViolation):
             with c.transaction():
                 c.execute("DELETE FROM cashflow.cheque_format WHERE id = %s", (fmt,))
+
+
+def test_sayad_numbers_of_a_cheque_book_come_together_or_not_at_all(db):
+    # 015_cashflow_cheque_book_sayad.sql: 8 middle digits and a 4-digit first serial; old books may have neither.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        add = "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, sayad_middle, sayad_first) VALUES (%s, %s, '1234', 567801, 567850, %s, %s)"
+        c.execute(add, (uuid.uuid4(), uuid.uuid4(), "12345678", 1))
+        c.execute(add, (uuid.uuid4(), uuid.uuid4(), None, None))
+        for middle, first in [("12345678", None), ("1234567", 1), ("12345678", 10000)]:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), uuid.uuid4(), middle, first))

@@ -50,12 +50,16 @@ public sealed record InstrumentSnapshot(
 
 public sealed record HistorySnapshot(InstrumentAction Action, InstrumentState? From, InstrumentState To, DateOnly Date, string UserId, string? Reference, string? Note);
 
-public sealed record ChequeBookSnapshot(Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, bool IsActive, IReadOnlyDictionary<long, SheetUse> UsedSheets, long Version, Guid? FormatId = null)
+public sealed record ChequeBookSnapshot(
+    Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, bool IsActive, IReadOnlyDictionary<long, SheetUse> UsedSheets, long Version,
+    Guid? FormatId = null, string? SayadMiddle = null, int? SayadFirstSerial = null)
 {
     public static ChequeBookSnapshot From(ChequeBook b, long version) =>
-        new(b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.IsActive, new Dictionary<long, SheetUse>(b.UsedSheets), version, b.FormatId);
+        new(b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.IsActive, new Dictionary<long, SheetUse>(b.UsedSheets), version, b.FormatId,
+            b.Sayad?.Middle, b.Sayad?.FirstSerial);
 
-    public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version, FormatId);
+    public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version, FormatId,
+        SayadMiddle is { } m && SayadFirstSerial is { } s ? ChequeBookSayad.Restore(m, s) : null);
 }
 
 public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)

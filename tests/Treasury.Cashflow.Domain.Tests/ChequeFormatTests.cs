@@ -30,7 +30,7 @@ public sealed class ChequeFormatTests
     public void A_cheque_book_takes_a_type_of_its_own_account_at_any_time()
     {
         var account = Guid.NewGuid();
-        var book = ChequeBook.Register(Guid.NewGuid(), account, "A", 1, 10);
+        var book = ChequeBook.Register(Guid.NewGuid(), account, "1234", 200_001, 200_010);
         var mine = ChequeFormat.Register(Guid.NewGuid(), 1, account, ChequePrintType.NewestLarge);
         var other = ChequeFormat.Register(Guid.NewGuid(), 2, Guid.NewGuid(), ChequePrintType.NewestLarge);
         book.ReserveNext(); // already in use: the type may still be chosen

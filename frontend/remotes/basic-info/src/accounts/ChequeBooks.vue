@@ -1,7 +1,10 @@
 <script setup lang="ts">
 /**
  * Cheque books (معرفی دسته چک‌ها), new-version manual item 6: choose one of the company's bank accounts (bank and branch are
- * filled in from it), then the series, first and last sheet; the number of sheets is counted. A book can be switched off and
+ * filled in from it), then the numbers printed on the sheets (owner, 12 Nov 2026): the series (شماره سری, 4 digits, the same on
+ * every sheet), the first serial (شماره سریال, 6–8 digits) and the number of sheets, from which the last serial is calculated, and
+ * the Sayad ID (شماره صیادی, 16 digits in four boxes): the first 4 are typed when a cheque is issued, the middle 8 are the same on
+ * every sheet, the last 4 run from the first Sayad serial typed here. A book can be switched off and
  * on again ("امکان ابطال دسته چک ها"); corrected or deleted only while none of its sheets has been used. Saved by
  * cashflow-svc, which hands out the sheet numbers when cheques are issued. The print layout of each book (manual item 7)
  * comes with cheque printing.
@@ -16,6 +19,7 @@ interface Entry { id: string; name: string }
 interface Book {
   id: string; bankAccountId: string; serial: string; firstSheet: number; lastSheet: number; sheetCount: number; usedSheets: number
   remainingSheets: number; nextSheet: number | null; isActive: boolean; isInUse: boolean; version: number; formatId: string | null
+  sayadMiddle: string | null; sayadFirstSerial: number | null; sayadLastSerial: number | null
 }
 interface Format { id: string; number: number; bankAccountId: string; printType: string; isActive: boolean }
 const PRINT_TYPES: Record<string, [string, string]> = {
@@ -40,7 +44,7 @@ const editing = ref<Book | null>(null)
 const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
-const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', lastSheet: '', formatId: '' })
+const form = reactive({ bankAccountId: '', serial: '', firstSheet: '', sheetCount: '', formatId: '', sayadA: '', sayadB: '', sayadFirst: '' })
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
 const account = (id: string) => accounts.value.find(a => a.id === id)
@@ -63,11 +67,12 @@ const sheet = (s: string) => {
   const latin = searchKey(s).replace(/\D/g, '')
   return latin ? Number(latin) : NaN
 }
-const count = computed(() => {
-  const f = sheet(form.firstSheet)
-  const l = sheet(form.lastSheet)
-  return Number.isFinite(f) && Number.isFinite(l) && l >= f ? l - f + 1 : null
-})
+/** Owner: the last serial is calculated from the first serial and the number of sheets. */
+const count = computed(() => { const c = sheet(form.sheetCount); return Number.isFinite(c) && c > 0 ? c : null })
+const lastSheet = computed(() => { const f = sheet(form.firstSheet); return Number.isFinite(f) && count.value ? f + count.value - 1 : null })
+const sayadLast = computed(() => { const s = sheet(form.sayadFirst); return Number.isFinite(s) && count.value ? String(s + count.value - 1).padStart(4, '0') : '' })
+const pad4 = (n: number | null) => (n === null ? '' : String(n).padStart(4, '0'))
+const digitsOnly = (s: string) => searchKey(s).replace(/\D/g, '')
 const shown = computed(() => {
   const q = searchKey(search.value)
   return books.value.filter(b => (!accountFilter.value || b.bankAccountId === accountFilter.value)
@@ -93,14 +98,17 @@ async function loadLists() {
 }
 
 function startNew() {
-  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', lastSheet: '', formatId: '' })
+  Object.assign(form, { bankAccountId: accountFilter.value, serial: '', firstSheet: '', sheetCount: '', formatId: '', sayadA: '', sayadB: '', sayadFirst: '' })
   editing.value = null
   showForm.value = true
   message.value = null
 }
 
 function startEdit(b: Book) {
-  Object.assign(form, { bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), lastSheet: String(b.lastSheet), formatId: b.formatId ?? '' })
+  Object.assign(form, {
+    bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), sheetCount: String(b.sheetCount), formatId: b.formatId ?? '',
+    sayadA: b.sayadMiddle?.slice(0, 4) ?? '', sayadB: b.sayadMiddle?.slice(4) ?? '', sayadFirst: pad4(b.sayadFirstSerial),
+  })
   editing.value = b
   showForm.value = true
   message.value = null
@@ -110,12 +118,14 @@ async function save() {
   if (busy.value) return
   if (!form.bankAccountId) return fail('ChequeBook.BankAccountNotFound')
   const first = sheet(form.firstSheet)
-  const last = sheet(form.lastSheet)
-  if (!Number.isFinite(first) || !Number.isFinite(last)) return fail('ChequeBook.InvalidRange')
+  const last = lastSheet.value
+  if (!Number.isFinite(first)) return fail('ChequeBook.SerialInvalid')
+  if (last === null) return fail('ChequeBook.InvalidRange')
+  const sayad = { sayadMiddle: digitsOnly(form.sayadA) + digitsOnly(form.sayadB), sayadFirstSerial: digitsOnly(form.sayadFirst) }
   busy.value = true
   const r = editing.value
-    ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version, formatId: form.formatId || null })
-    : await api.post<string>(base, { bankAccountId: form.bankAccountId, serial: form.serial, firstSheet: first, lastSheet: last, formatId: form.formatId || null })
+    ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version, formatId: form.formatId || null, ...sayad })
+    : await api.post<string>(base, { bankAccountId: form.bankAccountId, serial: form.serial, firstSheet: first, lastSheet: last, formatId: form.formatId || null, ...sayad })
   busy.value = false
   if (!r.ok) return fail(r.code)
   message.value = { kind: 'ok', text: t('دسته چک ثبت شد.', 'Cheque book saved.') }
@@ -153,10 +163,28 @@ onMounted(async () => {
         </label>
         <label>{{ t('بانک', 'Bank') }}<input :value="bankName(chosen?.bankId)" readonly tabindex="-1" class="ro" /></label>
         <label>{{ t('شعبه', 'Branch') }}<input :value="chosen ? `${chosen.branchName ?? ''} ${chosen.branchCode ? '(' + chosen.branchCode + ')' : ''}` : ''" readonly tabindex="-1" class="ro" /></label>
-        <label>{{ t('سری', 'Series') }}<input v-model="form.serial" maxlength="20" autocomplete="off" :disabled="locked" /></label>
-        <label class="req"><span>{{ t('اولین برگ', 'First sheet') }} <span class="star">*</span></span><input v-model="form.firstSheet" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" /></label>
-        <label class="req"><span>{{ t('آخرین برگ', 'Last sheet') }} <span class="star">*</span></span><input v-model="form.lastSheet" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" /></label>
-        <label>{{ t('تعداد برگ', 'Sheets') }}<input :value="count === null ? '' : num(count)" readonly tabindex="-1" class="ro" /></label>
+        <label class="req"><span>{{ t('شماره سری (۴ رقم)', 'Series (4 digits)') }} <span class="star">*</span></span>
+          <input v-model="form.serial" maxlength="4" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="1234" />
+        </label>
+        <label class="req"><span>{{ t('شماره سریال آغازین', 'First serial') }} <span class="star">*</span></span>
+          <input v-model="form.firstSheet" maxlength="8" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="567801" />
+        </label>
+        <label class="req"><span>{{ t('تعداد برگ دسته چک', 'Number of sheets') }} <span class="star">*</span></span>
+          <input v-model="form.sheetCount" maxlength="3" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="50" />
+        </label>
+        <label>{{ t('شماره سریال پایانی', 'Last serial') }}<input :value="lastSheet ?? ''" dir="ltr" readonly tabindex="-1" class="ro" /></label>
+        <div class="req sayad">
+          <span>{{ t('شماره صیادی (۱۶ رقم)', 'Sayad ID (16 digits)') }} <span class="star">*</span></span>
+          <div class="sayad-boxes" dir="ltr">
+            <input value="" disabled class="ro" :placeholder="t('هنگام صدور', 'at issue')" :aria-label="t('چهار رقم اول (هنگام صدور چک)', 'First 4 digits (typed at issue)')" />
+            <input v-model="form.sayadA" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('رقم‌های ۵ تا ۸', 'Digits 5 to 8')" />
+            <input v-model="form.sayadB" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('رقم‌های ۹ تا ۱۲', 'Digits 9 to 12')" />
+            <input v-model="form.sayadFirst" maxlength="4" inputmode="numeric" :disabled="locked" :aria-label="t('سریال صیادی برگ اول', 'Sayad serial of the first sheet')" placeholder="0001" />
+          </div>
+          <small class="muted">{{ t('۴ رقم اول در هنگام صدور هر چک وارد می‌شود؛ ۸ رقم وسط در همهٔ برگ‌ها یکسان است؛ ۴ رقم آخر سریال صیادی برگ اول است.', 'First 4: typed when each cheque is issued; middle 8: the same on every sheet; last 4: the Sayad serial of the first sheet.') }}
+            <template v-if="sayadLast"> {{ t(`سریال صیادی برگ آخر: ${sayadLast}`, `Last sheet: ${sayadLast}`) }}</template>
+          </small>
+        </div>
         <label>{{ t('شماره / نوع چک', 'Cheque type') }}
           <SearchSelect v-model="form.formatId" :options="formatChoices" :empty-label="t('تعیین نشده', 'Not chosen')" :aria-label="t('نوع چک', 'Cheque type')"
                         :none-text="t('برای این حساب نوع چکی تعریف نشده است', 'No cheque type for this account')" />
@@ -181,8 +209,8 @@ onMounted(async () => {
         <table class="tr-table">
           <thead>
             <tr>
-              <th>{{ t('شماره حساب', 'Account') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('سری', 'Series') }}</th><th>{{ t('از برگ', 'From') }}</th>
-              <th>{{ t('تا برگ', 'To') }}</th><th>{{ t('تعداد', 'Sheets') }}</th><th>{{ t('استفاده‌شده', 'Used') }}</th><th>{{ t('باقی‌مانده', 'Left') }}</th>
+              <th>{{ t('شماره حساب', 'Account') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('سری / سریال', 'Series / serial') }}</th>
+              <th>{{ t('شماره صیادی', 'Sayad ID') }}</th><th>{{ t('تعداد', 'Sheets') }}</th><th>{{ t('استفاده‌شده', 'Used') }}</th><th>{{ t('باقی‌مانده', 'Left') }}</th>
               <th>{{ t('برگ بعدی', 'Next') }}</th><th>{{ t('نوع چک', 'Type') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
             </tr>
           </thead>
@@ -190,8 +218,8 @@ onMounted(async () => {
             <tr v-for="b in shown" :key="b.id" :class="{ inactive: !b.isActive }">
               <td dir="ltr">{{ account(b.bankAccountId)?.accountNumber }}</td>
               <td>{{ bankName(account(b.bankAccountId)?.bankId) }}</td>
-              <td>{{ b.serial }}</td>
-              <td dir="ltr">{{ b.firstSheet }}</td><td dir="ltr">{{ b.lastSheet }}</td>
+              <td dir="ltr">{{ b.serial }}/{{ b.firstSheet }} – {{ b.lastSheet }}</td>
+              <td dir="ltr" class="small">{{ b.sayadMiddle ? `____ ${b.sayadMiddle.slice(0, 4)} ${b.sayadMiddle.slice(4)} ${pad4(b.sayadFirstSerial)}–${pad4(b.sayadLastSerial)}` : '' }}</td>
               <td>{{ num(b.sheetCount) }}</td><td>{{ num(b.usedSheets) }}</td><td>{{ num(b.remainingSheets) }}</td>
               <td dir="ltr">{{ b.nextSheet ?? '' }}</td>
               <td>{{ formatName(b.formatId) }}</td>
@@ -202,7 +230,7 @@ onMounted(async () => {
                 <button v-if="!b.isInUse" type="button" class="tr-link danger" @click="change(b, 'delete')">{{ t('حذف', 'Delete') }}</button>
               </td>
             </tr>
-            <tr v-if="!shown.length"><td colspan="12" class="muted">{{ t('دسته چکی پیدا نشد.', 'No cheque book found.') }}</td></tr>
+            <tr v-if="!shown.length"><td colspan="11" class="muted">{{ t('دسته چکی پیدا نشد.', 'No cheque book found.') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -240,5 +268,9 @@ button:disabled { opacity: .5; cursor: default; }
 .muted { color: #7b8794; }
 .small { font-size: .8rem; }
 .wide-note { grid-column: 1 / -1; margin: 0; }
+.sayad { grid-column: span 2; display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
+.sayad-boxes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
+.sayad-boxes input { text-align: center; letter-spacing: .15em; min-width: 0; }
+.req .sayad-boxes input:not(.ro) { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 input:disabled { background: #f5f7fa; color: #7b8794; }
 </style>

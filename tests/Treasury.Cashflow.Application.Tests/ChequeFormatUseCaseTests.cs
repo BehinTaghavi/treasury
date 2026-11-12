@@ -49,11 +49,11 @@ public sealed class ChequeFormatUseCaseTests : IDisposable
     public async Task A_book_names_its_type_and_the_type_is_then_kept()
     {
         var format = (await _formats.RegisterAsync(Key(), _account, ChequePrintType.NewestSmall, CancellationToken.None)).Value;
-        var book = await _books.RegisterAsync(new(Key(), _account, "A", 1, 25, format), CancellationToken.None);
+        var book = await _books.RegisterAsync(new(Key(), _account, "1234", 100001, 100025, format, "12345678", "1"), CancellationToken.None);
         Assert.True(book.IsSuccess, book.ErrorCode);
         Assert.Equal(format, Assert.Single(await _books.ListAsync(_account, true, CancellationToken.None)).FormatId);
         Assert.Equal("ChequeFormat.InUse", (await _formats.ChangeStateAsync(Key(), format, "delete", 1, CancellationToken.None)).ErrorCode);
         var other = (await _formats.RegisterAsync(Key(), Guid.NewGuid(), ChequePrintType.NewestSmall, CancellationToken.None)).Value;
-        Assert.Equal("ChequeBook.FormatOtherAccount", (await _books.CorrectAsync(new(Key(), book.Value, "A", 1, 25, 1, other), CancellationToken.None)).ErrorCode);
+        Assert.Equal("ChequeBook.FormatOtherAccount", (await _books.CorrectAsync(new(Key(), book.Value, "1234", 100001, 100025, 1, other), CancellationToken.None)).ErrorCode);
     }
 }

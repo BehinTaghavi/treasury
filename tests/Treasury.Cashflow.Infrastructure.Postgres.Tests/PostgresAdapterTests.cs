@@ -65,7 +65,7 @@ public sealed class PostgresAdapterTests : IDisposable
         Assert.Equal("image/jpeg", image.ContentType);
         Assert.Equal(jpeg, image.Data);
 
-        var book = await _books.RegisterAsync(new(Key(), _account, "B", 8001, 8010, id.Value), CancellationToken.None);
+        var book = await _books.RegisterAsync(new(Key(), _account, "5678", 108_001, 108_010, id.Value, "12345678", "1"), CancellationToken.None);
         Assert.True(book.IsSuccess, book.ErrorCode);
         Assert.Equal(id.Value, (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == book.Value).FormatId);
         Assert.Equal("ChequeFormat.InUse", (await formats.ChangeStateAsync(Key(), id.Value, "delete", 2, CancellationToken.None)).ErrorCode);
@@ -75,16 +75,16 @@ public sealed class PostgresAdapterTests : IDisposable
     public async Task A_cheque_book_is_corrected_listed_and_deleted_while_unused_and_kept_once_a_sheet_is_used()
     {
         var unused = await RegisterBook(5001, 5050);
-        Assert.True((await _books.CorrectAsync(new(Key(), unused, "A", 6001, 6010, 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await _books.CorrectAsync(new(Key(), unused, "1234", Base + 6001, Base + 6010, 1), CancellationToken.None)).IsSuccess);
         var view = (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == unused);
-        Assert.Equal((6001L, 6010L, 10L, 2L), (view.FirstSheet, view.LastSheet, view.RemainingSheets, view.Version));
+        Assert.Equal((Base + 6001, Base + 6010, 10L, 2L), (view.FirstSheet, view.LastSheet, view.RemainingSheets, view.Version));
         Assert.True((await _books.ChangeStateAsync(new(Key(), unused, "delete", 2), CancellationToken.None)).IsSuccess);
         Assert.Equal(0L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.cheque_book WHERE id = @id", ("id", unused)));
 
         var used = await RegisterBook(7001, 7010);
-        Assert.True((await Issue(used, Approved(), 7001)).IsSuccess);
+        Assert.True((await Issue(used, Approved(), Base + 7001)).IsSuccess);
         var usedView = (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == used);
-        Assert.Equal((1L, (long?)7002, true), (usedView.UsedSheets, usedView.NextSheet, usedView.IsInUse));
+        Assert.Equal((1L, (long?)(Base + 7002), true), (usedView.UsedSheets, usedView.NextSheet, usedView.IsInUse));
         Assert.Equal("ChequeBook.InUse", (await _books.ChangeStateAsync(new(Key(), used, "delete", usedView.Version), CancellationToken.None)).ErrorCode);
     }
 
@@ -230,13 +230,13 @@ public sealed class PostgresAdapterTests : IDisposable
         var first = await Issue(book, Approved(), null);
         var second = await Issue(book, Approved(), null);
         Assert.True(first.IsSuccess, first.ErrorMessage);
-        Assert.Equal("1001", first.Value!.SheetNumber);
-        Assert.Equal("1002", second.Value!.SheetNumber);
+        Assert.Equal("101001", first.Value!.SheetNumber);
+        Assert.Equal("101002", second.Value!.SheetNumber);
         Assert.Equal(1L, second.Value.RemainingSheets);
 
         var cheque = await _useCases.GetAsync(first.Value.InstrumentId, CancellationToken.None);
         Assert.Equal("Issued", cheque!.State);
-        Assert.Equal("1001", cheque.Number);
+        Assert.Equal("101001", cheque.Number);
         Assert.Equal(2L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.cheque_sheet WHERE cheque_book_id = @b AND sheet_use = 'Issued'", ("b", book)));
         Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT version FROM cashflow.cheque_book WHERE id = @b", ("b", book)));
     }
@@ -268,10 +268,10 @@ public sealed class PostgresAdapterTests : IDisposable
         var payment = Approved();
         _policies.SetBalance(_account, 1_000);
         Assert.Equal("Payment.InsufficientBalance", (await Issue(book, payment, null)).ErrorCode);
-        Assert.Equal("ChequeBook.SheetOutOfRange", (await Issue(book, Approved(), 99)).ErrorCode);
+        Assert.Equal("ChequeBook.SheetOutOfRange", (await Issue(book, Approved(), Base + 99)).ErrorCode);
 
         var next = await Issue(book, Approved(), null);
-        Assert.Equal("1", next.Value!.SheetNumber);
+        Assert.Equal("100001", next.Value!.SheetNumber);
     }
 
     private static string Key() => Guid.NewGuid().ToString();
@@ -287,9 +287,12 @@ public sealed class PostgresAdapterTests : IDisposable
         return payment;
     }
 
+    /// <summary>Serials have 6 to 8 digits (owner, 12 Nov 2026): the tests count sheets from here.</summary>
+    private const long Base = 100_000;
+
     private async Task<Guid> RegisterBook(long first, long last)
     {
-        var result = await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "A", first, last), CancellationToken.None);
+        var result = await _books.RegisterAsync(new RegisterChequeBookCommand(Key(), _account, "1234", Base + first, Base + last, null, "12345678", "1"), CancellationToken.None);
         Assert.True(result.IsSuccess, result.ErrorMessage);
         return result.Value;
     }
