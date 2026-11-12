@@ -115,6 +115,16 @@ public sealed class InstrumentUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cheque_from_a_book_whose_serial_starts_with_0_keeps_the_zero_owner_12_nov()
+    {
+        var registered = await _books.RegisterAsync(
+            new RegisterChequeBookCommand(Key(), _account, "1234", 56_701, 56_725, null, "12345678", "1", SerialDigits: 6), CancellationToken.None);
+        Assert.True(registered.IsSuccess, registered.ErrorCode);
+        Assert.Equal("056701", (await Issue(registered.Value, Approved(), null)).Value!.SheetNumber);
+        Assert.Equal("056710", (await Issue(registered.Value, Approved(), 56_710)).Value!.SheetNumber);
+    }
+
+    [Fact]
     public async Task Parallel_issues_from_one_book_never_get_the_same_number()
     {
         var book = await RegisterBook(1, 40);

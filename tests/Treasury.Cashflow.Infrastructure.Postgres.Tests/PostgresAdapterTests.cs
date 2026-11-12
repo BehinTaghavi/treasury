@@ -81,6 +81,9 @@ public sealed class PostgresAdapterTests : IDisposable
         Assert.True(view.PartlyUsed);
         Assert.True((await _books.CorrectAsync(new(Key(), unused, "1234", Base + 6001, Base + 6025, 2, null, null, null, PartlyUsed: false), CancellationToken.None)).IsSuccess);
         Assert.False((await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == unused).PartlyUsed);
+        var zero = await _books.RegisterAsync(new(Key(), _account, "1234", 56_701, 56_725, null, "12345678", "1", SerialDigits: 6), CancellationToken.None);
+        Assert.True(zero.IsSuccess, zero.ErrorCode);
+        Assert.Equal(6, (await _books.ListAsync(_account, true, CancellationToken.None)).Single(b => b.Id == zero.Value).SerialDigits);
         Assert.True((await _books.ChangeStateAsync(new(Key(), unused, "delete", 3), CancellationToken.None)).IsSuccess);
         Assert.Equal(0L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.cheque_book WHERE id = @id", ("id", unused)));
 

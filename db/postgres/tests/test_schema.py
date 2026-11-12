@@ -391,3 +391,15 @@ def test_books_registered_before_the_size_rule_with_another_size_become_partly_u
         got = dict(c.execute("SELECT id, partly_used FROM cashflow.cheque_book WHERE id IN (%s, %s)", (full, odd)).fetchall())
         assert got == {full: False, odd: True}
         c.rollback()
+
+
+def test_a_cheque_book_keeps_the_digits_of_its_serial(db):
+    # 017_cashflow_cheque_book_serial_digits.sql: 056780 is stored as 56780 with 6 digits (owner, 12 Nov 2026); empty for older books.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        add = "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, serial_digits) VALUES (%s, %s, '1234', 56701, 56725, %s)"
+        c.execute(add, (uuid.uuid4(), uuid.uuid4(), 6))
+        c.execute(add, (uuid.uuid4(), uuid.uuid4(), None))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), uuid.uuid4(), 0))

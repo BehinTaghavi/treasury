@@ -18,13 +18,14 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 {
     private readonly Dictionary<long, SheetUse> _usedSheets = [];
 
-    private ChequeBook(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet)
+    private ChequeBook(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, int serialDigits)
         : base(id)
     {
         BankAccountId = bankAccountId;
         Serial = serial;
         FirstSheet = firstSheet;
         LastSheet = lastSheet;
+        SerialDigits = serialDigits;
         IsActive = true;
     }
 
@@ -36,6 +37,12 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     public long FirstSheet { get; private set; }
 
     public long LastSheet { get; private set; }
+
+    /// <summary>
+    /// How many digits the printed serial has (6 to 8). A serial may start with 0 (owner, 12 Nov 2026: "ممکن است سریال چک با صفر شروع
+    /// شود"), so 056780 is kept as sheet 56780 with 6 digits and always shown and printed as 056780.
+    /// </summary>
+    public int SerialDigits { get; private set; }
 
     /// <summary>The cheque type (print design) the book is printed with (manual item 6 "شماره / نوع چک"); null: not chosen yet.</summary>
     public Guid? FormatId { get; private set; }
@@ -67,14 +74,18 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet) =>
         Register(id, bankAccountId, serial, firstSheet, lastSheet, null, partlyUsed: true);
 
+    /// <summary>The number of digits of a book's serials: as typed on the screen, or else the digits of the first serial.</summary>
+    public static int SerialWidth(long firstSheet, int? serialDigits) => serialDigits ?? Digits(firstSheet);
+
     /// <summary>A book entered on the cheque books screen: series, serials and Sayad numbers (owner, 12 Nov 2026).</summary>
-    public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad, bool partlyUsed = false)
+    public static ChequeBook Register(Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad, bool partlyUsed = false,
+        int? serialDigits = null)
     {
-        CheckRange(firstSheet, lastSheet);
+        var digits = CheckRange(firstSheet, lastSheet, serialDigits);
         CheckSize(firstSheet, lastSheet, partlyUsed);
         sayad?.CheckFits(lastSheet - firstSheet + 1);
-        var book = new ChequeBook(id, bankAccountId, CleanSerial(serial), firstSheet, lastSheet) { Sayad = sayad, PartlyUsed = partlyUsed };
-        book.Raise(new ChequeBookRegistered(id, bankAccountId, book.Serial, firstSheet, lastSheet, sayad?.Middle, sayad?.FirstSerial));
+        var book = new ChequeBook(id, bankAccountId, CleanSerial(serial), firstSheet, lastSheet, digits) { Sayad = sayad, PartlyUsed = partlyUsed };
+        book.Raise(new ChequeBookRegistered(id, bankAccountId, book.Serial, firstSheet, lastSheet, sayad?.Middle, sayad?.FirstSerial, digits));
         return book;
     }
 
@@ -101,26 +112,27 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     /// </summary>
     /// <param name="sayad">The Sayad numbers; null keeps the current ones.</param>
     /// <param name="partlyUsed">Whether only the unused sheets of a partly used book are entered; null keeps the current answer.</param>
-    public void Correct(string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad = null, bool? partlyUsed = null)
+    /// <param name="serialDigits">Digits of the serials as typed (leading zeros count); null: the digits of the first serial.</param>
+    public void Correct(string serial, long firstSheet, long lastSheet, ChequeBookSayad? sayad = null, bool? partlyUsed = null, int? serialDigits = null)
     {
         if (IsInUse)
         {
             throw new DomainException("ChequeBook.InUse", "Sheets of this cheque book have been used; it can no longer be corrected.");
         }
 
-        CheckRange(firstSheet, lastSheet);
+        var digits = CheckRange(firstSheet, lastSheet, serialDigits);
         var partly = partlyUsed ?? PartlyUsed;
         CheckSize(firstSheet, lastSheet, partly);
         var cleaned = CleanSerial(serial);
         var newSayad = sayad ?? Sayad;
         newSayad?.CheckFits(lastSheet - firstSheet + 1);
-        if ((cleaned, firstSheet, lastSheet, newSayad, partly) == (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed))
+        if ((cleaned, firstSheet, lastSheet, newSayad, partly, digits) == (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed, SerialDigits))
         {
             return;
         }
 
-        (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed) = (cleaned, firstSheet, lastSheet, newSayad, partly);
-        Raise(new ChequeBookCorrected(Id, Serial, FirstSheet, LastSheet, Sayad?.Middle, Sayad?.FirstSerial));
+        (Serial, FirstSheet, LastSheet, Sayad, PartlyUsed, SerialDigits) = (cleaned, firstSheet, lastSheet, newSayad, partly, digits);
+        Raise(new ChequeBookCorrected(Id, Serial, FirstSheet, LastSheet, Sayad?.Middle, Sayad?.FirstSerial, SerialDigits));
     }
 
     /// <summary>
@@ -262,9 +274,9 @@ public sealed class ChequeBook : AggregateRoot<Guid>
 
     public static ChequeBook Restore(
         Guid id, Guid bankAccountId, string serial, long firstSheet, long lastSheet, bool isActive, IEnumerable<KeyValuePair<long, SheetUse>> usedSheets, long version,
-        Guid? formatId = null, ChequeBookSayad? sayad = null, bool partlyUsed = false)
+        Guid? formatId = null, ChequeBookSayad? sayad = null, bool partlyUsed = false, int? serialDigits = null)
     {
-        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet) { IsActive = isActive, FormatId = formatId, Sayad = sayad, PartlyUsed = partlyUsed };
+        var book = new ChequeBook(id, bankAccountId, serial, firstSheet, lastSheet, SerialWidth(firstSheet, serialDigits)) { IsActive = isActive, FormatId = formatId, Sayad = sayad, PartlyUsed = partlyUsed };
         foreach (var (sheet, use) in usedSheets)
         {
             book._usedSheets[sheet] = use;
@@ -274,16 +286,21 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         return book;
     }
 
-    /// <summary>Serial numbers (شماره سریال) printed on the sheets have 6 to 8 digits (owner, 12 Nov 2026).</summary>
-    public const long LowestSerial = 100_000;
+    /// <summary>Serial numbers (شماره سریال) printed on the sheets have 6 to 8 digits, leading zeros included (owner, 12 Nov 2026).</summary>
+    public const int MinSerialDigits = 6;
 
-    public const long HighestSerial = 99_999_999;
+    public const int MaxSerialDigits = 8;
 
     /// <summary>Only the last two digits of the serial change within a book (owner, 12 Nov 2026), so a book has at most 100 sheets.</summary>
     public const int MaxSheets = 100;
 
     /// <summary>The serial of a sheet as printed: series and serial separated by a slash, e.g. 1234/567801.</summary>
-    public string SheetLabel(long sheet) => Serial.Length > 0 ? $"{Serial}/{sheet}" : sheet.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    public string SheetLabel(long sheet) => Serial.Length > 0 ? $"{Serial}/{SerialText(sheet)}" : SerialText(sheet);
+
+    /// <summary>The serial of a sheet with its leading zeros, e.g. 056780.</summary>
+    public string SerialText(long sheet) => sheet.ToString("D" + SerialDigits.ToString(System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture);
+
+    private static int Digits(long n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture).Length;
 
     private static void CheckSize(long firstSheet, long lastSheet, bool partlyUsed)
     {
@@ -293,14 +310,15 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         }
     }
 
-    private static void CheckRange(long firstSheet, long lastSheet)
+    private static int CheckRange(long firstSheet, long lastSheet, int? serialDigits)
     {
         if (firstSheet <= 0 || lastSheet < firstSheet)
         {
             throw new DomainException("ChequeBook.InvalidRange", "Last sheet must be greater than or equal to the first sheet.");
         }
 
-        if (firstSheet < LowestSerial || lastSheet > HighestSerial)
+        var digits = SerialWidth(firstSheet, serialDigits);
+        if (digits is < MinSerialDigits or > MaxSerialDigits || Digits(lastSheet) > digits)
         {
             throw new DomainException("ChequeBook.SerialInvalid", "A serial number (شماره سریال) has 6 to 8 digits.");
         }
@@ -309,6 +327,8 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         {
             throw new DomainException("ChequeBook.TooManySheets", $"A cheque book has at most {MaxSheets} sheets.");
         }
+
+        return digits;
     }
 
     /// <summary>
@@ -361,7 +381,7 @@ public sealed class ChequeBook : AggregateRoot<Guid>
     }
 }
 
-public sealed record ChequeBookRegistered(Guid ChequeBookId, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, string? SayadMiddle = null, int? SayadFirstSerial = null) : DomainEvent;
+public sealed record ChequeBookRegistered(Guid ChequeBookId, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, string? SayadMiddle = null, int? SayadFirstSerial = null, int? SerialDigits = null) : DomainEvent;
 
 /// <summary>
 /// The Sayad numbers of a cheque book (شماره صیادی, 16 digits per sheet, owner 12 Nov 2026): the 8 middle digits are the same on
@@ -427,7 +447,7 @@ public sealed record ChequeBookDeactivated(Guid ChequeBookId) : DomainEvent;
 
 public sealed record ChequeBookActivated(Guid ChequeBookId) : DomainEvent;
 
-public sealed record ChequeBookCorrected(Guid ChequeBookId, string Serial, long FirstSheet, long LastSheet, string? SayadMiddle = null, int? SayadFirstSerial = null) : DomainEvent;
+public sealed record ChequeBookCorrected(Guid ChequeBookId, string Serial, long FirstSheet, long LastSheet, string? SayadMiddle = null, int? SayadFirstSerial = null, int? SerialDigits = null) : DomainEvent;
 
 public sealed record ChequeBookDeleted(Guid ChequeBookId) : DomainEvent;
 

@@ -19,7 +19,7 @@ interface Entry { id: string; name: string }
 interface Book {
   id: string; bankAccountId: string; serial: string; firstSheet: number; lastSheet: number; sheetCount: number; usedSheets: number
   remainingSheets: number; nextSheet: number | null; isActive: boolean; isInUse: boolean; version: number; formatId: string | null
-  sayadMiddle: string | null; sayadFirstSerial: number | null; sayadLastSerial: number | null; partlyUsed: boolean
+  sayadMiddle: string | null; sayadFirstSerial: number | null; sayadLastSerial: number | null; partlyUsed: boolean; serialDigits: number
 }
 /** Banks issue books of 25, 50 or 100 sheets; a book partly used before go-live is entered with any number of unused sheets (owner, 12 Nov 2026). */
 const BOOK_SIZES = ['25', '50', '100']
@@ -75,10 +75,14 @@ const lastSheet = computed(() => { const f = sheet(form.firstSheet); return Numb
 const sayadLast = computed(() => { const s = sheet(form.sayadFirst); return Number.isFinite(s) && count.value ? String(s + count.value - 1).padStart(4, '0') : '' })
 const pad4 = (n: number | null) => (n === null ? '' : String(n).padStart(4, '0'))
 const digitsOnly = (s: string) => searchKey(s).replace(/\D/g, '')
+/** A serial may start with 0 (owner, 12 Nov 2026): it is shown with as many digits as were typed, e.g. 056780. */
+const serialText = (n: number | null, digits: number) => (n === null ? '' : String(n).padStart(digits, '0'))
+const typedDigits = computed(() => digitsOnly(form.firstSheet).length)
+const lastSerialText = computed(() => serialText(lastSheet.value, typedDigits.value))
 const shown = computed(() => {
   const q = searchKey(search.value)
   return books.value.filter(b => (!accountFilter.value || b.bankAccountId === accountFilter.value)
-    && (!q || [b.serial, String(b.firstSheet), String(b.lastSheet), account(b.bankAccountId)?.accountNumber ?? '', bankName(account(b.bankAccountId)?.bankId)]
+    && (!q || [b.serial, serialText(b.firstSheet, b.serialDigits), serialText(b.lastSheet, b.serialDigits), account(b.bankAccountId)?.accountNumber ?? '', bankName(account(b.bankAccountId)?.bankId)]
       .some(f => searchKey(f).includes(q))))
 })
 
@@ -114,7 +118,7 @@ function choosePartlyUsed(partly: boolean) {
 
 function startEdit(b: Book) {
   Object.assign(form, {
-    bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: String(b.firstSheet), sheetCount: String(b.sheetCount), formatId: b.formatId ?? '',
+    bankAccountId: b.bankAccountId, serial: b.serial, firstSheet: serialText(b.firstSheet, b.serialDigits), sheetCount: String(b.sheetCount), formatId: b.formatId ?? '',
     sayadA: b.sayadMiddle?.slice(0, 4) ?? '', sayadB: b.sayadMiddle?.slice(4) ?? '', sayadFirst: pad4(b.sayadFirstSerial), partlyUsed: b.partlyUsed,
   })
   editing.value = b
@@ -129,7 +133,7 @@ async function save() {
   const last = lastSheet.value
   if (!Number.isFinite(first)) return fail('ChequeBook.SerialInvalid')
   if (last === null) return fail('ChequeBook.InvalidRange')
-  const sayad = { sayadMiddle: digitsOnly(form.sayadA) + digitsOnly(form.sayadB), sayadFirstSerial: digitsOnly(form.sayadFirst), partlyUsed: form.partlyUsed }
+  const sayad = { sayadMiddle: digitsOnly(form.sayadA) + digitsOnly(form.sayadB), sayadFirstSerial: digitsOnly(form.sayadFirst), partlyUsed: form.partlyUsed, serialDigits: typedDigits.value }
   busy.value = true
   const r = editing.value
     ? await api.put<string>(`${base}/${editing.value.id}`, { serial: form.serial, firstSheet: first, lastSheet: last, version: editing.value.version, formatId: form.formatId || null, ...sayad })
@@ -182,7 +186,7 @@ onMounted(async () => {
           <input v-model="form.serial" maxlength="4" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="1234" />
         </label>
         <label class="req"><span>{{ form.partlyUsed ? t('سریال اولین برگ استفاده‌نشده', 'Serial of the first unused sheet') : t('شماره سریال آغازین', 'First serial') }} <span class="star">*</span></span>
-          <input v-model="form.firstSheet" maxlength="8" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="567801" />
+          <input v-model="form.firstSheet" maxlength="8" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="056780" />
         </label>
         <label v-if="form.partlyUsed" class="req"><span>{{ t('تعداد برگ‌های استفاده‌نشده', 'Unused sheets') }} <span class="star">*</span></span>
           <input v-model="form.sheetCount" maxlength="3" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="17" />
@@ -192,7 +196,7 @@ onMounted(async () => {
             <option v-for="s in BOOK_SIZES" :key="s" :value="s">{{ t(`${num(Number(s))} برگی`, `${s} sheets`) }}</option>
           </select>
         </label>
-        <label>{{ t('شماره سریال پایانی', 'Last serial') }}<input :value="lastSheet ?? ''" dir="ltr" readonly tabindex="-1" class="ro" /></label>
+        <label>{{ t('شماره سریال پایانی', 'Last serial') }}<input :value="lastSerialText" dir="ltr" readonly tabindex="-1" class="ro" /></label>
         <div class="req sayad">
           <span>{{ t('شماره صیادی (۱۶ رقم)', 'Sayad ID (16 digits)') }} <span class="star">*</span></span>
           <div class="sayad-boxes" dir="ltr">
@@ -238,10 +242,10 @@ onMounted(async () => {
             <tr v-for="b in shown" :key="b.id" :class="{ inactive: !b.isActive }">
               <td dir="ltr">{{ account(b.bankAccountId)?.accountNumber }}</td>
               <td>{{ bankName(account(b.bankAccountId)?.bankId) }}</td>
-              <td dir="ltr">{{ b.serial }}/{{ b.firstSheet }} – {{ b.lastSheet }}</td>
+              <td dir="ltr">{{ b.serial }}/{{ serialText(b.firstSheet, b.serialDigits) }} – {{ serialText(b.lastSheet, b.serialDigits) }}</td>
               <td dir="ltr" class="small">{{ b.sayadMiddle ? `____ ${b.sayadMiddle.slice(0, 4)} ${b.sayadMiddle.slice(4)} ${pad4(b.sayadFirstSerial)}–${pad4(b.sayadLastSerial)}` : '' }}</td>
               <td>{{ num(b.sheetCount) }} <small v-if="b.partlyUsed" class="tr-badge" :title="t('دسته چک نیمه‌مصرف از پیش از شروع کار؛ فقط برگ‌های استفاده‌نشده ثبت شده است.', 'Partly used before go-live; only its unused sheets are registered.')">{{ t('نیمه‌مصرف', 'partly used') }}</small></td><td>{{ num(b.usedSheets) }}</td><td>{{ num(b.remainingSheets) }}</td>
-              <td dir="ltr">{{ b.nextSheet ?? '' }}</td>
+              <td dir="ltr">{{ serialText(b.nextSheet, b.serialDigits) }}</td>
               <td>{{ formatName(b.formatId) }}</td>
               <td>{{ b.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
               <td class="tr-actions">

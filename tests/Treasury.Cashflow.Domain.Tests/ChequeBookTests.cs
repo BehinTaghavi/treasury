@@ -189,4 +189,31 @@ public sealed class ChequeBookTests
         book.Correct("1234", 567_801, 567_850, null, partlyUsed: false);
         Assert.Equal((50L, false), (book.SheetCount, book.PartlyUsed));
     }
+
+    [Fact]
+    public void A_serial_may_start_with_0_and_keeps_its_zero_owner_12_nov()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 56_701, 56_725, Sayad, serialDigits: 6);
+        Assert.Equal((6, "056701", "1234/056725"), (book.SerialDigits, book.SerialText(book.FirstSheet), book.SheetLabel(56_725)));
+        var eight = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 1, 25, Sayad, serialDigits: 8);
+        Assert.Equal("1234/00000001", eight.SheetLabel(1));
+    }
+
+    [Theory]
+    [InlineData(56_701L, 56_725L, 5)]          // fewer than 6 digits
+    [InlineData(56_701L, 56_725L, 9)]          // more than 8 digits
+    [InlineData(999_990L, 1_000_014L, 6)]      // the last serial no longer fits in 6 digits
+    public void A_serial_typed_with_leading_zeros_still_has_6_to_8_digits(long first, long last, int digits) =>
+        Assert.Equal("ChequeBook.SerialInvalid", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", first, last, Sayad, serialDigits: digits)).Code);
+
+    [Fact]
+    public void Without_a_typed_width_the_serial_has_the_digits_of_the_first_sheet()
+    {
+        var book = ChequeBook.Restore(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_850, true, [], 1);
+        Assert.Equal((6, "1234/567801"), (book.SerialDigits, book.SheetLabel(567_801)));
+        book.Correct("1234", 56_701, 56_750, null, null, serialDigits: 6);
+        Assert.Equal("056701", book.SerialText(book.FirstSheet));
+    }
 }
+

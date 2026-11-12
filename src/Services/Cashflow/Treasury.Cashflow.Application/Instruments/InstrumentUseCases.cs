@@ -255,7 +255,8 @@ public sealed class InstrumentUseCases(
                 command.BankAccountId,
                 command.PaymentId,
                 currentUser.UserId);
-            instrument.Issue(book.Id, sheet.ToString(CultureInfo.InvariantCulture), issueDate, currentUser.UserId);
+            // The cheque number keeps the leading zeros of the printed serial (owner, 12 Nov 2026).
+            instrument.Issue(book.Id, book.SerialText(sheet), issueDate, currentUser.UserId);
 
             await chequeBooks.SaveAsync(book, ct).ConfigureAwait(false);
             await instruments.AddAsync(instrument, ct).ConfigureAwait(false);

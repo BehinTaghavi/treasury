@@ -10,26 +10,28 @@ namespace Treasury.Cashflow.Application.ChequeBooks;
 /// <param name="SayadFirstSerial">The 4-digit Sayad serial of the first sheet (required).</param>
 /// <param name="PartlyUsed">Only the unused sheets of a book already in use when the company started are entered (any count up to 100);
 /// otherwise the book has 25, 50 or 100 sheets.</param>
+/// <param name="SerialDigits">Digits of the serial as typed, leading zeros included (056780: 6); null: the digits of <paramref name="FirstSheet"/>.</param>
 public sealed record RegisterChequeBookCommand(
     string IdempotencyKey, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null,
-    bool PartlyUsed = false);
+    bool PartlyUsed = false, int? SerialDigits = null);
 
 /// <summary>Series and range change only while no sheet is used; the cheque type can always be chosen.</summary>
 public sealed record CorrectChequeBookCommand(
     string IdempotencyKey, Guid Id, string Serial, long FirstSheet, long LastSheet, long ExpectedVersion, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null,
-    bool? PartlyUsed = null);
+    bool? PartlyUsed = null, int? SerialDigits = null);
 
 /// <summary><paramref name="Change"/>: "activate", "deactivate" or "delete".</summary>
 public sealed record ChangeChequeBookStateCommand(string IdempotencyKey, Guid Id, string Change, long ExpectedVersion);
 
 /// <param name="NextSheet">The sheet the issue form will suggest; null when none is left or the book is off.</param>
+/// <param name="SerialDigits">Digits of the printed serials; show sheet numbers padded with leading zeros to this width.</param>
 public sealed record ChequeBookView(
     Guid Id, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, long SheetCount, long UsedSheets, long RemainingSheets,
-    long? NextSheet, bool IsActive, bool IsInUse, long Version, Guid? FormatId, string? SayadMiddle, int? SayadFirstSerial, int? SayadLastSerial, bool PartlyUsed)
+    long? NextSheet, bool IsActive, bool IsInUse, long Version, Guid? FormatId, string? SayadMiddle, int? SayadFirstSerial, int? SayadLastSerial, bool PartlyUsed, int SerialDigits)
 {
     public static ChequeBookView From(ChequeBook b) => new(
         b.Id, b.BankAccountId, b.Serial, b.FirstSheet, b.LastSheet, b.SheetCount, b.UsedSheets.Count, b.RemainingSheets, b.SuggestNext(),
-        b.IsActive, b.IsInUse, b.Version, b.FormatId, b.Sayad?.Middle, b.Sayad?.FirstSerial, b.Sayad?.LastSerial(b.SheetCount), b.PartlyUsed);
+        b.IsActive, b.IsInUse, b.Version, b.FormatId, b.Sayad?.Middle, b.Sayad?.FirstSerial, b.Sayad?.LastSerial(b.SheetCount), b.PartlyUsed, b.SerialDigits);
 }
 
 /// <summary>
@@ -71,7 +73,7 @@ public sealed class ChequeBookUseCases(
         {
             // Owner, 12 Nov 2026: books entered on the screen carry their Sayad numbers.
             var sayad = ChequeBookSayad.Create(command.SayadMiddle, command.SayadFirstSerial);
-            var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet, sayad, command.PartlyUsed);
+            var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet, sayad, command.PartlyUsed, command.SerialDigits);
             book.UseFormat(await FormatAsync(command.FormatId, ct).ConfigureAwait(false));
             if (await OverlapsAsync(book, ct).ConfigureAwait(false))
             {
@@ -91,11 +93,12 @@ public sealed class ChequeBookUseCases(
             var sayad = string.IsNullOrWhiteSpace(command.SayadMiddle) && string.IsNullOrWhiteSpace(command.SayadFirstSerial)
                 ? null
                 : ChequeBookSayad.Create(command.SayadMiddle, command.SayadFirstSerial);
-            var changed = (PersianText.Key(command.Serial), command.FirstSheet, command.LastSheet, sayad ?? book.Sayad, command.PartlyUsed ?? book.PartlyUsed)
-                != (book.Serial, book.FirstSheet, book.LastSheet, book.Sayad, book.PartlyUsed);
+            var changed = (PersianText.Key(command.Serial), command.FirstSheet, command.LastSheet, sayad ?? book.Sayad, command.PartlyUsed ?? book.PartlyUsed,
+                    ChequeBook.SerialWidth(command.FirstSheet, command.SerialDigits))
+                != (book.Serial, book.FirstSheet, book.LastSheet, book.Sayad, book.PartlyUsed, book.SerialDigits);
             if (!book.IsInUse || changed)
             {
-                book.Correct(command.Serial, command.FirstSheet, command.LastSheet, sayad, command.PartlyUsed);
+                book.Correct(command.Serial, command.FirstSheet, command.LastSheet, sayad, command.PartlyUsed, command.SerialDigits);
             }
 
             if (await OverlapsAsync(book, ct).ConfigureAwait(false))
