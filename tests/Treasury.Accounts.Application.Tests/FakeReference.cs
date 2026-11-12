@@ -62,6 +62,9 @@ public sealed class FakeReference : IReferenceLookup
 
     public Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken) => Answer(_details.GetValueOrDefault(code));
 
+    public Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
+        Answer(_details.ContainsKey(code) ? $"تفصیل {code}" : null);
+
     private Task<T?> Answer<T>(T? value) =>
         Down ? throw new Treasury.BuildingBlocks.Domain.DomainException("Reference.Unavailable", "down") : Task.FromResult(value);
 }

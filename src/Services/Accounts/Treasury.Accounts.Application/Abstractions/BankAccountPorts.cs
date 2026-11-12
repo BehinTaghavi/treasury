@@ -1,4 +1,5 @@
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.Accounts.Domain.CashDesks;
 
 namespace Treasury.Accounts.Application.Abstractions;
 
@@ -17,6 +18,20 @@ public interface IBankAccountRepository
     Task SaveAsync(BankAccount account, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<BankAccount>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+}
+
+public interface ICashDeskRepository
+{
+    Task<CashDesk?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Is the name (CashDesk.NameKey) already used by another cash desk?</summary>
+    Task<bool> NameTakenAsync(string nameKey, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task AddAsync(CashDesk desk, CancellationToken cancellationToken);
+
+    Task SaveAsync(CashDesk desk, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<CashDesk>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 }
 
 /// <summary>An entry of a reference-svc list (bank name, city, currency) as reference-svc returns it.</summary>
@@ -38,6 +53,9 @@ public interface IReferenceLookup
     Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
     Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>Name of a تفصیل (e.g. the holder of a cash desk); null when unknown.</summary>
+    Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken);
 
     /// <summary>
     /// Tells reference-svc that a bank account is about to name this entry (<paramref name="list"/>: banks, cities, currencies),

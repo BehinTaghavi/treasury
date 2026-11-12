@@ -9,6 +9,8 @@ public sealed record ChangeBankAccountRequest(BankAccountForm Form, long Version
 
 public sealed record VersionRequest(long Version);
 
+public sealed record CashDeskChangeRequest(Treasury.Accounts.Application.CashDesks.CashDeskForm Form, long Version);
+
 public static class Endpoints
 {
     public static void MapBankAccountEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
@@ -23,6 +25,9 @@ public static class Endpoints
         api.MapGet("/", async (bool? includeInactive, BankAccountUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
 
+        api.MapGet("/{id:guid}", async (Guid id, BankAccountUseCases useCases, CancellationToken ct) =>
+            await useCases.GetAsync(id, ct).ConfigureAwait(false) is { } view ? Results.Ok(view) : Results.NotFound());
+
         api.MapPost("/", async (RegisterBankAccountRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RegisterAsync(new RegisterBankAccountCommand(Key(http), r.Form, r.MainAccountId, r.IsBackup), ct).ConfigureAwait(false)));
 
@@ -31,6 +36,28 @@ public static class Endpoints
 
         api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.SetActiveAsync(new SetBankAccountActiveCommand(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Cash desks (manual item 10) under /api/accounts/cash-desks; same conventions as bank accounts.</summary>
+    public static void MapCashDeskEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/cash-desks");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (bool? includeInactive, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+
+        api.MapPost("/", async (Treasury.Accounts.Application.CashDesks.CashDeskForm form, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RegisterAsync(new(Key(http), form), ct).ConfigureAwait(false)));
+
+        api.MapPut("/{id:guid}", async (Guid id, CashDeskChangeRequest r, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ChangeAsync(new(Key(http), id, r.Form, r.Version), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.SetActiveAsync(new(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
     }
 
     private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();
@@ -46,7 +73,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
-            "BankAccount.NotFound" => StatusCodes.Status404NotFound,
+            "BankAccount.NotFound" or "CashDesk.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

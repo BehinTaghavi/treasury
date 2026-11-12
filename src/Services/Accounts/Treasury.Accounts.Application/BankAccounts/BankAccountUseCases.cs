@@ -121,6 +121,10 @@ public sealed class BankAccountUseCases(IUnitOfWork unitOfWork, IBankAccountRepo
                 .ToList(),
             cancellationToken);
 
+    /// <summary>One bank account, active or not (asked by cashflow-svc when a cheque book is registered); null when unknown.</summary>
+    public Task<BankAccountView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct => await accounts.GetAsync(id, ct).ConfigureAwait(false) is { } a ? BankAccountView.From(a) : null, cancellationToken);
+
     private async Task<BankAccount> LoadAsync(Guid id, long expectedVersion, CancellationToken ct)
     {
         var account = await accounts.GetAsync(id, ct).ConfigureAwait(false)

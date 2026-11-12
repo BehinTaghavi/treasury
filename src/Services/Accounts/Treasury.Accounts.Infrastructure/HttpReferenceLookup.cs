@@ -16,7 +16,7 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
 
     private sealed record Account(string Code, bool IsActive, bool IsPostable, string[] Detail1Types, string[] Detail2Types);
 
-    private sealed record Detail(string Code, string? Type, bool IsActive);
+    private sealed record Detail(string Code, string? Type, bool IsActive, string? Name = null);
 
     public Task<ReferenceEntry?> BankAsync(Guid id, CancellationToken cancellationToken) => EntryAsync($"api/reference/banks/{id}", cancellationToken);
 
@@ -39,6 +39,9 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
         var d = await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false);
         return d is null ? null : new DetailFact(d.Code, d.Type, d.IsActive);
     }
+
+    public async Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
+        (await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false))?.Name;
 
     public async Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {

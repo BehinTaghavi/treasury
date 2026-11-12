@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.Accounts.Domain.CashDesks;
 using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 
@@ -27,11 +28,20 @@ public sealed record BankAccountSnapshot(Guid Id, BankAccountData Data, Guid? Ma
     public BankAccount ToDomain() => BankAccount.Restore(Id, Data, MainAccountId, IsActive, Version);
 }
 
+/// <summary>Stored form of a cash desk.</summary>
+public sealed record CashDeskSnapshot(Guid Id, CashDeskData Data, bool IsActive, long Version)
+{
+    public static CashDeskSnapshot From(CashDesk d, long version) => new(d.Id, d.Data, d.IsActive, version);
+
+    public CashDesk ToDomain() => CashDesk.Restore(Id, Data, IsActive, Version);
+}
+
 /// <summary>In-memory storage for local runs and tests: one transaction at a time, all-or-nothing commit, version checks, outbox.</summary>
 public sealed class InMemoryAccountsDatabase : IDisposable
 {
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, BankAccountSnapshot> BankAccounts = [];
+    internal readonly Dictionary<Guid, CashDeskSnapshot> CashDesks = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -53,6 +63,8 @@ public sealed class InMemoryAccountsDatabase : IDisposable
 internal sealed class PendingChanges
 {
     public Dictionary<Guid, BankAccountSnapshot> BankAccounts { get; } = [];
+
+    public Dictionary<Guid, CashDeskSnapshot> CashDesks { get; } = [];
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -79,6 +91,11 @@ public sealed class InMemoryUnitOfWork(InMemoryAccountsDatabase db) : IUnitOfWor
                 foreach (var (id, s) in pending.BankAccounts)
                 {
                     db.BankAccounts[id] = s;
+                }
+
+                foreach (var (id, s) in pending.CashDesks)
+                {
+                    db.CashDesks[id] = s;
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -148,6 +165,56 @@ public sealed class InMemoryBankAccountRepository(InMemoryAccountsDatabase db) :
         pending.BankAccounts[account.Id] = BankAccountSnapshot.From(account, newVersion);
         pending.Outbox.AddRange(account.PendingEvents.Select(OutboxMessage.From));
         account.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class InMemoryCashDeskRepository(InMemoryAccountsDatabase db) : ICashDeskRepository
+{
+    public Task<CashDesk?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().FirstOrDefault(s => s.Id == id)?.ToDomain());
+
+    public Task<bool> NameTakenAsync(string nameKey, Guid? exceptId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Any(s => s.Id != exceptId && PersianText.Key(s.Data.Name) == nameKey));
+
+    public Task AddAsync(CashDesk desk, CancellationToken cancellationToken) => Write(desk, 1, null);
+
+    public Task SaveAsync(CashDesk desk, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(desk);
+        return Write(desk, desk.Version + 1, desk.Version);
+    }
+
+    public Task<IReadOnlyList<CashDesk>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CashDesk>>(Visible().Where(s => includeInactive || s.IsActive).Select(s => s.ToDomain()).ToList());
+
+    private List<CashDeskSnapshot> Visible()
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, CashDeskSnapshot>(db.CashDesks);
+            foreach (var (id, s) in pending.CashDesks)
+            {
+                all[id] = s;
+            }
+
+            return [.. all.Values];
+        }
+    }
+
+    private Task Write(CashDesk desk, long newVersion, long? expected)
+    {
+        ArgumentNullException.ThrowIfNull(desk);
+        if (expected is { } v && Visible().FirstOrDefault(s => s.Id == desk.Id)?.Version != v)
+        {
+            throw new ConcurrencyConflictException($"Cash desk {desk.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.CashDesks[desk.Id] = CashDeskSnapshot.From(desk, newVersion);
+        pending.Outbox.AddRange(desk.PendingEvents.Select(OutboxMessage.From));
+        desk.MarkSaved(newVersion);
         return Task.CompletedTask;
     }
 }

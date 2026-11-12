@@ -48,6 +48,20 @@ public sealed class BankAccountPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cash_desk_round_trips_and_its_name_is_unique()
+    {
+        var desks = new Treasury.Accounts.Application.CashDesks.CashDeskUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresCashDeskRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        var form = new Treasury.Accounts.Application.CashDesks.CashDeskForm("صندوق " + _tag, "130100", "111078", null, false, null);
+        var r = await desks.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.Equal("CashDesk.NameTaken", (await desks.RegisterAsync(new(Key(), form with { Name = "صندوق  " + _tag }), CancellationToken.None)).ErrorCode);
+        var v = (await desks.ListAsync(true, CancellationToken.None)).Single(d => d.Id == r.Value);
+        Assert.Equal(("130100", "111078", "IRR", 1L), (v.LedgerAccountCode, v.HolderDetailCode, v.CurrencyCode, v.Version));
+        Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE type = 'CashDeskChanged' AND payload->>'CashDeskId' = @id", ("id", r.Value.ToString())));
+    }
+
+    [Fact]
     public async Task The_collection_priority_is_stored_as_a_number_or_none()
     {
         var first = await _useCases.RegisterAsync(new(Key(), Form("p1", priority: 3)), CancellationToken.None);
