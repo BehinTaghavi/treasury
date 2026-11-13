@@ -58,7 +58,16 @@ const parentChoices = computed(() => choices(parents.value.filter(p => p.isActiv
 /** Parents offered when correcting an entry: every active parent, with its country on the city screen. */
 const editParentChoices = computed(() =>
   choices(parents.value.filter(p => p.isActive), p => (props.spec.grandparent ? byId(tops.value, p.parentId)?.name : undefined)))
-const topChoices = computed(() => choices(tops.value.filter(c => c.isActive)))
+/**
+ * Countries on the city screen, each with its number of provinces, so that a second, empty «ایران» is told apart from the one
+ * holding the provinces (owner, 14 Nov 2026: "کومبوی استان خالی است").
+ */
+const provinceCount = (countryId: string) => parents.value.filter(p => p.isActive && p.parentId === countryId).length
+const topChoices = computed<Choice[]>(() => tops.value.filter(c => c.isActive).map(c => ({
+  value: c.id, label: t(`${c.name} (${num(provinceCount(c.id))} استان)`, `${c.name} (${provinceCount(c.id)} provinces)`),
+})))
+/** The chosen country has no province yet: say why the province list is empty and what to do. */
+const noParentForTop = computed(() => !!props.spec.grandparent && !!top.value && provinceCount(top.value) === 0)
 
 const inScope = (i: Item) =>
   (!parent.value || i.parentId === parent.value) && (!top.value || byId(parents.value, i.parentId)?.parentId === top.value)
@@ -198,7 +207,7 @@ onMounted(async () => {
         <SearchSelect
           v-model="parent"
           :options="parentChoices"
-          :empty-label="t(`همه (برای افزودن، یک ${label(spec.parent.label)} را انتخاب کنید)`, `All (choose a ${label(spec.parent.label).toLowerCase()} to add)`)"
+          :empty-label="t(`— ${label(spec.parent.label)} را انتخاب کنید —`, `— choose a ${label(spec.parent.label).toLowerCase()} —`)"
           :aria-label="label(spec.parent.label)"
           :none-text="t('موردی پیدا نشد', 'No match')"
         />
@@ -212,6 +221,10 @@ onMounted(async () => {
       <button type="submit" :disabled="busy">{{ t('افزودن', 'Add') }}</button>
     </form>
 
+    <p v-if="noParentForTop" class="tr-msg error" role="status">
+      {{ t(`برای «${byId(tops, top)?.name}» هنوز ${label(spec.parent.label)}ی تعریف نشده است. اگر در فهرست کشور دو «ایران» هست، آن را انتخاب کنید که کنارش «۳۱ استان» نوشته شده؛ وگرنه ابتدا در بخش «استان / ایالت» آن را تعریف کنید.`,
+               `"${byId(tops, top)?.name}" has no ${label(spec.parent.label).toLowerCase()} yet. If the country list shows two "Iran", choose the one marked "31 provinces"; otherwise define the ${label(spec.parent.label).toLowerCase()} first.`) }}
+    </p>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <div class="tr-search">
