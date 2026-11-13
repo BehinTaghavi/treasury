@@ -7,7 +7,7 @@
  *
  * For long lists kept on the server (تفصیل), the parent listens to `search` and replaces `options` with what it found.
  */
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { searchKey } from '../text'
 
 export interface Choice { value: string; label: string; hint?: string; muted?: boolean }
@@ -35,6 +35,25 @@ const open = ref(false)
 const typed = ref<string | null>(null) // null: show the chosen entry's text
 const active = ref(0)
 const listEl = ref<HTMLElement | null>(null)
+const rootEl = ref<HTMLElement | null>(null)
+const inputEl = ref<HTMLInputElement | null>(null)
+
+/**
+ * A click or touch anywhere outside the box closes its list without choosing (owner, 14 Nov 2026: "برای بستن لیست باکس ها گاها
+ * بدون انتخاب گزینه ای ممکن نیست"). Focus leaving the box was not enough: a list opened with the ▾ arrow never had the focus.
+ */
+function onOutside(e: PointerEvent) {
+  if (open.value && rootEl.value && !rootEl.value.contains(e.target as Node)) close(false) // only an exact code or name is kept
+}
+onMounted(() => document.addEventListener('pointerdown', onOutside, true))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside, true))
+
+/** The ▾ arrow opens the list and puts the cursor in the box (so Tab, Esc and typing work), or closes an open list. */
+function toggle() {
+  if (open.value) return close(false)
+  inputEl.value?.focus()
+  show()
+}
 const id = `ss-${Math.random().toString(36).slice(2, 9)}`
 
 const chosen = computed(() => props.options.find(o => o.value === props.modelValue))
@@ -75,12 +94,12 @@ function pick(o: Choice) {
  * entry left in the list. Owner's report no. 2, item 8: a code typed into «معین برگشتی» and left with Tab was sometimes not saved.
  * Text that matches nothing (or several entries) is dropped and the previous choice stays.
  */
-function close() {
+function close(keepOnlyLeft = true) {
   const q = searchKey(typed.value ?? '')
   if (q) {
     const exact = props.options.filter(o => o.value !== '' && (searchKey(o.hint ?? '') === q || searchKey(o.label) === q || searchKey(o.value) === q))
     const left = shown.value.filter(o => o.value !== '')
-    const one = exact.length === 1 ? exact[0] : !props.remote && left.length === 1 ? left[0] : undefined
+    const one = exact.length === 1 ? exact[0] : keepOnlyLeft && !props.remote && left.length === 1 ? left[0] : undefined
     if (one && one.value !== props.modelValue) emit('update:modelValue', one.value)
   }
   typed.value = null
@@ -111,8 +130,9 @@ function scrollToActive() {
 </script>
 
 <template>
-  <div class="ss" :class="{ open, required, disabled }" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) close() }">
+  <div ref="rootEl" class="ss" :class="{ open, required, disabled }" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) close() }">
     <input
+      ref="inputEl"
       :id="id"
       role="combobox"
       :aria-expanded="open"
@@ -129,7 +149,7 @@ function scrollToActive() {
       @input="onInput"
       @keydown="onKey"
     />
-    <button type="button" class="ss-arrow" tabindex="-1" :disabled="disabled" :aria-label="ariaLabel" @mousedown.prevent="open ? close() : show()">▾</button>
+    <button type="button" class="ss-arrow" tabindex="-1" :disabled="disabled" :aria-label="ariaLabel" @mousedown.prevent="toggle">▾</button>
     <ul v-if="open" :id="`${id}-list`" ref="listEl" role="listbox" class="ss-list">
       <li
         v-for="(o, i) in shown"

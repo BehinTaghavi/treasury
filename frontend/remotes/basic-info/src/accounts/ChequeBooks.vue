@@ -26,7 +26,7 @@ const BOOK_SIZES = ['25', '50', '100']
 interface Format { id: string; number: number; bankAccountId: string | null; printType: string; isActive: boolean }
 const PRINT_TYPES: Record<string, [string, string]> = {
   NewLarge: ['جدید – قطع بزرگ', 'New – large'], NewestLarge: ['جدیدترین – قطع بزرگ', 'Newest – large'], OldLarge: ['قدیمی – قطع بزرگ', 'Old – large'],
-  NewSmall: ['جدید – قطع کوچک', 'New – small'], NewestSmall: ['جدیدترین – قطع کوچک', 'Newest – small'], OldSmall: ['قدیمی – قطع کوچک', 'Old – small'],
+  Standard: ['استاندارد', 'Standard'], NewSmall: ['جدید – قطع کوچک', 'New – small'], NewestSmall: ['جدیدترین – قطع کوچک', 'Newest – small'], OldSmall: ['قدیمی – قطع کوچک', 'Old – small'],
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
@@ -57,7 +57,7 @@ const accountChoices = computed<Choice[]>(() =>
 const filterChoices = computed<Choice[]>(() => accounts.value.map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber })))
 const chosen = computed(() => account(form.bankAccountId))
 const formatLabel = (f: Format | undefined) => (f
-  ? `${fa.value ? PRINT_TYPES[f.printType]?.[0] : PRINT_TYPES[f.printType]?.[1]} (${num(f.number)})${f.bankAccountId ? '' : t(' – استاندارد', ' – standard')}`
+  ? `${fa.value ? PRINT_TYPES[f.printType]?.[0] : PRINT_TYPES[f.printType]?.[1]} (${num(f.number)})${f.bankAccountId || f.printType === 'Standard' ? '' : t(' – استاندارد', ' – standard')}`
   : '')
 const formatName = (id: string | null) => formatLabel(formats.value.find(f => f.id === id))
 /** Manual item 6 "شماره / نوع چک": a cheque type of the chosen account (manual item 7) or a standard type of all accounts (report no. 3, item 3). */

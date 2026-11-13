@@ -47,8 +47,9 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
   { id: 'bank-accounts', title: ['حساب‌های بانکی', 'Bank accounts'] },
-  { id: 'cheque-books', title: ['دسته چک‌ها', 'Cheque books'] },
+  // Owner, 14 Nov 2026: cheque types first; cheque books choose from them.
   { id: 'cheque-formats', title: ['انواع چک و چاپ', 'Cheque types and printing'] },
+  { id: 'cheque-books', title: ['دسته چک‌ها', 'Cheque books'] },
   { id: 'references', title: ['عطف‌ها', 'References'] },
   { id: 'purposes', title: ['گروه بابت‌ها و بابت‌ها', 'Purpose groups and purposes'] },
   { id: 'cash-desks', title: ['صندوق‌ها', 'Cash desks'] },

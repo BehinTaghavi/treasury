@@ -47,7 +47,8 @@ public sealed class ChequeFormatTests
     [Fact]
     public void The_standard_type_fits_the_books_of_every_account_owner_report_3()
     {
-        var standard = ChequeFormat.Register(Guid.NewGuid(), 4, null, ChequePrintType.NewestLarge);
+        // Owner, 14 Nov 2026: the uniform cheque of all banks is its own print type, «استاندارد».
+        var standard = ChequeFormat.Register(Guid.NewGuid(), 4, null, ChequePrintType.Standard);
         var a = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 200_001, 200_010);
         var b = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "5678", 300_001, 300_010);
         a.UseFormat(standard);

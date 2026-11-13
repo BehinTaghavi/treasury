@@ -464,6 +464,7 @@ def test_a_standard_cheque_type_has_no_account_and_each_print_type_once(db):
         c.execute("SET ROLE cashflow_svc")
         add = "INSERT INTO cashflow.cheque_format (id, number, bank_account_id, print_type) VALUES (%s, %s, %s, %s)"
         c.execute(add, (uuid.uuid4(), 980001, None, "NewestSmall"))
+        c.execute(add, (uuid.uuid4(), 980004, None, "Standard"))  # 023: the Standard print type
         c.execute(add, (uuid.uuid4(), 980002, uuid.uuid4(), "NewestSmall"))
         with pytest.raises(psycopg.errors.UniqueViolation):
             with c.transaction():

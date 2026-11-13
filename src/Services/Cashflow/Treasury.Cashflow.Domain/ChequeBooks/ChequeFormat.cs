@@ -25,6 +25,12 @@ public enum ChequePrintType
 
     /// <summary>قطع کوچک (the manual's sixth entry: the old small design)</summary>
     OldSmall,
+
+    /// <summary>
+    /// استاندارد: the uniform cheque all Iranian banks now print (owner, 14 Nov 2026), kept with its scan like the others; usually
+    /// defined once as the standard type for all accounts.
+    /// </summary>
+    Standard,
 }
 
 /// <summary>

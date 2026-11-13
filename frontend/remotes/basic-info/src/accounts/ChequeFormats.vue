@@ -8,7 +8,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
 
-type PrintType = 'NewLarge' | 'NewestLarge' | 'OldLarge' | 'NewSmall' | 'NewestSmall' | 'OldSmall'
+type PrintType = 'Standard' | 'NewLarge' | 'NewestLarge' | 'OldLarge' | 'NewSmall' | 'NewestSmall' | 'OldSmall'
 interface Format { id: string; number: number; bankAccountId: string | null; printType: PrintType; hasImage: boolean; isActive: boolean; version: number }
 interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; isActive: boolean }
 interface Entry { id: string; name: string }
@@ -22,6 +22,8 @@ const base = '/api/cashflow/cheque-formats'
 
 /** The manual's six print types, in its order. */
 const PRINT_TYPES: { value: PrintType; fa: string; en: string }[] = [
+  // Owner, 14 Nov 2026: all banks now print one standard cheque; it comes first.
+  { value: 'Standard', fa: 'استاندارد', en: 'Standard' },
   { value: 'NewLarge', fa: 'جدید – قطع بزرگ', en: 'New – large' },
   { value: 'NewestLarge', fa: 'جدیدترین – قطع بزرگ', en: 'Newest – large' },
   { value: 'OldLarge', fa: 'قدیمی – قطع بزرگ', en: 'Old – large' },
