@@ -64,13 +64,21 @@ const formatName = (id: string | null) => formatLabel(formats.value.find(f => f.
 const formatChoices = computed<Choice[]>(() => formats.value
   .filter(f => (f.bankAccountId === form.bankAccountId || !f.bankAccountId) && (f.isActive || f.id === form.formatId))
   .map(f => ({ value: f.id, label: formatLabel(f) })))
-/** A new book of an account without its own cheque type takes the standard one. */
+/**
+ * A new book of an account without its own cheque type takes the standard one; a type of the previously chosen account is
+ * cleared when the account changes (owner, 14 Nov 2026: the standard type must be seen for every account).
+ */
 watch(() => form.bankAccountId, id => {
-  if (editing.value || form.formatId) return
+  if (editing.value) return
+  const current = formats.value.find(f => f.id === form.formatId)
+  if (current && current.bankAccountId && current.bankAccountId !== id) form.formatId = ''
+  if (form.formatId) return
   const own = formats.value.filter(f => f.bankAccountId === id && f.isActive)
   const standard = formats.value.filter(f => !f.bankAccountId && f.isActive)
-  if (id && !own.length && standard.length) form.formatId = standard[0]!.id
+  if (id && !own.length && standard.length) form.formatId = standard.find(f => f.printType === 'Standard')?.id ?? standard[0]!.id
 })
+/** Standard types exist but all are switched off: say so, otherwise the list silently lacks them. */
+const standardSwitchedOff = computed(() => formats.value.some(f => !f.bankAccountId) && !formats.value.some(f => !f.bankAccountId && f.isActive))
 /** Sheets were used: only the cheque type can still change. */
 const locked = computed(() => !!editing.value?.isInUse)
 /** Digits typed in Persian or Arabic are accepted. */
@@ -220,6 +228,7 @@ onMounted(async () => {
         <label>{{ t('شماره / نوع چک', 'Cheque type') }}
           <SearchSelect v-model="form.formatId" :options="formatChoices" :empty-label="t('تعیین نشده', 'Not chosen')" :aria-label="t('نوع چک', 'Cheque type')"
                         :none-text="t('برای این حساب نوع چکی تعریف نشده است', 'No cheque type for this account')" />
+          <small v-if="standardSwitchedOff" class="tr-warn">{{ t('نوع چک استاندارد غیرفعال است و در این فهرست نمی‌آید؛ آن را در «انواع چک و چاپ» ← «چک استاندارد» فعال کنید.', 'The standard cheque type is switched off, so it is not offered; switch it on under Cheque types → Standard cheque.') }}</small>
         </label>
         <p v-if="locked" class="muted small wide-note">{{ t('از برگ‌های این دسته چک استفاده شده؛ فقط نوع چک قابل تغییر است.', 'Sheets were used; only the cheque type can change.') }}</p>
       </fieldset>
@@ -299,6 +308,7 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-actions { white-space: nowrap; }
 .muted { color: #7b8794; }
 .small { font-size: .8rem; }
+.tr-warn { color: #b42318; font-weight: 600; font-size: .8rem; }
 .wide-note { grid-column: 1 / -1; margin: 0; }
 .sayad { grid-column: span 2; display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .sayad-boxes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
