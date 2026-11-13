@@ -9,7 +9,7 @@ import { createApi, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
 
 type PrintType = 'NewLarge' | 'NewestLarge' | 'OldLarge' | 'NewSmall' | 'NewestSmall' | 'OldSmall'
-interface Format { id: string; number: number; bankAccountId: string; printType: PrintType; hasImage: boolean; isActive: boolean; version: number }
+interface Format { id: string; number: number; bankAccountId: string | null; printType: PrintType; hasImage: boolean; isActive: boolean; version: number }
 interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; isActive: boolean }
 interface Entry { id: string; name: string }
 
@@ -42,8 +42,17 @@ const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
 const bankName = (id: string | undefined) => banks.value.find(b => b.id === id)?.name ?? ''
-const accountChoices = computed<Choice[]>(() => accounts.value.map(a => ({ value: a.id, label: `${bankName(a.bankId)} · ${a.branchName ?? ''}`, hint: a.accountNumber, muted: !a.isActive })))
-const shown = computed(() => formats.value.filter(f => f.bankAccountId === account.value))
+/**
+ * Owner's report no. 3, item 3: all banks print the same standard cheque, so a type can be defined once for all accounts. It is
+ * the first entry of the account list; every account's cheque books can then use it.
+ */
+const STANDARD = 'standard'
+const accountChoices = computed<Choice[]>(() => [
+  { value: STANDARD, label: t('چک استاندارد (برای همهٔ حساب‌های بانکی)', 'Standard cheque (all bank accounts)') },
+  ...accounts.value.map(a => ({ value: a.id, label: `${bankName(a.bankId)} · ${a.branchName ?? ''}`, hint: a.accountNumber, muted: !a.isActive })),
+])
+const chosenAccountId = computed(() => (account.value === STANDARD ? null : account.value))
+const shown = computed(() => formats.value.filter(f => f.bankAccountId === chosenAccountId.value))
 const freeTypes = computed(() => PRINT_TYPES.filter(p => !shown.value.some(f => f.printType === p.value)))
 
 function headers(): Record<string, string> {
@@ -73,13 +82,13 @@ async function loadLists() {
   const [a, b] = await Promise.all([api.get<BankAccount[]>('/api/accounts/bank-accounts?includeInactive=true'), api.get<Entry[]>('/api/reference/banks?includeInactive=true')])
   if (a.ok) accounts.value = a.value
   if (b.ok) banks.value = b.value
-  if (!account.value && accounts.value.length) account.value = accounts.value.find(x => x.isActive)?.id ?? accounts.value[0]!.id
+  if (!account.value) account.value = STANDARD
 }
 
 async function add() {
   if (busy.value || !account.value) return
   busy.value = true
-  const r = await api.post<string>(base, { bankAccountId: account.value, printType: newType.value })
+  const r = await api.post<string>(base, { bankAccountId: chosenAccountId.value, printType: newType.value })
   busy.value = false
   if (!r.ok) return fail(r.code)
   message.value = { kind: 'ok', text: t('نوع چک ثبت شد؛ اکنون تصویر اسکن آن را بارگذاری کنید.', 'Cheque type saved; now upload its scan.') }
@@ -136,15 +145,15 @@ onBeforeUnmount(() => Object.values(images.value).forEach(u => URL.revokeObjectU
 <template>
   <div>
     <h3>{{ t('انواع چک و چاپ آن‌ها', 'Cheque types and print layout') }}</h3>
-    <p v-if="!accounts.length" class="muted">{{ t('ابتدا در «حساب‌های بانکی» حساب بانکی شرکت را تعریف کنید.', 'Define the company\'s bank accounts first.') }}</p>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
-    <div v-if="accounts.length" class="tr-search">
+    <div class="tr-search">
       <label class="acc">{{ t('شماره حساب بانکی', 'Bank account') }}
         <SearchSelect :model-value="account" :options="accountChoices" :aria-label="t('شماره حساب بانکی', 'Bank account')" @update:model-value="chooseAccount" />
       </label>
       <label>{{ t('نوع چاپ', 'Print type') }}
-        <select v-model="newType" :disabled="!freeTypes.length"><option v-for="p in freeTypes" :key="p.value" :value="p.value">{{ fa ? p.fa : p.en }}</option></select>
+        <SearchSelect :model-value="newType" :options="freeTypes.map(p => ({ value: p.value, label: fa ? p.fa : p.en }))" :disabled="!freeTypes.length"
+                      :aria-label="t('نوع چاپ', 'Print type')" @update:model-value="v => (newType = v as PrintType)" />
       </label>
       <button type="button" :disabled="busy || !freeTypes.length || !account" @click="add">{{ t('افزودن نوع چک', 'Add cheque type') }}</button>
     </div>
@@ -153,9 +162,9 @@ onBeforeUnmount(() => Object.values(images.value).forEach(u => URL.revokeObjectU
       <article v-for="f in shown" :key="f.id" :class="['tr-card', { inactive: !f.isActive }]">
         <header>
           <strong>{{ t(`شماره چاپ ${num(f.number)}`, `Print no. ${f.number}`) }}</strong>
-          <select :value="f.printType" :aria-label="t('نوع چاپ', 'Print type')" @change="changeType(f, ($event.target as HTMLSelectElement).value as PrintType)">
-            <option v-for="p in PRINT_TYPES" :key="p.value" :value="p.value" :disabled="p.value !== f.printType && shown.some(x => x.printType === p.value)">{{ fa ? p.fa : p.en }}</option>
-          </select>
+          <SearchSelect :model-value="f.printType" :aria-label="t('نوع چاپ', 'Print type')"
+                        :options="PRINT_TYPES.filter(p => p.value === f.printType || !shown.some(x => x.printType === p.value)).map(p => ({ value: p.value, label: fa ? p.fa : p.en }))"
+                        @update:model-value="v => v !== f.printType && changeType(f, v as PrintType)" />
         </header>
         <div class="scan">
           <img v-if="images[f.id]" :src="images[f.id]" :alt="t('تصویر اسکن چک', 'Cheque scan') + ' – ' + typeLabel(f.printType)" />
@@ -172,7 +181,9 @@ onBeforeUnmount(() => Object.values(images.value).forEach(u => URL.revokeObjectU
           </span>
         </footer>
       </article>
-      <p v-if="account && !shown.length" class="muted">{{ t('برای این حساب هنوز نوع چکی تعریف نشده است.', 'No cheque type for this account yet.') }}</p>
+      <p v-if="account && !shown.length" class="muted">{{ account === STANDARD
+        ? t('هنوز چک استانداردی تعریف نشده است. نوع چاپ را انتخاب و «افزودن نوع چک» را بزنید؛ دسته چک‌های همهٔ حساب‌ها می‌توانند از آن استفاده کنند.', 'No standard cheque yet. Choose the print type and add it; every account\'s cheque books can use it.')
+        : t('برای این حساب هنوز نوع چکی تعریف نشده است؛ دسته چک‌های آن می‌توانند از چک استاندارد استفاده کنند.', 'No cheque type for this account yet; its cheque books can use the standard cheque.') }}</p>
     </div>
   </div>
 </template>

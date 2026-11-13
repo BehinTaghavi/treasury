@@ -66,6 +66,9 @@ public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActiv
 public interface IBankAccountLookup
 {
     Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tells accounts-svc a cheque book or cheque type is about to name the account, so it is never deleted.</summary>
+    Task MarkInUseAsync(Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>Answered by the Fiscal Periods context: may operations be recorded on this date? (rule R2)</summary>

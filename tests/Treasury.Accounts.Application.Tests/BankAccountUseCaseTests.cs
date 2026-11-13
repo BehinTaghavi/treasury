@@ -146,4 +146,23 @@ public sealed class BankAccountUseCaseTests : IDisposable
         Assert.Equal("Reference.Unavailable", (await _useCases.RegisterAsync(new(Key(), Form()), CancellationToken.None)).ErrorCode);
         Assert.Empty(_db.OutboxMessages);
     }
+
+    [Fact]
+    public async Task An_unused_account_is_deleted_a_used_one_and_a_main_with_a_backup_are_not_owner_report_3()
+    {
+        var free = await Register(Form(number: "0101-900"));
+        Assert.True((await _useCases.DeleteAsync(new(Key(), free, 1), CancellationToken.None)).IsSuccess);
+        Assert.DoesNotContain(await _useCases.ListAsync(true, CancellationToken.None), a => a.Id == free);
+
+        var used = await Register(Form(number: "0101-901"));
+        Assert.True((await _useCases.MarkInUseAsync(Key(), used, CancellationToken.None)).IsSuccess);
+        var view = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == used);
+        Assert.True(view.IsInUse);
+        Assert.Equal("BankAccount.InUse", (await _useCases.DeleteAsync(new(Key(), used, view.Version), CancellationToken.None)).ErrorCode);
+
+        var main = await Register(Form(number: "0101-902"));
+        await Register(Form(number: "0101-903", d1: "100001"), main);
+        Assert.Equal("BankAccount.HasBackup", (await _useCases.DeleteAsync(new(Key(), main, 1), CancellationToken.None)).ErrorCode);
+    }
 }
+

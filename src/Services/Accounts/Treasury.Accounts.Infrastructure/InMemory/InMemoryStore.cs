@@ -22,11 +22,12 @@ public sealed record OutboxMessage(Guid Id, string Type, string Payload, DateTim
 }
 
 /// <summary>Stored form of a bank account (immutable: a transaction's copy never leaks into committed state).</summary>
-public sealed record BankAccountSnapshot(Guid Id, BankAccountData Data, Guid? MainAccountId, bool IsActive, long Version)
+/// <param name="Deleted">A deleted account stays as a marker so that a transaction's delete reaches the committed state.</param>
+public sealed record BankAccountSnapshot(Guid Id, BankAccountData Data, Guid? MainAccountId, bool IsActive, long Version, bool IsInUse = false, bool Deleted = false)
 {
-    public static BankAccountSnapshot From(BankAccount a, long version) => new(a.Id, a.Data, a.MainAccountId, a.IsActive, version);
+    public static BankAccountSnapshot From(BankAccount a, long version) => new(a.Id, a.Data, a.MainAccountId, a.IsActive, version, a.IsInUse);
 
-    public BankAccount ToDomain() => BankAccount.Restore(Id, Data, MainAccountId, IsActive, Version);
+    public BankAccount ToDomain() => BankAccount.Restore(Id, Data, MainAccountId, IsActive, Version, IsInUse);
 }
 
 /// <summary>Stored form of a cash desk.</summary>
@@ -155,6 +156,22 @@ public sealed class InMemoryBankAccountRepository(InMemoryAccountsDatabase db) :
     public Task<IReadOnlyList<BankAccount>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<BankAccount>>(Visible().Where(s => includeInactive || s.IsActive).Select(s => s.ToDomain()).ToList());
 
+    public Task DeleteAsync(BankAccount account, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var current = Visible().FirstOrDefault(s => s.Id == account.Id);
+        if (current is null || current.Version != account.Version || current.IsInUse)
+        {
+            throw new ConcurrencyConflictException($"Bank account {account.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.BankAccounts[account.Id] = current with { Deleted = true };
+        pending.Outbox.AddRange(account.PendingEvents.Select(OutboxMessage.From));
+        account.MarkSaved(account.Version);
+        return Task.CompletedTask;
+    }
+
     private List<BankAccountSnapshot> Visible()
     {
         var pending = InMemoryUnitOfWork.Pending;
@@ -166,7 +183,7 @@ public sealed class InMemoryBankAccountRepository(InMemoryAccountsDatabase db) :
                 all[id] = s;
             }
 
-            return [.. all.Values];
+            return [.. all.Values.Where(s => !s.Deleted)];
         }
     }
 

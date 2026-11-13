@@ -9,7 +9,7 @@
  * cashflow-svc, which hands out the sheet numbers when cheques are issued. The print layout of each book (manual item 7)
  * comes with cheque printing.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
 import { searchKey } from '../text'
@@ -23,7 +23,7 @@ interface Book {
 }
 /** Banks issue books of 25, 50 or 100 sheets; a book partly used before go-live is entered with any number of unused sheets (owner, 12 Nov 2026). */
 const BOOK_SIZES = ['25', '50', '100']
-interface Format { id: string; number: number; bankAccountId: string; printType: string; isActive: boolean }
+interface Format { id: string; number: number; bankAccountId: string | null; printType: string; isActive: boolean }
 const PRINT_TYPES: Record<string, [string, string]> = {
   NewLarge: ['جدید – قطع بزرگ', 'New – large'], NewestLarge: ['جدیدترین – قطع بزرگ', 'Newest – large'], OldLarge: ['قدیمی – قطع بزرگ', 'Old – large'],
   NewSmall: ['جدید – قطع کوچک', 'New – small'], NewestSmall: ['جدیدترین – قطع کوچک', 'Newest – small'], OldSmall: ['قدیمی – قطع کوچک', 'Old – small'],
@@ -56,12 +56,21 @@ const accountChoices = computed<Choice[]>(() =>
   accounts.value.filter(a => a.isActive || a.id === form.bankAccountId).map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber, muted: !a.isActive })))
 const filterChoices = computed<Choice[]>(() => accounts.value.map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber })))
 const chosen = computed(() => account(form.bankAccountId))
-const formatLabel = (f: Format | undefined) => (f ? `${fa.value ? PRINT_TYPES[f.printType]?.[0] : PRINT_TYPES[f.printType]?.[1]} (${num(f.number)})` : '')
+const formatLabel = (f: Format | undefined) => (f
+  ? `${fa.value ? PRINT_TYPES[f.printType]?.[0] : PRINT_TYPES[f.printType]?.[1]} (${num(f.number)})${f.bankAccountId ? '' : t(' – استاندارد', ' – standard')}`
+  : '')
 const formatName = (id: string | null) => formatLabel(formats.value.find(f => f.id === id))
-/** Manual item 6 "شماره / نوع چک": a cheque type of the chosen account (manual item 7). */
+/** Manual item 6 "شماره / نوع چک": a cheque type of the chosen account (manual item 7) or a standard type of all accounts (report no. 3, item 3). */
 const formatChoices = computed<Choice[]>(() => formats.value
-  .filter(f => f.bankAccountId === form.bankAccountId && (f.isActive || f.id === form.formatId))
+  .filter(f => (f.bankAccountId === form.bankAccountId || !f.bankAccountId) && (f.isActive || f.id === form.formatId))
   .map(f => ({ value: f.id, label: formatLabel(f) })))
+/** A new book of an account without its own cheque type takes the standard one. */
+watch(() => form.bankAccountId, id => {
+  if (editing.value || form.formatId) return
+  const own = formats.value.filter(f => f.bankAccountId === id && f.isActive)
+  const standard = formats.value.filter(f => !f.bankAccountId && f.isActive)
+  if (id && !own.length && standard.length) form.formatId = standard[0]!.id
+})
 /** Sheets were used: only the cheque type can still change. */
 const locked = computed(() => !!editing.value?.isInUse)
 /** Digits typed in Persian or Arabic are accepted. */
@@ -163,7 +172,7 @@ onMounted(async () => {
   <div>
     <h3>{{ t('دسته چک‌ها', 'Cheque books') }}</h3>
     <p v-if="!accounts.length" class="muted">{{ t('ابتدا در «حساب‌های بانکی» حساب بانکی شرکت را تعریف کنید.', 'Define the company\'s bank accounts first.') }}</p>
-    <button v-if="!showForm && accounts.length" type="button" @click="startNew">{{ t('دسته چک جدید', 'New cheque book') }}</button>
+    <button v-if="accounts.length" type="button" class="tr-new" @click="startNew">{{ t('دسته چک جدید', 'New cheque book') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">
@@ -192,9 +201,8 @@ onMounted(async () => {
           <input v-model="form.sheetCount" maxlength="3" dir="ltr" inputmode="numeric" autocomplete="off" :disabled="locked" placeholder="17" />
         </label>
         <label v-else class="req"><span>{{ t('تعداد برگ دسته چک', 'Number of sheets') }} <span class="star">*</span></span>
-          <select v-model="form.sheetCount" :disabled="locked">
-            <option v-for="s in BOOK_SIZES" :key="s" :value="s">{{ t(`${num(Number(s))} برگی`, `${s} sheets`) }}</option>
-          </select>
+          <SearchSelect v-model="form.sheetCount" :disabled="locked" required :aria-label="t('تعداد برگ دسته چک', 'Number of sheets')"
+                        :options="BOOK_SIZES.map(s => ({ value: s, label: t(`${num(Number(s))} برگی`, `${s} sheets`) }))" />
         </label>
         <label>{{ t('شماره سریال پایانی', 'Last serial') }}<input :value="lastSerialText" dir="ltr" readonly tabindex="-1" class="ro" /></label>
         <div class="req sayad">

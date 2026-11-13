@@ -69,6 +69,9 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
 
     public bool IsActive { get; private set; }
 
+    /// <summary>A cheque book, cheque type or cheque names this account (recorded by cashflow-svc); then it is never deleted.</summary>
+    public bool IsInUse { get; private set; }
+
     /// <summary>Comparison key of the account number: digits only, Persian/Arabic digits as 0-9 (Form_Bankacc: "شماره حساب تكراري است").</summary>
     public string NumberKey => NumberKeyOf(Data.AccountNumber);
 
@@ -118,9 +121,32 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
 
     public void Activate() => SetActive(true);
 
-    public static BankAccount Restore(Guid id, BankAccountData data, Guid? mainAccountId, bool isActive, long version)
+    /// <summary>Marks the account as used by another service's data; false when it already was.</summary>
+    public bool MarkInUse()
     {
-        var account = new BankAccount(id, data, mainAccountId) { IsActive = isActive };
+        if (IsInUse)
+        {
+            return false;
+        }
+
+        IsInUse = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Deletes an account typed by mistake (owner's report no. 3, item 1: "حذف در شرایطی قابل انجام است که حساب مربوطه گردش نداشته
+    /// باشد"): only while no cheque book, cheque type or cheque names it, and while no backup account points to it.
+    /// </summary>
+    public void Delete(bool hasBackup)
+    {
+        Require(!IsInUse, "BankAccount.InUse", "Cheque books or cheques name this account; switch it off instead.");
+        Require(!hasBackup, "BankAccount.HasBackup", "A backup account belongs to this account; delete the backup first.");
+        Raise(new BankAccountDeleted(Id));
+    }
+
+    public static BankAccount Restore(Guid id, BankAccountData data, Guid? mainAccountId, bool isActive, long version, bool isInUse = false)
+    {
+        var account = new BankAccount(id, data, mainAccountId) { IsActive = isActive, IsInUse = isInUse };
         account.SetLoadedVersion(version);
         return account;
     }
@@ -242,3 +268,5 @@ public sealed record BankAccountChanged(
         a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code, a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode,
         a.Data.CollectionPriority, a.IsActive);
 }
+
+public sealed record BankAccountDeleted(Guid BankAccountId) : DomainEvent;

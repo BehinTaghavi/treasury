@@ -23,7 +23,7 @@ interface BankAccount {
   id: string; accountNumber: string; bankId: string; branchName: string | null; branchCode: string | null; cityId: string | null
   openingDate: string | null; currencyCode: string; mainAccountId: string | null; ledgerAccountCode: string; detail1Code: string | null
   detail2Code: string | null; collectionAccountCode: string | null; bouncedAccountCode: string | null; collectionPriority: number | null
-  isFacility: boolean; isActive: boolean; version: number
+  isFacility: boolean; isActive: boolean; version: number; isInUse: boolean
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
@@ -227,6 +227,17 @@ async function toggle(a: BankAccount) {
   await loadAccounts()
 }
 
+/** Owner's report no. 3, item 1: an account nothing uses (no cheque book, cheque type or cheque) and without a backup. */
+const hasBackup = (a: BankAccount) => accounts.value.some(b => b.mainAccountId === a.id)
+async function remove(a: BankAccount) {
+  if (!window.confirm(t(`حساب «${a.accountNumber}» حذف شود؟`, `Delete account "${a.accountNumber}"?`))) return
+  const r = await api.post<string>(`${base}/${a.id}/delete`, { version: a.version })
+  if (!r.ok) return fail(r.code)
+  message.value = { kind: 'ok', text: t('حساب بانکی حذف شد.', 'Bank account deleted.') }
+  if (editing.value?.id === a.id) showForm.value = false
+  await loadAccounts()
+}
+
 onMounted(async () => {
   await loadLists()
   await loadAccounts()
@@ -237,7 +248,7 @@ onMounted(async () => {
   <div>
     <h3>{{ t('حساب‌های بانکی', 'Bank accounts') }}</h3>
     <p v-if="!ledger.length" class="muted">{{ t('ابتدا در «کدینگ حساب‌ها» حساب‌های سیستم حسابداری را وارد کنید؛ حساب معین بانک از آنجا انتخاب می‌شود.', 'Import the chart of accounts first; the bank\'s ledger account is chosen from it.') }}</p>
-    <button v-if="!showForm" type="button" @click="startNew">{{ t('حساب بانکی جدید', 'New bank account') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('حساب بانکی جدید', 'New bank account') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">
@@ -247,15 +258,14 @@ onMounted(async () => {
         <div class="tr-kind">
           <label class="tr-check"><input v-model="form.isForeign" type="checkbox" :disabled="restLocked && !form.isBackup" /> {{ t('ارزی', 'Foreign currency') }}</label>
           <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
-            <select v-model="form.currencyCode"><option value="" /><option v-for="c in foreignCurrencies" :key="c.id" :value="c.code">{{ c.name }} ({{ c.code }})</option></select>
+            <SearchSelect v-model="form.currencyCode" :options="foreignCurrencies.map(c => ({ value: c.code, label: c.name, hint: c.code }))" required :aria-label="t('نوع ارز', 'Currency')" />
           </label>
           <label class="tr-check"><input :checked="form.isBackup" type="checkbox" :disabled="!!editing" @change="onBackupChange(($event.target as HTMLInputElement).checked)" /> {{ t('پشتیبان', 'Backup account') }}</label>
           <label v-if="form.isBackup" class="req main"><span>{{ t('شماره حساب جاری اصلی', 'Main current account') }} <span class="star">*</span></span>
-            <select v-model="form.mainAccountId" :disabled="!!editing || backupBlocked">
-              <option value="" />
-              <option v-if="editing?.mainAccountId" :value="editing.mainAccountId">{{ accounts.find(a => a.id === editing!.mainAccountId)?.accountNumber }}</option>
-              <option v-for="a in mainChoices" :key="a.id" :value="a.id">{{ mainLabel(a) }}</option>
-            </select>
+            <SearchSelect v-model="form.mainAccountId" :disabled="!!editing || backupBlocked" required :aria-label="t('شماره حساب جاری اصلی', 'Main current account')"
+                          :options="editing?.mainAccountId
+                            ? accounts.filter(a => a.id === editing!.mainAccountId).map(a => ({ value: a.id, label: mainLabel(a) }))
+                            : mainChoices.map(a => ({ value: a.id, label: mainLabel(a) }))" />
             <small v-if="!backupBlocked && !editing" class="muted">{{ t('بانک، شعبه و شهر از حساب جاری اصلی گرفته می‌شود.', 'Bank, branch and city come from the main account.') }}</small>
           </label>
           <p v-if="backupBlocked" class="tr-msg error wide" role="alert">{{ translate('BankAccount.MainAccountRequired', locale) }}</p>
@@ -345,10 +355,11 @@ onMounted(async () => {
               <td dir="ltr" :title="ledgerName(a.ledgerAccountCode)">{{ a.ledgerAccountCode }}</td><td dir="ltr">{{ a.detail1Code }}</td>
               <td>{{ a.collectionPriority ? num(a.collectionPriority) : '' }}</td>
               <td dir="ltr">{{ accounts.find(m => m.id === a.mainAccountId)?.accountNumber }}</td>
-              <td>{{ a.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
+              <td>{{ a.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }} <span v-if="a.isInUse" class="tr-tag">{{ t('در حال استفاده', 'in use') }}</span></td>
               <td class="tr-actions">
                 <button type="button" class="tr-link" @click="startEdit(a)">{{ t('ویرایش', 'Edit') }}</button>
                 <button type="button" class="tr-link" @click="toggle(a)">{{ a.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
+                <button v-if="!a.isInUse && !hasBackup(a)" type="button" class="tr-link danger" @click="remove(a)">{{ t('حذف', 'Delete') }}</button>
               </td>
             </tr>
             <tr v-if="!shown.length"><td colspan="11" class="muted">{{ t('با این جستجو حسابی پیدا نشد.', 'No account matches this search.') }}</td></tr>
@@ -400,5 +411,7 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-table th, .tr-table td { padding: .4rem .5rem; border-bottom: 1px solid #e4e7eb; text-align: start; }
 .tr-table tr.inactive td { color: #9aa5b1; }
 .tr-actions { white-space: nowrap; }
+.tr-link.danger { color: #b42318; }
+.tr-tag { background: #eef2f6; color: #52606d; border-radius: 4px; padding: 0 .3rem; font-size: .75rem; }
 .muted { color: #7b8794; }
 </style>

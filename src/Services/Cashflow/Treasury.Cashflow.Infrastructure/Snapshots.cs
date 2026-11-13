@@ -62,7 +62,7 @@ public sealed record ChequeBookSnapshot(
         SayadMiddle is { } m && SayadFirstSerial is { } s ? ChequeBookSayad.Restore(m, s) : null, PartlyUsed, SerialDigits);
 }
 
-public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)
+public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid? BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)
 {
     public static ChequeFormatSnapshot From(ChequeFormat f, long version) => new(f.Id, f.Number, f.BankAccountId, f.PrintType, f.ImageType, f.IsActive, version);
 

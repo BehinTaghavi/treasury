@@ -12,10 +12,11 @@ public sealed class ChequeFormatUseCaseTests : IDisposable
     private readonly ChequeFormatUseCases _formats;
     private readonly ChequeBookUseCases _books;
     private readonly Guid _account = Guid.NewGuid();
+    private readonly FakeBankAccounts _accounts = new();
 
     public ChequeFormatUseCaseTests()
     {
-        var accounts = new FakeBankAccounts();
+        var accounts = _accounts;
         _formats = new ChequeFormatUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeFormatRepository(_db), accounts, new InMemoryIdempotencyStore(_db));
         _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), accounts, new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
     }
@@ -56,4 +57,26 @@ public sealed class ChequeFormatUseCaseTests : IDisposable
         var other = (await _formats.RegisterAsync(Key(), Guid.NewGuid(), ChequePrintType.NewestSmall, CancellationToken.None)).Value;
         Assert.Equal("ChequeBook.FormatOtherAccount", (await _books.CorrectAsync(new(Key(), book.Value, "1234", 100001, 100025, 1, other), CancellationToken.None)).ErrorCode);
     }
+
+    [Fact]
+    public async Task A_standard_type_is_defined_once_for_all_accounts_and_a_book_of_any_account_takes_it_owner_report_3()
+    {
+        var standard = await _formats.RegisterAsync(Key(), null, ChequePrintType.NewestLarge, CancellationToken.None);
+        Assert.True(standard.IsSuccess, standard.ErrorCode);
+        Assert.Equal("ChequeFormat.Taken", (await _formats.RegisterAsync(Key(), null, ChequePrintType.NewestLarge, CancellationToken.None)).ErrorCode);
+        Assert.True((await _formats.RegisterAsync(Key(), _account, ChequePrintType.NewestLarge, CancellationToken.None)).IsSuccess); // own type too
+        var book = await _books.RegisterAsync(new(Key(), Guid.NewGuid(), "1234", 100_001, 100_025, standard.Value, "12345678", "1"), CancellationToken.None);
+        Assert.True(book.IsSuccess, book.ErrorCode);
+        Assert.Null((await _formats.ListAsync(null, true, CancellationToken.None)).Single(f => f.Id == standard.Value).BankAccountId);
+    }
+
+    [Fact]
+    public async Task Cheque_types_and_books_mark_their_bank_account_in_use_owner_report_3()
+    {
+        await _formats.RegisterAsync(Key(), _account, ChequePrintType.NewLarge, CancellationToken.None);
+        var other = Guid.NewGuid();
+        await _books.RegisterAsync(new(Key(), other, "1234", 100_001, 100_025, null, "12345678", "1"), CancellationToken.None);
+        Assert.Equal(new HashSet<Guid> { _account, other }, _accounts.InUse);
+    }
 }
+

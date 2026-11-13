@@ -16,7 +16,8 @@ public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long F
 
 public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool? PartlyUsed = null, int? SerialDigits = null);
 
-public sealed record ChequeFormatRequest(Guid BankAccountId, Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType);
+/// <param name="BankAccountId">Null: the standard cheque type for all accounts (owner's report no. 3, item 3).</param>
+public sealed record ChequeFormatRequest(Guid? BankAccountId, Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType);
 
 public sealed record ChequeFormatChange(Treasury.Cashflow.Domain.ChequeBooks.ChequePrintType PrintType, long Version);
 

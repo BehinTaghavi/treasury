@@ -98,7 +98,7 @@ onMounted(load)
   <div>
     <h3>{{ t('بخش‌ها (واحدهای سازمانی)', 'Departments') }}</h3>
     <p v-if="!centers.length" class="muted">{{ t('مراکز هزینه از «حساب‌های تفصیل» (تفصیل‌های علامت‌خورده به عنوان مرکز هزینه) خوانده می‌شوند؛ ابتدا آن‌ها را وارد کنید.', 'Cost centres come from the detail accounts marked as cost centres; import them first.') }}</p>
-    <button v-if="!showForm" type="button" @click="startNew">{{ t('بخش جدید', 'New department') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('بخش جدید', 'New department') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">

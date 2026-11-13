@@ -31,13 +31,14 @@ public enum ChequePrintType
 /// A cheque type of one of our bank accounts (معرفی انواع چک و چاپ آنها), new-version manual item 7; MVC ChequeFormatTypes:
 /// a print number, the print type and a scan of the cheque (فایل نمونه اسکن شکل چک) used when cheques are printed. Each account has
 /// each print type once. Cheque books name the type they are printed with. The positions of the printed fields come with cheque
-/// printing (Phase E).
+/// printing (Phase E). A type without a bank account is the standard cheque of all banks (owner's report no. 3, item 3: "تمامی
+/// بانکها از یک فرمت استاندارد برای چک استفاده میکنند"): defined once and usable by every account's cheque books.
 /// </summary>
 public sealed class ChequeFormat : AggregateRoot<Guid>
 {
     public const int MaxImageBytes = 2 * 1024 * 1024;
 
-    private ChequeFormat(Guid id, int number, Guid bankAccountId, ChequePrintType printType)
+    private ChequeFormat(Guid id, int number, Guid? bankAccountId, ChequePrintType printType)
         : base(id)
     {
         Number = number;
@@ -49,7 +50,10 @@ public sealed class ChequeFormat : AggregateRoot<Guid>
     /// <summary>Manual: "شماره چاپ" – given in order.</summary>
     public int Number { get; }
 
-    public Guid BankAccountId { get; }
+    /// <summary>The account the type belongs to; null: the standard type for all accounts.</summary>
+    public Guid? BankAccountId { get; }
+
+    public bool IsStandard => BankAccountId is null;
 
     public ChequePrintType PrintType { get; private set; }
 
@@ -58,7 +62,7 @@ public sealed class ChequeFormat : AggregateRoot<Guid>
 
     public bool IsActive { get; private set; }
 
-    public static ChequeFormat Register(Guid id, int number, Guid bankAccountId, ChequePrintType printType)
+    public static ChequeFormat Register(Guid id, int number, Guid? bankAccountId, ChequePrintType printType)
     {
         Require(number > 0, "ChequeFormat.NumberInvalid", "The print number is a positive number.");
         Require(Enum.IsDefined(printType), "ChequeFormat.PrintTypeInvalid", "Unknown print type.");
@@ -99,7 +103,7 @@ public sealed class ChequeFormat : AggregateRoot<Guid>
         Raise(new ChequeFormatDeleted(Id));
     }
 
-    public static ChequeFormat Restore(Guid id, int number, Guid bankAccountId, ChequePrintType printType, string? imageType, bool isActive, long version)
+    public static ChequeFormat Restore(Guid id, int number, Guid? bankAccountId, ChequePrintType printType, string? imageType, bool isActive, long version)
     {
         var f = new ChequeFormat(id, number, bankAccountId, printType) { ImageType = imageType, IsActive = isActive };
         f.SetLoadedVersion(version);
@@ -129,7 +133,7 @@ public sealed class ChequeFormat : AggregateRoot<Guid>
     }
 }
 
-public sealed record ChequeFormatChanged(Guid ChequeFormatId, int Number, Guid BankAccountId, ChequePrintType PrintType, bool HasImage, bool IsActive) : DomainEvent
+public sealed record ChequeFormatChanged(Guid ChequeFormatId, int Number, Guid? BankAccountId, ChequePrintType PrintType, bool HasImage, bool IsActive) : DomainEvent
 {
     public static ChequeFormatChanged From(ChequeFormat f) => new(f.Id, f.Number, f.BankAccountId, f.PrintType, f.ImageType is not null, f.IsActive);
 }

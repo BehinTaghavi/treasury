@@ -5,7 +5,7 @@ using Treasury.Cashflow.Domain.ChequeBooks;
 
 namespace Treasury.Cashflow.Application.ChequeBooks;
 
-public sealed record ChequeFormatView(Guid Id, int Number, Guid BankAccountId, ChequePrintType PrintType, bool HasImage, bool IsActive, long Version)
+public sealed record ChequeFormatView(Guid Id, int Number, Guid? BankAccountId, ChequePrintType PrintType, bool HasImage, bool IsActive, long Version)
 {
     public static ChequeFormatView From(ChequeFormat f) => new(f.Id, f.Number, f.BankAccountId, f.PrintType, f.ImageType is not null, f.IsActive, f.Version);
 }
@@ -18,12 +18,18 @@ public sealed class ChequeFormatUseCases(IUnitOfWork unitOfWork, IChequeFormatRe
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
-    public async Task<Result<Guid>> RegisterAsync(string key, Guid bankAccountId, ChequePrintType printType, CancellationToken cancellationToken)
+    /// <param name="bankAccountId">The account; null: the standard type for all accounts (owner's report no. 3, item 3).</param>
+    public async Task<Result<Guid>> RegisterAsync(string key, Guid? bankAccountId, ChequePrintType printType, CancellationToken cancellationToken)
     {
         // Asked before the transaction: a call to another service never holds a database transaction open.
         try
         {
-            var account = await bankAccounts.GetAsync(bankAccountId, cancellationToken).ConfigureAwait(false);
+            if (bankAccountId is not { } accountId)
+            {
+                return await SaveNewAsync(key, null, printType, cancellationToken).ConfigureAwait(false);
+            }
+
+            var account = await bankAccounts.GetAsync(accountId, cancellationToken).ConfigureAwait(false);
             if (account is null)
             {
                 return Result<Guid>.Fail("ChequeBook.BankAccountNotFound", "The bank account is not one of the company's bank accounts.");
@@ -33,13 +39,20 @@ public sealed class ChequeFormatUseCases(IUnitOfWork unitOfWork, IChequeFormatRe
             {
                 return Result<Guid>.Fail("ChequeBook.BankAccountInactive", "The bank account is switched off.");
             }
+
+            // From now on the account is never deleted (owner's report no. 3, item 1).
+            await bankAccounts.MarkInUseAsync(accountId, cancellationToken).ConfigureAwait(false);
         }
         catch (DomainException ex)
         {
             return Result<Guid>.Fail(ex.Code, ex.Message);
         }
 
-        return await RunAsync(key, async ct =>
+        return await SaveNewAsync(key, bankAccountId, printType, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task<Result<Guid>> SaveNewAsync(string key, Guid? bankAccountId, ChequePrintType printType, CancellationToken cancellationToken) =>
+        RunAsync(key, async ct =>
         {
             var format = ChequeFormat.Register(Guid.NewGuid(), await formats.NextNumberAsync(ct).ConfigureAwait(false), bankAccountId, printType);
             if (await TakenAsync(format, ct).ConfigureAwait(false))
@@ -49,8 +62,7 @@ public sealed class ChequeFormatUseCases(IUnitOfWork unitOfWork, IChequeFormatRe
 
             await formats.AddAsync(format, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(format.Id);
-        }, cancellationToken).ConfigureAwait(false);
-    }
+        }, cancellationToken);
 
     public Task<Result<Guid>> ChangePrintTypeAsync(string key, Guid id, ChequePrintType printType, long expectedVersion, CancellationToken cancellationToken) =>
         RunAsync(key, async ct =>
@@ -108,8 +120,10 @@ public sealed class ChequeFormatUseCases(IUnitOfWork unitOfWork, IChequeFormatRe
     public Task<(string ContentType, byte[] Data)?> GetImageAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(ct => formats.GetImageAsync(id, ct), cancellationToken);
 
+    /// <summary>The same print type twice for one account, or twice among the standard types.</summary>
     private async Task<bool> TakenAsync(ChequeFormat format, CancellationToken ct) =>
-        (await formats.ListAsync(format.BankAccountId, includeInactive: true, ct).ConfigureAwait(false)).Any(f => f.Id != format.Id && f.PrintType == format.PrintType);
+        (await formats.ListAsync(format.BankAccountId, includeInactive: true, ct).ConfigureAwait(false))
+            .Any(f => f.Id != format.Id && f.BankAccountId == format.BankAccountId && f.PrintType == format.PrintType);
 
     private async Task<ChequeFormat> LoadAsync(Guid id, long expectedVersion, CancellationToken ct)
     {

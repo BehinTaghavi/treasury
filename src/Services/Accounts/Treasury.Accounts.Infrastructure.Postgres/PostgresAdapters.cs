@@ -85,7 +85,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
 {
     private const string Columns =
         "id, account_number, bank_id, branch_name, branch_code, city_id, opening_date, currency, main_account_id, ledger_account, " +
-        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version";
+        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, in_use";
 
     public async Task<BankAccount?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -139,7 +139,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             "UPDATE accounts.bank_account SET account_number = @number, number_key = @key, bank_id = @bank, branch_name = @branch, " +
             "branch_code = @branchCode, city_id = @city, opening_date = @opened, currency = @currency, ledger_account = @ledger, detail1 = @d1, " +
             "detail2 = @d2, collection_account = @collection, bounced_account = @bounced, collection_priority = @priority, is_facility = @facility, " +
-            "is_active = @active, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
+            "is_active = @active, in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
         {
             Bind(cmd, account);
             cmd.Parameters.AddWithValue("expected", account.Version);
@@ -151,6 +151,27 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
 
         await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
         account.MarkSaved(account.Version + 1);
+    }
+
+    public async Task DeleteAsync(BankAccount account, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        var tx = PostgresUnitOfWork.Current;
+        // "NOT in_use" and "no backup": a cheque book or a backup saved since the account was loaded refuses the delete.
+        await using (var cmd = tx.Command(
+            "DELETE FROM accounts.bank_account b WHERE id = @id AND version = @expected AND NOT in_use " +
+            "AND NOT EXISTS (SELECT 1 FROM accounts.bank_account x WHERE x.main_account_id = b.id)"))
+        {
+            cmd.Parameters.AddWithValue("id", account.Id);
+            cmd.Parameters.AddWithValue("expected", account.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Bank account {account.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
+        account.MarkSaved(account.Version);
     }
 
     public async Task<IReadOnlyList<BankAccount>> ListAsync(bool includeInactive, CancellationToken cancellationToken)
@@ -178,6 +199,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         cmd.Parameters.Add(Nullable("collection", NpgsqlDbType.Text, d.Ledger.CollectionAccountCode));
         cmd.Parameters.Add(Nullable("bounced", NpgsqlDbType.Text, d.Ledger.BouncedAccountCode));
         cmd.Parameters.Add(new NpgsqlParameter("priority", NpgsqlTypes.NpgsqlDbType.Smallint) { Value = d.CollectionPriority is { } p ? (object)(short)p : DBNull.Value });
+        cmd.Parameters.AddWithValue("in_use", a.IsInUse);
         cmd.Parameters.AddWithValue("facility", d.IsFacility);
         cmd.Parameters.AddWithValue("active", a.IsActive);
     }
@@ -195,7 +217,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
                 r.GetString(1), r.GetGuid(2), S(3), S(4), r.IsDBNull(5) ? null : r.GetGuid(5),
                 r.IsDBNull(6) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(6)), r.GetString(7).Trim(),
                 new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.IsDBNull(14) ? null : r.GetInt16(14), r.GetBoolean(15));
-            list.Add(BankAccount.Restore(r.GetGuid(0), data, r.IsDBNull(8) ? null : r.GetGuid(8), r.GetBoolean(16), r.GetInt64(17)));
+            list.Add(BankAccount.Restore(r.GetGuid(0), data, r.IsDBNull(8) ? null : r.GetGuid(8), r.GetBoolean(16), r.GetInt64(17), r.GetBoolean(18)));
         }
 
         return list;

@@ -140,6 +140,20 @@ public sealed class BankAccountTests
     }
 
     [Fact]
+    public void An_account_is_deleted_only_while_nothing_uses_it_and_it_has_no_backup_owner_report_3()
+    {
+        var free = BankAccount.Register(Guid.NewGuid(), Data(), Ledger);
+        free.MarkSaved(1);
+        free.Delete(hasBackup: false);
+        Assert.IsType<BankAccountDeleted>(Assert.Single(free.PendingEvents));
+        Assert.Equal("BankAccount.HasBackup", Code(() => BankAccount.Register(Guid.NewGuid(), Data(), Ledger).Delete(hasBackup: true)));
+        var used = BankAccount.Register(Guid.NewGuid(), Data(), Ledger);
+        Assert.True(used.MarkInUse());
+        Assert.False(used.MarkInUse());
+        Assert.Equal("BankAccount.InUse", Code(() => used.Delete(hasBackup: false)));
+    }
+
+    [Fact]
     public void A_backup_account_has_the_currency_of_its_main_account_owner_13_nov()
     {
         var rial = BankAccount.Register(Guid.NewGuid(), Data(), Ledger);

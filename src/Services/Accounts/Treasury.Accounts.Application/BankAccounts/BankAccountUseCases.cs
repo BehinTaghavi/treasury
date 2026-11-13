@@ -30,15 +30,17 @@ public sealed record ChangeBankAccountCommand(string IdempotencyKey, Guid Id, Ba
 
 public sealed record SetBankAccountActiveCommand(string IdempotencyKey, Guid Id, bool Active, long ExpectedVersion);
 
+public sealed record DeleteBankAccountCommand(string IdempotencyKey, Guid Id, long ExpectedVersion);
+
 public sealed record BankAccountView(
     Guid Id, string AccountNumber, Guid BankId, string? BranchName, string? BranchCode, Guid? CityId, string? OpeningDate,
     string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode, string? Detail1Code, string? Detail2Code,
-    string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsFacility, bool IsActive, long Version)
+    string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsFacility, bool IsActive, long Version, bool IsInUse = false)
 {
     public static BankAccountView From(BankAccount a) => new(
         a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.BranchName, a.Data.BranchCode, a.Data.CityId, a.Data.OpeningDate?.ToJalaliString(),
         a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode, a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code,
-        a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.CollectionPriority, a.Data.IsFacility, a.IsActive, a.Version);
+        a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.CollectionPriority, a.Data.IsFacility, a.IsActive, a.Version, a.IsInUse);
 }
 
 /// <summary>Use cases of the company's bank accounts (manual section 5). Each write is one command in one transaction.</summary>
@@ -104,6 +106,37 @@ public sealed class BankAccountUseCases(IUnitOfWork unitOfWork, IBankAccountRepo
             }
 
             await accounts.SaveAsync(account, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(account.Id);
+        }, cancellationToken);
+
+    /// <summary>Deletes an account nothing uses and no backup points to (owner's report no. 3, item 1).</summary>
+    public Task<Result<Guid>> DeleteAsync(DeleteBankAccountCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var account = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
+            account.Delete(await accounts.HasBackupAsync(account.Id, null, ct).ConfigureAwait(false));
+            await accounts.DeleteAsync(account, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(account.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// cashflow-svc is about to save a cheque book, cheque type or cheque naming the account: from then on it is never deleted.
+    /// Same pattern as the "in use" lists of reference-svc (ADR 0001: no service reads another's schema).
+    /// </summary>
+    public Task<Result<Guid>> MarkInUseAsync(string key, Guid id, CancellationToken cancellationToken) =>
+        Run(key, async ct =>
+        {
+            var account = await accounts.GetAsync(id, ct).ConfigureAwait(false);
+            if (account is null)
+            {
+                return Result<Guid>.Fail("BankAccount.NotFound", $"Bank account {id} was not found.");
+            }
+
+            if (account.MarkInUse())
+            {
+                await accounts.SaveAsync(account, ct).ConfigureAwait(false);
+            }
+
             return Result<Guid>.Ok(account.Id);
         }, cancellationToken);
 

@@ -69,6 +69,16 @@ public sealed class ChequeBookUseCases(
             return Result<Guid>.Fail("ChequeBook.BankAccountInactive", "The bank account is switched off.");
         }
 
+        try
+        {
+            // From now on the account is never deleted (owner's report no. 3, item 1).
+            await bankAccounts.MarkInUseAsync(command.BankAccountId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DomainException ex)
+        {
+            return Result<Guid>.Fail(ex.Code, ex.Message);
+        }
+
         return await RunAsync(command.IdempotencyKey, async ct =>
         {
             // Owner, 12 Nov 2026: books entered on the screen carry their Sayad numbers.

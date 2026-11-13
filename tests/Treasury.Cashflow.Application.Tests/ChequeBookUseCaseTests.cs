@@ -13,6 +13,20 @@ public sealed class FakeBankAccounts : IBankAccountLookup
 
     public bool Down { get; set; }
 
+    /// <summary>Accounts the use cases marked "in use" in accounts-svc (owner's report no. 3, item 1).</summary>
+    public HashSet<Guid> InUse { get; } = [];
+
+    public Task MarkInUseAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (Down)
+        {
+            throw new Treasury.BuildingBlocks.Domain.DomainException("Accounts.Unavailable", "down");
+        }
+
+        InUse.Add(id);
+        return Task.CompletedTask;
+    }
+
     public Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         Down ? throw new Treasury.BuildingBlocks.Domain.DomainException("Accounts.Unavailable", "down")
         : Task.FromResult(id == Unknown ? null : new BankAccountFact(id, "0101-" + id.ToString()[..4], id != Closed));

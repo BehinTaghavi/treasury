@@ -444,3 +444,28 @@ def test_a_requester_may_have_no_department_and_keeps_its_staff_detail(db):
         c.execute("INSERT INTO reference.requester (id, number, full_name, department_id, cost_center, person_detail) VALUES (%s, 883001, 'علی', NULL, '770100', '600046')",
                   (uuid.uuid4(),))
         c.rollback()
+
+
+def test_a_bank_account_knows_whether_it_is_in_use_and_unused_ones_can_be_deleted(db):
+    # 021_accounts_bank_account_in_use.sql (owner's report no. 3, item 1).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        acc = uuid.uuid4()
+        c.execute("""INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account, is_facility, is_active)
+                     VALUES (%s, '884-1', '8841', %s, 'IRR', '1103', false, true)""", (acc, uuid.uuid4()))
+        assert c.execute("SELECT in_use FROM accounts.bank_account WHERE id = %s", (acc,)).fetchone()[0] is False
+        c.execute("DELETE FROM accounts.bank_account WHERE id = %s", (acc,))
+        c.rollback()
+
+
+def test_a_standard_cheque_type_has_no_account_and_each_print_type_once(db):
+    # 022_cashflow_standard_cheque_format.sql (owner's report no. 3, item 3).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        add = "INSERT INTO cashflow.cheque_format (id, number, bank_account_id, print_type) VALUES (%s, %s, %s, %s)"
+        c.execute(add, (uuid.uuid4(), 980001, None, "NewestSmall"))
+        c.execute(add, (uuid.uuid4(), 980002, uuid.uuid4(), "NewestSmall"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), 980003, None, "NewestSmall"))
+        c.rollback()

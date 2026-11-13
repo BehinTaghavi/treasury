@@ -33,4 +33,21 @@ public sealed class HttpBankAccountLookup(HttpClient http) : IBankAccountLookup
             throw new DomainException("Accounts.Unavailable", $"accounts-svc could not answer ({path}): {ex.Message}");
         }
     }
+
+    public async Task MarkInUseAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var path = $"api/accounts/bank-accounts/{id}/in-use";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+            // Same key for the same account: marking twice is harmless and answered from the idempotency store.
+            request.Headers.Add("Idempotency-Key", $"cashflow-in-use:{id}");
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            throw new DomainException("Accounts.Unavailable", $"accounts-svc could not answer ({path}): {ex.Message}");
+        }
+    }
 }

@@ -147,7 +147,7 @@ onMounted(async () => {
   <div>
     <h3>{{ t('صندوق‌ها', 'Cash desks') }}</h3>
     <p v-if="!ledger.length" class="muted">{{ t('ابتدا در «کدینگ حساب‌ها» و «حساب‌های تفصیل» حساب‌های سیستم حسابداری را وارد کنید؛ دارندهٔ صندوق باید در سیستم مالی تعریف شده باشد.', 'Import the chart of accounts and the detail accounts first; the holder must exist in the accounting system.') }}</p>
-    <button v-if="!showForm" type="button" @click="startNew">{{ t('صندوق جدید', 'New cash desk') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('صندوق جدید', 'New cash desk') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">
@@ -170,7 +170,7 @@ onMounted(async () => {
         </label>
         <label class="tr-check"><input v-model="form.isForeign" type="checkbox" /> {{ t('ارزی', 'Foreign currency') }}</label>
         <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
-          <select v-model="form.currencyCode"><option value="" /><option v-for="c in foreignCurrencies" :key="c.id" :value="c.code">{{ c.name }} ({{ c.code }})</option></select>
+          <SearchSelect v-model="form.currencyCode" :options="foreignCurrencies.map(c => ({ value: c.code, label: c.name, hint: c.code }))" required :aria-label="t('نوع ارز', 'Currency')" />
         </label>
         <label class="req"><span>{{ t('تاریخ ایجاد', 'Created on') }} <span class="star">*</span></span><input v-model="form.createdOn" dir="ltr" placeholder="1405/08/22" /></label>
       </fieldset>

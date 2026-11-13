@@ -182,7 +182,7 @@ onMounted(async () => {
         <button v-for="d in ([['', t('همه', 'All')], ['Receipt', t('دریافت', 'Receipts')], ['Payment', t('پرداخت', 'Payments')]] as const)" :key="d[0]"
                 type="button" role="tab" :aria-selected="filter === d[0]" :class="{ on: filter === d[0] }" @click="filter = d[0]">{{ d[1] }}</button>
       </div>
-      <button v-if="!showForm" type="button" @click="startNew">{{ t('گروه بابت جدید', 'New purpose group') }}</button>
+      <button type="button" class="tr-new" @click="startNew">{{ t('گروه بابت جدید', 'New purpose group') }}</button>
     </div>
 
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>

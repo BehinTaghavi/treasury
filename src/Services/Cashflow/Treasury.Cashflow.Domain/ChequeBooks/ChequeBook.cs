@@ -152,7 +152,8 @@ public sealed class ChequeBook : AggregateRoot<Guid>
             return;
         }
 
-        if (format.BankAccountId != BankAccountId)
+        // A standard type (no account) fits every account's books (owner's report no. 3, item 3).
+        if (!format.IsStandard && format.BankAccountId != BankAccountId)
         {
             throw new DomainException("ChequeBook.FormatOtherAccount", "The cheque type belongs to another bank account.");
         }

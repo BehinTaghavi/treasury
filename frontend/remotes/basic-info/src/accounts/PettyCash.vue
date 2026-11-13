@@ -153,7 +153,7 @@ onMounted(async () => {
 <template>
   <div>
     <h3>{{ t('دارندگان تنخواه گردان', 'Petty cash holders') }}</h3>
-    <button v-if="!showForm" type="button" @click="startNew">{{ t('تنخواه گردان جدید', 'New petty cash') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('تنخواه گردان جدید', 'New petty cash') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">

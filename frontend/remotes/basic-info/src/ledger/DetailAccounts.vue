@@ -6,6 +6,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { createApi, type Locale } from '@treasury/ui-kit'
 import ImportBox from './ImportBox.vue'
+import SearchSelect from '../components/SearchSelect.vue'
 
 interface Detail { code: string; name: string; type: string | null; isCostCenter: boolean; isActive: boolean }
 interface DetailType { type: string; activeCount: number }
@@ -81,10 +82,8 @@ onMounted(loadAll)
     <div class="tr-filters">
       <label>{{ t('جستجو (کد یا نام)', 'Search (code or name)') }}<input v-model="search" autocomplete="off" /></label>
       <label>{{ t('نوع تفصیل', 'Detail type') }}
-        <select v-model="type">
-          <option value="">{{ t('همه', 'All') }}</option>
-          <option v-for="ty in types" :key="ty.type" :value="ty.type">{{ ty.type }} ({{ ty.activeCount }})</option>
-        </select>
+        <SearchSelect v-model="type" :options="types.map(ty => ({ value: ty.type, label: ty.type, hint: num(ty.activeCount) }))"
+                      :empty-label="t('همه', 'All')" :aria-label="t('نوع تفصیل', 'Detail type')" :none-text="t('نوعی پیدا نشد', 'No type found')" />
       </label>
       <label class="tr-check"><input v-model="showInactive" type="checkbox" /> {{ t('نمایش غیرفعال‌ها', 'Show inactive') }}</label>
     </div>

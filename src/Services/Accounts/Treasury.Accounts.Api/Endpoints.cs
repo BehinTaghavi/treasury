@@ -38,6 +38,14 @@ public static class Endpoints
 
         api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.SetActiveAsync(new SetBankAccountActiveCommand(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
+
+        // Owner's report no. 3, item 1: delete an account nothing uses.
+        api.MapPost("/{id:guid}/delete", async (Guid id, VersionRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.DeleteAsync(new DeleteBankAccountCommand(Key(http), id, r.Version), ct).ConfigureAwait(false)));
+
+        // cashflow-svc calls this before saving a cheque book, cheque type or cheque that names the account.
+        api.MapPost("/{id:guid}/in-use", async (Guid id, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.MarkInUseAsync(Key(http), id, ct).ConfigureAwait(false)));
     }
 
     /// <summary>Cash desks (manual item 10) under /api/accounts/cash-desks; same conventions as bank accounts.</summary>

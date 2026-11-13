@@ -18,6 +18,9 @@ public interface IBankAccountRepository
 
     Task SaveAsync(BankAccount account, CancellationToken cancellationToken);
 
+    /// <summary>Removes the account (version-checked; refused when it was marked in use meanwhile).</summary>
+    Task DeleteAsync(BankAccount account, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<BankAccount>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 }
 

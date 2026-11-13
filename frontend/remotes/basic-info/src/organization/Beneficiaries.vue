@@ -134,7 +134,7 @@ onMounted(load)
 <template>
   <div>
     <h3>{{ t('مشخصات ذینفعان', 'Beneficiaries') }}</h3>
-    <button v-if="!showForm" type="button" @click="startNew">{{ t('ذینفع جدید', 'New beneficiary') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('ذینفع جدید', 'New beneficiary') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">

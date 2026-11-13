@@ -117,7 +117,7 @@ public sealed class PostgresChequeFormatRepository : IChequeFormatRepository
     {
         cmd.Parameters.AddWithValue("id", f.Id);
         cmd.Parameters.AddWithValue("number", f.Number);
-        cmd.Parameters.AddWithValue("account", f.BankAccountId);
+        cmd.Parameters.Add(new NpgsqlParameter("account", NpgsqlDbType.Uuid) { Value = (object?)f.BankAccountId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("type", f.PrintType.ToString());
         cmd.Parameters.Add(new NpgsqlParameter("image", NpgsqlDbType.Text) { Value = (object?)f.ImageType ?? DBNull.Value });
         cmd.Parameters.AddWithValue("active", f.IsActive);
@@ -129,7 +129,7 @@ public sealed class PostgresChequeFormatRepository : IChequeFormatRepository
         await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await r.ReadAsync(ct).ConfigureAwait(false))
         {
-            list.Add(ChequeFormat.Restore(r.GetGuid(0), r.GetInt32(1), r.GetGuid(2), Enum.Parse<ChequePrintType>(r.GetString(3)),
+            list.Add(ChequeFormat.Restore(r.GetGuid(0), r.GetInt32(1), r.IsDBNull(2) ? null : r.GetGuid(2), Enum.Parse<ChequePrintType>(r.GetString(3)),
                 r.IsDBNull(4) ? null : r.GetString(4), r.GetBoolean(5), r.GetInt64(6)));
         }
 

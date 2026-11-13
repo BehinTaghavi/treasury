@@ -49,6 +49,8 @@ public sealed class PostgresAdapterTests : IDisposable
     private sealed class AnyBankAccount : IBankAccountLookup
     {
         public Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<BankAccountFact?>(new(id, "0101", true));
+
+        public Task MarkInUseAsync(Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     public void Dispose() => _dataSource.Dispose();

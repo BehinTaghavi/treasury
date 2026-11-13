@@ -43,4 +43,17 @@ public sealed class ChequeFormatTests
         off.Deactivate();
         Assert.Equal("ChequeBook.FormatInactive", Assert.Throws<DomainException>(() => book.UseFormat(off)).Code);
     }
+
+    [Fact]
+    public void The_standard_type_fits_the_books_of_every_account_owner_report_3()
+    {
+        var standard = ChequeFormat.Register(Guid.NewGuid(), 4, null, ChequePrintType.NewestLarge);
+        var a = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 200_001, 200_010);
+        var b = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "5678", 300_001, 300_010);
+        a.UseFormat(standard);
+        b.UseFormat(standard);
+        Assert.True(standard.IsStandard);
+        Assert.Equal((standard.Id, standard.Id), (a.FormatId, b.FormatId));
+    }
 }
+
