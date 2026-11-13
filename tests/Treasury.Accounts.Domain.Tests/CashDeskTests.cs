@@ -17,9 +17,10 @@ public sealed class CashDeskTests
         },
         new Dictionary<string, DetailFact>
         {
-            ["111078"] = new("111078", "اشخاص وشركتها", true),
+            ["111078"] = new("111078", "اشخاص وشركتها", true, "Staff"),
             ["100000"] = new("100000", "بانكها", true),
-            ["111099"] = new("111099", "اشخاص وشركتها", false),
+            ["111099"] = new("111099", "اشخاص وشركتها", false, "Staff"),
+            ["111050"] = new("111050", "اشخاص وشركتها", true),
         });
 
     private static CashDeskData Data(string name = "صندوق مرکزی", string account = "1101", string holder = "111078", string currency = "IRR") =>
@@ -66,4 +67,9 @@ public sealed class CashDeskTests
         d.Activate();
         Assert.True(d.IsActive);
     }
+
+    [Fact]
+    public void The_holder_is_staff_a_cost_centre_or_an_organisational_unit_owner_report_2() =>
+        Assert.Equal("CashDesk.HolderNotStaff", Code(() => CashDesk.Register(Guid.NewGuid(), Data(holder: "111050"), Ledger)));
 }
+

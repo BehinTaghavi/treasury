@@ -20,6 +20,8 @@ public sealed class OrganizationPostgresTests : IDisposable
     private readonly string _center;
     private readonly string _person;
 
+    private string Staff => "97" + _n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
     public OrganizationPostgresTests(PostgresDatabase db)
     {
         _db = db;
@@ -36,8 +38,9 @@ public sealed class OrganizationPostgresTests : IDisposable
         _person = "99" + _n.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _db.ScalarAsync<long>(
             "WITH x AS (INSERT INTO reference.detail_account (code, name, name_key, type, is_cost_center, is_active) VALUES " +
-            "(@c, 'مرکز هزینه آزمایشی', 'مرکزهزینهآزمایشی', null, true, true), (@p, 'شخص آزمایشی', 'شخصآزمایشی', null, false, true) " +
-            "ON CONFLICT (code) DO UPDATE SET is_active = true RETURNING 1) SELECT count(*) FROM x", ("c", _center), ("p", _person)).GetAwaiter().GetResult();
+            "(@c, 'مرکز هزینه آزمایشی', 'مرکزهزینهآزمایشی', null, true, true), (@p, 'شخص آزمایشی', 'شخصآزمایشی', null, false, true), " +
+            "(@s, 'کارمند آزمایشی', 'کارمندآزمایشی', 'كاركنان دفتر', false, true) " +
+            "ON CONFLICT (code) DO UPDATE SET is_active = true RETURNING 1) SELECT count(*) FROM x", ("c", _center), ("p", _person), ("s", Staff)).GetAwaiter().GetResult();
     }
 
     public void Dispose() => _dataSource.Dispose();
@@ -52,8 +55,12 @@ public sealed class OrganizationPostgresTests : IDisposable
         Assert.Equal([_center], (await _useCases.ListDepartmentsAsync(true, CancellationToken.None)).Single(x => x.Id == d.Value).CostCenterCodes);
         Assert.Equal("Department.NumberTaken", (await _useCases.AddDepartmentAsync(Key(), new(_n, "دیگر " + _n, []), CancellationToken.None)).ErrorCode);
 
-        var r = await _useCases.AddRequesterAsync(Key(), new(_n, "درخواست کننده " + _n, d.Value, _center), CancellationToken.None);
+        var r = await _useCases.AddRequesterAsync(Key(), new(_n, Staff, d.Value, _center), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
+        var rv = (await _useCases.ListRequestersAsync(null, true, CancellationToken.None)).Single(x => x.Id == r.Value);
+        Assert.Equal(("کارمند آزمایشی", Staff), (rv.FullName, rv.PersonDetailCode));
+        var free = await _useCases.AddRequesterAsync(Key(), new(_n + 50_000, Staff, null, _center), CancellationToken.None); // no department
+        Assert.True(free.IsSuccess, free.ErrorCode);
         Assert.Equal("Department.HasRequesters", (await _useCases.ChangeDepartmentAsync(new(Key(), d.Value, "delete", 1), CancellationToken.None)).ErrorCode);
 
         var bank = (await _catalogue.AddAsync(new(Key(), CatalogueKind.Bank, "بانک آزمایشی " + _n), CancellationToken.None)).Value;

@@ -72,7 +72,8 @@ async function loadLists() {
 async function searchHolders(text: string) {
   const types = chosenLedger.value?.detail1Types ?? []
   const found = (await Promise.all((types.length ? types : [null]).map(type => {
-    const q = new URLSearchParams({ take: '50' })
+    // The holder is staff, a cost centre or an organisational unit (owner's report no. 2, item 3).
+    const q = new URLSearchParams({ take: '50', roles: 'Staff,CostCentre,OrgUnit' })
     if (text.trim()) q.set('search', text.trim())
     if (type) q.set('type', type)
     return api.get<Detail[]>(`/api/reference/ledger/details?${q}`)

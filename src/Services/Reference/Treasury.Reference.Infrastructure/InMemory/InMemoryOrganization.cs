@@ -7,7 +7,7 @@ namespace Treasury.Reference.Infrastructure.InMemory;
 
 public sealed record DepartmentSnapshot(Guid Id, int Number, string Name, IReadOnlyList<string> CostCenters, bool IsActive, long Version);
 
-public sealed record RequesterSnapshot(Guid Id, int Number, string FullName, Guid DepartmentId, string CostCenter, bool IsActive, bool IsInUse, long Version);
+public sealed record RequesterSnapshot(Guid Id, int Number, string FullName, Guid? DepartmentId, string CostCenter, bool IsActive, bool IsInUse, long Version, string? PersonDetailCode = null);
 
 public sealed record BeneficiarySnapshot(Guid Id, string DetailCode, string LegalName, BeneficiaryBank Bank, string? Phone, bool IsActive, bool IsInUse, long Version, BeneficiaryIdentity? Identity = null);
 
@@ -60,13 +60,13 @@ public sealed class InMemoryOrganizationRepository(InMemoryReferenceDatabase db)
 
     private static DepartmentSnapshot Snapshot(Department d, long v) => new(d.Id, d.Number, d.Name, d.CostCenterCodes, d.IsActive, v);
 
-    private static RequesterSnapshot Snapshot(Requester r, long v) => new(r.Id, r.Number, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive, r.IsInUse, v);
+    private static RequesterSnapshot Snapshot(Requester r, long v) => new(r.Id, r.Number, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive, r.IsInUse, v, r.PersonDetailCode);
 
     private static BeneficiarySnapshot Snapshot(Beneficiary b, long v) => new(b.Id, b.DetailCode, b.LegalName, b.Bank, b.Phone, b.IsActive, b.IsInUse, v, b.Identity);
 
     private static Department ToDomain(DepartmentSnapshot s) => Department.Restore(s.Id, s.Number, s.Name, s.CostCenters, s.IsActive, s.Version);
 
-    private static Requester ToDomain(RequesterSnapshot s) => Requester.Restore(s.Id, s.Number, s.FullName, s.DepartmentId, s.CostCenter, s.IsActive, s.IsInUse, s.Version);
+    private static Requester ToDomain(RequesterSnapshot s) => Requester.Restore(s.Id, s.Number, s.FullName, s.DepartmentId, s.CostCenter, s.IsActive, s.IsInUse, s.Version, s.PersonDetailCode);
 
     private static Beneficiary ToDomain(BeneficiarySnapshot s) => Beneficiary.Restore(s.Id, s.DetailCode, s.LegalName, s.Bank, s.Phone, s.IsActive, s.IsInUse, s.Version, s.Identity);
 

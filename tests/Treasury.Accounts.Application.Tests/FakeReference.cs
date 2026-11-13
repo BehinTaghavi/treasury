@@ -30,7 +30,8 @@ public sealed class FakeReference : IReferenceLookup
     {
         ["100000"] = new("100000", "بانكها", true),
         ["100001"] = new("100001", "بانكها", true),
-        ["111078"] = new("111078", "اشخاص وشركتها", true),
+        ["111078"] = new("111078", "اشخاص وشركتها", true, "Staff"),
+        ["600046"] = new("600046", "كاركنان دفتر", true, "Staff"),
     };
 
     public bool Down { get; set; }

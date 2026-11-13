@@ -10,7 +10,12 @@ namespace Treasury.Accounts.Domain.BankAccounts;
 public sealed record LedgerAccountFact(string Code, bool IsActive, bool IsPostable, IReadOnlySet<string> Detail1Types, IReadOnlySet<string> Detail2Types);
 
 /// <summary>What reference-svc says about a تفصیل account.</summary>
-public sealed record DetailFact(string Code, string? Type, bool IsActive);
+/// <param name="Role">Staff, CostCentre or OrgUnit as reference-svc reads it from the type (owner, 13 Nov 2026); null otherwise.</param>
+public sealed record DetailFact(string Code, string? Type, bool IsActive, string? Role = null)
+{
+    /// <summary>Who may hold a cash desk or a petty cash: staff, cost centres, organisational units (owner's report no. 2, item 3).</summary>
+    public bool MayHold => Role is "Staff" or "CostCentre" or "OrgUnit";
+}
 
 /// <summary>
 /// The accounting side of a bank account (manual section 5): the معین / معین در معین of the account with its تفصیل 1 and 2,
@@ -83,6 +88,8 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             Require(main.IsActive, "BankAccount.MainAccountInactive", "The main account is inactive.");
             Require(!main.IsBackup, "BankAccount.MainAccountIsBackup", "A backup account cannot be the main account of another one.");
             Require(main.Data.BankId == clean.BankId, "BankAccount.MainAccountOtherBank", "The main account must be at the same bank.");
+            // Owner, 13 Nov 2026: Rial with Rial, a foreign currency with the same foreign currency.
+            Require(main.Data.CurrencyCode == clean.CurrencyCode, "BankAccount.MainAccountOtherCurrency", "A backup account has the currency of its main account.");
             Require(!mainAlreadyHasBackup, "BankAccount.MainAccountHasBackup", "This main account already has a backup account.");
         }
 
@@ -96,6 +103,7 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
     {
         var clean = Validate(data, ledger);
         Require(!IsBackup || clean.BankId == Data.BankId, "BankAccount.MainAccountOtherBank", "A backup account stays at the bank of its main account.");
+        Require(!IsBackup || clean.CurrencyCode == Data.CurrencyCode, "BankAccount.MainAccountOtherCurrency", "A backup account keeps the currency of its main account.");
         if (clean == Data)
         {
             return;

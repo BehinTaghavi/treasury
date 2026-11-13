@@ -72,6 +72,8 @@ async function searchDetails(position: 1 | 2, text: string) {
     const q = new URLSearchParams({ take: '50' })
     if (text.trim()) q.set('search', text.trim())
     if (type) q.set('type', type)
+    // The holder is staff, a cost centre or an organisational unit (owner's report no. 2, item 3).
+    if (position === 1) q.set('roles', 'Staff,CostCentre,OrgUnit')
     return api.get<Detail[]>(`/api/reference/ledger/details?${q}`)
   }))).flatMap(r => (r.ok ? r.value : []))
   const current = position === 1 ? form.holderDetailCode : form.detail2Code

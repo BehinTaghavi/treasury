@@ -63,8 +63,10 @@ const foreignCurrencies = computed(() => currencies.value.filter(c => c.isActive
 // MVC BanksController: a current (main) account, not a backup itself and without a backup yet. Owner's report no. 2, item 3:
 // «پشتیبان» is ticked first, at the top of the form; the main account is chosen next and the backup takes its bank, branch and
 // city. With no such current account the owner's message shows and the rest of the form stays locked, so nothing is saved.
+// Owner, 13 Nov 2026: the backup has the currency of its main account (Rial with Rial, the same foreign currency).
+const wantedCurrency = (a: BankAccount) => !form.isForeign ? a.currencyCode === 'IRR' : form.currencyCode ? a.currencyCode === form.currencyCode : a.currencyCode !== 'IRR'
 const mainChoices = computed(() => accounts.value.filter(a =>
-  a.isActive && !a.mainAccountId && !accounts.value.some(b => b.mainAccountId === a.id)))
+  a.isActive && !a.mainAccountId && !accounts.value.some(b => b.mainAccountId === a.id) && wantedCurrency(a)))
 const backupBlocked = computed(() => form.isBackup && !editing.value && !mainChoices.value.length)
 const mainLabel = (a: BankAccount) => `${a.accountNumber} – ${name(banks.value, a.bankId)}${a.branchName ? ' – ' + a.branchName : ''}${a.currencyCode !== 'IRR' ? ' (' + a.currencyCode + ')' : ''}`
 /** The rest of the form waits until the main account of a backup is chosen. */
@@ -143,6 +145,7 @@ watch(() => form.mainAccountId, id => {
   if (!main || editing.value) return
   Object.assign(form, {
     bankId: main.bankId, branchName: main.branchName ?? '', branchCode: main.branchCode ?? '', cityId: main.cityId ?? '',
+    isForeign: main.currencyCode !== 'IRR', currencyCode: main.currencyCode === 'IRR' ? '' : main.currencyCode,
     provinceId: cities.value.find(c => c.id === main.cityId)?.parentId ?? '',
   })
 })

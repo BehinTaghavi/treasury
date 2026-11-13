@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Reference.Domain.Catalogue;
+using Treasury.Reference.Domain.Ledger;
 using Treasury.Reference.Domain.Organization;
 using Xunit;
 
@@ -14,6 +15,7 @@ public sealed class OrganizationTests
         ["770200"] = new("770200", "اداری", true, true),
         ["770300"] = new("770300", "قدیمی", true, false),
         ["111078"] = new("111078", "شرکت نمونه بازرگانی", false, true),
+        ["600046"] = new("600046", "علی رضایی", false, true, DetailRole.Staff),
     };
 
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
@@ -35,19 +37,43 @@ public sealed class OrganizationTests
     }
 
     [Fact]
-    public void A_requester_has_a_department_and_one_of_its_cost_centres()
+    public void A_requester_is_a_staff_detail_account_with_a_cost_centre_of_its_department_owner_report_2()
     {
         var d = Production();
-        var r = Requester.Register(Guid.NewGuid(), 5, "علی رضایی", d, "770100", Facts["770100"]);
-        Assert.Equal((5, d.Id, "770100"), (r.Number, r.DepartmentId, r.CostCenterCode));
-        Assert.Equal("Requester.CostCenterNotInDepartment", Code(() => Requester.Register(Guid.NewGuid(), 6, "x", d, "770200", Facts["770200"])));
-        Assert.Equal("Requester.NotCostCenter", Code(() => Requester.Register(Guid.NewGuid(), 6, "x", d, "111078", Facts["111078"])));
-        Assert.Equal("Requester.DepartmentRequired", Code(() => Requester.Register(Guid.NewGuid(), 6, "x", null, "770100", Facts["770100"])));
-        Assert.Equal("Requester.CostCenterRequired", Code(() => Requester.Register(Guid.NewGuid(), 6, "x", d, " ", null)));
+        Requester Make(Department? dep, string cc, string person = "600046") =>
+            Requester.Register(Guid.NewGuid(), 6, dep, cc, Facts.GetValueOrDefault(cc), person, Facts.GetValueOrDefault(person));
+        var r = Requester.Register(Guid.NewGuid(), 5, d, "770100", Facts["770100"], "600046", Facts["600046"]);
+        Assert.Equal((5, d.Id, "770100", "علی رضایی", "600046"), (r.Number, r.DepartmentId, r.CostCenterCode, r.FullName, r.PersonDetailCode));
+        Assert.Equal("Requester.CostCenterNotInDepartment", Code(() => Make(d, "770200")));
+        Assert.Equal("Requester.NotCostCenter", Code(() => Make(d, "111078")));
+        Assert.Equal("Requester.CostCenterRequired", Code(() => Make(d, " ")));
+        Assert.Equal("Requester.PersonRequired", Code(() => Make(d, "770100", " ")));
+        Assert.Equal("Requester.PersonNotStaff", Code(() => Make(d, "770100", "111078")));
+        Assert.Equal("Requester.PersonNotFound", Code(() => Make(d, "770100", "999999")));
+        Assert.Null(Make(null, "770200").DepartmentId); // owner, 13 Nov 2026: Iran Nazho Co. has no departments
         var open = Department.Register(Guid.NewGuid(), 11, "بدون مرکز هزینه", [], Facts);
-        Requester.Register(Guid.NewGuid(), 7, "y", open, "770200", Facts["770200"]); // a department without listed centres takes any
+        Make(open, "770200"); // a department without listed centres takes any
         r.MarkInUse();
         Assert.Equal("Requester.InUse", Code(r.Delete));
+    }
+
+    [Theory]
+    [InlineData("کارکنان کارخانه", DetailRole.Staff)]
+    [InlineData("كاركنان دفتر", DetailRole.Staff)]
+    [InlineData("مراکز هزینه تولیدی", DetailRole.CostCentre)]
+    [InlineData("مراكز هزينه سربار كارخانه", DetailRole.CostCentre)]
+    [InlineData("مراکز هزینه اداری دفتر", DetailRole.CostCentre)]
+    [InlineData("مرکز هزینه تبلیغات", DetailRole.CostCentre)]
+    [InlineData("واحدهای سازمانی", DetailRole.OrgUnit)]
+    public void The_role_of_a_detail_account_comes_from_its_type_owner_13_nov(string type, DetailRole role) =>
+        Assert.Equal(role, DetailRoles.Of(type));
+
+    [Fact]
+    public void Other_types_have_no_role_unless_marked_as_cost_centre()
+    {
+        Assert.Null(DetailRoles.Of("اشخاص وشركتها"));
+        Assert.Null(DetailRoles.Of(null));
+        Assert.Equal(DetailRole.CostCentre, DetailRoles.Of("بانكها", markedCostCentre: true));
     }
 
     [Theory]

@@ -2,11 +2,14 @@ using System.Numerics;
 using System.Text.RegularExpressions;
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Reference.Domain.Catalogue;
+using Treasury.Reference.Domain.Ledger;
 
 namespace Treasury.Reference.Domain.Organization;
 
 /// <summary>What the copy of the accounting system's تفصیل list says about one code; null in place of a fact: no such تفصیل.</summary>
-public sealed record DetailFact(string Code, string Name, bool IsCostCenter, bool IsActive);
+/// <param name="IsCostCenter">Marked as a cost centre or of a cost-centre type (owner, 13 Nov 2026).</param>
+/// <param name="Role">Staff, cost centre or organisational unit, from the type; null for other تفصیل.</param>
+public sealed record DetailFact(string Code, string Name, bool IsCostCenter, bool IsActive, DetailRole? Role = null);
 
 internal static class Rules
 {
@@ -143,16 +146,18 @@ public sealed record DepartmentChanged(Guid DepartmentId, int Number, string Nam
 public sealed record DepartmentDeleted(Guid DepartmentId) : DomainEvent;
 
 /// <summary>
-/// A person who requests money (درخواست کننده وجوه), new-version manual item 13: a number (may differ from their تفصیل), full name,
-/// department and cost centre. When the department lists its cost centres, the requester's cost centre is one of them.
+/// A person who requests money (درخواست کننده وجوه), new-version manual item 13: a number (may differ from their تفصیل), the person
+/// – a staff تفصیل (owner's report no. 2, item 6; the name comes from it) –, department and cost centre. The department is optional
+/// (owner, 13 Nov 2026: Iran Nazho Co. has no departments); when given and it lists its cost centres, the cost centre is one of them.
 /// </summary>
 public sealed class Requester : AggregateRoot<Guid>
 {
     public const int MaxNameLength = 100;
 
-    private Requester(Guid id, int number, string fullName, Guid departmentId, string costCenterCode)
+    private Requester(Guid id, int number, string fullName, Guid? departmentId, string costCenterCode, string? personDetailCode)
         : base(id)
     {
+        PersonDetailCode = personDetailCode;
         Number = number;
         FullName = fullName;
         DepartmentId = departmentId;
@@ -164,7 +169,10 @@ public sealed class Requester : AggregateRoot<Guid>
 
     public string FullName { get; private set; }
 
-    public Guid DepartmentId { get; private set; }
+    public Guid? DepartmentId { get; private set; }
+
+    /// <summary>The staff تفصیل of the requester; empty only on requesters saved before report no. 2.</summary>
+    public string? PersonDetailCode { get; private set; }
 
     public string CostCenterCode { get; private set; }
 
@@ -173,23 +181,25 @@ public sealed class Requester : AggregateRoot<Guid>
     /// <summary>A payment request names this requester (recorded by requests-svc); then it is never deleted.</summary>
     public bool IsInUse { get; private set; }
 
-    public static Requester Register(Guid id, int number, string fullName, Department? department, string costCenterCode, DetailFact? costCenter)
+    /// <param name="personCode">The requester's staff تفصیل; <paramref name="person"/> is what the list says about it.</param>
+    public static Requester Register(
+        Guid id, int number, Department? department, string costCenterCode, DetailFact? costCenter, string personCode, DetailFact? person)
     {
-        var (n, name, dep, cc) = Validate(number, fullName, department, costCenterCode, costCenter, null);
-        var r = new Requester(id, n, name, dep, cc);
+        var (n, name, dep, cc, p) = Validate(number, department, costCenterCode, costCenter, personCode, person, null);
+        var r = new Requester(id, n, name, dep, cc, p);
         r.Raise(RequesterChanged.From(r));
         return r;
     }
 
-    public void Edit(int number, string fullName, Department? department, string costCenterCode, DetailFact? costCenter)
+    public void Edit(int number, Department? department, string costCenterCode, DetailFact? costCenter, string personCode, DetailFact? person)
     {
-        var v = Validate(number, fullName, department, costCenterCode, costCenter, this);
-        if (v == (Number, FullName, DepartmentId, CostCenterCode))
+        var v = Validate(number, department, costCenterCode, costCenter, personCode, person, this);
+        if (v == (Number, FullName, DepartmentId, CostCenterCode, PersonDetailCode))
         {
             return;
         }
 
-        (Number, FullName, DepartmentId, CostCenterCode) = v;
+        (Number, FullName, DepartmentId, CostCenterCode, PersonDetailCode) = v;
         Raise(RequesterChanged.From(this));
     }
 
@@ -214,25 +224,29 @@ public sealed class Requester : AggregateRoot<Guid>
         Raise(new RequesterDeleted(Id));
     }
 
-    public static Requester Restore(Guid id, int number, string fullName, Guid departmentId, string costCenterCode, bool isActive, bool isInUse, long version)
+    public static Requester Restore(
+        Guid id, int number, string fullName, Guid? departmentId, string costCenterCode, bool isActive, bool isInUse, long version, string? personDetailCode = null)
     {
-        var r = new Requester(id, number, fullName, departmentId, costCenterCode) { IsActive = isActive, IsInUse = isInUse };
+        var r = new Requester(id, number, fullName, departmentId, costCenterCode, personDetailCode) { IsActive = isActive, IsInUse = isInUse };
         r.SetLoadedVersion(version);
         return r;
     }
 
-    private static (int, string, Guid, string) Validate(int number, string fullName, Department? department, string costCenterCode, DetailFact? fact, Requester? before)
+    private static (int, string, Guid?, string, string?) Validate(
+        int number, Department? department, string costCenterCode, DetailFact? fact, string personCode, DetailFact? person, Requester? before)
     {
         Rules.Require(number > 0, "Requester.NumberInvalid", "The requester number is a positive number.");
-        var name = Rules.Name(fullName, MaxNameLength, "Requester.NameRequired", "Requester.NameTooLong");
-        Rules.Require(department is not null, "Requester.DepartmentRequired", "The department of the requester is required.");
-        Rules.Require(department!.IsActive || department.Id == before?.DepartmentId, "Requester.DepartmentInactive", "The department is switched off.");
+        var pc = Rules.Optional(personCode) ?? throw new DomainException("Requester.PersonRequired", "Choose the requester from the staff تفصیل.");
+        var p = Rules.Detail(pc, person, before?.PersonDetailCode, "Requester.PersonNotFound", "Requester.PersonInactive");
+        Rules.Require(p.Role == DetailRole.Staff || pc == before?.PersonDetailCode, "Requester.PersonNotStaff", $"تفصیل {pc} is not of a staff type (کارکنان).");
+        var name = Rules.Name(p.Name, MaxNameLength, "Requester.NameRequired", "Requester.NameTooLong");
+        Rules.Require(department is null || department.IsActive || department.Id == before?.DepartmentId, "Requester.DepartmentInactive", "The department is switched off.");
         var code = Rules.Optional(costCenterCode) ?? throw new DomainException("Requester.CostCenterRequired", "The cost centre of the requester is required.");
         var cc = Rules.Detail(code, fact, before?.CostCenterCode, "Requester.CostCenterNotFound", "Requester.CostCenterInactive");
         Rules.Require(cc.IsCostCenter, "Requester.NotCostCenter", $"تفصیل {code} is not a cost centre.");
-        Rules.Require(department.CostCenterCodes.Count == 0 || department.CostCenterCodes.Contains(code), "Requester.CostCenterNotInDepartment",
+        Rules.Require(department is null || department.CostCenterCodes.Count == 0 || department.CostCenterCodes.Contains(code), "Requester.CostCenterNotInDepartment",
             $"Cost centre {code} is not one of the department's cost centres.");
-        return (number, name, department.Id, code);
+        return (number, name, department?.Id, code, pc);
     }
 
     private void SetActive(bool active)
@@ -245,7 +259,7 @@ public sealed class Requester : AggregateRoot<Guid>
     }
 }
 
-public sealed record RequesterChanged(Guid RequesterId, int Number, string FullName, Guid DepartmentId, string CostCenterCode, bool IsActive) : DomainEvent
+public sealed record RequesterChanged(Guid RequesterId, int Number, string FullName, Guid? DepartmentId, string CostCenterCode, bool IsActive) : DomainEvent
 {
     public static RequesterChanged From(Requester r) => new(r.Id, r.Number, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive);
 }

@@ -96,6 +96,9 @@ public sealed partial class CashDesk : AggregateRoot<Guid>
         var holder = Clean(data.HolderDetailCode) ?? throw new DomainException("CashDesk.HolderRequired", "The تفصیل of the holder is required.");
         var d2 = Clean(data.Detail2Code);
         CheckDetail(account.Detail1Types, holder, ledger.Detail(holder), before?.HolderDetailCode, accountCode);
+        // Owner's report no. 2, item 3: the holder is a member of staff, a cost centre or an organisational unit.
+        Require(ledger.Detail(holder)!.MayHold || holder == before?.HolderDetailCode, "CashDesk.HolderNotStaff",
+            $"تفصیل {holder} is not of a staff, cost-centre or organisational-unit type.");
         if (d2 is not null)
         {
             CheckDetail(account.Detail2Types, d2, ledger.Detail(d2), before?.Detail2Code, accountCode);

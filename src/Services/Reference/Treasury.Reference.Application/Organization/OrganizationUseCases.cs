@@ -1,3 +1,4 @@
+using Treasury.Reference.Domain.Ledger;
 using System.Globalization;
 using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
@@ -10,7 +11,9 @@ namespace Treasury.Reference.Application.Organization;
 
 public sealed record DepartmentForm(int Number, string Name, IReadOnlyList<string>? CostCenterCodes);
 
-public sealed record RequesterForm(int Number, string FullName, Guid DepartmentId, string CostCenterCode);
+/// <param name="PersonDetailCode">The requester's staff تفصیل (owner's report no. 2, item 6); the name comes from it.</param>
+/// <param name="DepartmentId">Optional (owner, 13 Nov 2026: Iran Nazho Co. has no departments).</param>
+public sealed record RequesterForm(int Number, string? PersonDetailCode, Guid? DepartmentId, string CostCenterCode);
 
 /// <param name="LegalName">Empty: the title of the تفصیل.</param>
 /// <param name="Kind">Real or legal person; with <paramref name="NationalId"/> (کد ملی or شناسه ملی), address and postal code (report no. 2, item 7).</param>
@@ -29,9 +32,10 @@ public sealed record DepartmentView(Guid Id, int Number, string Name, IReadOnlyL
     public static DepartmentView From(Department d) => new(d.Id, d.Number, d.Name, d.CostCenterCodes, d.IsActive, d.Version);
 }
 
-public sealed record RequesterView(Guid Id, int Number, string FullName, Guid DepartmentId, string CostCenterCode, bool IsActive, bool IsInUse, long Version)
+public sealed record RequesterView(
+    Guid Id, int Number, string FullName, Guid? DepartmentId, string CostCenterCode, bool IsActive, bool IsInUse, long Version, string? PersonDetailCode)
 {
-    public static RequesterView From(Requester r) => new(r.Id, r.Number, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive, r.IsInUse, r.Version);
+    public static RequesterView From(Requester r) => new(r.Id, r.Number, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive, r.IsInUse, r.Version, r.PersonDetailCode);
 }
 
 /// <param name="DetailName">Title of the تفصیل in the accounting system's list (may differ from the legal name).</param>
@@ -115,8 +119,9 @@ public sealed class OrganizationUseCases(
         RunAsync(key, async ct =>
         {
             ArgumentNullException.ThrowIfNull(form);
-            var requester = Requester.Register(Guid.NewGuid(), form.Number, form.FullName,
-                await organization.GetDepartmentAsync(form.DepartmentId, ct).ConfigureAwait(false), form.CostCenterCode, await DetailAsync(form.CostCenterCode, ct).ConfigureAwait(false));
+            var requester = Requester.Register(Guid.NewGuid(), form.Number, await DepartmentAsync(form.DepartmentId, ct).ConfigureAwait(false),
+                form.CostCenterCode, await DetailAsync(form.CostCenterCode, ct).ConfigureAwait(false),
+                form.PersonDetailCode ?? string.Empty, await DetailAsync(form.PersonDetailCode, ct).ConfigureAwait(false));
             if (await RequesterNumberTakenAsync(requester, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Requester.NumberTaken", $"Requester number {requester.Number} is already used.");
@@ -131,8 +136,9 @@ public sealed class OrganizationUseCases(
         {
             ArgumentNullException.ThrowIfNull(form);
             var requester = Check(await organization.GetRequesterAsync(id, ct).ConfigureAwait(false), expectedVersion, "Requester.NotFound", id);
-            requester.Edit(form.Number, form.FullName, await organization.GetDepartmentAsync(form.DepartmentId, ct).ConfigureAwait(false),
-                form.CostCenterCode, await DetailAsync(form.CostCenterCode, ct).ConfigureAwait(false));
+            requester.Edit(form.Number, await DepartmentAsync(form.DepartmentId, ct).ConfigureAwait(false),
+                form.CostCenterCode, await DetailAsync(form.CostCenterCode, ct).ConfigureAwait(false),
+                form.PersonDetailCode ?? string.Empty, await DetailAsync(form.PersonDetailCode, ct).ConfigureAwait(false));
             if (await RequesterNumberTakenAsync(requester, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Requester.NumberTaken", $"Requester number {requester.Number} is already used.");
@@ -304,6 +310,12 @@ public sealed class OrganizationUseCases(
             : null;
     }
 
+    /// <summary>No department chosen: none; an unknown id: refused.</summary>
+    private async Task<Department?> DepartmentAsync(Guid? id, CancellationToken ct) =>
+        id is { } d && d != Guid.Empty
+            ? await organization.GetDepartmentAsync(d, ct).ConfigureAwait(false) ?? throw new DomainException("Requester.DepartmentNotFound", "The department is not in the list.")
+            : null;
+
     private async Task<bool> RequesterNumberTakenAsync(Requester requester, CancellationToken ct) =>
         (await organization.ListRequestersAsync(null, includeInactive: true, ct).ConfigureAwait(false)).Any(r => r.Id != requester.Id && r.Number == requester.Number);
 
@@ -312,7 +324,7 @@ public sealed class OrganizationUseCases(
 
     private async Task<DetailFact?> DetailAsync(string? code, CancellationToken ct) =>
         PersianText.Clean(code) is { Length: > 0 } c && await ledger.DetailAsync(c, ct).ConfigureAwait(false) is { } d
-            ? new DetailFact(d.Code, d.Name, d.IsCostCenter, d.IsActive)
+            ? new DetailFact(d.Code, d.Name, DetailRoles.Of(d.Type, d.IsCostCenter) == DetailRole.CostCentre, d.IsActive, DetailRoles.Of(d.Type, d.IsCostCenter))
             : null;
 
     private async Task<Dictionary<string, DetailFact>> DetailsAsync(IEnumerable<string> codes, CancellationToken ct)

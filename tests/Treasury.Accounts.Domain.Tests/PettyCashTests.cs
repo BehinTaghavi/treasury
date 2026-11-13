@@ -14,7 +14,7 @@ public sealed class PettyCashTests
 
     private static readonly LedgerFacts Ledger = new(
         new Dictionary<string, LedgerAccountFact> { ["1102"] = new("1102", true, true, new HashSet<string>(), new HashSet<string>()) },
-        new Dictionary<string, DetailFact> { ["600046"] = new("600046", "كاركنان كارخانه", true) });
+        new Dictionary<string, DetailFact> { ["600046"] = new("600046", "كاركنان كارخانه", true, "Staff"), ["100000"] = new("100000", "بانكها", true) });
 
     private static readonly Dictionary<Guid, PurposeGroupFact> Groups = new()
     {
@@ -101,4 +101,9 @@ public sealed class PettyCashTests
         f.Change(Data(60_000_000, groups: Expenses), Ledger, Groups);
         Assert.IsType<PettyCashChanged>(Assert.Single(f.PendingEvents));
     }
+
+    [Fact]
+    public void A_bank_detail_account_cannot_hold_a_petty_cash_owner_report_2() =>
+        Assert.Equal("PettyCash.HolderNotStaff", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { HolderDetailCode = "100000" }, Ledger, Groups)));
 }
+

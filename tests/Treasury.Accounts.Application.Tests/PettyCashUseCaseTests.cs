@@ -38,7 +38,12 @@ public sealed class PettyCashUseCaseTests : IDisposable
     {
         await _useCases.RegisterAsync(Key(), Form(), CancellationToken.None);
         Assert.Equal("PettyCash.HolderTaken", (await _useCases.RegisterAsync(Key(), Form(), CancellationToken.None)).ErrorCode);
-        Assert.Equal("PettyCash.PurposeGroupNotPayment", (await _useCases.RegisterAsync(Key(), Form("100000", FakeReference.SalesReceipts), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PettyCash.PurposeGroupNotPayment", (await _useCases.RegisterAsync(Key(), Form("600046", FakeReference.SalesReceipts), CancellationToken.None)).ErrorCode);
         Assert.Empty(_reference.MarkedInUse);
     }
+
+    [Fact]
+    public async Task The_holder_is_staff_a_cost_centre_or_an_organisational_unit_owner_report_2() =>
+        Assert.Equal("PettyCash.HolderNotStaff", (await _useCases.RegisterAsync(Key(), Form("100000"), CancellationToken.None)).ErrorCode);
 }
+

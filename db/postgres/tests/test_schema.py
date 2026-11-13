@@ -435,3 +435,12 @@ def test_a_beneficiary_keeps_a_ten_or_eleven_digit_national_id_and_a_ten_digit_p
                 with c.transaction():
                     c.execute(add, (uuid.uuid4(), detail, kind, nid, postal))
         c.rollback()
+
+
+def test_a_requester_may_have_no_department_and_keeps_its_staff_detail(db):
+    # 020_reference_requester_person.sql (owner, 13 Nov 2026: Iran Nazho Co. has no departments).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        c.execute("INSERT INTO reference.requester (id, number, full_name, department_id, cost_center, person_detail) VALUES (%s, 883001, 'علی', NULL, '770100', '600046')",
+                  (uuid.uuid4(),))
+        c.rollback()

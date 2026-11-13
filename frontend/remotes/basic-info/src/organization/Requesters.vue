@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * Requesters of funds (درخواست کنندگان وجوه), new-version manual item 13: number (may differ from the person's تفصیل), full name,
- * department and cost centre. When the department lists cost centres, the requester's is one of them.
+ * Requesters of funds (درخواست کنندگان وجوه), new-version manual item 13: number (may differ from the person's تفصیل), the person
+ * chosen from the staff تفصیل (owner's report no. 2, item 6; the name comes from it), department and cost centre. The department is
+ * optional (owner, 13 Nov 2026: Iran Nazho Co. has no departments); when it lists cost centres, the requester's is one of them.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
@@ -9,7 +10,7 @@ import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
 import { searchKey } from '../text'
 
 interface Department { id: string; number: number; name: string; costCenterCodes: string[]; isActive: boolean }
-interface Requester { id: string; number: number; fullName: string; departmentId: string; costCenterCode: string; isActive: boolean; isInUse: boolean; version: number }
+interface Requester { id: string; number: number; fullName: string; departmentId: string | null; costCenterCode: string; isActive: boolean; isInUse: boolean; version: number; personDetailCode: string | null }
 interface Detail { code: string; name: string; isActive: boolean }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
@@ -28,10 +29,31 @@ const editing = ref<Requester | null>(null)
 const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
-const form = reactive({ number: '', fullName: '', departmentId: '', costCenterCode: '' })
+const form = reactive({ number: '', personDetailCode: '', departmentId: '', costCenterCode: '' })
+const staff = ref<Detail[]>([])
+const staffChoices = computed<Choice[]>(() => staff.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
+const chosenName = computed(() => staff.value.find(d => d.code === form.personDetailCode)?.name ?? '')
+
+/** Staff تفصیل (types «کارکنان …»), searched on the server; the chosen one stays in the list. */
+async function searchStaff(text: string) {
+  const q = new URLSearchParams({ roles: 'Staff', take: '50' })
+  if (text.trim()) q.set('search', text.trim())
+  const r = await api.get<Detail[]>(`/api/reference/ledger/details?${q}`)
+  const found = r.ok ? r.value : []
+  if (form.personDetailCode && !found.some(d => d.code === form.personDetailCode)) {
+    const one = await api.get<Detail>(`/api/reference/ledger/details/${encodeURIComponent(form.personDetailCode)}`)
+    if (one.ok) found.unshift(one.value)
+  }
+  staff.value = found
+}
+let timer: ReturnType<typeof setTimeout> | undefined
+function onStaffSearch(text: string) {
+  clearTimeout(timer)
+  timer = setTimeout(() => searchStaff(text), 250)
+}
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
-const department = (id: string) => departments.value.find(d => d.id === id)
+const department = (id: string | null) => departments.value.find(d => d.id === id)
 const centerName = (code: string) => centers.value.find(c => c.code === code)?.name ?? ''
 const departmentChoices = computed<Choice[]>(() => departments.value.filter(d => d.isActive || d.id === form.departmentId).map(d => ({ value: d.id, label: d.name, hint: num(d.number) })))
 const filterChoices = computed<Choice[]>(() => departments.value.map(d => ({ value: d.id, label: d.name, hint: num(d.number) })))
@@ -68,30 +90,33 @@ function onDepartment(id: string) {
 
 function startNew() {
   const next = Math.max(0, ...requesters.value.map(r => r.number)) + 1
-  Object.assign(form, { number: String(next), fullName: '', departmentId: '', costCenterCode: '' })
+  Object.assign(form, { number: String(next), personDetailCode: '', departmentId: '', costCenterCode: '' })
   if (departmentFilter.value) onDepartment(departmentFilter.value)
   editing.value = null
   showForm.value = true
   message.value = null
+  void searchStaff('')
 }
 
 function startEdit(r: Requester) {
-  Object.assign(form, { number: String(r.number), fullName: r.fullName, departmentId: r.departmentId, costCenterCode: r.costCenterCode })
+  Object.assign(form, { number: String(r.number), personDetailCode: r.personDetailCode ?? '', departmentId: r.departmentId ?? '', costCenterCode: r.costCenterCode })
   editing.value = r
   showForm.value = true
   message.value = null
+  void searchStaff('')
 }
 
 async function save() {
   if (busy.value) return
-  const body = { number: Number(searchKey(form.number)) || 0, fullName: form.fullName, departmentId: form.departmentId || '00000000-0000-0000-0000-000000000000', costCenterCode: form.costCenterCode }
+  const body = { number: Number(searchKey(form.number)) || 0, personDetailCode: form.personDetailCode, departmentId: form.departmentId || null, costCenterCode: form.costCenterCode }
+  const name = chosenName.value
   busy.value = true
   const r = editing.value
     ? await api.put<string>(`${base}/${editing.value.id}`, { form: body, version: editing.value.version })
     : await api.post<string>(base, body)
   busy.value = false
   if (!r.ok) return fail(r.code)
-  message.value = { kind: 'ok', text: t(`«${form.fullName.trim()}» ثبت شد.`, `"${form.fullName.trim()}" saved.`) }
+  message.value = { kind: 'ok', text: t(`«${name}» ثبت شد.`, `"${name}" saved.`) }
   showForm.value = false
   await load()
 }
@@ -110,17 +135,20 @@ onMounted(load)
 <template>
   <div>
     <h3>{{ t('درخواست کنندگان وجوه', 'Requesters of funds') }}</h3>
-    <p v-if="!departments.length" class="muted">{{ t('ابتدا در «بخش‌ها» بخش‌های شرکت را تعریف کنید.', 'Define the departments first.') }}</p>
-    <button v-if="!showForm && departments.length" type="button" @click="startNew">{{ t('درخواست کنندهٔ جدید', 'New requester') }}</button>
+    <button v-if="!showForm" type="button" @click="startNew">{{ t('درخواست کنندهٔ جدید', 'New requester') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">
       <fieldset>
         <legend>{{ editing ? t('ویرایش درخواست کننده', 'Edit requester') : t('درخواست کنندهٔ جدید', 'New requester') }}</legend>
         <label class="req"><span>{{ t('شماره درخواست کننده', 'Number') }} <span class="star">*</span></span><input v-model="form.number" dir="ltr" inputmode="numeric" /></label>
-        <label class="req"><span>{{ t('نام و نام خانوادگی', 'Full name') }} <span class="star">*</span></span><input v-model="form.fullName" maxlength="100" autocomplete="off" /></label>
-        <label class="req"><span>{{ t('بخش (واحد سازمانی)', 'Department') }} <span class="star">*</span></span>
-          <SearchSelect :model-value="form.departmentId" :options="departmentChoices" required :aria-label="t('بخش', 'Department')" @update:model-value="onDepartment" />
+        <label class="req wide"><span>{{ t('نام و نام خانوادگی (از تفصیل‌های کارکنان)', 'Name (staff detail account)') }} <span class="star">*</span></span>
+          <SearchSelect v-model="form.personDetailCode" :options="staffChoices" remote required :aria-label="t('نام و نام خانوادگی', 'Name')"
+                        :none-text="t('تفصیلی از نوع کارکنان پیدا نشد', 'No staff detail account found')" @search="onStaffSearch" />
+          <small v-if="editing && !editing.personDetailCode" class="muted">{{ t(`نام قبلی: ${editing.fullName}؛ تفصیل او را انتخاب کنید.`, `Earlier name: ${editing.fullName}; choose the detail account.`) }}</small>
+        </label>
+        <label>{{ t('بخش (واحد سازمانی)', 'Department') }}
+          <SearchSelect :model-value="form.departmentId" :options="departmentChoices" :empty-label="t('ندارد', 'None')" :aria-label="t('بخش', 'Department')" @update:model-value="onDepartment" />
         </label>
         <label class="req"><span>{{ t('مرکز هزینه', 'Cost centre') }} <span class="star">*</span></span>
           <SearchSelect v-model="form.costCenterCode" :options="centerChoices" required :aria-label="t('مرکز هزینه', 'Cost centre')" :none-text="t('مرکز هزینه‌ای پیدا نشد', 'No cost centre found')" />

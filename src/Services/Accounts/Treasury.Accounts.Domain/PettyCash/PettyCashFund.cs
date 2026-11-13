@@ -115,6 +115,9 @@ public sealed class PettyCashFund : AggregateRoot<Guid>
         var fact = ledger.Detail(holder);
         Require(fact is not null, "PettyCash.DetailNotFound", $"تفصیل {holder} is not in the list.");
         Require(fact!.IsActive || holder == before?.HolderDetailCode, "PettyCash.DetailInactive", $"تفصیل {holder} is inactive.");
+        // Owner's report no. 2, item 3: the holder is a member of staff, a cost centre or an organisational unit.
+        Require(fact.MayHold || holder == before?.HolderDetailCode, "PettyCash.HolderNotStaff",
+            $"تفصیل {holder} is not of a staff, cost-centre or organisational-unit type.");
         Require(account.Detail1Types.Count == 0 || (fact.Type is not null && account.Detail1Types.Contains(fact.Type)), "PettyCash.DetailTypeNotAllowed",
             $"A تفصیل of type '{fact.Type}' cannot be used with account {accountCode}.");
 

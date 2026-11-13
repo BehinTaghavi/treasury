@@ -41,13 +41,14 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
 
     public Task AddRequesterAsync(Requester requester, CancellationToken cancellationToken) =>
         WriteAsync(requester, null,
-            "INSERT INTO reference.requester (id, number, full_name, department_id, cost_center, is_active, in_use) VALUES (@id, @number, @name, @department, @center, @active, @in_use)",
+            "INSERT INTO reference.requester (id, number, full_name, department_id, cost_center, is_active, in_use, person_detail) " +
+            "VALUES (@id, @number, @name, @department, @center, @active, @in_use, @person)",
             cmd => RequesterParameters(cmd, requester), cancellationToken);
 
     public Task SaveRequesterAsync(Requester requester, CancellationToken cancellationToken) =>
         WriteAsync(requester, requester.Version,
             "UPDATE reference.requester SET number = @number, full_name = @name, department_id = @department, cost_center = @center, is_active = @active, " +
-            "in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected",
+            "in_use = @in_use, person_detail = @person, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected",
             cmd => RequesterParameters(cmd, requester), cancellationToken);
 
     public Task DeleteRequesterAsync(Requester requester, CancellationToken cancellationToken) =>
@@ -94,8 +95,9 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
         cmd.Parameters.AddWithValue("id", r.Id);
         cmd.Parameters.AddWithValue("number", r.Number);
         cmd.Parameters.AddWithValue("name", r.FullName);
-        cmd.Parameters.AddWithValue("department", r.DepartmentId);
+        cmd.Parameters.Add(new NpgsqlParameter("department", NpgsqlDbType.Uuid) { Value = (object?)r.DepartmentId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("center", r.CostCenterCode);
+        cmd.Parameters.Add(new NpgsqlParameter("person", NpgsqlDbType.Text) { Value = (object?)r.PersonDetailCode ?? DBNull.Value });
         cmd.Parameters.AddWithValue("active", r.IsActive);
         cmd.Parameters.AddWithValue("in_use", r.IsInUse);
     }
@@ -181,7 +183,7 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
         string where, (string Name, Guid Value)? id, CancellationToken ct, Guid? departmentId = null, bool includeInactive = true)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            $"SELECT id, number, full_name, department_id, cost_center, is_active, in_use, version FROM reference.requester {where}");
+            $"SELECT id, number, full_name, department_id, cost_center, is_active, in_use, version, person_detail FROM reference.requester {where}");
         if (id is { } p)
         {
             cmd.Parameters.AddWithValue(p.Name, p.Value);
@@ -196,7 +198,8 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
         await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await r.ReadAsync(ct).ConfigureAwait(false))
         {
-            list.Add(Requester.Restore(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.GetGuid(3), r.GetString(4), r.GetBoolean(5), r.GetBoolean(6), r.GetInt64(7)));
+            list.Add(Requester.Restore(r.GetGuid(0), r.GetInt32(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetGuid(3), r.GetString(4), r.GetBoolean(5), r.GetBoolean(6), r.GetInt64(7),
+                r.IsDBNull(8) ? null : r.GetString(8)));
         }
 
         return list;

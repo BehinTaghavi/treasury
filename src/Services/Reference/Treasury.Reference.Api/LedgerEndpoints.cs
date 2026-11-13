@@ -51,11 +51,12 @@ public static class LedgerEndpoints
         api.MapPut("/accounts/{code}/detail-types", async (string code, DetailTypesRequest r, HttpRequest http, LedgerUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.SetDetailTypesAsync(new SetDetailTypesCommand(Key(http), code, r.Detail1Types ?? [], r.Detail2Types ?? []), ct).ConfigureAwait(false)));
 
-        api.MapGet("/details", async (string? search, string? type, bool? includeInactive, int? take, bool? costCentersOnly, int? skip, LedgerUseCases useCases, CancellationToken ct) =>
-            Results.Ok(await useCases.SearchDetailsAsync(search, type, includeInactive ?? false, take ?? 100, ct, costCentersOnly ?? false, skip ?? 0).ConfigureAwait(false)));
+        // roles: comma-separated Staff, CostCentre, OrgUnit (owner, 13 Nov 2026: holder, requester and cost-centre lists).
+        api.MapGet("/details", async (string? search, string? type, bool? includeInactive, int? take, bool? costCentersOnly, int? skip, string? roles, LedgerUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.SearchDetailsAsync(search, type, includeInactive ?? false, take ?? 100, ct, costCentersOnly ?? false, skip ?? 0, Roles(roles)).ConfigureAwait(false)));
 
-        api.MapGet("/details-count", async (string? search, string? type, bool? includeInactive, bool? costCentersOnly, LedgerUseCases useCases, CancellationToken ct) =>
-            Results.Ok(await useCases.CountDetailsAsync(search, type, includeInactive ?? false, costCentersOnly ?? false, ct).ConfigureAwait(false)));
+        api.MapGet("/details-count", async (string? search, string? type, bool? includeInactive, bool? costCentersOnly, string? roles, LedgerUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.CountDetailsAsync(search, type, includeInactive ?? false, costCentersOnly ?? false, ct, Roles(roles)).ConfigureAwait(false)));
 
         api.MapGet("/accounts/{code}", async (string code, LedgerUseCases useCases, CancellationToken ct) =>
             await useCases.AccountAsync(code, ct).ConfigureAwait(false) is { } a ? Results.Ok(a) : Results.NotFound());
@@ -102,9 +103,14 @@ public static class LedgerEndpoints
 
     private static IResult Problem(string code, string? detail, int status) =>
         Results.Problem(statusCode: status, title: code, detail: detail, extensions: new Dictionary<string, object?> { ["code"] = code });
+
+    private static List<Treasury.Reference.Domain.Ledger.DetailRole> Roles(string? text) =>
+        (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(r => Enum.TryParse<Treasury.Reference.Domain.Ledger.DetailRole>(r, ignoreCase: true, out var role) ? role : (Treasury.Reference.Domain.Ledger.DetailRole?)null)
+            .OfType<Treasury.Reference.Domain.Ledger.DetailRole>()
+            .ToList();
 }
 
-/// <summary>Offline builds have no Excel package: importing is refused with a clear code instead of failing at start-up.</summary>
 public sealed class UnavailableExportReader : ILedgerExportReader
 {
     public IReadOnlyList<ChartRow> ReadChart(Stream file) => throw NotAvailable();

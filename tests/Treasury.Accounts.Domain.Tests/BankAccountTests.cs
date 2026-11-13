@@ -140,6 +140,16 @@ public sealed class BankAccountTests
     }
 
     [Fact]
+    public void A_backup_account_has_the_currency_of_its_main_account_owner_13_nov()
+    {
+        var rial = BankAccount.Register(Guid.NewGuid(), Data(), Ledger);
+        var dollar = BankAccount.Register(Guid.NewGuid(), Data(number: "0101-500", currency: "USD"), Ledger);
+        Assert.Equal("BankAccount.MainAccountOtherCurrency", Code(() => BankAccount.Register(Guid.NewGuid(), Data(number: "0101-501", currency: "USD"), Ledger, rial)));
+        var backup = BankAccount.Register(Guid.NewGuid(), Data(number: "0101-502", currency: "USD", d1: "100001"), Ledger, dollar); // foreign with foreign
+        Assert.Equal("BankAccount.MainAccountOtherCurrency", Code(() => backup.Change(Data(number: "0101-502", currency: "EUR", d1: "100001"), Ledger)));
+    }
+
+    [Fact]
     public void A_backup_account_is_never_saved_without_its_main_account_owner_item_10() =>
         Assert.Equal("BankAccount.MainAccountRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data(), Ledger, main: null, isBackup: true)));
 
