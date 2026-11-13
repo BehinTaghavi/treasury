@@ -24,7 +24,9 @@ public sealed class PettyCashTests
     };
 
     private static PettyCashData Data(decimal amount = 50_000_000, decimal limit = 40_000_000, decimal ceiling = 5_000_000, params Guid[] groups) =>
-        new("600046", "1102", amount, limit, ceiling, groups, PettyCashRecovery.Cheque);
+        new("600046", "1102", amount, limit, ceiling, groups, PettyCashRecovery.Cheque, new FiscalDate(new DateOnly(2026, 11, 13)), CashOnly);
+
+    private static readonly PettyCashKeeping CashOnly = new(false, null, null, true, false, null, null);
 
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
 
@@ -43,8 +45,35 @@ public sealed class PettyCashTests
     [InlineData(1000, 1001, 10, "PettyCash.SettleLimitInvalid")]
     [InlineData(1000, 0, 10, "PettyCash.SettleLimitInvalid")]
     [InlineData(1000, 800, 1001, "PettyCash.PayCeilingInvalid")]
-    public void Amounts_must_fit_together(decimal amount, decimal limit, decimal ceiling, string code) =>
+    [InlineData(1000, 1000, 10, "PettyCash.SettleLimitInvalid")] // owner's report no. 2, item 4: limit below the amount
+    [InlineData(1000, 500, 600, "PettyCash.PayCeilingInvalid")]   // and the ceiling at most the limit
+    public void Amounts_must_fit_together_payment_ceiling_at_most_limit_below_amount(decimal amount, decimal limit, decimal ceiling, string code) =>
         Assert.Equal(code, Code(() => PettyCashFund.Register(Guid.NewGuid(), Data(amount, limit, ceiling), Ledger, Groups)));
+
+    [Fact]
+    public void The_ceiling_may_equal_the_limit_owner_report_2() =>
+        Assert.Equal(500m, PettyCashFund.Register(Guid.NewGuid(), Data(1000, 500, 500), Ledger, Groups).Data.PayCeiling);
+
+    [Fact]
+    public void Creation_date_and_how_the_money_is_kept_are_required_owner_report_2()
+    {
+        Assert.Equal("PettyCash.CreatedOnRequired", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { CreatedOn = null }, Ledger, Groups)));
+        Assert.Equal("PettyCash.KeepingRequired", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = null }, Ledger, Groups)));
+        Assert.Equal("PettyCash.KeepingRequired", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Cash = false } }, Ledger, Groups)));
+        Assert.Equal("PettyCash.KeepingBankIncomplete", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Bank = true, BankAccountName = "حساب جاری" } }, Ledger, Groups)));
+        Assert.Equal("PettyCash.KeepingCardIncomplete", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardNumber = "6037991234567893" } }, Ledger, Groups)));
+        Assert.Equal("PettyCash.CardNumberInvalid", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardHolderName = "علی رضایی", CardNumber = "6037991234567890" } }, Ledger, Groups)));
+    }
+
+    [Fact]
+    public void Money_kept_in_a_bank_account_and_on_a_card_and_topped_up_by_card_owner_report_2()
+    {
+        var keeping = new PettyCashKeeping(true, "جاری تنخواه", "۰۱۰۱-۵۵۵", false, true, "علی رضایی", "6037-9912-3456-7893");
+        var f = PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = keeping, Recovery = PettyCashRecovery.BankCard }, Ledger, Groups);
+        Assert.Equal(new PettyCashKeeping(true, "جاری تنخواه", "0101-555", false, true, "علی رضایی", "6037991234567893"), f.Data.Keeping);
+        Assert.Equal(PettyCashRecovery.BankCard, f.Data.Recovery);
+        Assert.Equal("1405/08/22", f.Data.CreatedOn!.Value.ToJalaliString());
+    }
 
     [Fact]
     public void Only_active_payment_purpose_groups_can_be_allowed()

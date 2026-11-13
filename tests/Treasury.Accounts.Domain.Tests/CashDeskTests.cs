@@ -23,7 +23,7 @@ public sealed class CashDeskTests
         });
 
     private static CashDeskData Data(string name = "صندوق مرکزی", string account = "1101", string holder = "111078", string currency = "IRR") =>
-        new(name, account, holder, null, currency);
+        new(name, account, holder, null, currency, new FiscalDate(new DateOnly(2026, 11, 13)));
 
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
 

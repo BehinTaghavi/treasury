@@ -7,13 +7,14 @@ using Treasury.BuildingBlocks.Domain;
 namespace Treasury.Accounts.Application.PettyCash;
 
 /// <summary>The petty cash form as sent by the screen.</summary>
+/// <param name="CreatedOn">Jalali date, e.g. 1405/08/22.</param>
 public sealed record PettyCashForm(
     string HolderDetailCode, string LedgerAccountCode, decimal Amount, decimal SettleLimit, decimal PayCeiling,
-    IReadOnlyList<Guid>? AllowedPurposeGroupIds, PettyCashRecovery Recovery);
+    IReadOnlyList<Guid>? AllowedPurposeGroupIds, PettyCashRecovery Recovery, string? CreatedOn = null, PettyCashKeeping? Keeping = null);
 
 public sealed record PettyCashView(
     Guid Id, string HolderDetailCode, string? HolderName, string LedgerAccountCode, decimal Amount, decimal SettleLimit, decimal PayCeiling,
-    IReadOnlyList<Guid> AllowedPurposeGroupIds, PettyCashRecovery Recovery, bool IsActive, long Version);
+    IReadOnlyList<Guid> AllowedPurposeGroupIds, PettyCashRecovery Recovery, bool IsActive, long Version, string? CreatedOn, PettyCashKeeping? Keeping);
 
 /// <summary>Petty cash holders (manual item 11). Each write is one command in one transaction on one petty cash.</summary>
 public sealed class PettyCashUseCases(IUnitOfWork unitOfWork, IPettyCashRepository funds, IReferenceLookup reference, IIdempotencyStore idempotency)
@@ -86,7 +87,8 @@ public sealed class PettyCashUseCases(IUnitOfWork unitOfWork, IPettyCashReposito
             }
 
             var d = f.Data;
-            views.Add(new(f.Id, d.HolderDetailCode, name, d.LedgerAccountCode, d.Amount, d.SettleLimit, d.PayCeiling, d.AllowedPurposeGroupIds, d.Recovery, f.IsActive, f.Version));
+            views.Add(new(f.Id, d.HolderDetailCode, name, d.LedgerAccountCode, d.Amount, d.SettleLimit, d.PayCeiling, d.AllowedPurposeGroupIds, d.Recovery, f.IsActive, f.Version,
+                d.CreatedOn?.ToJalaliString(), d.Keeping));
         }
 
         return views;
@@ -134,7 +136,8 @@ public sealed class PettyCashUseCases(IUnitOfWork unitOfWork, IPettyCashReposito
             }
         }
 
-        var data = new PettyCashData(form.HolderDetailCode, form.LedgerAccountCode, form.Amount, form.SettleLimit, form.PayCeiling, form.AllowedPurposeGroupIds ?? [], form.Recovery);
+        var data = new PettyCashData(form.HolderDetailCode, form.LedgerAccountCode, form.Amount, form.SettleLimit, form.PayCeiling, form.AllowedPurposeGroupIds ?? [], form.Recovery,
+            string.IsNullOrWhiteSpace(form.CreatedOn) ? null : FiscalDate.ParseJalali(form.CreatedOn), form.Keeping);
         return (data, new LedgerFacts(accounts, details), groups);
     }
 

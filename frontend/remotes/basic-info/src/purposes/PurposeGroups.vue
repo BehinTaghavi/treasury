@@ -156,7 +156,10 @@ async function savePurpose(p: PurposeRow) {
 }
 
 async function changePurpose(p: PurposeRow, change: 'activate' | 'deactivate' | 'delete') {
-  if (change === 'delete' && !window.confirm(t(`بابت «${p.name}» حذف شود؟`, `Delete purpose "${p.name}"?`))) return
+  // A used purpose may be deleted too (owner's report no. 2, item 10); saved documents keep its text.
+  if (change === 'delete' && !window.confirm(p.isInUse
+    ? t(`بابت «${p.name}» قبلاً استفاده شده است. حذف شود؟ اسناد ثبت‌شده شرح خود را حفظ می‌کنند.`, `Purpose "${p.name}" was used before. Delete it? Saved documents keep their text.`)
+    : t(`بابت «${p.name}» حذف شود؟`, `Delete purpose "${p.name}"?`))) return
   const r = await api.post<string>(`/api/reference/purposes/${p.id}/${change}`, { version: p.version })
   if (!r.ok) return fail(r.code)
   show('ok', change === 'delete' ? t('بابت حذف شد.', 'Purpose deleted.') : change === 'activate' ? t('فعال شد.', 'Switched on.') : t('غیرفعال شد.', 'Switched off.'))
@@ -279,7 +282,7 @@ onMounted(async () => {
               <td class="tr-actions">
                 <button type="button" class="tr-link" @click="editingPurpose = { id: p.id, name: p.name, groupId: p.groupId }">{{ t('ویرایش', 'Edit') }}</button>
                 <button type="button" class="tr-link" @click="changePurpose(p, p.isActive ? 'deactivate' : 'activate')">{{ p.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
-                <button v-if="!p.isInUse" type="button" class="tr-link danger" @click="changePurpose(p, 'delete')">{{ t('حذف', 'Delete') }}</button>
+                <button type="button" class="tr-link danger" @click="changePurpose(p, 'delete')">{{ t('حذف', 'Delete') }}</button>
               </td>
             </template>
           </tr>

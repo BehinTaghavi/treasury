@@ -20,7 +20,8 @@ public sealed class PettyCashUseCaseTests : IDisposable
 
     // 130100 allows any تفصیل type in FakeReference.
     private static PettyCashForm Form(string holder = "111078", params Guid[] groups) =>
-        new(holder, "130100", 50_000_000, 40_000_000, 5_000_000, groups, PettyCashRecovery.Cash);
+        new(holder, "130100", 50_000_000, 40_000_000, 5_000_000, groups, PettyCashRecovery.Cash, "1405/08/22",
+            new PettyCashKeeping(false, null, null, true, false, null, null));
 
     [Fact]
     public async Task A_petty_cash_is_saved_its_groups_marked_in_use_and_listed_with_the_holders_name()

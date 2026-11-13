@@ -88,14 +88,18 @@ public sealed class PurposeTests
     }
 
     [Fact]
-    public void A_used_purpose_is_never_deleted()
+    public void A_purpose_is_deleted_even_after_it_was_used_owner_report_2()
     {
         var p = Purpose.Add(Guid.NewGuid(), Group(), "اجاره");
         p.MarkSaved(1);
         p.Delete();
         Assert.IsType<PurposeDeleted>(Assert.Single(p.PendingEvents));
+        // Owner's report no. 2, item 10: a purpose already used can still be deleted and corrected (documents keep their text).
         var used = Purpose.Add(Guid.NewGuid(), Group(), "حقوق");
         used.MarkInUse();
-        Assert.Equal("Purpose.InUse", Code(used.Delete));
+        used.MarkSaved(1);
+        used.Edit("حقوق و دستمزد", Group());
+        used.Delete();
+        Assert.IsType<PurposeDeleted>(used.PendingEvents[^1]);
     }
 }

@@ -5,13 +5,13 @@
  * rule again. Switched off, not deleted (like bank accounts).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, translate, type Locale } from '@treasury/ui-kit'
+import { createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
 import { searchKey } from '../text'
 
 interface Desk {
   id: string; name: string; ledgerAccountCode: string; holderDetailCode: string; holderName: string | null; detail2Code: string | null
-  currencyCode: string; isActive: boolean; version: number
+  currencyCode: string; isActive: boolean; version: number; createdOn: string | null
 }
 interface LedgerAccount { code: string; name: string; isPostable: boolean; isActive: boolean; detail1Types: string[]; detail2Types: string[] }
 interface Detail { code: string; name: string; type: string | null; isActive: boolean }
@@ -35,7 +35,8 @@ const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
 
-const empty = () => ({ name: '', ledgerAccountCode: '', holderDetailCode: '', detail2Code: '', isForeign: false, currencyCode: '' })
+/** The creation date (owner's report no. 2, item 11) starts as today. */
+const empty = () => ({ name: '', ledgerAccountCode: '', holderDetailCode: '', detail2Code: '', isForeign: false, currencyCode: '', createdOn: todayJalali() })
 const form = reactive(empty())
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
@@ -99,7 +100,7 @@ function startNew() {
 function startEdit(d: Desk) {
   Object.assign(form, {
     name: d.name, ledgerAccountCode: d.ledgerAccountCode, holderDetailCode: d.holderDetailCode, detail2Code: d.detail2Code ?? '',
-    isForeign: d.currencyCode !== 'IRR', currencyCode: d.currencyCode === 'IRR' ? '' : d.currencyCode,
+    isForeign: d.currencyCode !== 'IRR', currencyCode: d.currencyCode === 'IRR' ? '' : d.currencyCode, createdOn: d.createdOn ?? '',
   })
   editing.value = d
   showForm.value = true
@@ -113,6 +114,7 @@ async function save() {
   const body = {
     name: form.name, ledgerAccountCode: form.ledgerAccountCode, holderDetailCode: form.holderDetailCode, detail2Code: form.detail2Code || null,
     isForeignCurrency: form.isForeign, currencyCode: form.isForeign ? form.currencyCode : null,
+    createdOn: form.createdOn ? normaliseJalali(form.createdOn) ?? form.createdOn : null,
   }
   busy.value = true
   const r = editing.value
@@ -168,6 +170,7 @@ onMounted(async () => {
         <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
           <select v-model="form.currencyCode"><option value="" /><option v-for="c in foreignCurrencies" :key="c.id" :value="c.code">{{ c.name }} ({{ c.code }})</option></select>
         </label>
+        <label class="req"><span>{{ t('تاریخ ایجاد', 'Created on') }} <span class="star">*</span></span><input v-model="form.createdOn" dir="ltr" placeholder="1405/08/22" /></label>
       </fieldset>
       <div class="tr-buttons">
         <button type="submit" :disabled="busy">{{ t('ذخیره', 'Save') }}</button>
@@ -183,7 +186,7 @@ onMounted(async () => {
       </div>
       <table class="tr-table">
         <thead>
-          <tr><th>{{ t('نام صندوق', 'Name') }}</th><th>{{ t('دارنده', 'Holder') }}</th><th>{{ t('معین', 'Ledger account') }}</th><th>{{ t('ارز', 'Currency') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr>
+          <tr><th>{{ t('نام صندوق', 'Name') }}</th><th>{{ t('دارنده', 'Holder') }}</th><th>{{ t('معین', 'Ledger account') }}</th><th>{{ t('ارز', 'Currency') }}</th><th>{{ t('تاریخ ایجاد', 'Created') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr>
         </thead>
         <tbody>
           <tr v-for="d in shown" :key="d.id" :class="{ inactive: !d.isActive }">
@@ -191,13 +194,14 @@ onMounted(async () => {
             <td>{{ d.holderName }} <small class="muted" dir="ltr">{{ d.holderDetailCode }}</small></td>
             <td><span dir="ltr">{{ d.ledgerAccountCode }}</span> <small class="muted">{{ ledgerName(d.ledgerAccountCode) }}</small></td>
             <td>{{ d.currencyCode }}</td>
+            <td dir="ltr">{{ d.createdOn ?? '' }}</td>
             <td>{{ d.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
             <td class="tr-actions">
               <button type="button" class="tr-link" @click="startEdit(d)">{{ t('ویرایش', 'Edit') }}</button>
               <button type="button" class="tr-link" @click="toggle(d)">{{ d.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="6" class="muted">{{ t('با این جستجو صندوقی پیدا نشد.', 'No cash desk matches.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="7" class="muted">{{ t('با این جستجو صندوقی پیدا نشد.', 'No cash desk matches.') }}</td></tr>
         </tbody>
       </table>
     </template>

@@ -1,3 +1,4 @@
+using Treasury.Reference.Domain.Organization;
 using Npgsql;
 using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Application.Organization;
@@ -56,10 +57,12 @@ public sealed class OrganizationPostgresTests : IDisposable
         Assert.Equal("Department.HasRequesters", (await _useCases.ChangeDepartmentAsync(new(Key(), d.Value, "delete", 1), CancellationToken.None)).ErrorCode);
 
         var bank = (await _catalogue.AddAsync(new(Key(), CatalogueKind.Bank, "بانک آزمایشی " + _n), CancellationToken.None)).Value;
-        var b = await _useCases.AddBeneficiaryAsync(Key(), new(_person, null, bank, "شعبه", "0101-" + _n, "IR460120000000003123456789", "021-88888888"), CancellationToken.None);
+        var b = await _useCases.AddBeneficiaryAsync(Key(), new(_person, null, bank, "شعبه", "0101-" + _n, "IR460120000000003123456789", "021-88888888",
+            BeneficiaryKind.Natural, "0084575948", "تهران", "1234567890"), CancellationToken.None);
         Assert.True(b.IsSuccess, b.ErrorCode);
         var view = (await _useCases.ListBeneficiariesAsync(true, CancellationToken.None)).Single(x => x.Id == b.Value);
         Assert.Equal(("شخص آزمایشی", "IR460120000000003123456789", (Guid?)bank), (view.LegalName, view.Sheba, view.BankId));
+        Assert.Equal(((BeneficiaryKind?)BeneficiaryKind.Natural, "0084575948", "تهران", "1234567890"), (view.Kind, view.NationalId, view.PostalAddress, view.PostalCode));
         Assert.True(await _db.ScalarAsync<bool>("SELECT in_use FROM reference.catalogue_item WHERE id = @id", ("id", bank)));
         Assert.True((await _useCases.ChangeBeneficiaryAsync(new(Key(), b.Value, "delete", 1), CancellationToken.None)).IsSuccess);
     }

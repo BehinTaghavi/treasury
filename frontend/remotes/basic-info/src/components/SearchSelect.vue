@@ -70,8 +70,19 @@ function pick(o: Choice) {
   open.value = false
 }
 
+/**
+ * Leaving the box (Tab, click elsewhere) keeps what was typed when it names exactly one entry: its code, its name, or the only
+ * entry left in the list. Owner's report no. 2, item 8: a code typed into «معین برگشتی» and left with Tab was sometimes not saved.
+ * Text that matches nothing (or several entries) is dropped and the previous choice stays.
+ */
 function close() {
-  // Typed text that matches nothing is dropped; the previous choice stays.
+  const q = searchKey(typed.value ?? '')
+  if (q) {
+    const exact = props.options.filter(o => o.value !== '' && (searchKey(o.hint ?? '') === q || searchKey(o.label) === q || searchKey(o.value) === q))
+    const left = shown.value.filter(o => o.value !== '')
+    const one = exact.length === 1 ? exact[0] : !props.remote && left.length === 1 ? left[0] : undefined
+    if (one && one.value !== props.modelValue) emit('update:modelValue', one.value)
+  }
   typed.value = null
   open.value = false
 }
@@ -89,7 +100,8 @@ function onKey(e: KeyboardEvent) {
     if (o) pick(o)
   } else if (e.key === 'Escape' && open.value) {
     e.preventDefault()
-    close()
+    typed.value = null
+    open.value = false
   }
 }
 

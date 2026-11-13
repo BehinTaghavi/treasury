@@ -216,6 +216,23 @@ public sealed class DefaultListTests : IDisposable
     private async Task<int> Count(CatalogueKind kind) => (await _useCases.ListAsync(kind, null, true, CancellationToken.None)).Count;
 
     [Fact]
+    public async Task Cities_go_to_the_country_holding_irans_provinces_even_beside_an_empty_second_iran_owner_report_2()
+    {
+        // An older database: Iran (here renamed) with its 31 provinces and capitals, and an empty «ایران» typed later.
+        async Task<Guid> Add(CatalogueKind kind, string name, Guid? parent = null) =>
+            (await _useCases.AddAsync(new AddCatalogueItemCommand(Guid.NewGuid().ToString(), kind, name, parent), CancellationToken.None)).Value;
+        var old = await Add(CatalogueKind.Country, "جمهوری اسلامی ایران");
+        foreach (var (province, capital) in DefaultLists.IranProvinces)
+        {
+            await Add(CatalogueKind.City, capital, await Add(CatalogueKind.Province, province, old));
+        }
+
+        await Add(CatalogueKind.Country, "ایران");
+        Assert.Equal(DefaultLists.IranCities.Count - 31, await DefaultLists.AddIranCitiesAsync(_useCases, CancellationToken.None));
+        Assert.Equal(DefaultLists.IranCities.Count, await Count(CatalogueKind.City));
+    }
+
+    [Fact]
     public async Task An_empty_database_gets_the_default_lists_once()
     {
         await DefaultLists.SeedAsync(_useCases, CancellationToken.None);

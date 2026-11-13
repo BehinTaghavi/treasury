@@ -19,7 +19,7 @@ public sealed record SetDetailTypesCommand(string IdempotencyKey, string Code, I
 /// </summary>
 public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository ledger, ILedgerQueries queries, IIdempotencyStore idempotency)
 {
-    public const int MaxSearchResults = 200;
+    public const int MaxSearchResults = 1000;
 
     private static readonly JsonSerializerOptions Json = new();
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
@@ -101,10 +101,17 @@ public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository led
         unitOfWork.ExecuteAsync(ct => queries.AccountsAsync(postableOnly, includeInactive, ct), cancellationToken);
 
     /// <summary>Search by code or name (Arabic/Persian letters alike), optionally of one type; at most <see cref="MaxSearchResults"/> rows.</summary>
-    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false) =>
+    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(
+        string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false, int skip = 0) =>
         unitOfWork.ExecuteAsync(
-            ct => queries.SearchDetailsAsync(PersianText.Key(search), string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct, costCentersOnly),
+            ct => queries.SearchDetailsAsync(PersianText.Key(search), TypeOrNull(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct, costCentersOnly, Math.Max(0, skip)),
             cancellationToken);
+
+    /// <summary>The number of تفصیل the same search finds, for "1–100 of 9,628" and the next/previous page buttons.</summary>
+    public Task<int> CountDetailsAsync(string? search, string? type, bool includeInactive, bool costCentersOnly, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(ct => queries.CountDetailsAsync(PersianText.Key(search), TypeOrNull(type), includeInactive, costCentersOnly, ct), cancellationToken);
+
+    private static string? TypeOrNull(string? type) => string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type);
 
     /// <summary>One account by code (asked by accounts-svc when a bank account names it).</summary>
     public Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken) =>

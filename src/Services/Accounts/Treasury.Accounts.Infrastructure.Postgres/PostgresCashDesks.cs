@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using Npgsql;
 using NpgsqlTypes;
 using Treasury.Accounts.Application.Abstractions;
@@ -10,7 +11,7 @@ namespace Treasury.Accounts.Infrastructure.Postgres;
 
 public sealed class PostgresCashDeskRepository : ICashDeskRepository
 {
-    private const string Columns = "id, name, ledger_account, holder_detail, detail2, currency, is_active, version";
+    private const string Columns = "id, name, ledger_account, holder_detail, detail2, currency, is_active, version, created_on";
 
     public async Task<CashDesk?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -32,8 +33,8 @@ public sealed class PostgresCashDeskRepository : ICashDeskRepository
         ArgumentNullException.ThrowIfNull(desk);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "INSERT INTO accounts.cash_desk (id, name, name_key, ledger_account, holder_detail, detail2, currency, is_active, version) " +
-            "VALUES (@id, @name, @key, @ledger, @holder, @d2, @currency, @active, 1)"))
+            "INSERT INTO accounts.cash_desk (id, name, name_key, ledger_account, holder_detail, detail2, currency, is_active, version, created_on) " +
+            "VALUES (@id, @name, @key, @ledger, @holder, @d2, @currency, @active, 1, @created_on)"))
         {
             Parameters(cmd, desk);
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -49,7 +50,7 @@ public sealed class PostgresCashDeskRepository : ICashDeskRepository
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
             "UPDATE accounts.cash_desk SET name = @name, name_key = @key, ledger_account = @ledger, holder_detail = @holder, detail2 = @d2, " +
-            "currency = @currency, is_active = @active, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
+            "currency = @currency, is_active = @active, created_on = @created_on, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
         {
             Parameters(cmd, desk);
             cmd.Parameters.AddWithValue("expected", desk.Version);
@@ -79,6 +80,7 @@ public sealed class PostgresCashDeskRepository : ICashDeskRepository
         cmd.Parameters.AddWithValue("holder", d.Data.HolderDetailCode);
         cmd.Parameters.Add(new NpgsqlParameter("d2", NpgsqlDbType.Text) { Value = (object?)d.Data.Detail2Code ?? DBNull.Value });
         cmd.Parameters.Add(new NpgsqlParameter("currency", NpgsqlDbType.Char) { Value = d.Data.CurrencyCode });
+        cmd.Parameters.Add(new NpgsqlParameter("created_on", NpgsqlDbType.Date) { Value = d.Data.CreatedOn is { } c ? c.Value : DBNull.Value });
         cmd.Parameters.AddWithValue("active", d.IsActive);
     }
 
@@ -88,7 +90,8 @@ public sealed class PostgresCashDeskRepository : ICashDeskRepository
         await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
         while (await r.ReadAsync(ct).ConfigureAwait(false))
         {
-            var data = new CashDeskData(r.GetString(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.GetString(5).Trim());
+            var data = new CashDeskData(r.GetString(1), r.GetString(2), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4), r.GetString(5).Trim(),
+                r.IsDBNull(8) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(8)));
             list.Add(CashDesk.Restore(r.GetGuid(0), data, r.GetBoolean(6), r.GetInt64(7)));
         }
 

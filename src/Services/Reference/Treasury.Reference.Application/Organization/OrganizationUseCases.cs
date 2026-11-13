@@ -13,7 +13,13 @@ public sealed record DepartmentForm(int Number, string Name, IReadOnlyList<strin
 public sealed record RequesterForm(int Number, string FullName, Guid DepartmentId, string CostCenterCode);
 
 /// <param name="LegalName">Empty: the title of the تفصیل.</param>
-public sealed record BeneficiaryForm(string DetailCode, string? LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone);
+/// <param name="Kind">Real or legal person; with <paramref name="NationalId"/> (کد ملی or شناسه ملی), address and postal code (report no. 2, item 7).</param>
+public sealed record BeneficiaryForm(
+    string DetailCode, string? LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone,
+    BeneficiaryKind Kind = BeneficiaryKind.Natural, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null)
+{
+    public BeneficiaryIdentity Identity => new(Kind, NationalId, PostalAddress, PostalCode);
+}
 
 /// <summary>Switch on/off or delete; <paramref name="Change"/> is "activate", "deactivate" or "delete".</summary>
 public sealed record OrganizationStateCommand(string IdempotencyKey, Guid Id, string Change, long ExpectedVersion);
@@ -31,7 +37,7 @@ public sealed record RequesterView(Guid Id, int Number, string FullName, Guid De
 /// <param name="DetailName">Title of the تفصیل in the accounting system's list (may differ from the legal name).</param>
 public sealed record BeneficiaryView(
     Guid Id, string DetailCode, string? DetailName, string LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone,
-    bool IsActive, bool IsInUse, long Version);
+    bool IsActive, bool IsInUse, long Version, BeneficiaryKind? Kind = null, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null);
 
 /// <summary>
 /// Departments (manual item 12), requesters (13) and beneficiaries (14). Each write is one command in one transaction on one
@@ -171,7 +177,7 @@ public sealed class OrganizationUseCases(
         return await RunAsync(key, async ct =>
         {
             var (detail, bank, bankForm) = await BeneficiaryFactsAsync(form, ct).ConfigureAwait(false);
-            var beneficiary = Beneficiary.Register(Guid.NewGuid(), form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone);
+            var beneficiary = Beneficiary.Register(Guid.NewGuid(), form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity);
             if (await BeneficiaryTakenAsync(beneficiary, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Beneficiary.DetailTaken", $"تفصیل {beneficiary.DetailCode} is already a beneficiary.");
@@ -194,7 +200,7 @@ public sealed class OrganizationUseCases(
         {
             var beneficiary = Check(await organization.GetBeneficiaryAsync(id, ct).ConfigureAwait(false), expectedVersion, "Beneficiary.NotFound", id);
             var (detail, bank, bankForm) = await BeneficiaryFactsAsync(form, ct).ConfigureAwait(false);
-            beneficiary.Edit(form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone);
+            beneficiary.Edit(form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity);
             if (await BeneficiaryTakenAsync(beneficiary, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Beneficiary.DetailTaken", $"تفصیل {beneficiary.DetailCode} is already a beneficiary.");
@@ -272,7 +278,8 @@ public sealed class OrganizationUseCases(
             foreach (var b in (await organization.ListBeneficiariesAsync(includeInactive, ct).ConfigureAwait(false)).OrderBy(b => b.LegalName, PersianOrder))
             {
                 var detail = await ledger.DetailAsync(b.DetailCode, ct).ConfigureAwait(false);
-                list.Add(new(b.Id, b.DetailCode, detail?.Name, b.LegalName, b.Bank.BankId, b.Bank.BranchName, b.Bank.AccountNumber, b.Bank.Sheba, b.Phone, b.IsActive, b.IsInUse, b.Version));
+                list.Add(new(b.Id, b.DetailCode, detail?.Name, b.LegalName, b.Bank.BankId, b.Bank.BranchName, b.Bank.AccountNumber, b.Bank.Sheba, b.Phone, b.IsActive, b.IsInUse, b.Version,
+                    b.Identity?.Kind, b.Identity?.NationalId, b.Identity?.PostalAddress, b.Identity?.PostalCode));
             }
 
             return list;

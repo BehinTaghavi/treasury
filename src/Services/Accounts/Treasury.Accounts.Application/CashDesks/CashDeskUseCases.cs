@@ -8,7 +8,8 @@ using Treasury.BuildingBlocks.Domain;
 namespace Treasury.Accounts.Application.CashDesks;
 
 /// <summary>The cash desk form as sent by the screen.</summary>
-public sealed record CashDeskForm(string Name, string LedgerAccountCode, string HolderDetailCode, string? Detail2Code, bool IsForeignCurrency, string? CurrencyCode);
+/// <param name="CreatedOn">Jalali date the cash desk was set up, e.g. 1405/08/22 (owner's report no. 2, item 11).</param>
+public sealed record CashDeskForm(string Name, string LedgerAccountCode, string HolderDetailCode, string? Detail2Code, bool IsForeignCurrency, string? CurrencyCode, string? CreatedOn = null);
 
 public sealed record RegisterCashDeskCommand(string IdempotencyKey, CashDeskForm Form);
 
@@ -18,7 +19,7 @@ public sealed record SetCashDeskActiveCommand(string IdempotencyKey, Guid Id, bo
 
 /// <param name="HolderName">Name of the holder's تفصیل (manual: "نام ... از طریق انتخاب حساب تفصیل مربوط در این فیلد پر می شود").</param>
 public sealed record CashDeskView(
-    Guid Id, string Name, string LedgerAccountCode, string HolderDetailCode, string? HolderName, string? Detail2Code, string CurrencyCode, bool IsActive, long Version);
+    Guid Id, string Name, string LedgerAccountCode, string HolderDetailCode, string? HolderName, string? Detail2Code, string CurrencyCode, bool IsActive, long Version, string? CreatedOn);
 
 /// <summary>Use cases of the company's cash desks (manual item 10). Each write is one command in one transaction.</summary>
 public sealed class CashDeskUseCases(IUnitOfWork unitOfWork, ICashDeskRepository desks, IReferenceLookup reference, IIdempotencyStore idempotency)
@@ -91,7 +92,7 @@ public sealed class CashDeskUseCases(IUnitOfWork unitOfWork, ICashDeskRepository
                 // reference-svc cannot answer now: the list still shows, without the holder's name.
             }
 
-            views.Add(new(d.Id, d.Data.Name, d.Data.LedgerAccountCode, d.Data.HolderDetailCode, holder, d.Data.Detail2Code, d.Data.CurrencyCode, d.IsActive, d.Version));
+            views.Add(new(d.Id, d.Data.Name, d.Data.LedgerAccountCode, d.Data.HolderDetailCode, holder, d.Data.Detail2Code, d.Data.CurrencyCode, d.IsActive, d.Version, d.Data.CreatedOn?.ToJalaliString()));
         }
 
         return views;
@@ -141,7 +142,8 @@ public sealed class CashDeskUseCases(IUnitOfWork unitOfWork, ICashDeskRepository
             }
         }
 
-        var data = new CashDeskData(form.Name, form.LedgerAccountCode, form.HolderDetailCode, form.Detail2Code, currencyCode);
+        var data = new CashDeskData(form.Name, form.LedgerAccountCode, form.HolderDetailCode, form.Detail2Code, currencyCode,
+            string.IsNullOrWhiteSpace(form.CreatedOn) ? null : FiscalDate.ParseJalali(form.CreatedOn));
         return (data, new LedgerFacts(accounts, details), currencyId);
     }
 

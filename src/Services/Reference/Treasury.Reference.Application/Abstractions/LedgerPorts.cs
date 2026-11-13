@@ -29,7 +29,11 @@ public interface ILedgerQueries
 
     /// <param name="searchKey">PersianText.Key of the search text; matched against code and name. Empty: no filter.</param>
     /// <param name="costCentersOnly">Only تفصیل marked as cost centres (departments and requesters choose from them).</param>
-    Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false);
+    /// <param name="skip">Rows to leave out first (page by page browsing of the whole list, owner's report no. 2, item 2).</param>
+    Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false, int skip = 0);
+
+    /// <summary>How many تفصیل match the same filters as <see cref="SearchDetailsAsync"/>.</summary>
+    Task<int> CountDetailsAsync(string searchKey, string? type, bool includeInactive, bool costCentersOnly, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken);
 

@@ -403,3 +403,35 @@ def test_a_cheque_book_keeps_the_digits_of_its_serial(db):
         with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
                 c.execute(add, (uuid.uuid4(), uuid.uuid4(), 0))
+
+
+def test_petty_cash_ceiling_at_most_limit_below_amount_and_top_up_by_card(db):
+    # 018_accounts_petty_cash_and_cash_desk_details.sql (owner's report no. 2, items 4, 11, 12, 13).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        add = """INSERT INTO accounts.petty_cash (id, holder_detail, ledger_account, amount, settle_limit, pay_ceiling, recovery, created_on, keeping)
+                 VALUES (%s, %s, '1102', %s, %s, %s, %s, '2026-11-13', '{"Cash": true}')"""
+        c.execute(add, (uuid.uuid4(), "881001", 1000, 800, 800, "BankCard"))
+        for holder, amount, limit, ceiling in [("881002", 1000, 1000, 100), ("881003", 1000, 500, 600)]:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), holder, amount, limit, ceiling, "Cash"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "881004", 1000, 800, 100, "Transfer"))
+        c.rollback()
+
+
+def test_a_beneficiary_keeps_a_ten_or_eleven_digit_national_id_and_a_ten_digit_postal_code(db):
+    # 019_reference_beneficiary_identity.sql (owner's report no. 2, item 7).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        add = """INSERT INTO reference.beneficiary (id, detail_code, legal_name, person_kind, national_id, postal_code)
+                 VALUES (%s, %s, 'ذینفع', %s, %s, %s)"""
+        c.execute(add, (uuid.uuid4(), "882001", "Natural", "0084575948", "1234567890"))
+        c.execute(add, (uuid.uuid4(), "882002", "Legal", "10101010103", None))
+        for detail, kind, nid, postal in [("882003", "Other", "0084575948", None), ("882004", "Natural", "12345", None), ("882005", "Natural", "0084575948", "123")]:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), detail, kind, nid, postal))
+        c.rollback()

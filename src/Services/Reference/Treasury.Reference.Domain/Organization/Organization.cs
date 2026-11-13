@@ -255,6 +255,19 @@ public sealed record RequesterDeleted(Guid RequesterId) : DomainEvent;
 /// <summary>The bank details of a beneficiary as typed on the form.</summary>
 public sealed record BeneficiaryBank(Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba);
 
+/// <summary>Real person (شخص حقیقی) or legal person (شخص حقوقی, a company or organisation).</summary>
+public enum BeneficiaryKind
+{
+    Natural,
+    Legal,
+}
+
+/// <summary>
+/// Who the beneficiary is (owner's report no. 2, item 7): a real person's national code (کد ملی, 10 digits) or a legal person's
+/// national ID (شناسه ملی, 11 digits) – required, checked with their check digit – and the postal address and 10-digit postal code.
+/// </summary>
+public sealed record BeneficiaryIdentity(BeneficiaryKind Kind, string? NationalId, string? PostalAddress, string? PostalCode);
+
 /// <summary>
 /// A beneficiary (ذینفع), new-version manual item 14: the تفصیل (the beneficiary must exist in the accounting system first), the
 /// registered legal title printed on cheques (by default the تفصیل title), bank, branch, account number, Sheba (شبا: needed when the
@@ -264,9 +277,12 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
 {
     public const int MaxNameLength = 150;
 
-    private Beneficiary(Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone)
+    public const int MaxAddressLength = 300;
+
+    private Beneficiary(Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, BeneficiaryIdentity? identity)
         : base(id)
     {
+        Identity = identity;
         DetailCode = detailCode;
         LegalName = legalName;
         Bank = bank;
@@ -283,29 +299,35 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
 
     public string? Phone { get; private set; }
 
+    /// <summary>National code or ID, address and postal code; empty only on beneficiaries saved before report no. 2.</summary>
+    public BeneficiaryIdentity? Identity { get; private set; }
+
     public bool IsActive { get; private set; }
 
     /// <summary>A payment request or issued cheque names this beneficiary; then it is never deleted.</summary>
     public bool IsInUse { get; private set; }
 
     /// <param name="bank">The beneficiary's bank as loaded by the use case (a bank-name entry); null when none was chosen.</param>
-    public static Beneficiary Register(Guid id, string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone)
+    public static Beneficiary Register(
+        Guid id, string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity)
     {
         var v = Validate(detailCode, detail, legalName, form, bank, phone, null);
-        var b = new Beneficiary(id, v.Code, v.Name, v.Bank, v.Phone);
+        var b = new Beneficiary(id, v.Code, v.Name, v.Bank, v.Phone, CheckIdentity(identity));
         b.Raise(BeneficiaryChanged.From(b));
         return b;
     }
 
-    public void Edit(string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone)
+    public void Edit(string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity)
     {
         var v = Validate(detailCode, detail, legalName, form, bank, phone, this);
-        if (v == (DetailCode, LegalName, Bank, Phone))
+        var id = CheckIdentity(identity);
+        if (v == (DetailCode, LegalName, Bank, Phone) && id == Identity)
         {
             return;
         }
 
         (DetailCode, LegalName, Bank, Phone) = v;
+        Identity = id;
         Raise(BeneficiaryChanged.From(this));
     }
 
@@ -330,9 +352,10 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
         Raise(new BeneficiaryDeleted(Id));
     }
 
-    public static Beneficiary Restore(Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, bool isActive, bool isInUse, long version)
+    public static Beneficiary Restore(
+        Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, bool isActive, bool isInUse, long version, BeneficiaryIdentity? identity = null)
     {
-        var b = new Beneficiary(id, detailCode, legalName, bank, phone) { IsActive = isActive, IsInUse = isInUse };
+        var b = new Beneficiary(id, detailCode, legalName, bank, phone, identity) { IsActive = isActive, IsInUse = isInUse };
         b.SetLoadedVersion(version);
         return b;
     }
@@ -357,6 +380,72 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
         // Move "IR" and the check digits to the end, letters as numbers (I=18, R=27), remainder mod 97 must be 1.
         var rearranged = digits[4..] + "1827" + digits[2..4];
         return BigInteger.Parse(rearranged, System.Globalization.CultureInfo.InvariantCulture) % 97 == 1 ? digits : null;
+    }
+
+    /// <summary>
+    /// Iranian national code (کد ملی): 10 digits; the last is a check digit. s = Σ digit(i)·(10−i) for the first nine; with
+    /// r = s mod 11 the check digit is r when r &lt; 2, otherwise 11 − r. Ten equal digits are refused.
+    /// </summary>
+    public static bool IsNationalCode(string digits)
+    {
+        if (digits.Length != 10 || !digits.All(char.IsAsciiDigit) || digits.Distinct().Count() == 1)
+        {
+            return false;
+        }
+
+        var s = 0;
+        for (var i = 0; i < 9; i++)
+        {
+            s += (digits[i] - '0') * (10 - i);
+        }
+
+        var r = s % 11;
+        return digits[9] - '0' == (r < 2 ? r : 11 - r);
+    }
+
+    /// <summary>
+    /// National ID of a legal person (شناسه ملی): 11 digits; the last is a check digit. With d = 10th digit + 2 and weights
+    /// 29, 27, 23, 19, 17 (twice), s = Σ (digit(i) + d)·weight(i) for the first ten; the check digit is s mod 11 (10 counts as 0).
+    /// </summary>
+    public static bool IsLegalNationalId(string digits)
+    {
+        if (digits.Length != 11 || !digits.All(char.IsAsciiDigit) || digits.Distinct().Count() == 1)
+        {
+            return false;
+        }
+
+        int[] weights = [29, 27, 23, 19, 17, 29, 27, 23, 19, 17];
+        var d = digits[9] - '0' + 2;
+        var s = 0;
+        for (var i = 0; i < 10; i++)
+        {
+            s += (digits[i] - '0' + d) * weights[i];
+        }
+
+        var r = s % 11;
+        return digits[10] - '0' == (r == 10 ? 0 : r);
+    }
+
+    private static BeneficiaryIdentity CheckIdentity(BeneficiaryIdentity? identity)
+    {
+        var kind = identity?.Kind ?? BeneficiaryKind.Natural;
+        var id = PersianText.Key(identity?.NationalId).Replace("-", string.Empty, StringComparison.Ordinal);
+        if (kind == BeneficiaryKind.Natural)
+        {
+            Rules.Require(id.Length > 0, "Beneficiary.NationalCodeRequired", "The national code (کد ملی) of a real person is required.");
+            Rules.Require(IsNationalCode(id), "Beneficiary.NationalCodeInvalid", "The national code has 10 digits and a valid check digit.");
+        }
+        else
+        {
+            Rules.Require(id.Length > 0, "Beneficiary.LegalIdRequired", "The national ID (شناسه ملی) of a legal person is required.");
+            Rules.Require(IsLegalNationalId(id), "Beneficiary.LegalIdInvalid", "The national ID has 11 digits and a valid check digit.");
+        }
+
+        var address = Rules.Optional(identity?.PostalAddress);
+        Rules.Require(address is null || address.Length <= MaxAddressLength, "Beneficiary.AddressTooLong", $"An address has at most {MaxAddressLength} characters.");
+        var postal = Rules.Optional(identity?.PostalCode) is { } p ? PersianText.Key(p).Replace("-", string.Empty, StringComparison.Ordinal) : null;
+        Rules.Require(postal is null || (postal.Length == 10 && postal.All(char.IsAsciiDigit)), "Beneficiary.PostalCodeInvalid", "A postal code has 10 digits.");
+        return new BeneficiaryIdentity(kind, id, address, postal);
     }
 
     private static (string Code, string Name, BeneficiaryBank Bank, string? Phone) Validate(

@@ -52,12 +52,12 @@ public sealed class BankAccountPostgresTests : IDisposable
     {
         var desks = new Treasury.Accounts.Application.CashDesks.CashDeskUseCases(
             new PostgresUnitOfWork(_dataSource), new PostgresCashDeskRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
-        var form = new Treasury.Accounts.Application.CashDesks.CashDeskForm("صندوق " + _tag, "130100", "111078", null, false, null);
+        var form = new Treasury.Accounts.Application.CashDesks.CashDeskForm("صندوق " + _tag, "130100", "111078", null, false, null, "1405/08/22");
         var r = await desks.RegisterAsync(new(Key(), form), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         Assert.Equal("CashDesk.NameTaken", (await desks.RegisterAsync(new(Key(), form with { Name = "صندوق  " + _tag }), CancellationToken.None)).ErrorCode);
         var v = (await desks.ListAsync(true, CancellationToken.None)).Single(d => d.Id == r.Value);
-        Assert.Equal(("130100", "111078", "IRR", 1L), (v.LedgerAccountCode, v.HolderDetailCode, v.CurrencyCode, v.Version));
+        Assert.Equal(("130100", "111078", "IRR", 1L, "1405/08/22"), (v.LedgerAccountCode, v.HolderDetailCode, v.CurrencyCode, v.Version, v.CreatedOn));
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE type = 'CashDeskChanged' AND payload->>'CashDeskId' = @id", ("id", r.Value.ToString())));
     }
 
@@ -68,7 +68,8 @@ public sealed class BankAccountPostgresTests : IDisposable
             new PostgresUnitOfWork(_dataSource), new PostgresPettyCashRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
         // One petty cash per holder and the test database is kept between runs: register once, then change.
         var form = new Treasury.Accounts.Application.PettyCash.PettyCashForm(
-            "111078", "130100", 75_000_000_000, 60_000_000_000, 1_000_000_000, [FakeReference.Expenses], Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.Cheque);
+            "111078", "130100", 75_000_000_000, 60_000_000_000, 1_000_000_000, [FakeReference.Expenses], Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.BankCard,
+            "1405/08/22", new Treasury.Accounts.Domain.PettyCash.PettyCashKeeping(true, "جاری تنخواه", "0101-555", true, true, "علی رضایی", "6037991234567893"));
         var existing = (await funds.ListAsync(true, CancellationToken.None)).FirstOrDefault(f => f.HolderDetailCode == "111078");
         var r = existing is null
             ? await funds.RegisterAsync(Key(), form, CancellationToken.None)
@@ -77,6 +78,7 @@ public sealed class BankAccountPostgresTests : IDisposable
         var v = (await funds.ListAsync(true, CancellationToken.None)).Single(f => f.Id == r.Value);
         Assert.Equal((75_000_000_000m, 60_000_000_000m, 1_000_000_000m), (v.Amount, v.SettleLimit, v.PayCeiling));
         Assert.Equal([FakeReference.Expenses], v.AllowedPurposeGroupIds);
+        Assert.Equal(("1405/08/22", "6037991234567893", Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.BankCard), (v.CreatedOn, v.Keeping!.CardNumber, v.Recovery));
         Assert.Equal("PettyCash.HolderTaken", (await funds.RegisterAsync(Key(), form, CancellationToken.None)).ErrorCode);
     }
 

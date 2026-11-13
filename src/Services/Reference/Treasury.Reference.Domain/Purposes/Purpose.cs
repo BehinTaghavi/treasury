@@ -68,11 +68,11 @@ public sealed class Purpose : AggregateRoot<Guid>
         return true;
     }
 
-    public void Delete()
-    {
-        Require(!IsInUse, "Purpose.InUse", "The purpose is already used and cannot be deleted; switch it off instead.");
-        Raise(new PurposeDeleted(Id));
-    }
+    /// <summary>
+    /// A purpose may be deleted or corrected even after it was used (owner's report no. 2, item 10): receipts, cheques and vouchers
+    /// keep the purpose text they were saved with, so their history does not change.
+    /// </summary>
+    public void Delete() => Raise(new PurposeDeleted(Id));
 
     public static Purpose Restore(Guid id, Guid groupId, string name, bool isActive, bool isInUse, long version)
     {

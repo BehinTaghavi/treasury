@@ -6,7 +6,8 @@ namespace Treasury.Accounts.Domain.CashDesks;
 
 /// <summary>Everything the user enters on the cash desk form.</summary>
 /// <param name="HolderDetailCode">تفصیل of the person who holds the cash desk; their name comes from it.</param>
-public sealed record CashDeskData(string Name, string LedgerAccountCode, string HolderDetailCode, string? Detail2Code, string CurrencyCode);
+/// <param name="CreatedOn">Date the cash desk was set up (owner's report no. 2, item 11); empty only on rows saved before it existed.</param>
+public sealed record CashDeskData(string Name, string LedgerAccountCode, string HolderDetailCode, string? Detail2Code, string CurrencyCode, FiscalDate? CreatedOn = null);
 
 /// <summary>
 /// A cash desk (صندوق) of the company, new-version manual item 10 "تعریف مشخصات دارندگان صندوق": the holder's تفصیل (the
@@ -83,6 +84,7 @@ public sealed partial class CashDesk : AggregateRoot<Guid>
         Require(name.Length <= MaxNameLength, "CashDesk.NameTooLong", $"A name has at most {MaxNameLength} characters.");
         var currency = (data.CurrencyCode ?? string.Empty).Trim().ToUpperInvariant();
         Require(CurrencyPattern().IsMatch(currency), "CashDesk.CurrencyInvalid", "The currency is a three-letter code; the Rial is IRR.");
+        Require(data.CreatedOn is not null, "CashDesk.CreatedOnRequired", "The date the cash desk was set up is required.");
 
         var accountCode = Clean(data.LedgerAccountCode) ?? throw new DomainException("CashDesk.LedgerAccountRequired", "The ledger account (معین) of the cash desk is required.");
         var account = ledger.Account(accountCode);
@@ -99,7 +101,7 @@ public sealed partial class CashDesk : AggregateRoot<Guid>
             CheckDetail(account.Detail2Types, d2, ledger.Detail(d2), before?.Detail2Code, accountCode);
         }
 
-        return new CashDeskData(name, accountCode, holder, d2, currency);
+        return new CashDeskData(name, accountCode, holder, d2, currency, data.CreatedOn);
     }
 
     /// <summary>Same rule as for bank accounts (owner, 10 Nov 2026): a تفصیل of a type the account does not allow is refused.</summary>

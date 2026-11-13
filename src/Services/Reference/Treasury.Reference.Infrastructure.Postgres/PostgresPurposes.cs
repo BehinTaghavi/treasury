@@ -156,7 +156,7 @@ public sealed class PostgresPurposeRepository : IPurposeRepository
     public async Task DeletePurposeAsync(Purpose purpose, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(purpose);
-        await using (var cmd = Command("DELETE FROM reference.purpose WHERE id = @id AND version = @expected AND NOT in_use"))
+        await using (var cmd = Command("DELETE FROM reference.purpose WHERE id = @id AND version = @expected"))
         {
             cmd.Parameters.AddWithValue("id", purpose.Id);
             cmd.Parameters.AddWithValue("expected", purpose.Version);

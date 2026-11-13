@@ -29,7 +29,8 @@ export function createApi(options: ApiOptions = {}) {
   async function handle<T>(res: Response): Promise<ApiResult<T>> {
     if (res.ok) {
       const body = await res.json()
-      return 'value' in body ? { ok: true, value: body.value as T, warnings: body.warnings ?? [] } : { ok: true, value: body as T, warnings: [] }
+      // A bare number or text (e.g. a count) is a value too.
+      return typeof body === 'object' && body !== null && 'value' in body ? { ok: true, value: body.value as T, warnings: body.warnings ?? [] } : { ok: true, value: body as T, warnings: [] }
     }
     let code = 'Unknown'
     try {

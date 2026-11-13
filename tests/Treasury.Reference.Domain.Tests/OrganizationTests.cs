@@ -67,10 +67,45 @@ public sealed class OrganizationTests
     public void A_beneficiary_takes_the_detail_title_as_legal_name_unless_another_is_typed()
     {
         var bank = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Bank, "بانک ملت");
-        var b = Beneficiary.Register(Guid.NewGuid(), "111078", Facts["111078"], null, new(bank.Id, "شعبه بازار", "0101-55", "ir46 0120 0000 0000 3123 4567 89"), bank, "۰۲۱-۸۸۸۸۸۸۸۸");
+        var b = Beneficiary.Register(Guid.NewGuid(), "111078", Facts["111078"], null, new(bank.Id, "شعبه بازار", "0101-55", "ir46 0120 0000 0000 3123 4567 89"), bank, "۰۲۱-۸۸۸۸۸۸۸۸", Company);
         Assert.Equal(("شرکت نمونه بازرگانی", "IR460120000000003123456789"), (b.LegalName, b.Bank.Sheba));
-        b.Edit("111078", Facts["111078"], "شرکت نمونه بازرگانی (سهامی خاص)", b.Bank with { Sheba = b.Bank.Sheba }, bank, null);
+        b.Edit("111078", Facts["111078"], "شرکت نمونه بازرگانی (سهامی خاص)", b.Bank with { Sheba = b.Bank.Sheba }, bank, null, Company);
         Assert.Equal("شرکت نمونه بازرگانی (سهامی خاص)", b.LegalName);
+    }
+
+    private static readonly BeneficiaryIdentity Person = new(BeneficiaryKind.Natural, "0084575948", null, null);
+    private static readonly BeneficiaryIdentity Company = new(BeneficiaryKind.Legal, "10101010103", "تهران، خیابان آزادی، پلاک ۱", "1234567890");
+
+    [Theory]
+    [InlineData("0084575948", true)]
+    [InlineData("۰۰۸۴۵۷۵۹۴۸", true)]
+    [InlineData("1234567891", true)]
+    [InlineData("0084575949", false)]
+    [InlineData("1111111111", false)]
+    [InlineData("008457594", false)]
+    public void The_national_code_of_a_real_person_has_ten_digits_and_a_check_digit_owner_report_2(string typed, bool valid) =>
+        Assert.Equal(valid, Beneficiary.IsNationalCode(Treasury.BuildingBlocks.Domain.PersianText.Key(typed)));
+
+    [Theory]
+    [InlineData("10101010103", true)]
+    [InlineData("14003628900", true)]
+    [InlineData("10101010104", false)]
+    [InlineData("1010101010", false)]
+    public void The_national_id_of_a_legal_person_has_eleven_digits_and_a_check_digit_owner_report_2(string typed, bool valid) =>
+        Assert.Equal(valid, Beneficiary.IsLegalNationalId(typed));
+
+    [Fact]
+    public void A_beneficiary_needs_its_national_code_or_id_and_a_ten_digit_postal_code_owner_report_2()
+    {
+        var detail = Facts["111078"];
+        Beneficiary Make(BeneficiaryIdentity? id) => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, null, null), null, null, id);
+        Assert.Equal("Beneficiary.NationalCodeRequired", Code(() => Make(null)));
+        Assert.Equal("Beneficiary.NationalCodeInvalid", Code(() => Make(Person with { NationalId = "0084575949" })));
+        Assert.Equal("Beneficiary.LegalIdRequired", Code(() => Make(Company with { NationalId = " " })));
+        Assert.Equal("Beneficiary.LegalIdInvalid", Code(() => Make(Company with { NationalId = "0084575948" })));
+        Assert.Equal("Beneficiary.PostalCodeInvalid", Code(() => Make(Person with { PostalCode = "12345" })));
+        var b = Make(Company with { PostalCode = "۱۲۳۴۵-۶۷۸۹۰" });
+        Assert.Equal(new BeneficiaryIdentity(BeneficiaryKind.Legal, "10101010103", "تهران، خیابان آزادی، پلاک ۱", "1234567890"), b.Identity);
     }
 
     [Fact]
@@ -78,11 +113,11 @@ public sealed class OrganizationTests
     {
         var bank = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Bank, "بانک ملت");
         var detail = Facts["111078"];
-        Assert.Equal("Beneficiary.DetailNotFound", Code(() => Beneficiary.Register(Guid.NewGuid(), "555555", null, null, new(null, null, null, null), null, null)));
-        Assert.Equal("Beneficiary.ShebaInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, null, "IR47"), null, null)));
-        Assert.Equal("Beneficiary.BankRequired", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, "0101-55", null), null, null)));
-        Assert.Equal("Beneficiary.AccountNumberInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(bank.Id, null, "abc", null), bank, null)));
-        Assert.Equal("Beneficiary.PhoneInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, null, null), null, "12")));
-        Assert.Equal("Beneficiary.BankNotFound", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(Guid.NewGuid(), null, null, null), null, null)));
+        Assert.Equal("Beneficiary.DetailNotFound", Code(() => Beneficiary.Register(Guid.NewGuid(), "555555", null, null, new(null, null, null, null), null, null, Person)));
+        Assert.Equal("Beneficiary.ShebaInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, null, "IR47"), null, null, Person)));
+        Assert.Equal("Beneficiary.BankRequired", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, "0101-55", null), null, null, Person)));
+        Assert.Equal("Beneficiary.AccountNumberInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(bank.Id, null, "abc", null), bank, null, Person)));
+        Assert.Equal("Beneficiary.PhoneInvalid", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(null, null, null, null), null, "12", Person)));
+        Assert.Equal("Beneficiary.BankNotFound", Code(() => Beneficiary.Register(Guid.NewGuid(), "111078", detail, null, new(Guid.NewGuid(), null, null, null), null, null, Person)));
     }
 }

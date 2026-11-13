@@ -61,14 +61,16 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
 
     public Task AddBeneficiaryAsync(Beneficiary beneficiary, CancellationToken cancellationToken) =>
         WriteAsync(beneficiary, null,
-            "INSERT INTO reference.beneficiary (id, detail_code, legal_name, bank_id, branch_name, account_number, sheba, phone, is_active, in_use) " +
-            "VALUES (@id, @detail, @name, @bank, @branch, @account, @sheba, @phone, @active, @in_use)",
+            "INSERT INTO reference.beneficiary (id, detail_code, legal_name, bank_id, branch_name, account_number, sheba, phone, is_active, in_use, person_kind, national_id, postal_address, postal_code) " +
+            "VALUES (@id, @detail, @name, @bank, @branch, @account, @sheba, @phone, @active, @in_use, @kind, @national_id, @address, @postal)",
             cmd => BeneficiaryParameters(cmd, beneficiary), cancellationToken);
 
     public Task SaveBeneficiaryAsync(Beneficiary beneficiary, CancellationToken cancellationToken) =>
         WriteAsync(beneficiary, beneficiary.Version,
             "UPDATE reference.beneficiary SET detail_code = @detail, legal_name = @name, bank_id = @bank, branch_name = @branch, account_number = @account, " +
-            "sheba = @sheba, phone = @phone, is_active = @active, in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected",
+            "sheba = @sheba, phone = @phone, is_active = @active, in_use = @in_use, " +
+            "person_kind = @kind, national_id = @national_id, postal_address = @address, postal_code = @postal, version = version + 1, updated_at = now() " +
+            "WHERE id = @id AND version = @expected",
             cmd => BeneficiaryParameters(cmd, beneficiary), cancellationToken);
 
     public Task DeleteBeneficiaryAsync(Beneficiary beneficiary, CancellationToken cancellationToken) =>
@@ -110,6 +112,10 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
         cmd.Parameters.Add(new NpgsqlParameter("phone", NpgsqlDbType.Text) { Value = (object?)b.Phone ?? DBNull.Value });
         cmd.Parameters.AddWithValue("active", b.IsActive);
         cmd.Parameters.AddWithValue("in_use", b.IsInUse);
+        cmd.Parameters.Add(new NpgsqlParameter("kind", NpgsqlDbType.Text) { Value = (object?)b.Identity?.Kind.ToString() ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("national_id", NpgsqlDbType.Text) { Value = (object?)b.Identity?.NationalId ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("address", NpgsqlDbType.Text) { Value = (object?)b.Identity?.PostalAddress ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("postal", NpgsqlDbType.Text) { Value = (object?)b.Identity?.PostalCode ?? DBNull.Value });
     }
 
     /// <summary>Insert (expected null) or version-checked update, then the pending events into the outbox.</summary>
@@ -199,7 +205,8 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
     private static async Task<IReadOnlyList<Beneficiary>> ReadBeneficiariesAsync(string where, Guid? id, CancellationToken ct)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            $"SELECT id, detail_code, legal_name, bank_id, branch_name, account_number, sheba, phone, is_active, in_use, version FROM reference.beneficiary {where}");
+            $"SELECT id, detail_code, legal_name, bank_id, branch_name, account_number, sheba, phone, is_active, in_use, version, " +
+            $"person_kind, national_id, postal_address, postal_code FROM reference.beneficiary {where}");
         if (id is { } i)
         {
             cmd.Parameters.AddWithValue("id", i);
@@ -211,7 +218,8 @@ public sealed class PostgresOrganizationRepository : IOrganizationRepository
         {
             string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
             var bank = new BeneficiaryBank(r.IsDBNull(3) ? null : r.GetGuid(3), S(4), S(5), S(6));
-            list.Add(Beneficiary.Restore(r.GetGuid(0), r.GetString(1), r.GetString(2), bank, S(7), r.GetBoolean(8), r.GetBoolean(9), r.GetInt64(10)));
+            list.Add(Beneficiary.Restore(r.GetGuid(0), r.GetString(1), r.GetString(2), bank, S(7), r.GetBoolean(8), r.GetBoolean(9), r.GetInt64(10),
+                S(11) is { } kind ? new BeneficiaryIdentity(Enum.Parse<BeneficiaryKind>(kind), S(12), S(13), S(14)) : null));
         }
 
         return list;

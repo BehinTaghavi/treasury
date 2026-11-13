@@ -51,8 +51,11 @@ public static class LedgerEndpoints
         api.MapPut("/accounts/{code}/detail-types", async (string code, DetailTypesRequest r, HttpRequest http, LedgerUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.SetDetailTypesAsync(new SetDetailTypesCommand(Key(http), code, r.Detail1Types ?? [], r.Detail2Types ?? []), ct).ConfigureAwait(false)));
 
-        api.MapGet("/details", async (string? search, string? type, bool? includeInactive, int? take, bool? costCentersOnly, LedgerUseCases useCases, CancellationToken ct) =>
-            Results.Ok(await useCases.SearchDetailsAsync(search, type, includeInactive ?? false, take ?? 100, ct, costCentersOnly ?? false).ConfigureAwait(false)));
+        api.MapGet("/details", async (string? search, string? type, bool? includeInactive, int? take, bool? costCentersOnly, int? skip, LedgerUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.SearchDetailsAsync(search, type, includeInactive ?? false, take ?? 100, ct, costCentersOnly ?? false, skip ?? 0).ConfigureAwait(false)));
+
+        api.MapGet("/details-count", async (string? search, string? type, bool? includeInactive, bool? costCentersOnly, LedgerUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.CountDetailsAsync(search, type, includeInactive ?? false, costCentersOnly ?? false, ct).ConfigureAwait(false)));
 
         api.MapGet("/accounts/{code}", async (string code, LedgerUseCases useCases, CancellationToken ct) =>
             await useCases.AccountAsync(code, ct).ConfigureAwait(false) is { } a ? Results.Ok(a) : Results.NotFound());

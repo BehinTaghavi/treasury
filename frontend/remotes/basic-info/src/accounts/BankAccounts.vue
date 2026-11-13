@@ -60,10 +60,15 @@ const name = (list: { id: string; name: string }[], id: string | null) => list.f
 const ledgerName = (code: string | null) => ledger.value.find(a => a.code === code)?.name ?? ''
 const chosenLedger = computed(() => ledger.value.find(a => a.code === form.ledgerAccountCode))
 const foreignCurrencies = computed(() => currencies.value.filter(c => c.isActive && c.code !== 'IRR'))
-// MVC BanksController: main account of the same bank, not a backup, and without a backup yet.
+// MVC BanksController: a current (main) account, not a backup itself and without a backup yet. Owner's report no. 2, item 3:
+// «پشتیبان» is ticked first, at the top of the form; the main account is chosen next and the backup takes its bank, branch and
+// city. With no such current account the owner's message shows and the rest of the form stays locked, so nothing is saved.
 const mainChoices = computed(() => accounts.value.filter(a =>
-  a.isActive && !a.mainAccountId && a.bankId === form.bankId && !accounts.value.some(b => b.mainAccountId === a.id)))
+  a.isActive && !a.mainAccountId && !accounts.value.some(b => b.mainAccountId === a.id)))
 const backupBlocked = computed(() => form.isBackup && !editing.value && !mainChoices.value.length)
+const mainLabel = (a: BankAccount) => `${a.accountNumber} – ${name(banks.value, a.bankId)}${a.branchName ? ' – ' + a.branchName : ''}${a.currencyCode !== 'IRR' ? ' (' + a.currencyCode + ')' : ''}`
+/** The rest of the form waits until the main account of a backup is chosen. */
+const restLocked = computed(() => backupBlocked.value || (form.isBackup && !editing.value && !form.mainAccountId))
 
 const toChoices = (list: Entry[]): Choice[] => list.filter(e => e.isActive).map(e => ({ value: e.id, label: e.name }))
 const bankChoices = computed(() => toChoices(banks.value))
@@ -130,6 +135,22 @@ let timer: ReturnType<typeof setTimeout> | undefined
 function onDetailSearch(position: 1 | 2, text: string) {
   clearTimeout(timer)
   timer = setTimeout(() => searchDetails(position, text), 250)
+}
+
+/** A backup account is at the bank and branch of its main account (owner's report no. 1, item 10). */
+watch(() => form.mainAccountId, id => {
+  const main = accounts.value.find(a => a.id === id)
+  if (!main || editing.value) return
+  Object.assign(form, {
+    bankId: main.bankId, branchName: main.branchName ?? '', branchCode: main.branchCode ?? '', cityId: main.cityId ?? '',
+    provinceId: cities.value.find(c => c.id === main.cityId)?.parentId ?? '',
+  })
+})
+
+/** Ticking «پشتیبان» starts from an empty form; unticking leaves what was typed. */
+function onBackupChange(checked: boolean) {
+  if (checked) Object.assign(form, empty(), { isBackup: true, isForeign: form.isForeign, currencyCode: form.currencyCode })
+  else Object.assign(form, { isBackup: false, mainAccountId: '' })
 }
 
 function onProvinceChange(id: string) {
@@ -220,11 +241,30 @@ onMounted(async () => {
       <p class="muted small"><span class="star">*</span> {{ t('فیلدهای با کادر قرمز اجباری هستند.', 'Fields with a red frame are required.') }}</p>
       <fieldset>
         <legend>{{ t('مشخصات حساب', 'Account') }}</legend>
+        <div class="tr-kind">
+          <label class="tr-check"><input v-model="form.isForeign" type="checkbox" :disabled="restLocked && !form.isBackup" /> {{ t('ارزی', 'Foreign currency') }}</label>
+          <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
+            <select v-model="form.currencyCode"><option value="" /><option v-for="c in foreignCurrencies" :key="c.id" :value="c.code">{{ c.name }} ({{ c.code }})</option></select>
+          </label>
+          <label class="tr-check"><input :checked="form.isBackup" type="checkbox" :disabled="!!editing" @change="onBackupChange(($event.target as HTMLInputElement).checked)" /> {{ t('پشتیبان', 'Backup account') }}</label>
+          <label v-if="form.isBackup" class="req main"><span>{{ t('شماره حساب جاری اصلی', 'Main current account') }} <span class="star">*</span></span>
+            <select v-model="form.mainAccountId" :disabled="!!editing || backupBlocked">
+              <option value="" />
+              <option v-if="editing?.mainAccountId" :value="editing.mainAccountId">{{ accounts.find(a => a.id === editing!.mainAccountId)?.accountNumber }}</option>
+              <option v-for="a in mainChoices" :key="a.id" :value="a.id">{{ mainLabel(a) }}</option>
+            </select>
+            <small v-if="!backupBlocked && !editing" class="muted">{{ t('بانک، شعبه و شهر از حساب جاری اصلی گرفته می‌شود.', 'Bank, branch and city come from the main account.') }}</small>
+          </label>
+          <p v-if="backupBlocked" class="tr-msg error wide" role="alert">{{ translate('BankAccount.MainAccountRequired', locale) }}</p>
+        </div>
+      </fieldset>
+      <fieldset :disabled="restLocked">
+        <legend class="sr-only">{{ t('مشخصات حساب', 'Account') }}</legend>
         <label class="req"><span>{{ t('شماره حساب', 'Account number') }} <span class="star">*</span></span>
           <input v-model="form.accountNumber" dir="ltr" autocomplete="off" @blur="checkNumber" />
         </label>
         <label class="req"><span>{{ t('نام بانک', 'Bank') }} <span class="star">*</span></span>
-          <SearchSelect v-model="form.bankId" :options="bankChoices" required :disabled="!!editing?.mainAccountId" :aria-label="t('نام بانک', 'Bank')" />
+          <SearchSelect v-model="form.bankId" :options="bankChoices" required :disabled="!!editing?.mainAccountId || form.isBackup" :aria-label="t('نام بانک', 'Bank')" />
         </label>
         <label class="req"><span>{{ t('نام شعبه', 'Branch') }} <span class="star">*</span></span><input v-model="form.branchName" /></label>
         <label class="req"><span>{{ t('کد شعبه', 'Branch code') }} <span class="star">*</span></span><input v-model="form.branchCode" dir="ltr" /></label>
@@ -235,24 +275,9 @@ onMounted(async () => {
           <SearchSelect v-model="form.cityId" :options="cityChoices" required :aria-label="t('شهر', 'City')" :none-text="t('برای این استان شهری تعریف نشده است', 'No city for this province')" />
         </label>
         <label>{{ t('تاریخ افتتاح', 'Opening date') }}<input v-model="form.openingDate" placeholder="1400/01/15" dir="ltr" /></label>
-        <label class="tr-check"><input v-model="form.isForeign" type="checkbox" /> {{ t('ارزی', 'Foreign currency') }}</label>
-        <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
-          <select v-model="form.currencyCode"><option value="" /><option v-for="c in foreignCurrencies" :key="c.id" :value="c.code">{{ c.name }} ({{ c.code }})</option></select>
-        </label>
-        <label class="tr-check"><input v-model="form.isBackup" type="checkbox" :disabled="!!editing" /> {{ t('پشتیبان', 'Backup account') }}</label>
-        <label v-if="form.isBackup" class="req"><span>{{ t('شماره حساب جاری اصلی', 'Main current account') }} <span class="star">*</span></span>
-          <select v-model="form.mainAccountId" :disabled="!!editing || backupBlocked">
-            <option value="" />
-            <option v-if="editing?.mainAccountId" :value="editing.mainAccountId">{{ accounts.find(a => a.id === editing!.mainAccountId)?.accountNumber }}</option>
-            <option v-for="a in mainChoices" :key="a.id" :value="a.id">{{ a.accountNumber }}</option>
-          </select>
-          <small v-if="backupBlocked && !form.bankId" class="tr-warn">{{ t('ابتدا نام بانک را انتخاب کنید.', 'Choose the bank first.') }}</small>
-          <small v-else-if="backupBlocked" class="tr-warn">{{ translate('BankAccount.MainAccountRequired', locale) }}</small>
-          <small v-else class="muted">{{ t('فقط حساب‌های جاری همین بانک.', 'Current accounts of the same bank only.') }}</small>
-        </label>
       </fieldset>
 
-      <fieldset>
+      <fieldset :disabled="restLocked">
         <legend>{{ t('حساب‌های سیستم حسابداری', 'Accounting') }}</legend>
         <label class="req"><span>{{ t('معین / معین در معین', 'Ledger account') }} <span class="star">*</span></span>
           <SearchSelect v-model="form.ledgerAccountCode" :options="ledgerChoices" required :aria-label="t('معین / معین در معین', 'Ledger account')" :none-text="t('حسابی پیدا نشد', 'No account found')" />
@@ -290,7 +315,7 @@ onMounted(async () => {
       </fieldset>
 
       <div class="tr-buttons">
-        <button type="submit" :disabled="busy || backupBlocked">{{ t('ذخیره', 'Save') }}</button>
+        <button type="submit" :disabled="busy || restLocked">{{ t('ذخیره', 'Save') }}</button>
         <button type="button" class="tr-link" @click="showForm = false">{{ t('انصراف', 'Cancel') }}</button>
       </div>
     </form>
@@ -339,6 +364,12 @@ fieldset { border: 1px solid #e4e7eb; border-radius: 8px; display: grid; grid-te
 legend { font-weight: 600; padding: 0 .25rem; }
 label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .tr-check { flex-direction: row; align-items: center; align-self: center; }
+/* Owner's report no. 2, item 3: «ارزی» and «پشتیبان» first, under the form title, on the left. */
+.tr-kind { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .75rem 1.25rem; align-items: end; justify-content: flex-end; }
+.tr-kind .main { min-width: 18rem; }
+.tr-kind .wide { flex-basis: 100%; margin: 0; }
+fieldset:disabled { opacity: .55; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 input, select { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 /* Owner, item 12: required fields have a red frame. */
 .req > input, .req > select { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }

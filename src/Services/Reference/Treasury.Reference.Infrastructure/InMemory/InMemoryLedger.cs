@@ -70,14 +70,21 @@ public sealed class InMemoryLedgerRepository(InMemoryReferenceDatabase db) : ILe
             .Select(a => new LedgerAccountView(a.Code, a.Name, a.Level.ToString(), a.ParentCode, a.IsPostable, a.IsActive, a.Detail1Types, a.Detail2Types))
             .ToList());
 
-    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false) =>
-        Task.FromResult<IReadOnlyList<DetailAccountView>>((Details()?.Details ?? [])
-            .Where(d => (includeInactive || d.IsActive) && (type is null || d.Type == type) && (!costCentersOnly || d.IsCostCenter)
-                && (searchKey.Length == 0 || d.Code.Contains(searchKey, StringComparison.Ordinal) || PersianText.Key(d.Name).Contains(searchKey, StringComparison.Ordinal)))
+    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(
+        string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false, int skip = 0) =>
+        Task.FromResult<IReadOnlyList<DetailAccountView>>(Matching(searchKey, type, includeInactive, costCentersOnly)
             .OrderBy(d => d.Code, StringComparer.Ordinal)
+            .Skip(skip)
             .Take(take)
             .Select(d => new DetailAccountView(d.Code, d.Name, d.Type, d.IsCostCenter, d.IsActive))
             .ToList());
+
+    public Task<int> CountDetailsAsync(string searchKey, string? type, bool includeInactive, bool costCentersOnly, CancellationToken cancellationToken) =>
+        Task.FromResult(Matching(searchKey, type, includeInactive, costCentersOnly).Count());
+
+    private IEnumerable<DetailAccountRecord> Matching(string searchKey, string? type, bool includeInactive, bool costCentersOnly) =>
+        (Details()?.Details ?? []).Where(d => (includeInactive || d.IsActive) && (type is null || d.Type == type) && (!costCentersOnly || d.IsCostCenter)
+            && (searchKey.Length == 0 || d.Code.Contains(searchKey, StringComparison.Ordinal) || PersianText.Key(d.Name).Contains(searchKey, StringComparison.Ordinal)));
 
     public Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<DetailTypeView>>((Details()?.Details ?? [])

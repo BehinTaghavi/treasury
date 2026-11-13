@@ -109,17 +109,26 @@ public static class DefaultLists
     public static async Task<int> AddIranCitiesAsync(CatalogueUseCases useCases, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(useCases);
-        var iranKey = PersianText.Key("ایران");
-        var iran = (await useCases.ListAsync(CatalogueKind.Country, null, includeInactive: true, cancellationToken).ConfigureAwait(false))
-            .FirstOrDefault(c => PersianText.Key(c.Name) == iranKey);
-        if (iran is null)
+        // Iran is the country that holds Iran's provinces, whatever it is called now: a second, empty «ایران» typed by a user
+        // (or the first one renamed) must not hide them (owner's report no. 2, item 1: the province list stayed empty).
+        var provinceKeys = IranCities.Select(c => PersianText.Key(c.Province)).ToHashSet(StringComparer.Ordinal);
+        Dictionary<string, CatalogueItemView>? provinces = null;
+        foreach (var country in await useCases.ListAsync(CatalogueKind.Country, null, includeInactive: true, cancellationToken).ConfigureAwait(false))
+        {
+            var mine = (await useCases.ListAsync(CatalogueKind.Province, country.Id, includeInactive: true, cancellationToken).ConfigureAwait(false))
+                .Where(p => provinceKeys.Contains(PersianText.Key(p.Name)))
+                .GroupBy(p => PersianText.Key(p.Name))
+                .ToDictionary(g => g.Key, g => g.First());
+            if (mine.Count > (provinces?.Count ?? 0))
+            {
+                provinces = mine;
+            }
+        }
+
+        if (provinces is null)
         {
             return 0;
         }
-
-        var provinces = (await useCases.ListAsync(CatalogueKind.Province, iran.Id, includeInactive: true, cancellationToken).ConfigureAwait(false))
-            .GroupBy(p => PersianText.Key(p.Name))
-            .ToDictionary(g => g.Key, g => g.First());
         var added = 0;
         foreach (var byProvince in IranCities.GroupBy(c => PersianText.Key(c.Province)))
         {

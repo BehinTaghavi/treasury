@@ -83,8 +83,18 @@ async function loadList(list: string) {
   return []
 }
 
-function homeCountry(list: Item[]) {
-  return list.find(c => c.isActive && searchKey(c.name) === searchKey(HOME_COUNTRY))?.id ?? ''
+/**
+ * The country opened first: «ایران», and of several entries with that name the one holding the provinces. If Iran's provinces
+ * hang under a country with another name (renamed), that one. Owner's report no. 2, item 1: with a second, empty «ایران» the
+ * province list stayed empty.
+ */
+function homeCountry(countries: Item[], provinces: Item[]) {
+  const count = (c: Item) => provinces.filter(p => p.isActive && p.parentId === c.id).length
+  const active = countries.filter(c => c.isActive).sort((a, b) => count(b) - count(a))
+  const named = active.filter(c => searchKey(c.name) === searchKey(HOME_COUNTRY))
+  if (named[0] && count(named[0]) > 0) return named[0].id
+  if (active[0] && count(active[0]) > 0) return active[0].id
+  return named[0]?.id ?? ''
 }
 
 function showAll() {
@@ -161,15 +171,11 @@ async function remove(i: Item) {
 }
 
 onMounted(async () => {
-  if (props.spec.grandparent) {
-    tops.value = await loadList(props.spec.grandparent.list)
-    top.value = homeCountry(tops.value)
-  }
-  if (props.spec.parent) {
-    parents.value = await loadList(props.spec.parent.list)
-    if (props.spec.parent.list === 'countries') parent.value = homeCountry(parents.value)
-  }
+  if (props.spec.grandparent) tops.value = await loadList(props.spec.grandparent.list)
+  if (props.spec.parent) parents.value = await loadList(props.spec.parent.list)
   await load()
+  if (props.spec.grandparent) top.value = homeCountry(tops.value, parents.value) // city screen: provinces are the parents
+  if (props.spec.parent?.list === 'countries') parent.value = homeCountry(parents.value, items.value) // province screen
 })
 </script>
 
@@ -192,7 +198,7 @@ onMounted(async () => {
         <SearchSelect
           v-model="parent"
           :options="parentChoices"
-          :empty-label="t('همه (برای افزودن یکی را انتخاب کنید)', 'All (choose one to add)')"
+          :empty-label="t(`همه (برای افزودن، یک ${label(spec.parent.label)} را انتخاب کنید)`, `All (choose a ${label(spec.parent.label).toLowerCase()} to add)`)"
           :aria-label="label(spec.parent.label)"
           :none-text="t('موردی پیدا نشد', 'No match')"
         />

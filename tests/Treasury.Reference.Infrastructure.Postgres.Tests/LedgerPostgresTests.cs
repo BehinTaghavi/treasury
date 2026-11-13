@@ -87,7 +87,15 @@ public sealed class LedgerPostgresTests : IDisposable
         Assert.Equal(59, banks.Count);
         Assert.Equal("100000", banks[0].Code);
         Assert.Single(await _useCases.SearchDetailsAsync("100059", null, false, 200, CancellationToken.None));
-        Assert.Equal(200, (await _useCases.SearchDetailsAsync(null, null, false, 5_000, CancellationToken.None)).Count);
+        Assert.Equal(LedgerUseCases.MaxSearchResults, (await _useCases.SearchDetailsAsync(null, null, false, 5_000, CancellationToken.None)).Count);
+        // Owner's report no. 2, item 2: the whole list page by page, with its total.
+        var total = await _useCases.CountDetailsAsync(null, null, false, false, CancellationToken.None);
+        var firstPage = await _useCases.SearchDetailsAsync(null, null, false, 100, CancellationToken.None);
+        var secondPage = await _useCases.SearchDetailsAsync(null, null, false, 100, CancellationToken.None, skip: 100);
+        Assert.True(total > 1_000);
+        Assert.Equal(100, secondPage.Count);
+        Assert.True(string.CompareOrdinal(firstPage[^1].Code, secondPage[0].Code) < 0);
+        Assert.Equal(1, await _useCases.CountDetailsAsync("100059", null, false, false, CancellationToken.None));
         Assert.Empty(await _useCases.SearchDetailsAsync("%", null, false, 200, CancellationToken.None));
     }
 

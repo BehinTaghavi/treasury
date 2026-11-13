@@ -12,6 +12,7 @@ import { searchKey } from '../text'
 interface Beneficiary {
   id: string; detailCode: string; detailName: string | null; legalName: string; bankId: string | null; branchName: string | null
   accountNumber: string | null; sheba: string | null; phone: string | null; isActive: boolean; isInUse: boolean; version: number
+  kind: 'Natural' | 'Legal' | null; nationalId: string | null; postalAddress: string | null; postalCode: string | null
 }
 interface Detail { code: string; name: string; type: string | null; isActive: boolean }
 interface Entry { id: string; name: string; isActive: boolean }
@@ -31,7 +32,12 @@ const editing = ref<Beneficiary | null>(null)
 const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
-const form = reactive({ detailCode: '', legalName: '', bankId: '', branchName: '', accountNumber: '', sheba: '', phone: '' })
+/** Owner's report no. 2, item 7: real person (کد ملی, 10 digits) or legal person (شناسه ملی, 11 digits), postal address and code. */
+const empty = () => ({
+  detailCode: '', legalName: '', bankId: '', branchName: '', accountNumber: '', sheba: '', phone: '',
+  kind: 'Natural' as 'Natural' | 'Legal', nationalId: '', postalAddress: '', postalCode: '',
+})
+const form = reactive(empty())
 
 const fail = (code: string) => { message.value = { kind: 'error', text: translate(code, props.locale) } }
 const bankName = (id: string | null) => banks.value.find(b => b.id === id)?.name ?? ''
@@ -77,7 +83,7 @@ function onDetail(code: string) {
 }
 
 function startNew() {
-  Object.assign(form, { detailCode: '', legalName: '', bankId: '', branchName: '', accountNumber: '', sheba: '', phone: '' })
+  Object.assign(form, empty())
   editing.value = null
   showForm.value = true
   message.value = null
@@ -88,6 +94,7 @@ function startEdit(b: Beneficiary) {
   Object.assign(form, {
     detailCode: b.detailCode, legalName: b.legalName, bankId: b.bankId ?? '', branchName: b.branchName ?? '', accountNumber: b.accountNumber ?? '',
     sheba: b.sheba ?? '', phone: b.phone ?? '',
+    kind: b.kind ?? 'Natural', nationalId: b.nationalId ?? '', postalAddress: b.postalAddress ?? '', postalCode: b.postalCode ?? '',
   })
   editing.value = b
   showForm.value = true
@@ -100,6 +107,7 @@ async function save() {
   const body = {
     detailCode: form.detailCode, legalName: form.legalName || null, bankId: form.bankId || null, branchName: form.branchName || null,
     accountNumber: form.accountNumber || null, sheba: form.sheba || null, phone: form.phone || null,
+    kind: form.kind, nationalId: form.nationalId || null, postalAddress: form.postalAddress || null, postalCode: form.postalCode || null,
   }
   busy.value = true
   const r = editing.value
@@ -140,6 +148,15 @@ onMounted(load)
         <label class="req wide"><span>{{ t('عنوان حقوقی ثبت‌شده (روی چک)', 'Registered legal title (printed on cheques)') }} <span class="star">*</span></span>
           <input v-model="form.legalName" maxlength="150" autocomplete="off" />
         </label>
+        <div class="kind">
+          <label class="tr-check"><input v-model="form.kind" type="radio" value="Natural" /> {{ t('شخص حقیقی', 'Person') }}</label>
+          <label class="tr-check"><input v-model="form.kind" type="radio" value="Legal" /> {{ t('شخص حقوقی', 'Company / organisation') }}</label>
+        </div>
+        <label class="req"><span>{{ form.kind === 'Natural' ? t('کد ملی (۱۰ رقم)', 'National code (10 digits)') : t('شناسه ملی (۱۱ رقم)', 'National ID (11 digits)') }} <span class="star">*</span></span>
+          <input v-model="form.nationalId" dir="ltr" inputmode="numeric" :maxlength="form.kind === 'Natural' ? 10 : 11" autocomplete="off" />
+        </label>
+        <label class="wide">{{ t('نشانی پستی', 'Postal address') }}<input v-model="form.postalAddress" maxlength="300" /></label>
+        <label>{{ t('کد پستی (۱۰ رقم)', 'Postal code (10 digits)') }}<input v-model="form.postalCode" dir="ltr" inputmode="numeric" maxlength="11" /></label>
         <label>{{ t('نام بانک', 'Bank') }}<SearchSelect v-model="form.bankId" :options="bankChoices" :empty-label="t('ندارد', 'None')" :aria-label="t('نام بانک', 'Bank')" /></label>
         <label>{{ t('نام شعبه', 'Branch') }}<input v-model="form.branchName" maxlength="100" /></label>
         <label>{{ t('شماره حساب', 'Account number') }}<input v-model="form.accountNumber" dir="ltr" maxlength="40" /></label>
@@ -162,11 +179,12 @@ onMounted(load)
       </div>
       <div style="overflow-x:auto">
         <table class="tr-table">
-          <thead><tr><th>{{ t('تفصیل', 'Detail') }}</th><th>{{ t('عنوان حقوقی', 'Legal title') }}</th><th>{{ t('بانک / شعبه', 'Bank / branch') }}</th><th>{{ t('شماره حساب', 'Account') }}</th><th>{{ t('شبا', 'Sheba') }}</th><th>{{ t('تلفن', 'Phone') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
+          <thead><tr><th>{{ t('تفصیل', 'Detail') }}</th><th>{{ t('عنوان حقوقی', 'Legal title') }}</th><th>{{ t('کد / شناسه ملی', 'National code / ID') }}</th><th>{{ t('بانک / شعبه', 'Bank / branch') }}</th><th>{{ t('شماره حساب', 'Account') }}</th><th>{{ t('شبا', 'Sheba') }}</th><th>{{ t('تلفن', 'Phone') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
           <tbody>
             <tr v-for="b in shown" :key="b.id" :class="{ inactive: !b.isActive }">
               <td><span dir="ltr">{{ b.detailCode }}</span> <small class="muted">{{ b.detailName }}</small></td>
               <td>{{ b.legalName }}</td>
+              <td dir="ltr">{{ b.nationalId }}</td>
               <td>{{ bankName(b.bankId) }} <small v-if="b.branchName" class="muted">{{ b.branchName }}</small></td>
               <td dir="ltr">{{ b.accountNumber }}</td>
               <td dir="ltr" class="small">{{ shebaText(b.sheba) }}</td>
@@ -178,7 +196,7 @@ onMounted(load)
                 <button v-if="!b.isInUse" type="button" class="tr-link danger" @click="change(b, 'delete')">{{ t('حذف', 'Delete') }}</button>
               </td>
             </tr>
-            <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('موردی پیدا نشد.', 'Nothing found.') }}</td></tr>
+            <tr v-if="!shown.length"><td colspan="9" class="muted">{{ t('موردی پیدا نشد.', 'Nothing found.') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -188,3 +206,6 @@ onMounted(load)
 </template>
 
 <style scoped src="./organization.css"></style>
+<style scoped>
+.kind { display: flex; gap: 1.25rem; align-items: center; align-self: end; }
+</style>

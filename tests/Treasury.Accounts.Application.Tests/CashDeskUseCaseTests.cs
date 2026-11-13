@@ -19,7 +19,15 @@ public sealed class CashDeskUseCaseTests : IDisposable
 
     // 130100 allows any تفصیل type in FakeReference.
     private static CashDeskForm Form(string name = "صندوق مرکزی", string holder = "111078", bool foreign = false, string? currency = null) =>
-        new(name, "130100", holder, null, foreign, currency);
+        new(name, "130100", holder, null, foreign, currency, "1405/08/22");
+
+    [Fact]
+    public async Task A_cash_desk_has_its_creation_date_owner_report_2()
+    {
+        Assert.Equal("CashDesk.CreatedOnRequired", (await _useCases.RegisterAsync(new(Key(), Form() with { CreatedOn = null }), CancellationToken.None)).ErrorCode);
+        var id = (await _useCases.RegisterAsync(new(Key(), Form()), CancellationToken.None)).Value;
+        Assert.Equal("1405/08/22", (await _useCases.ListAsync(true, CancellationToken.None)).Single(d => d.Id == id).CreatedOn);
+    }
 
     [Fact]
     public async Task A_cash_desk_is_saved_and_listed_with_its_holders_name()

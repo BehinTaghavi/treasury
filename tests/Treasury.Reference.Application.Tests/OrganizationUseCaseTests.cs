@@ -1,3 +1,4 @@
+using Treasury.Reference.Domain.Organization;
 using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Application.Ledger;
 using Treasury.Reference.Application.Organization;
@@ -77,11 +78,13 @@ public sealed class OrganizationUseCaseTests : IDisposable
     public async Task A_beneficiary_per_detail_account_with_its_bank_marked_in_use()
     {
         var mellat = (await _catalogue.AddAsync(new(Key(), CatalogueKind.Bank, "بانک ملت"), CancellationToken.None)).Value;
-        var form = new BeneficiaryForm("111078", null, mellat, "شعبه بازار", "0101-55", "IR460120000000003123456789", "021-88888888");
+        var form = new BeneficiaryForm("111078", null, mellat, "شعبه بازار", "0101-55", "IR460120000000003123456789", "021-88888888",
+            BeneficiaryKind.Legal, "10101010103", "تهران", "1234567890");
         var b = await _useCases.AddBeneficiaryAsync(Key(), form, CancellationToken.None);
         Assert.True(b.IsSuccess, b.ErrorCode);
         var view = Assert.Single(await _useCases.ListBeneficiariesAsync(true, CancellationToken.None));
         Assert.Equal(("شركت نمونه بازرگاني", "شركت نمونه بازرگاني"), (view.LegalName, view.DetailName));
+        Assert.Equal(((BeneficiaryKind?)BeneficiaryKind.Legal, "10101010103", "1234567890"), (view.Kind, view.NationalId, view.PostalCode));
         Assert.True((await _catalogue.ListAsync(CatalogueKind.Bank, null, true, CancellationToken.None)).Single().IsInUse);
         Assert.Equal("Beneficiary.DetailTaken", (await _useCases.AddBeneficiaryAsync(Key(), form with { LegalName = "x" }, CancellationToken.None)).ErrorCode);
         Assert.True((await _useCases.MarkInUseAsync(Key(), b.Value, CancellationToken.None)).IsSuccess);
