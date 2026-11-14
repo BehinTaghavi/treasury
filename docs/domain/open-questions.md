@@ -17,3 +17,16 @@ Each item is a behaviour the code currently implements one way, with the reason.
 | Q9 | Please map the MVC version's **PlaningType** codes to the states in `instrument-lifecycle.md`. | — | Needed to migrate clients who already use the MVC version. |
 | Q10 | Is a **due date required** for received instalments and promissory notes? | Required for every kind except guarantee items. | Old `D_Check` requires a due date ("سررسید نامشخص است"). |
 | Q11 | Rule N2 says a cheque cannot be **cleared** before its due date. Does the same apply to a **bounce** (can the bank return a cheque before its due date)? | **Answered 10 Nov 2026: yes.** A bounce before the due date is refused (`Instrument.BouncedBeforeDueDate`). | See `docs/decisions.md`. |
+
+## Receipts (owner, 14 Nov 2026)
+
+Q12–Q18 are about cheque printing, in [cheque-printing.md](cheque-printing.md).
+
+| # | Question | Current behaviour | Why |
+|---|---|---|---|
+| Q19 | **Receipt numbers:** does each kind (cash, bank deposit, cheques and notes) keep its own series starting at 1 each year, or should all receipts share one series? | Own series per kind and year, as in the old program. | Old `Subs.Sno` is counted per `Scode` (17 cash, 16 deposit) and year. |
+| Q20 | **Correcting a receipt:** a cash or bank receipt typed wrongly is **cancelled with a reason** and entered again; a receipt of cheques is not cancelled, each cheque is **returned** instead. Is that right, or should a receipt be editable until it is confirmed («قطعی»), as in the old program? | Cancel with reason; no editing. | Cancelling keeps a clear trail for the auditor; the old `Final` flag only locked editing. |
+| Q21 | Is the cheque's 16-digit **Sayad ID** required on every received cheque? | Optional; when entered it must have 16 digits. | Old cheques (before 1397) and some bank cheques may not show it. |
+| Q22 | Which **payers** may be chosen: any تفصیل, or only some types (customers, persons and companies…)? | Any active تفصیل. | The old form lists all تفصیل (`Openaccs 15/16`). |
+| Q23 | Must POS and card-to-card receipts carry a **tracking number**? | Optional for every way of paying in. | Old `D_variz` requires only the deposit type. |
+| Q24 | Does one payer ever pay **cash and cheques together** so that they need **one** receipt number? | No: one receipt per kind (a cash receipt and a cheque receipt). | The old program has separate forms and series. |
