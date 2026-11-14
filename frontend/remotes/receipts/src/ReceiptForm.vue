@@ -210,11 +210,11 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
     <fieldset>
       <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
       <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" /></label>
-      <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }} <span class="star">*</span>
+      <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
         <SearchSelect v-model="header.payer" :options="payerChoices" remote required :aria-label="t('پرداخت کننده', 'Payer')"
                       :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
       </label>
-      <label>{{ t('گروه بابت', 'Purpose group') }} <span class="star">*</span>
+      <label>{{ t('گروه بابت', 'Purpose group') }}
         <SearchSelect v-model="header.groupId" :options="groupChoices" required :aria-label="t('گروه بابت', 'Purpose group')"
                       :none-text="t('گروه بابت دریافتی تعریف نشده است', 'No receipt purpose group')" />
       </label>
@@ -224,7 +224,9 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="header.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="header.ref2" /></label>
-      <label>{{ t('بخش', 'Department') }}
+      <!-- بخش: the department that received the money (manual, form «دریافت چک و اسناد دریافتنی»). Shown only when departments are
+           defined in Basic Information; Iran Nazho Co. defines none (owner, 13 Nov 2026). -->
+      <label v-if="departmentChoices.length">{{ t('بخش', 'Department') }}
         <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش', 'Department')" />
       </label>
       <label class="tr-check"><input v-model="header.salesProceeds" type="checkbox" /> {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</label>
@@ -233,14 +235,14 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
 
     <fieldset v-if="kind !== 'Instruments'">
       <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : t('واریز به حساب', 'Paid into a bank account') }}</legend>
-      <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }} <span class="star">*</span>
+      <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }}
         <SearchSelect v-model="money1.accountId" :options="deskChoices" required :aria-label="t('صندوق', 'Cash desk')" :none-text="t('صندوقی تعریف نشده است', 'No cash desk')" />
       </label>
       <template v-else>
-        <label class="wide">{{ t('حساب بانکی', 'Bank account') }} <span class="star">*</span>
+        <label class="wide">{{ t('حساب بانکی', 'Bank account') }}
           <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />
         </label>
-        <label>{{ t('نوع واریز', 'Paid in by') }} <span class="star">*</span>
+        <label>{{ t('نوع واریز', 'Paid in by') }}
           <SearchSelect v-model="money1.method" :options="methods.map(m => ({ value: m.value, label: fa ? m.fa : m.en }))" required :aria-label="t('نوع واریز', 'Paid in by')" />
         </label>
         <label>{{ money1.method === 'Pos' ? t('شماره پیگیری / مرجع', 'Tracking / reference no.') : money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری', 'Tracking no.') }}
@@ -274,7 +276,7 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
           <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="linesRial[i] === null ? '' : money(linesRial[i]!)" readonly /></label>
         </template>
         <template v-if="isCheque(l.kind)">
-          <label>{{ t('بانک', 'Bank') }} <span class="star">*</span>
+          <label>{{ t('بانک', 'Bank') }}
             <SearchSelect v-model="l.bankId" :options="bankChoices" required :aria-label="t('بانک', 'Bank')" />
           </label>
           <label>{{ t('شعبه', 'Branch') }} <input v-model="l.branchName" /></label>
