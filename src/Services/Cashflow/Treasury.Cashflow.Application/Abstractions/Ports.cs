@@ -3,6 +3,7 @@ using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
+using Treasury.Cashflow.Domain.Receipts;
 
 namespace Treasury.Cashflow.Application.Abstractions;
 
@@ -17,6 +18,49 @@ public interface IInstrumentRepository
 
     /// <summary>Saves changes and pending events. Throws <see cref="ConcurrencyConflictException"/> if someone else saved first.</summary>
     Task SaveAsync(Instrument instrument, CancellationToken cancellationToken);
+
+    /// <summary>The cheques and notes received on one receipt, in the order they were entered.</summary>
+    Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken);
+}
+
+/// <summary>Receipts (رسید دریافت) of one fiscal year, numbered per kind.</summary>
+public interface IReceiptRepository
+{
+    Task<Receipt?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The next serial number of <paramref name="kind"/> in <paramref name="fiscalYear"/>; taken numbers are never reused.</summary>
+    Task<int> NextNumberAsync(int fiscalYear, ReceiptKind kind, CancellationToken cancellationToken);
+
+    Task AddAsync(Receipt receipt, CancellationToken cancellationToken);
+
+    /// <summary>Saves a cancellation. Version-checked.</summary>
+    Task SaveAsync(Receipt receipt, CancellationToken cancellationToken);
+
+    /// <summary>Receipts of a year, newest first; of one kind or all.</summary>
+    Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken);
+}
+
+/// <summary>Answered by accounts-svc (ADR 0001): a cash desk or bank account a receipt is booked to; null when unknown.</summary>
+public interface IReceiptAccountLookup
+{
+    Task<ReceiptAccountFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken);
+}
+
+/// <summary>Answered by reference-svc (ADR 0001). Failure to reach it: DomainException "Reference.Unavailable".</summary>
+public interface IReceiptReferenceLookup
+{
+    /// <summary>The payer's تفصیل by its code; null when unknown.</summary>
+    Task<PayerFact?> PayerAsync(string detailCode, CancellationToken cancellationToken);
+
+    Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Name of a bank in the bank-names list; null when unknown.</summary>
+    Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
+    Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }
 
 public interface IChequeBookRepository

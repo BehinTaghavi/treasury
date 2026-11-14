@@ -487,3 +487,46 @@ def test_an_opening_balance_once_per_account_and_year_and_cash_never_below_zero(
             with c.transaction():
                 c.execute(add, (uuid.uuid4(), "CashDesk", uuid.uuid4(), -1, None))
         c.rollback()
+
+
+def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_closed_year(db):
+    # 025_cashflow_receipts.sql (owner, 14 Nov 2026: receipts of cash, bank deposits, cheques and notes).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code,
+                 purpose_group_id, purpose_group_name, purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency,
+                 instrument_ids, total_rial, state)
+             VALUES (%s, %s, %s, %s, %s, %s, 'الف', '200015', %s, 'فروش', 'فروش', 'test', %s, %s, %s, %s, %s, %s, %s, 'Recorded')"""
+    with psycopg.connect(db) as c:
+        names = {r[0] for r in c.execute("SELECT relname FROM pg_class WHERE relname LIKE 'receipt_fy14%'")}
+        assert {"receipt_fy1404", "receipt_fy1405"} <= names
+        c.execute("SET ROLE cashflow_svc")
+
+        def cash(year, number, day, account_kind="CashDesk", method=None):
+            c.execute(add, (year, uuid.uuid4(), "Cash", number, day, uuid.uuid4(), uuid.uuid4(), account_kind, uuid.uuid4(), method, 1000, "IRR", [], 1000))
+
+        cash(1405, 1, date(2026, 11, 14))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                cash(1405, 1, date(2026, 11, 15))
+        with pytest.raises(psycopg.errors.CheckViolation):  # cash goes into a cash desk
+            with c.transaction():
+                cash(1405, 2, date(2026, 11, 15), "BankAccount", "Pos")
+        with pytest.raises(psycopg.errors.CheckViolation):  # a receipt of cheques names them
+            with c.transaction():
+                c.execute(add, (1405, uuid.uuid4(), "Instruments", 1, date(2026, 11, 15), uuid.uuid4(), uuid.uuid4(), None, None, None, None, None, [], 1000))
+        c.execute(add, (1405, uuid.uuid4(), "Instruments", 1, date(2026, 11, 15), uuid.uuid4(), uuid.uuid4(), None, None, None, None, None, [uuid.uuid4()], 1000))
+        c.execute("""INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'Cash', 1)
+                     ON CONFLICT (fiscal_year, kind) DO UPDATE SET last_number = cashflow.receipt_number.last_number + 1""")
+        cash(1404, 1, date(2025, 11, 14))
+        c.commit()
+
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+    try:
+        with psycopg.connect(db) as c:
+            with pytest.raises(psycopg.errors.RaiseException):
+                c.execute("UPDATE cashflow.receipt SET state = 'Cancelled', cancelled_on = receipt_date, cancel_reason = 'x' WHERE fiscal_year = 1404")
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("instrument_event_fy1404", "receipt_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON cashflow.{t}")

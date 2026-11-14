@@ -7,7 +7,7 @@
  */
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
-import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
+import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
 type Direction = 'Receipt' | 'Payment'

@@ -2,7 +2,7 @@ import { federation } from '@module-federation/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
-// Micro-frontend "receipts": received cheques and notes. Exposed to the shell through Module Federation 2.0.
+// Micro-frontend "receipts": cash, bank deposits, cheques and notes received. Exposed to the shell through Module Federation 2.0.
 export default defineConfig({
   base: process.env.REMOTE_BASE_URL ?? 'http://localhost:5174/',
   plugins: [
@@ -15,7 +15,7 @@ export default defineConfig({
       // loads remotes at run time without them. Use vue-tsc here if a remote's types are ever needed.
       dts: false,
       exposes: {
-        './ReceivedCheques': './src/ReceivedCheques.vue',
+        './Receipts': './src/Receipts.vue',
       },
       shared: {
         vue: { singleton: true, requiredVersion: '^3.5.0' },

@@ -72,7 +72,11 @@ public sealed record InstrumentView(
     int OriginFiscalYear,
     IReadOnlyList<string> AllowedActions,
     IReadOnlyList<InstrumentHistoryView> History,
-    long Version)
+    long Version,
+    decimal? RateToRial = null,
+    Guid? ReceiptId = null,
+    bool IsPostDated = false,
+    ReceivedInstrumentDetails? Details = null)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -92,7 +96,11 @@ public sealed record InstrumentView(
         i.OriginFiscalYear,
         i.AllowedActions().Select(a => a.ToString()).ToList(),
         i.History.Select(h => new InstrumentHistoryView(h.Action.ToString(), h.From?.ToString(), h.To.ToString(), h.Date.ToJalaliString(), h.UserId, h.Reference, h.Note)).ToList(),
-        i.Version);
+        i.Version,
+        i.Amount.RateToRial,
+        i.ReceiptId,
+        i.IsPostDated,
+        i.Direction == InstrumentDirection.Received ? i.Details : null);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);

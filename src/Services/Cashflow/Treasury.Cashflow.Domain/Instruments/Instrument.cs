@@ -4,7 +4,32 @@ using Treasury.Cashflow.Domain.Common;
 namespace Treasury.Cashflow.Domain.Instruments;
 
 /// <summary>A party on the other side of the instrument (drawer of a received cheque, payee of an issued one).</summary>
-public sealed record CounterpartyRef(Guid Id, string DisplayName);
+/// <param name="DetailCode">The party's تفصیل in the accounting system, when known (payers on receipts).</param>
+public sealed record CounterpartyRef(Guid Id, string DisplayName, string? DetailCode = null)
+{
+    /// <summary>
+    /// A party known by its تفصیل code. The id is derived from the code (name-based UUID from SHA-256, RFC 9562 version 8), so every receipt
+    /// and instrument of the same تفصیل carries the same id without a separate counterparty table.
+    /// </summary>
+    public static CounterpartyRef ForDetail(string detailCode, string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(detailCode);
+        var code = detailCode.Trim();
+        return new CounterpartyRef(DetailId(code), name.Trim(), code);
+    }
+
+    private static readonly Guid DetailNamespace = new("6f1c2a52-7d8e-4b55-9c3a-0e5b7d1f4a21");
+
+    private static Guid DetailId(string code)
+    {
+        var ns = DetailNamespace.ToByteArray(bigEndian: true);
+        var name = System.Text.Encoding.UTF8.GetBytes("detail:" + code);
+        var hash = System.Security.Cryptography.SHA256.HashData([.. ns, .. name]);
+        hash[6] = (byte)((hash[6] & 0x0F) | 0x80);
+        hash[8] = (byte)((hash[8] & 0x3F) | 0x80);
+        return new Guid(hash.AsSpan(0, 16), bigEndian: true);
+    }
+}
 
 /// <summary>One step in the instrument's life. Replaces the old fixed columns D1–D5 / G1–G5 with a full history.</summary>
 public sealed record InstrumentHistoryEntry(
@@ -56,6 +81,18 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Drawer's bank for received cheques.</summary>
     public string? BankName { get; }
 
+    /// <summary>Received side: the receipt (رسید دریافت) that brought the instrument in; null for older single entries.</summary>
+    public Guid? ReceiptId { get; private set; }
+
+    /// <summary>Received side: branch, account, holder, Sayad ID, guarantors.</summary>
+    public ReceivedInstrumentDetails Details { get; private set; } = ReceivedInstrumentDetails.None;
+
+    /// <summary>
+    /// Received side: post-dated (مدت‌دار, اسناد دریافتنی) when due after the day it was received; otherwise a current cheque
+    /// (چک روز). Manual: "چنانچه تاریخ چک دریافتی روز باشد (مساوی تاریخ کامپیوتر یا کوچکتر از آن) … تیک می خورد".
+    /// </summary>
+    public bool IsPostDated => Direction == InstrumentDirection.Received && DueDate is { } due && due > IssueDate;
+
     /// <summary>Our bank account for issued cheques.</summary>
     public Guid? BankAccountId { get; private set; }
 
@@ -106,16 +143,43 @@ public sealed class Instrument : AggregateRoot<Guid>
         string purpose,
         string userId)
     {
+        Require(!string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
+        return Receive(id, kind, number, bankName, amount, receivedOn, dueDate, drawer, purpose, userId, ReceivedInstrumentDetails.None, null);
+    }
+
+    /// <summary>
+    /// A cheque or note received on a receipt (رسید دریافت), with what is written on it. A cheque needs its bank (rule R1); a
+    /// promissory note has no bank and may name up to two guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»).
+    /// </summary>
+    public static Instrument Receive(
+        Guid id,
+        InstrumentKind kind,
+        string number,
+        string? bankName,
+        Money amount,
+        FiscalDate receivedOn,
+        FiscalDate? dueDate,
+        CounterpartyRef drawer,
+        string purpose,
+        string userId,
+        ReceivedInstrumentDetails details,
+        Guid? receiptId)
+    {
+        ArgumentNullException.ThrowIfNull(details);
         Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
         Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
-        Require(!string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
+        Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
         ValidateCommon(kind, drawer, purpose, dueDate);
+        var checkedDetails = details.Validated(kind);
 
-        var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(), bankName.Trim())
+        var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
+            string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
         {
             Number = number.Trim(),
             State = InstrumentState.InCashDesk,
             OriginFiscalYear = receivedOn.JalaliYear,
+            ReceiptId = receiptId,
+            Details = checkedDetails,
         };
         instrument.Record(InstrumentAction.Receive, null, InstrumentState.InCashDesk, receivedOn, userId, null, null);
         return instrument;
@@ -241,7 +305,9 @@ public sealed class Instrument : AggregateRoot<Guid>
         InstrumentState state,
         int originFiscalYear,
         IEnumerable<InstrumentHistoryEntry> history,
-        long version)
+        long version,
+        Guid? receiptId = null,
+        ReceivedInstrumentDetails? details = null)
     {
         var historyList = history.ToList();
         var instrument = new Instrument(id, direction, kind, amount, issueDate, dueDate, counterparty, purpose, bankName)
@@ -254,6 +320,8 @@ public sealed class Instrument : AggregateRoot<Guid>
             State = state,
             OriginFiscalYear = originFiscalYear,
             IsMatured = historyList.Any(h => h.Action == InstrumentAction.RecordMatured),
+            ReceiptId = receiptId,
+            Details = details ?? ReceivedInstrumentDetails.None,
         };
         instrument._history.AddRange(historyList);
         instrument.SetLoadedVersion(version);

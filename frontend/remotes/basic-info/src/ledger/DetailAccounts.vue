@@ -6,7 +6,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { createApi, type Locale } from '@treasury/ui-kit'
 import ImportBox from './ImportBox.vue'
-import SearchSelect from '../components/SearchSelect.vue'
+import SearchSelect from '@treasury/ui-kit/SearchSelect.vue'
 
 interface Detail { code: string; name: string; type: string | null; isCostCenter: boolean; isActive: boolean }
 interface DetailType { type: string; activeCount: number }

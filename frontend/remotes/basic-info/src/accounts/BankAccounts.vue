@@ -13,7 +13,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, normaliseJalali, translate, type Locale } from '@treasury/ui-kit'
-import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
+import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
 interface Entry { id: string; name: string; code: string | null; isActive: boolean; parentId: string | null }

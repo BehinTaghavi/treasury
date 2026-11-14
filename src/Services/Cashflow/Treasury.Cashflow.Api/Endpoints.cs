@@ -3,6 +3,8 @@ using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.ChequeBooks;
 using Treasury.Cashflow.Application.Instruments;
+using Treasury.Cashflow.Application.Receipts;
+using Treasury.Cashflow.Domain.Receipts;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
 
@@ -24,6 +26,14 @@ public sealed record ChequeFormatChange(Treasury.Cashflow.Domain.ChequeBooks.Che
 public sealed record ChequeBookVersion(long Version);
 
 public sealed record IssueRequest(Guid PaymentId, Guid BankAccountId, Guid ChequeBookId, long? SheetNumber, InstrumentKind Kind, MoneyInput Amount, string IssueDate, string? DueDate, Guid PayeeId, string PayeeName, string Purpose);
+
+public sealed record CashReceiptRequest(ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial);
+
+public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial);
+
+public sealed record InstrumentReceiptRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
+
+public sealed record CancelReceiptRequest(string Date, string Reason, long Version);
 
 public static class Endpoints
 {
@@ -49,6 +59,30 @@ public static class Endpoints
             ToHttp(await useCases.ChangeStateAsync(
                 new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
+
+        // Receipts (owner, 14 Nov 2026): cash, money paid into a bank account, cheques and notes.
+        api.MapGet("/receipts", async (int year, ReceiptKind? kind, ReceiptUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListAsync(year, kind, ct).ConfigureAwait(false)));
+
+        api.MapGet("/receipts/{id:guid}", async (Guid id, ReceiptUseCases useCases, CancellationToken ct) =>
+            await useCases.GetAsync(id, ct).ConfigureAwait(false) is { } view ? Results.Ok(view) : Results.NotFound());
+
+        api.MapPost("/receipts/cash", async (CashReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RecordCashAsync(new RecordCashReceiptCommand(Key(http), r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
+                id => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPost("/receipts/bank", async (BankReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RecordBankDepositAsync(
+                new RecordBankReceiptCommand(Key(http), r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
+                id => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPost("/receipts/instruments", async (InstrumentReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RecordInstrumentsAsync(new RecordInstrumentReceiptCommand(Key(http), r.Header, r.Instruments), ct).ConfigureAwait(false),
+                id => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPost("/receipts/{id:guid}/cancel", async (Guid id, CancelReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
 
         // Cheque books screen (Basic Information, manual item 6).
         api.MapGet("/cheque-books", async (Guid? bankAccountId, bool? includeInactive, ChequeBookUseCases useCases, CancellationToken ct) =>
@@ -125,9 +159,9 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" => StatusCodes.Status404NotFound,
+            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
-            "Accounts.Unavailable" => StatusCodes.Status503ServiceUnavailable,
+            "Accounts.Unavailable" or "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,
         };
         return Results.Problem(

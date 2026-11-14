@@ -6,7 +6,7 @@
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
-import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
+import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 
 type PrintType = 'Standard' | 'NewLarge' | 'NewestLarge' | 'OldLarge' | 'NewSmall' | 'NewestSmall' | 'OldSmall'
 interface Format { id: string; number: number; bankAccountId: string | null; printType: PrintType; hasImage: boolean; isActive: boolean; version: number }

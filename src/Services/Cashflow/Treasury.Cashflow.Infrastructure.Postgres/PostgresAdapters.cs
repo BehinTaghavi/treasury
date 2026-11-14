@@ -22,6 +22,7 @@ public static class PostgresRegistration
         services.AddSingleton<IUnitOfWork>(sp => sp.GetRequiredService<PostgresUnitOfWork>());
         services.AddSingleton<IInstrumentRepository, PostgresInstrumentRepository>();
         services.AddSingleton<IChequeBookRepository, PostgresChequeBookRepository>();
+        services.AddSingleton<IReceiptRepository, PostgresReceiptRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
@@ -95,7 +96,9 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
 {
     private const string Columns =
         "origin_fiscal_year, id, direction, kind, number, bank_name, bank_account_id, cheque_book_id, payment_id, amount, currency, rate_to_rial, " +
-        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version";
+        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version, receipt_id, counterparty_detail_code, details";
+
+    private static readonly System.Text.Json.JsonSerializerOptions DetailsJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     public async Task<Instrument?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -128,7 +131,10 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
                     State: Enum.Parse<InstrumentState>(r.GetString(18)),
                     OriginFiscalYear: r.GetInt32(0),
                     History: [],
-                    Version: r.GetInt64(19));
+                    Version: r.GetInt64(19),
+                    ReceiptId: r.IsDBNull(20) ? null : r.GetGuid(20),
+                    Details: r.IsDBNull(22) ? null : System.Text.Json.JsonSerializer.Deserialize<ReceivedInstrumentDetails>(r.GetString(22), DetailsJson),
+                    CounterpartyDetailCode: r.IsDBNull(21) ? null : r.GetString(21));
             }
         }
 
@@ -183,7 +189,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         var s = InstrumentSnapshot.From(instrument, 1);
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.instrument ({Columns}, amount_rial) VALUES " +
-            "(@year, @id, @direction, @kind, @number, @bank, @account, @book, @payment, @amount, @currency, @rate, @issue, @due, @cp, @cpname, @purpose, @destination, @state, 1, @rial)"))
+            "(@year, @id, @direction, @kind, @number, @bank, @account, @book, @payment, @amount, @currency, @rate, @issue, @due, @cp, @cpname, @purpose, @destination, @state, 1, " +
+            "@receipt, @cpcode, @details, @rial)"))
         {
             BindInstrument(cmd, s, instrument.Amount.ToRial());
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -268,6 +275,34 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         cmd.Parameters.AddWithValue("destination", (object?)s.Destination ?? DBNull.Value);
         cmd.Parameters.AddWithValue("state", s.State.ToString());
         cmd.Parameters.AddWithValue("rial", amountRial);
+        cmd.Parameters.AddWithValue("receipt", (object?)s.ReceiptId ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("cpcode", (object?)s.CounterpartyDetailCode ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("details", NpgsqlDbType.Jsonb)
+        {
+            Value = s.Details is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(s.Details, DetailsJson),
+        });
+    }
+
+    public async Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+        await using (var cmd = PostgresUnitOfWork.Current.Command("SELECT id FROM cashflow.instrument WHERE receipt_id = @receipt ORDER BY created_at, number"))
+        {
+            cmd.Parameters.AddWithValue("receipt", receiptId);
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(r.GetGuid(0));
+            }
+        }
+
+        var list = new List<Instrument>();
+        foreach (var id in ids)
+        {
+            list.Add((await GetAsync(id, cancellationToken).ConfigureAwait(false))!);
+        }
+
+        return list;
     }
 }
 

@@ -7,7 +7,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, normaliseJalali, parseAmount, todayJalali, translate, type Locale } from '@treasury/ui-kit'
-import SearchSelect from '../components/SearchSelect.vue'
+import SearchSelect from '@treasury/ui-kit/SearchSelect.vue'
 
 type Kind = 'BankAccount' | 'CashDesk' | 'PettyCash'
 interface Entry { id: string; date: string; amount: number; rialEquivalent: number | null; version: number }

@@ -8,7 +8,7 @@
  * For long lists kept on the server (تفصیل), the parent listens to `search` and replaces `options` with what it found.
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { searchKey } from '../text'
+import { searchKey } from './format'
 
 export interface Choice { value: string; label: string; hint?: string; muted?: boolean }
 

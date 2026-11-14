@@ -4,6 +4,7 @@ using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
+using Treasury.Cashflow.Domain.Receipts;
 
 namespace Treasury.Cashflow.Infrastructure;
 
@@ -29,7 +30,10 @@ public sealed record InstrumentSnapshot(
     InstrumentState State,
     int OriginFiscalYear,
     IReadOnlyList<HistorySnapshot> History,
-    long Version)
+    long Version,
+    Guid? ReceiptId = null,
+    ReceivedInstrumentDetails? Details = null,
+    string? CounterpartyDetailCode = null)
 {
     public static InstrumentSnapshot From(Instrument i, long version) => new(
         i.Id, i.Direction, i.Kind, i.Number, i.BankName, i.BankAccountId, i.ChequeBookId, i.PaymentId,
@@ -37,15 +41,36 @@ public sealed record InstrumentSnapshot(
         i.IssueDate.Value, i.DueDate?.Value, i.Counterparty.Id, i.Counterparty.DisplayName, i.Purpose, i.Destination,
         i.State, i.OriginFiscalYear,
         i.History.Select(h => new HistorySnapshot(h.Action, h.From, h.To, h.Date.Value, h.UserId, h.Reference, h.Note)).ToList(),
-        version);
+        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode);
 
     public Instrument ToDomain() => Instrument.Restore(
         Id, Direction, Kind, Number, BankName, BankAccountId, ChequeBookId, PaymentId,
         Currency == Money.Rial ? Money.Rials(Amount) : Money.Foreign(Amount, Currency, RateToRial ?? 0),
         new FiscalDate(IssueDate), DueDate is { } d ? new FiscalDate(d) : null,
-        new CounterpartyRef(CounterpartyId, CounterpartyName), Purpose, Destination, State, OriginFiscalYear,
+        new CounterpartyRef(CounterpartyId, CounterpartyName, CounterpartyDetailCode), Purpose, Destination, State, OriginFiscalYear,
         History.Select(h => new InstrumentHistoryEntry(h.Action, h.From, h.To, new FiscalDate(h.Date), h.UserId, h.Reference, h.Note)),
-        Version);
+        Version, ReceiptId, Details);
+}
+
+/// <summary>Flat, storable form of a receipt. Dates are ISO dates.</summary>
+public sealed record ReceiptSnapshot(
+    Guid Id, ReceiptKind Kind, int FiscalYear, int Number, DateOnly Date, Guid PayerId, string PayerName, string? PayerDetailCode,
+    Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1, string? Reference2, Guid? DepartmentId, bool SalesProceeds,
+    string? Note, string RecordedBy, ReceiptAccountKind? AccountKind, Guid? AccountId, DepositMethod? Method, string? TrackingNumber,
+    decimal? Amount, string? Currency, decimal? RateToRial, IReadOnlyList<Guid> InstrumentIds, decimal TotalRial, ReceiptState State,
+    DateOnly? CancelledOn, string? CancelReason, long Version)
+{
+    public static ReceiptSnapshot From(Receipt r, long version) => new(
+        r.Id, r.Kind, r.FiscalYear, r.Number, r.Date.Value, r.Payer.Id, r.Payer.DisplayName, r.Payer.DetailCode, r.PurposeGroupId, r.PurposeGroupName,
+        r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note, r.RecordedBy, r.AccountKind, r.AccountId, r.Method,
+        r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial, [.. r.InstrumentIds], r.TotalRial, r.State,
+        r.CancelledOn?.Value, r.CancelReason, version);
+
+    public Receipt ToDomain() => Receipt.Restore(
+        Id, Kind, Number, new FiscalDate(Date), new CounterpartyRef(PayerId, PayerName, PayerDetailCode), PurposeGroupId, PurposeGroupName, Purpose,
+        Reference1, Reference2, DepartmentId, SalesProceeds, Note, RecordedBy, AccountKind, AccountId, Method, TrackingNumber,
+        Amount is { } a ? (Currency == Money.Rial ? Money.Rials(a) : Money.Foreign(a, Currency!, RateToRial ?? 0)) : null,
+        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version);
 }
 
 public sealed record HistorySnapshot(InstrumentAction Action, InstrumentState? From, InstrumentState To, DateOnly Date, string UserId, string? Reference, string? Note);

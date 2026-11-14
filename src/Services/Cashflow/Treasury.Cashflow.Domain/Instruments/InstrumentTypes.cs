@@ -75,6 +75,14 @@ public static class InstrumentKindRules
     public static bool RequiresDueNotBeforeIssue(this InstrumentKind kind) =>
         kind is InstrumentKind.OrdinaryCheque or InstrumentKind.PostDatedCheque;
 
+    /// <summary>Cheques carry a bank, branch, account number and Sayad ID.</summary>
+    public static bool IsCheque(this InstrumentKind kind) =>
+        kind is InstrumentKind.OrdinaryCheque or InstrumentKind.GuaranteeCheque or InstrumentKind.BankCheque or InstrumentKind.PostDatedCheque;
+
+    /// <summary>Promissory notes (سفته) carry guarantors instead of bank details.</summary>
+    public static bool IsNote(this InstrumentKind kind) =>
+        kind is InstrumentKind.PromissoryNote or InstrumentKind.GuaranteeNote;
+
     public static bool IsValidFor(this InstrumentKind kind, InstrumentDirection direction) => direction switch
     {
         InstrumentDirection.Received => kind != InstrumentKind.PostDatedCheque,

@@ -11,7 +11,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
-import SearchSelect, { type Choice } from '../components/SearchSelect.vue'
+import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
 interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; branchCode: string | null; isActive: boolean }
