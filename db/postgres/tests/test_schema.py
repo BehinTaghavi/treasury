@@ -528,5 +528,48 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("instrument_event_fy1404", "receipt_fy1404"):
-                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON cashflow.{t}")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+
+
+def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
+    # 026_requests.sql (owner, 15 Nov 2026: payment requests).
+    add = """INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id,
+                 beneficiary_detail_code, beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority,
+                 transfer_account, card_number, state, recorded_by)
+             VALUES (%s, %s, %s, %s, %s, 'الف', %s, '300200', 'ب', %s, 'خرید', 'خرید', %s, 'IRR', %s, 1, %s, %s, 'Registered', 'test')"""
+    with psycopg.connect(db) as c:
+        names = {r[0] for r in c.execute("SELECT relname FROM pg_class WHERE relname LIKE 'payment_request_fy14%'")}
+        assert {"payment_request_fy1404", "payment_request_fy1405"} <= names
+        c.execute("SET ROLE requests_svc")
+
+        def request(number, method="Cash", transfer=None, card=None, amount=1000, year=1405, day=date(2026, 11, 15)):
+            c.execute(add, (year, uuid.uuid4(), number, day, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), amount, method, transfer, card))
+
+        request(1)
+        for bad, error in (
+            (lambda: request(1), psycopg.errors.UniqueViolation),             # one number per year
+            (lambda: request(2, "Transfer"), psycopg.errors.CheckViolation),  # a transfer names the receiving account
+            (lambda: request(3, card="6037991234567893"), psycopg.errors.CheckViolation),  # a card only for card-to-card
+            (lambda: request(4, amount=10.5), psycopg.errors.CheckViolation),  # Rial amounts are whole
+        ):
+            with pytest.raises(error):
+                with c.transaction():
+                    bad()
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # the service cannot read another service's schema
+            with c.transaction():
+                c.execute("SELECT 1 FROM cashflow.receipt")
+        request(1, year=1404, day=date(2025, 11, 15))
+        c.commit()
+
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+    try:
+        with psycopg.connect(db) as c:
+            with pytest.raises(psycopg.errors.RaiseException):
+                c.execute("UPDATE requests.payment_request SET priority = 2 WHERE fiscal_year = 1404")
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")

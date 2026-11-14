@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain layer of requests-svc (Payment Requests, درخواست وجه). No frameworks. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Requests.Domain</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Treasury.BuildingBlocks.Domain\Treasury.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+</Project>

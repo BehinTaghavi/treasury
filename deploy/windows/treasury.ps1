@@ -111,6 +111,7 @@ function Get-RequiredSettings {
         'CASHFLOW_DB_PASSWORD'    = (New-Password)
         'REFERENCE_DB_PASSWORD'   = (New-Password)
         'ACCOUNTS_DB_PASSWORD'    = (New-Password)
+        'REQUESTS_DB_PASSWORD'    = (New-Password)
         'KEYCLOAK_ADMIN_PASSWORD' = (New-Password)
         'GATEWAY_PORT'            = '8080'
         'GATEWAY_ADDRESS'         = '127.0.0.1'

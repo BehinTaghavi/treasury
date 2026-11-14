@@ -15,7 +15,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       // Where each remote's manifest lives. Overridden per deployment: NUXT_PUBLIC_REMOTES_RECEIPTS=https://...
-      remotes: { receipts: 'http://localhost:5174/mf-manifest.json', basicinfo: 'http://localhost:5175/mf-manifest.json' },
+      remotes: { receipts: 'http://localhost:5174/mf-manifest.json', basicinfo: 'http://localhost:5175/mf-manifest.json', requests: 'http://localhost:5176/mf-manifest.json' },
       apiBase: '',
       keycloakUrl: '',
     },
@@ -25,6 +25,7 @@ export default defineNuxtConfig({
     devProxy: {
       '/api/reference': { target: 'http://localhost:5082/api/reference', changeOrigin: true },
       '/api/accounts': { target: 'http://localhost:5083/api/accounts', changeOrigin: true },
+      '/api/requests': { target: 'http://localhost:5084/api/requests', changeOrigin: true },
       '/api': { target: 'http://localhost:5081/api', changeOrigin: true },
     },
   },
