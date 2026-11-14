@@ -30,3 +30,13 @@ Q12–Q18 are about cheque printing, in [cheque-printing.md](cheque-printing.md)
 | Q22 | Which **payers** may be chosen: any تفصیل, or only some types (customers, persons and companies…)? | **Answered 14 Nov 2026: only customers and persons/companies (`Receipt.PayerTypeNotAllowed`); the role is read from the تفصیل type («مشتریان», «اشخاص و شرکتها»).** | The old form lists all تفصیل (`Openaccs 15/16`). |
 | Q23 | Must POS and card-to-card receipts carry a **tracking number**? | **Answered 14 Nov 2026: optional.** | Old `D_variz` requires only the deposit type. |
 | Q24 | Does one payer ever pay **cash and cheques together** so that they need **one** receipt number? | **Answered 14 Nov 2026: no: each kind has its own receipt, even when paid at the same time.** | The old program has separate forms and series. |
+
+## Payment requests (owner, 15 Nov 2026)
+
+| # | Question | Current behaviour | Why |
+|---|---|---|---|
+| Q25 | **Who may approve** a payment request («تایید پرداخت»)? May the requester approve his own request? Are there **amount limits** (e.g. above a sum the CEO approves)? | Anyone using the system may approve, including the requester; no limits. Login and permissions (Keycloak) come next. | The manual names "the person allowed to approve requests" and lets the treasurer enter and approve when there are no requests. |
+| Q26 | The **beneficiary** is chosen from Basic Information → «ذینفعان» (with bank account and Sheba). Is that right, or should any تفصیل of the accounting system be allowed, chosen by its type as the manual describes? | Only beneficiaries defined in Basic Information. | The beneficiary list keeps the Sheba and national ID that transfers and cheques need. |
+| Q27 | May an **approved** request be corrected (the manual allows the approver to edit fields without *)? | No: the approval is withdrawn («برداشتن تایید»), the request corrected, then approved again. | Keeps what was approved exactly what is paid. |
+| Q28 | **Attachments** («اسکن ضمائم»): should the scans be uploaded with the request now, or is the number of attachments enough until the documents service is built? | Only the number of attachments. | Scans need a documents store (planned `documents-svc`). |
+| Q29 | When a request is paid by **several cheques or from several accounts** (manual: «پرداخت یک درخواست وجه از طریق چند فقره چک»), and for «پرداخت جمعی», are the details entered at payment time? | Yes, planned for the payment screens (Phase E). | As the manual describes. |
