@@ -15,6 +15,7 @@ export default defineConfig({
       dts: false,
       exposes: {
         './BasicInfo': './src/BasicInfo.vue',
+        './OpeningBalances': './src/accounts/OpeningBalances.vue',
       },
       shared: {
         vue: { singleton: true, requiredVersion: '^3.5.0' },

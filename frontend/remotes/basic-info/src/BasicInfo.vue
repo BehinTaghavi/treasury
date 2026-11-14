@@ -14,7 +14,6 @@ import CashDesks from './accounts/CashDesks.vue'
 import ChequeBooks from './accounts/ChequeBooks.vue'
 import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
-import OpeningBalances from './accounts/OpeningBalances.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
@@ -55,8 +54,7 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'purposes', title: ['گروه بابت‌ها و بابت‌ها', 'Purpose groups and purposes'] },
   { id: 'cash-desks', title: ['صندوق‌ها', 'Cash desks'] },
   { id: 'petty-cash', title: ['تنخواه گردان‌ها', 'Petty cash'] },
-  // Owner, 14 Nov 2026: opening balances of bank accounts, cash desks and petty cash (old program: «موجودی اول دوره حسابها»).
-  { id: 'opening-balances', title: ['موجودی اول دوره', 'Opening balances'] },
+  // Opening balances are an item of the main menu (owner, 14 Nov 2026), exposed as ./OpeningBalances.
   { id: 'departments', title: ['بخش‌ها (واحد سازمانی)', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
   { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
@@ -89,7 +87,6 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <CashDesks v-else-if="selected === 'cash-desks'" :key="'cash-desks' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChequeFormats v-else-if="selected === 'cheque-formats'" :key="'cheque-formats' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <PettyCash v-else-if="selected === 'petty-cash'" :key="'petty-cash' + locale" :api-base="apiBase" :locale="locale" :token="token" />
-      <OpeningBalances v-else-if="selected === 'opening-balances'" :key="'opening-balances' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Departments v-else-if="selected === 'departments'" :key="'departments' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />

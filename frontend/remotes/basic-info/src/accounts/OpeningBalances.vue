@@ -20,7 +20,9 @@ interface Named { id: string; name: string }
 interface Row { kind: Kind; id: string; title: string; hint: string; currency: string; isActive: boolean }
 interface Draft { date: string; amount: string; rial: string }
 
-const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
+/** fiscalYear: the year chosen in the shell's top bar, shown first (owner, 14 Nov 2026: opening balances in the main menu). */
+const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
+  { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const fa = computed(() => props.locale === 'fa')
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
@@ -29,7 +31,7 @@ const num = (n: number) => n.toLocaleString(fa.value ? 'fa-IR' : 'en-US', { useG
 const base = '/api/accounts/opening-balances'
 
 const thisYear = Number(todayJalali().slice(0, 4))
-const year = ref(String(thisYear))
+const year = ref(String(props.fiscalYear ?? thisYear))
 const yearChoices = computed(() => Array.from({ length: 8 }, (_, i) => thisYear - 4 + i).map(y => ({ value: String(y), label: num(y) })))
 
 const banks = ref<Named[]>([])

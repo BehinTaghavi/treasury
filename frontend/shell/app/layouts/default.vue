@@ -13,6 +13,8 @@ const menu = computed(() => [
   { to: '/basic-info', label: t('اطلاعات پایه', 'Basic info') },
   { to: '/payment-requests', label: t('درخواست وجه', 'Payment requests') },
   { to: '/payments', label: t('پرداخت‌ها', 'Payments') },
+  // Owner, 14 Nov 2026: opening balances get their own item, above receipts.
+  { to: '/opening-balances', label: t('موجودی اول دوره', 'Opening balances') },
   { to: '/receipts', label: t('دریافت‌ها', 'Receipts') },
   { to: '/reports', label: t('گزارشات', 'Reports') },
 ])
