@@ -9,6 +9,10 @@ public sealed record ChangeBankAccountRequest(BankAccountForm Form, long Version
 
 public sealed record VersionRequest(long Version);
 
+/// <param name="Version">Version of the entry being corrected; null for a new one.</param>
+public sealed record OpeningBalanceRequest(
+    Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind Kind, Guid AccountId, int FiscalYear, string Date, decimal Amount, decimal? RialEquivalent, long? Version);
+
 public sealed record PettyCashChangeRequest(Treasury.Accounts.Application.PettyCash.PettyCashForm Form, long Version);
 
 public sealed record CashDeskChangeRequest(Treasury.Accounts.Application.CashDesks.CashDeskForm Form, long Version);
@@ -87,6 +91,25 @@ public static class Endpoints
             ToHttp(await u.ChangeAsync(Key(http), id, r.Form, r.Version, ct).ConfigureAwait(false)));
         api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
             ToHttp(await u.SetActiveAsync(Key(http), id, change == "activate", r.Version, ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Opening balances (موجودی اول دوره) under /api/accounts/opening-balances (owner, 14 Nov 2026).</summary>
+    public static void MapOpeningBalanceEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/opening-balances");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (int year, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(year, ct).ConfigureAwait(false)));
+
+        api.MapPut("/", async (OpeningBalanceRequest r, HttpRequest http, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            ToHttp(await u.EnterAsync(new(Key(http), r.Kind, r.AccountId, r.FiscalYear, r.Date, r.Amount, r.RialEquivalent, r.Version), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/delete", async (Guid id, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveAsync(new(Key(http), id, r.Version), ct).ConfigureAwait(false)));
     }
 
     private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();

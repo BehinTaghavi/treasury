@@ -19,7 +19,8 @@ public sealed class BankAccountPostgresTests : IDisposable
         _db = db;
         _db.Require();
         _dataSource = NpgsqlDataSource.Create(db.ServiceAs("accounts_svc"));
-        _useCases = new BankAccountUseCases(new PostgresUnitOfWork(_dataSource), new PostgresBankAccountRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        _useCases = new BankAccountUseCases(new PostgresUnitOfWork(_dataSource), new PostgresBankAccountRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource),
+            new PostgresOpeningBalanceRepository());
     }
 
     public void Dispose() => _dataSource.Dispose();
@@ -121,4 +122,24 @@ public sealed class BankAccountPostgresTests : IDisposable
         Assert.DoesNotContain(await _useCases.ListAsync(false, CancellationToken.None), x => x.Id == id);
         Assert.Equal("شعبه مرکزی", (await _useCases.ListAsync(true, CancellationToken.None)).Single(x => x.Id == id).BranchName);
     }
+
+    [Fact]
+    public async Task An_opening_balance_round_trips_is_carried_to_the_next_year_and_keeps_the_account_from_deletion()
+    {
+        var balances = new Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresOpeningBalanceRepository(), new PostgresBankAccountRepository(), new PostgresCashDeskRepository(),
+            new PostgresPettyCashRepository(), new PostgresIdempotencyStore(_dataSource));
+        var bank = await _useCases.RegisterAsync(new(Key(), Form("ob")), CancellationToken.None);
+        Assert.True(bank.IsSuccess, bank.ErrorCode);
+        var kind = Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind.BankAccount;
+        var r = await balances.EnterAsync(new(Key(), kind, bank.Value, 1405, "1405/08/24", -2_500_000, null), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.True((await balances.EnterAsync(new(Key(), kind, bank.Value, 1405, "1405/08/25", 3_000_000, null, 1), CancellationToken.None)).IsSuccess);
+
+        var mine = (await balances.ListAsync(1405, CancellationToken.None)).Single(v => v.AccountId == bank.Value);
+        Assert.Equal(("1405/08/25", 3_000_000m, 2L), (mine.Entry!.Date, mine.Entry.Amount, mine.Entry.Version));
+        Assert.Equal(1405, (await balances.ListAsync(1407, CancellationToken.None)).Single(v => v.AccountId == bank.Value).Carried!.FromYear);
+        Assert.Equal("BankAccount.InUse", (await _useCases.DeleteAsync(new(Key(), bank.Value, 1), CancellationToken.None)).ErrorCode);
+    }
 }
+

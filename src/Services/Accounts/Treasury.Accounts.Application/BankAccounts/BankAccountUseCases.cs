@@ -44,7 +44,8 @@ public sealed record BankAccountView(
 }
 
 /// <summary>Use cases of the company's bank accounts (manual section 5). Each write is one command in one transaction.</summary>
-public sealed class BankAccountUseCases(IUnitOfWork unitOfWork, IBankAccountRepository accounts, IReferenceLookup reference, IIdempotencyStore idempotency)
+public sealed class BankAccountUseCases(
+    IUnitOfWork unitOfWork, IBankAccountRepository accounts, IReferenceLookup reference, IIdempotencyStore idempotency, IOpeningBalanceRepository? openingBalances = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -114,7 +115,9 @@ public sealed class BankAccountUseCases(IUnitOfWork unitOfWork, IBankAccountRepo
         Run(command.IdempotencyKey, async ct =>
         {
             var account = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
-            account.Delete(await accounts.HasBackupAsync(account.Id, null, ct).ConfigureAwait(false));
+            var hasBalance = openingBalances is not null
+                && await openingBalances.AnyForAccountAsync(Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind.BankAccount, account.Id, ct).ConfigureAwait(false);
+            account.Delete(await accounts.HasBackupAsync(account.Id, null, ct).ConfigureAwait(false), hasBalance);
             await accounts.DeleteAsync(account, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(account.Id);
         }, cancellationToken);

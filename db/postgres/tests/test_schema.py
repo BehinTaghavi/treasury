@@ -470,3 +470,20 @@ def test_a_standard_cheque_type_has_no_account_and_each_print_type_once(db):
             with c.transaction():
                 c.execute(add, (uuid.uuid4(), 980003, None, "NewestSmall"))
         c.rollback()
+
+
+def test_an_opening_balance_once_per_account_and_year_and_cash_never_below_zero(db):
+    # 024_accounts_opening_balances.sql (owner, 14 Nov 2026).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        add = """INSERT INTO accounts.opening_balance (id, account_kind, account_id, fiscal_year, balance_date, amount, rial_equivalent)
+                 VALUES (%s, %s, %s, 1405, '2026-11-15', %s, %s)"""
+        bank = uuid.uuid4()
+        c.execute(add, (uuid.uuid4(), "BankAccount", bank, -100, None))  # a bank account may be overdrawn
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "BankAccount", bank, 5, None))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "CashDesk", uuid.uuid4(), -1, None))
+        c.rollback()

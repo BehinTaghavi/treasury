@@ -53,6 +53,7 @@ public sealed class InMemoryAccountsDatabase : IDisposable
     internal readonly Dictionary<Guid, BankAccountSnapshot> BankAccounts = [];
     internal readonly Dictionary<Guid, CashDeskSnapshot> CashDesks = [];
     internal readonly Dictionary<Guid, PettyCashSnapshot> PettyCash = [];
+    internal readonly Dictionary<Guid, OpeningBalanceSnapshot> OpeningBalances = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -78,6 +79,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, CashDeskSnapshot> CashDesks { get; } = [];
 
     public Dictionary<Guid, PettyCashSnapshot> PettyCash { get; } = [];
+
+    public Dictionary<Guid, OpeningBalanceSnapshot?> OpeningBalances { get; } = []; // null: removed
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -114,6 +117,18 @@ public sealed class InMemoryUnitOfWork(InMemoryAccountsDatabase db) : IUnitOfWor
                 foreach (var (id, s) in pending.PettyCash)
                 {
                     db.PettyCash[id] = s;
+                }
+
+                foreach (var (id, s) in pending.OpeningBalances)
+                {
+                    if (s is null)
+                    {
+                        db.OpeningBalances.Remove(id);
+                    }
+                    else
+                    {
+                        db.OpeningBalances[id] = s;
+                    }
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -318,3 +333,101 @@ public sealed class InMemoryIdempotencyStore(InMemoryAccountsDatabase db) : IIde
         return Task.CompletedTask;
     }
 }
+
+/// <summary>Stored form of an opening balance.</summary>
+public sealed record OpeningBalanceSnapshot(
+    Guid Id, Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind Kind, Guid AccountId, int FiscalYear, DateOnly Date, decimal Amount, decimal? RialEquivalent, long Version)
+{
+    public static OpeningBalanceSnapshot From(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance b, long version) =>
+        new(b.Id, b.AccountKind, b.AccountId, b.FiscalYear, b.Date.Value, b.Amount, b.RialEquivalent, version);
+
+    public Treasury.Accounts.Domain.OpeningBalances.OpeningBalance ToDomain() =>
+        Treasury.Accounts.Domain.OpeningBalances.OpeningBalance.Restore(Id, Kind, AccountId, FiscalYear, new FiscalDate(Date), Amount, RialEquivalent, Version);
+}
+
+/// <summary>In-memory opening balances: same version checks and outbox as the database.</summary>
+public sealed class InMemoryOpeningBalanceRepository(InMemoryAccountsDatabase db) : IOpeningBalanceRepository
+{
+    public Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().GetValueOrDefault(id)?.ToDomain());
+
+    public Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> FindAsync(
+        Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, int fiscalYear, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Values.FirstOrDefault(s => s.Kind == kind && s.AccountId == accountId && s.FiscalYear == fiscalYear)?.ToDomain());
+
+    public Task<IReadOnlyList<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance>> ListUpToAsync(int fiscalYear, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance>>(
+            Visible().Values.Where(s => s.FiscalYear <= fiscalYear).Select(s => s.ToDomain()).ToList());
+
+    public Task<bool> AnyForAccountAsync(Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Values.Any(s => s.Kind == kind && s.AccountId == accountId));
+
+    public Task AddAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(balance);
+        if (Visible().Values.Any(s => s.Kind == balance.AccountKind && s.AccountId == balance.AccountId && s.FiscalYear == balance.FiscalYear))
+        {
+            throw new ConcurrencyConflictException("An opening balance for this account and year was saved by someone else.");
+        }
+
+        return Write(balance, 1, null);
+    }
+
+    public Task SaveAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(balance);
+        return Write(balance, balance.Version + 1, balance.Version);
+    }
+
+    public Task DeleteAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(balance);
+        if (Visible().GetValueOrDefault(balance.Id)?.Version != balance.Version)
+        {
+            throw new ConcurrencyConflictException($"Opening balance {balance.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.OpeningBalances[balance.Id] = null;
+        pending.Outbox.AddRange(balance.PendingEvents.Select(OutboxMessage.From));
+        balance.MarkSaved(balance.Version);
+        return Task.CompletedTask;
+    }
+
+    private Dictionary<Guid, OpeningBalanceSnapshot> Visible()
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, OpeningBalanceSnapshot>(db.OpeningBalances);
+            foreach (var (id, s) in pending.OpeningBalances)
+            {
+                if (s is null)
+                {
+                    all.Remove(id);
+                }
+                else
+                {
+                    all[id] = s;
+                }
+            }
+
+            return all;
+        }
+    }
+
+    private Task Write(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, long newVersion, long? expected)
+    {
+        if (expected is { } v && Visible().GetValueOrDefault(balance.Id)?.Version != v)
+        {
+            throw new ConcurrencyConflictException($"Opening balance {balance.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.OpeningBalances[balance.Id] = OpeningBalanceSnapshot.From(balance, newVersion);
+        pending.Outbox.AddRange(balance.PendingEvents.Select(OutboxMessage.From));
+        balance.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+}
+

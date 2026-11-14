@@ -137,9 +137,10 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
     /// Deletes an account typed by mistake (owner's report no. 3, item 1: "حذف در شرایطی قابل انجام است که حساب مربوطه گردش نداشته
     /// باشد"): only while no cheque book, cheque type or cheque names it, and while no backup account points to it.
     /// </summary>
-    public void Delete(bool hasBackup)
+    /// <param name="hasTransactions">The account has a transaction such as an opening balance (owner, 14 Nov 2026).</param>
+    public void Delete(bool hasBackup, bool hasTransactions = false)
     {
-        Require(!IsInUse, "BankAccount.InUse", "Cheque books or cheques name this account; switch it off instead.");
+        Require(!IsInUse && !hasTransactions, "BankAccount.InUse", "Cheque books, cheques or transactions name this account; switch it off instead.");
         Require(!hasBackup, "BankAccount.HasBackup", "A backup account belongs to this account; delete the backup first.");
         Raise(new BankAccountDeleted(Id));
     }

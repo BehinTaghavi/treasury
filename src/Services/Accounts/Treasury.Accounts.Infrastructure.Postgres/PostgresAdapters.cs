@@ -22,6 +22,7 @@ public static class PostgresRegistration
         services.AddSingleton<IBankAccountRepository, PostgresBankAccountRepository>();
         services.AddSingleton<ICashDeskRepository, PostgresCashDeskRepository>();
         services.AddSingleton<IPettyCashRepository, PostgresPettyCashRepository>();
+        services.AddSingleton<IOpeningBalanceRepository, PostgresOpeningBalanceRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -160,7 +161,8 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         // "NOT in_use" and "no backup": a cheque book or a backup saved since the account was loaded refuses the delete.
         await using (var cmd = tx.Command(
             "DELETE FROM accounts.bank_account b WHERE id = @id AND version = @expected AND NOT in_use " +
-            "AND NOT EXISTS (SELECT 1 FROM accounts.bank_account x WHERE x.main_account_id = b.id)"))
+            "AND NOT EXISTS (SELECT 1 FROM accounts.bank_account x WHERE x.main_account_id = b.id) " +
+            "AND NOT EXISTS (SELECT 1 FROM accounts.opening_balance o WHERE o.account_kind = 'BankAccount' AND o.account_id = b.id)"))
         {
             cmd.Parameters.AddWithValue("id", account.Id);
             cmd.Parameters.AddWithValue("expected", account.Version);

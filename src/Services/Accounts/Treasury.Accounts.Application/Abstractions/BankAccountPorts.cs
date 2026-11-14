@@ -84,3 +84,25 @@ public interface IReferenceLookup
     /// </summary>
     Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }
+
+/// <summary>Opening balances (موجودی اول دوره) of bank accounts, cash desks and petty cash.</summary>
+public interface IOpeningBalanceRepository
+{
+    Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> FindAsync(
+        Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, int fiscalYear, CancellationToken cancellationToken);
+
+    /// <summary>Every entry of years up to and including <paramref name="fiscalYear"/> (for the balance carried to it).</summary>
+    Task<IReadOnlyList<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance>> ListUpToAsync(int fiscalYear, CancellationToken cancellationToken);
+
+    /// <summary>Does the account have any opening balance? Then it has a transaction and is never deleted (owner, 14 Nov 2026).</summary>
+    Task<bool> AnyForAccountAsync(Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, CancellationToken cancellationToken);
+
+    Task AddAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+
+    Task SaveAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+}
+
