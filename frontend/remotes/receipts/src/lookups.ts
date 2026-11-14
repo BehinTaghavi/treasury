@@ -48,9 +48,10 @@ export function useLookups(api: TreasuryApi) {
   const accountTitle = (a: BankAccount) => `${bankName(a.bankId)} – ${a.accountNumber}${a.branchName ? ` (${a.branchName})` : ''}`
 
   /** تفصیل found by name or code; the chosen one is always kept in the list. */
-  async function searchDetails(text: string, keep?: string): Promise<Detail[]> {
+  async function searchDetails(text: string, keep?: string, roles?: string): Promise<Detail[]> {
     const q = new URLSearchParams({ take: '50' })
     if (text.trim()) q.set('search', text.trim())
+    if (roles) q.set('roles', roles)
     const r = await api.get<Detail[]>(`/api/reference/ledger/details?${q}`)
     const found = r.ok ? r.value : []
     if (keep && !found.some(d => d.code === keep)) {

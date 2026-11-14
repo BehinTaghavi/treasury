@@ -45,6 +45,8 @@ const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 // ---- header (every kind) ----
 const header = reactive({ date: todayJalali(), payer: '', groupId: '', purpose: '', ref1: '', ref2: '', departmentId: '', salesProceeds: false, note: '' })
 const payers = ref<Detail[]>([])
+/** Owner, 14 Nov 2026 (answer to Q22): payers are customers and persons or companies. */
+const PayerRoles = 'Customer,PersonOrCompany'
 const purposes = ref<Purpose[]>([])
 const group = computed(() => L.groups.value.find(g => g.id === header.groupId))
 const refTitle = (id: string | null | undefined) => L.references.value.find(r => r.id === id)?.name
@@ -54,7 +56,7 @@ const departmentChoices = computed<Choice[]>(() => L.departments.value.filter(d 
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 function onPayerSearch(text: string) {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(async () => { payers.value = await L.searchDetails(text, header.payer) }, 250)
+  searchTimer = setTimeout(async () => { payers.value = await L.searchDetails(text, header.payer, PayerRoles) }, 250)
 }
 watch(() => header.groupId, async id => {
   purposes.value = []
@@ -161,6 +163,7 @@ async function save() {
       if (parseAmount(l.amount) === null) return show('error', translate('Money.NotPositive', props.locale))
       if (l.dueDate && !normaliseJalali(l.dueDate)) return show('error', translate('FiscalDate.Invalid', props.locale))
       if (l.currency !== 'IRR' && parseAmount(l.rate) === null) return show('error', translate('Money.InvalidRate', props.locale))
+      if (isCheque(l.kind) && !l.sayadId.trim()) return show('error', translate('Receipt.SayadIdRequired', props.locale))
     }
     path = '/api/cashflow/receipts/instruments'
     body = { header: headerBody(), instruments: lines.value.map(lineBody) }
@@ -199,7 +202,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await L.load(); payers.value = await L.searchDetails('') })
+onMounted(async () => { await L.load(); payers.value = await L.searchDetails('', undefined, PayerRoles) })
 </script>
 
 <template>
@@ -277,7 +280,7 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('')
           <label>{{ t('شعبه', 'Branch') }} <input v-model="l.branchName" /></label>
           <label>{{ t('کد شعبه', 'Branch code') }} <input v-model="l.branchCode" dir="ltr" /></label>
           <label>{{ t('شماره حساب', 'Account no.') }} <input v-model="l.accountNumber" dir="ltr" /></label>
-          <label>{{ t('شناسهٔ صیاد (۱۶ رقم)', 'Sayad ID (16 digits)') }} <input v-model="l.sayadId" maxlength="16" dir="ltr" inputmode="numeric" /></label>
+          <label class="req">{{ t('شناسهٔ صیاد (۱۶ رقم)', 'Sayad ID (16 digits)') }} <input v-model="l.sayadId" maxlength="16" dir="ltr" inputmode="numeric" /></label>
           <label>{{ t('نام دارندهٔ حساب', 'Account holder') }} <input v-model="l.accountHolder" :placeholder="t('اگر چک شخص دیگری است', 'If someone else\'s cheque')" /></label>
           <label>{{ t('شهر', 'City') }}
             <SearchSelect v-model="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" />

@@ -13,6 +13,12 @@ public enum DetailRole
 
     /// <summary>An organisational unit (واحد سازمانی): holders of cash desks and petty cash.</summary>
     OrgUnit,
+
+    /// <summary>A customer (مشتری): may pay the company (owner, 14 Nov 2026, answer to Q22).</summary>
+    Customer,
+
+    /// <summary>A person or company (اشخاص و شرکت‌ها): may pay the company (owner, 14 Nov 2026, answer to Q22).</summary>
+    PersonOrCompany,
 }
 
 /// <summary>
@@ -20,6 +26,7 @@ public enum DetailRole
 /// staff "کارکنان کارخانه", "کارکنان دفتر"; cost centres "مراکز هزینه تولیدی", "… عمومی", "… سربار کارخانه", "… اداری دفتر",
 /// "… اداری کارخانه", "… تبلیغات" (Arabic or Persian letters, singular or plural). A تفصیل marked "مرکز هزینه است" in the export
 /// is a cost centre whatever its type. Types are matched by their first words so that other clients' "کارکنان …" also count.
+/// Payers (answer to Q22): "مشتریان" (customers) and "اشخاص و شرکتها" (persons and companies).
 /// </summary>
 public static class DetailRoles
 {
@@ -28,6 +35,7 @@ public static class DetailRoles
         ("کارکنان", DetailRole.Staff), ("کارکن", DetailRole.Staff), ("پرسنل", DetailRole.Staff),
         ("مراکزهزینه", DetailRole.CostCentre), ("مرکزهزینه", DetailRole.CostCentre),
         ("واحدهایسازمانی", DetailRole.OrgUnit), ("واحدسازمانی", DetailRole.OrgUnit),
+        ("مشتری", DetailRole.Customer), ("اشخاص", DetailRole.PersonOrCompany), ("شخص", DetailRole.PersonOrCompany),
     ];
 
     public static DetailRole? Of(string? type, bool markedCostCentre = false)
@@ -51,4 +59,7 @@ public static class DetailRoles
 
     /// <summary>Who may hold a cash desk or a petty cash (owner's report no. 2, item 3).</summary>
     public static readonly IReadOnlySet<DetailRole> Holders = new HashSet<DetailRole> { DetailRole.Staff, DetailRole.CostCentre, DetailRole.OrgUnit };
+
+    /// <summary>Who may pay the company on a receipt: customers, persons and companies (owner, 14 Nov 2026, answer to Q22).</summary>
+    public static readonly IReadOnlySet<DetailRole> Payers = new HashSet<DetailRole> { DetailRole.Customer, DetailRole.PersonOrCompany };
 }

@@ -21,7 +21,8 @@ public sealed class ReceiptTests
 
     private static Instrument Cheque(Guid receiptId, string due, InstrumentKind kind = InstrumentKind.OrdinaryCheque, Money? amount = null, ReceivedInstrumentDetails? details = null, string date = "1405/08/23") =>
         Instrument.Receive(Guid.NewGuid(), kind, "123456", kind.IsCheque() ? "بانک ملت" : null, amount ?? Money.Rials(10_000_000), D(date), D(due),
-            CounterpartyRef.ForDetail(Payer.DetailCode, Payer.Name), "فروش محصولات", User, details ?? ReceivedInstrumentDetails.None, receiptId);
+            CounterpartyRef.ForDetail(Payer.DetailCode, Payer.Name), "فروش محصولات", User,
+            details ?? (kind.IsCheque() ? new ReceivedInstrumentDetails(SayadId: "1234567890123456") : ReceivedInstrumentDetails.None), receiptId);
 
     [Fact]
     public void Cash_is_received_into_a_cash_desk_D_Naghd()
@@ -100,6 +101,21 @@ public sealed class ReceiptTests
         Assert.True(postDated.IsPostDated);
         Assert.Equal(current.Counterparty.Id, r.Payer.Id);
     }
+
+    [Fact]
+    public void Every_cheque_on_a_receipt_needs_its_Sayad_ID_owner_answer_Q21()
+    {
+        var id = Guid.NewGuid();
+        var noSayad = Cheque(id, "1405/09/01", details: ReceivedInstrumentDetails.None);
+        Assert.Equal("Receipt.SayadIdRequired", Assert.Throws<DomainException>(() => Receipt.RecordInstruments(id, 1, Header(), [noSayad], User)).Code);
+        var note = Cheque(id, "1405/09/01", InstrumentKind.PromissoryNote);
+        Assert.Single(Receipt.RecordInstruments(id, 1, Header(), [note], User).InstrumentIds);
+    }
+
+    [Fact]
+    public void Only_customers_persons_and_companies_pay_owner_answer_Q22() =>
+        Assert.Equal("Receipt.PayerTypeNotAllowed", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCash(Guid.NewGuid(), 1, Header(payer: Payer with { MayPay = false }), Desk, Money.Rials(1), User)).Code);
 
     [Fact]
     public void A_receipt_of_cheques_needs_at_least_one() =>

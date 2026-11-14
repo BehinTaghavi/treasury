@@ -41,6 +41,7 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     {
         "200015" => new PayerFact("200015", "شرکت نمونه بازرگانی", true),
         "200099" => new PayerFact("200099", "مشتری قدیمی", false),
+        "300001" => new PayerFact("300001", "کارمند", true, MayPay: false),
         _ => null,
     });
 
@@ -134,6 +135,7 @@ public sealed class ReceiptUseCaseTests : IDisposable
     {
         Assert.Equal("Receipt.PayerNotFound", (await _receipts.RecordCashAsync(new(Key(), Header(payer: "999999"), FakeReceiptAccounts.Desk, 1), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.PayerInactive", (await _receipts.RecordCashAsync(new(Key(), Header(payer: "200099"), FakeReceiptAccounts.Desk, 1), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.PayerTypeNotAllowed", (await _receipts.RecordCashAsync(new(Key(), Header(payer: "300001"), FakeReceiptAccounts.Desk, 1), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.PurposeGroupNotForReceipts", (await _receipts.RecordCashAsync(new(Key(), Header(group: FakeReceiptReference.PaymentGroup), FakeReceiptAccounts.Desk, 1), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.AccountNotFound", (await _receipts.RecordCashAsync(new(Key(), Header(), Guid.NewGuid(), 1), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.AccountInactive", (await _receipts.RecordCashAsync(new(Key(), Header(), FakeReceiptAccounts.ClosedDesk, 1), CancellationToken.None)).ErrorCode);
@@ -187,8 +189,9 @@ public sealed class ReceiptUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task An_unknown_bank_or_no_cheques_is_refused()
+    public async Task An_unknown_bank_or_no_cheques_or_a_cheque_without_its_Sayad_ID_is_refused()
     {
+        Assert.Equal("Receipt.SayadIdRequired", (await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("1", "1405/09/01") with { SayadId = null }]), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.BankNotFound", (await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("1", "1405/09/01", Guid.NewGuid())]), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.NoInstruments", (await _receipts.RecordInstrumentsAsync(new(Key(), Header(), []), CancellationToken.None)).ErrorCode);
     }

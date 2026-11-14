@@ -65,13 +65,18 @@ public sealed class OrganizationTests
     [InlineData("مراکز هزینه اداری دفتر", DetailRole.CostCentre)]
     [InlineData("مرکز هزینه تبلیغات", DetailRole.CostCentre)]
     [InlineData("واحدهای سازمانی", DetailRole.OrgUnit)]
+    [InlineData("مشتريان", DetailRole.Customer)]
+    [InlineData("مشتری عمده", DetailRole.Customer)]
+    [InlineData("اشخاص وشركتها", DetailRole.PersonOrCompany)]
+    [InlineData("اشخاص و شرکت‌ها", DetailRole.PersonOrCompany)]
     public void The_role_of_a_detail_account_comes_from_its_type_owner_13_nov(string type, DetailRole role) =>
         Assert.Equal(role, DetailRoles.Of(type));
 
     [Fact]
     public void Other_types_have_no_role_unless_marked_as_cost_centre()
     {
-        Assert.Null(DetailRoles.Of("اشخاص وشركتها"));
+        Assert.Null(DetailRoles.Of("بانكها"));
+        Assert.Null(DetailRoles.Of("سفارشات"));
         Assert.Null(DetailRoles.Of(null));
         Assert.Equal(DetailRole.CostCentre, DetailRoles.Of("بانكها", markedCostCentre: true));
     }

@@ -56,7 +56,7 @@ public sealed class HttpReceiptAccountLookup(HttpClient http) : IReceiptAccountL
 /// <summary>Payers' تفصیل, purpose groups and bank names, asked from reference-svc over its API (ADR 0001). Base address: Services:Reference.</summary>
 public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptReferenceLookup
 {
-    private sealed record Detail(string Code, string Name, bool IsActive);
+    private sealed record Detail(string Code, string Name, bool IsActive, string? Role = null);
 
     private sealed record Group(Guid Id, string Name, string Direction, bool IsActive);
 
@@ -64,7 +64,7 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
 
     public async Task<PayerFact?> PayerAsync(string detailCode, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Detail>(http, $"api/reference/ledger/details/{Uri.EscapeDataString(detailCode)}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } d
-            ? new PayerFact(d.Code, d.Name, d.IsActive)
+            ? new PayerFact(d.Code, d.Name, d.IsActive, d.Role is "Customer" or "PersonOrCompany")
             : null;
 
     public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>

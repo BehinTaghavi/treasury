@@ -44,7 +44,8 @@ public sealed record ReceiptAccountFact(ReceiptAccountKind Kind, Guid Id, string
 public sealed record PurposeGroupFact(Guid Id, string Name, bool IsForReceipts, bool IsActive);
 
 /// <summary>A payer's تفصیل as reference-svc describes it (old: Person + Tafno, "پرداخت كننده نامشخص است").</summary>
-public sealed record PayerFact(string DetailCode, string Name, bool IsActive);
+/// <param name="MayPay">Its type is a customer or a person/company (owner, 14 Nov 2026, answer to Q22).</param>
+public sealed record PayerFact(string DetailCode, string Name, bool IsActive, bool MayPay = true);
 
 /// <summary>What every receipt says, whatever its kind (new-version manual, form «دریافت چک و اسناد دریافتنی»).</summary>
 /// <param name="Reference1">Value of the purpose group's first reference (عطف), e.g. an invoice or contract number.</param>
@@ -174,6 +175,12 @@ public sealed class Receipt : AggregateRoot<Guid>
         ArgumentNullException.ThrowIfNull(instruments);
         Validate(header, number, userId);
         Require(instruments.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
+        foreach (var i in instruments.Where(i => i.Kind.IsCheque() && i.Details.SayadId is null))
+        {
+            // Owner, 14 Nov 2026 (answer to Q21): every received cheque carries its 16-digit Sayad ID.
+            throw new DomainException("Receipt.SayadIdRequired", $"Enter the Sayad ID of cheque {i.Number}.");
+        }
+
         var receipt = new Receipt(id, ReceiptKind.Instruments, number, header, userId);
         foreach (var i in instruments)
         {
@@ -211,7 +218,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version)
     {
         ArgumentNullException.ThrowIfNull(payer);
-        var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true),
+        var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true, true),
             new PurposeGroupFact(purposeGroupId, purposeGroupName, true, true), purpose, reference1, reference2, departmentId, salesProceeds, note);
         var r = new Receipt(id, kind, number, header, recordedBy)
         {
@@ -262,6 +269,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
         Require(header.Payer is not null && !string.IsNullOrWhiteSpace(header.Payer.DetailCode), "Receipt.PayerRequired", "Choose the payer (پرداخت کننده).");
         Require(header.Payer!.IsActive, "Receipt.PayerInactive", "The payer's تفصیل is switched off.");
+        Require(header.Payer.MayPay, "Receipt.PayerTypeNotAllowed", "The payer must be a customer or a person or company (owner, answer to Q22).");
         Require(header.PurposeGroup is not null, "Receipt.PurposeGroupRequired", "Choose the purpose group (گروه بابت).");
         Require(header.PurposeGroup!.IsForReceipts, "Receipt.PurposeGroupNotForReceipts", "This purpose group is for payments.");
         Require(header.PurposeGroup.IsActive, "Receipt.PurposeGroupInactive", "This purpose group is switched off.");
