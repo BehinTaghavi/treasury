@@ -16,7 +16,7 @@ interface Instrument {
 }
 interface Receipt {
   id: string; kind: 'Cash' | 'BankDeposit' | 'Instruments'; fiscalYear: number; number: number; date: string; payerDetailCode: string; payerName: string
-  purposeGroupName: string; purpose: string; reference1: string | null; reference2: string | null; salesProceeds: boolean; note: string | null
+  purposeGroupName: string; purpose: string; reference1: string | null; reference2: string | null; departmentId: string | null; salesProceeds: boolean; note: string | null
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null; currency: string | null
   rateToRial: number | null; totalRial: number; instrumentCount: number; state: string; cancelledOn: string | null; cancelReason: string | null
   recordedBy: string; version: number; instruments: Instrument[] | null
@@ -176,6 +176,7 @@ onMounted(async () => { await L.load(); await load() })
         {{ selected.purposeGroupName }}: {{ selected.purpose }}
         <template v-if="selected.reference1"> · {{ selected.reference1 }}</template>
         <template v-if="selected.reference2"> · {{ selected.reference2 }}</template>
+        <template v-if="selected.departmentId"> · {{ t('بخش دریافت کننده', 'Receiving department') }}: {{ L.departments.value.find(d => d.id === selected!.departmentId)?.name }}</template>
         <template v-if="selected.salesProceeds"> · {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</template>
         <template v-if="selected.trackingNumber"> · {{ t('پیگیری', 'Tracking') }}: {{ selected.trackingNumber }}</template>
         <template v-if="selected.rateToRial"> · {{ t('نرخ', 'Rate') }}: {{ money(selected.rateToRial) }}</template>

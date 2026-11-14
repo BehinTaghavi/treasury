@@ -224,10 +224,10 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="header.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="header.ref2" /></label>
-      <!-- بخش: the department that received the money (manual, form «دریافت چک و اسناد دریافتنی»). Shown only when departments are
+      <!-- «بخش دریافت کننده» (owner, 15 Nov 2026: keep it, with this title): the department that received the money (manual, form «دریافت چک و اسناد دریافتنی»). Shown only when departments are
            defined in Basic Information; Iran Nazho Co. defines none (owner, 13 Nov 2026). -->
-      <label v-if="departmentChoices.length">{{ t('بخش', 'Department') }}
-        <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش', 'Department')" />
+      <label v-if="departmentChoices.length">{{ t('بخش دریافت کننده', 'Receiving department') }}
+        <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش دریافت کننده', 'Receiving department')" />
       </label>
       <label class="tr-check"><input v-model="header.salesProceeds" type="checkbox" /> {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</label>
       <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="header.note" maxlength="500" /></label>
