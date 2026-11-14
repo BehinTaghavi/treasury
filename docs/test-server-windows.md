@@ -81,13 +81,17 @@ Your test data is kept. It is stored inside Docker, not in the folder, and the p
 - **"Docker Desktop is not installed"**: do step 2.
 - **"Docker is not running"**: open Docker Desktop, wait for *Engine running*, and try again.
 - **"Docker could not build the system after 3 attempts"**: usually the internet connection. Check it, then double-click **Start Treasury** again. Each try continues from what was already downloaded.
-- The browser says **"This site can't be reached"**: the system is not started. Double-click **Start Treasury**.
+- **"Conflict. The container name ... is already in use"**: an earlier start was interrupted. Since 14 Nov 2026 **Start Treasury** clears this
+  by itself; with an older download, use a newer one (step 7). Your test data is kept.
+- The browser says **"This site can't be reached": the system is not started. Double-click **Start Treasury**.
 - The PC becomes slow: use **Stop Treasury** when you are not testing.
 
 ## For the reviewer (technical)
 `deploy/windows/treasury.ps1` (Windows PowerShell 5.1) wraps `docker compose -f deploy/docker-compose.yml`. Its `.env` lives in
 `%LOCALAPPDATA%\Treasury\treasury.env` with generated passwords and `GATEWAY_ADDRESS=127.0.0.1`. It waits for the API (404 on an
 unknown id) and the shell (200) before opening the browser. `reset` is `down -v`.
-`start` runs `compose build` up to 3 times, then `up -d`. Builds keep downloads in BuildKit cache mounts (`treasury-pnpm-store`,
+`start` runs `compose build` up to 3 times, then `up -d --remove-orphans`. Before that it removes containers named `<12 hex>_treasury-*`
+(left by an interrupted recreate, which makes `up` fail with a name conflict); if `up` still fails it runs `down --remove-orphans`
+(no `-v`, data volume kept) and tries `up` once more. Builds keep downloads in BuildKit cache mounts (`treasury-pnpm-store`,
 `treasury-nuget`, `sharing=locked`), so a retry after a broken download continues where it stopped. The frontend install step comes before
 `ARG APP`, so the shell and remote images share one install layer.

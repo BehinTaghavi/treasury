@@ -49,6 +49,30 @@ function Invoke-Build {
     Fail "Docker could not build the system after $attempts attempts (see the lines above). Check the internet connection, then take a screenshot of this window and send it to Claude."
 }
 
+# A start or update that was interrupted (Docker Desktop restarted, the PC slept) can leave a half-replaced container behind,
+# named like "45d15a55486e_treasury-remote-receipts-1"; the next start then fails with
+# "Conflict. The container name ... is already in use". Containers hold no data (the database is in the 'pgdata' volume),
+# so they can be removed and created again.
+function Remove-LeftoverContainers {
+    $ErrorActionPreference = 'Continue'
+    $names = & docker ps -a --format '{{.Names}}' 2> $null | Where-Object { $_ -match '^[0-9a-f]{12}_treasury-' }
+    foreach ($name in $names) {
+        Say "Removing a container left over from an interrupted start: $name"
+        & docker rm -f $name *> $null
+    }
+}
+
+function Start-Containers {
+    Remove-LeftoverContainers
+    & docker compose -f $compose --env-file $envFile up -d --remove-orphans
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host ''
+    Say 'Starting stopped with a problem. Removing the containers (your test data is kept) and trying once more...'
+    & docker compose -f $compose --env-file $envFile down --remove-orphans   # no -v: the data volume stays
+    Remove-LeftoverContainers
+    Invoke-Compose @('up', '-d', '--remove-orphans')
+}
+
 # Windows PowerShell 5.1 turns a program's error output into a script-stopping error when it is redirected,
 # so the checks below run with 'Continue'.
 function Test-Docker {
@@ -138,7 +162,7 @@ function Start-Treasury {
     Initialize-Settings
     Say 'Building and starting the Treasury system. The first time this downloads about 2 GB and takes 10-20 minutes...'
     Invoke-Build
-    Invoke-Compose @('up', '-d')
+    Start-Containers
 
     Say 'Waiting for the system to answer...'
     $ready = $false
