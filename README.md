@@ -3,7 +3,7 @@
 Replacement of the Access program `Lcash.mdb` and the unfinished MVC version, built as DDD microservice modules (.NET 10),
 PostgreSQL 17 partitioned by fiscal year, and Nuxt 4 micro-frontends. Pilot client: Iran Nazho Co.
 
-**Start here:** `CLAUDE.md` (rules and commands) → `docs/plan.md` (what is next) → `docs/decisions.md` → `docs/architecture.md` → `docs/getting-started.md`. Design document: `docs/assessment.md` (Farsi: `docs/assessment.fa.md`). Old systems for reference: `legacy/`.
+**Start here:** `CLAUDE.md` (rules and commands) → `docs/plan.md` (what is next) → `docs/decisions.md` → `docs/architecture.md` → `docs/getting-started.md`. Design document: `docs/assessment.md` (Farsi: `docs/assessment.fa.md`). Old systems for reference: `legacy/`. For the reviewer, in Farsi: `docs/reviewer-guide.fa.md` (how the code is built, a review checklist, and a learning path per technology).
 
 ## Status — Phase A, first real build (10 Nov 2026)
 
