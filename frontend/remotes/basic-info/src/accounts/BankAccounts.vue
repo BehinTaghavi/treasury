@@ -12,7 +12,7 @@
  * - The list has a search box (item 16); typing a number that already exists opens that account (item 17).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, normaliseJalali, translate, type Locale } from '@treasury/ui-kit'
+import { createApi, normaliseJalali, translate, type Locale, toLatinDigits } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
@@ -24,7 +24,22 @@ interface BankAccount {
   openingDate: string | null; currencyCode: string; mainAccountId: string | null; ledgerAccountCode: string; detail1Code: string | null
   detail2Code: string | null; collectionAccountCode: string | null; bouncedAccountCode: string | null; collectionPriority: number | null
   isFacility: boolean; isActive: boolean; version: number; isInUse: boolean
+  accountType: AccountType; term: string | null; cards: Card[] | null; hasCheques: boolean
 }
+type AccountType = 'CurrentQardHasan' | 'SavingsQardHasan' | 'ShortTermDeposit' | 'LongTermDeposit'
+interface Card { number: string; holderName: string }
+
+/**
+ * Kinds of account (owner's report no. 4, items 1 and 2): only a current Qard-al-hasan account has cheque books; current and savings
+ * Qard-al-hasan and short-term deposits may have company bank cards; all but short-term deposits may be in a foreign currency.
+ */
+const TYPES: Record<AccountType, { fa: string; en: string; cards: boolean; foreign: boolean }> = {
+  CurrentQardHasan: { fa: 'سپرده قرض الحسنه جاری', en: 'Current Qard-al-hasan', cards: true, foreign: true },
+  SavingsQardHasan: { fa: 'قرض الحسنه پس انداز', en: 'Savings Qard-al-hasan', cards: true, foreign: true },
+  ShortTermDeposit: { fa: 'سپرده سرمایه گذاری کوتاه مدت', en: 'Short-term deposit', cards: true, foreign: false },
+  LongTermDeposit: { fa: 'سپرده سرمایه گذاری بلند مدت', en: 'Long-term deposit', cards: false, foreign: true },
+}
+const TERMS: Record<string, [string, string]> = { Ordinary: ['عادی', 'Ordinary'], ThreeMonths: ['سه ماهه', '3-month'], SixMonths: ['شش ماهه', '6-month'] }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
@@ -53,10 +68,24 @@ const empty = () => ({
   accountNumber: '', bankId: '', branchName: '', branchCode: '', provinceId: '', cityId: '', openingDate: '', isForeign: false,
   currencyCode: '', isBackup: false, mainAccountId: '', ledgerAccountCode: '', detail1Code: '', detail2Code: '',
   collectionAccountCode: '', bouncedAccountCode: '', collectionPriority: null as number | null, isFacility: false,
+  accountType: 'CurrentQardHasan' as AccountType, term: '', hasCards: false, cards: [] as Card[],
 })
 const form = reactive(empty())
 
 const name = (list: { id: string; name: string }[], id: string | null) => list.find(x => x.id === id)?.name ?? ''
+const typeChoices = computed(() => (Object.keys(TYPES) as AccountType[]).map(k => ({ value: k, label: fa.value ? TYPES[k].fa : TYPES[k].en })))
+const termChoices = computed(() => Object.entries(TERMS).map(([k, [f, e]]) => ({ value: k, label: fa.value ? f : e })))
+const typeName = (a: BankAccount) => {
+  const ty = TYPES[a.accountType ?? 'CurrentQardHasan']
+  const term = a.term ? ` (${fa.value ? TERMS[a.term]?.[0] : TERMS[a.term]?.[1]})` : ''
+  return (fa.value ? ty.fa : ty.en) + term
+}
+function addCard() { form.cards.push({ number: '', holderName: '' }) }
+// A kind that cannot be in a foreign currency clears the currency; one without cards clears them.
+watch(() => form.accountType, ty => {
+  if (!TYPES[ty].foreign) Object.assign(form, { isForeign: false, currencyCode: '' })
+  if (!TYPES[ty].cards) form.hasCards = false
+})
 const ledgerName = (code: string | null) => ledger.value.find(a => a.code === code)?.name ?? ''
 const chosenLedger = computed(() => ledger.value.find(a => a.code === form.ledgerAccountCode))
 const foreignCurrencies = computed(() => currencies.value.filter(c => c.isActive && c.code !== 'IRR'))
@@ -176,6 +205,7 @@ function startEdit(a: BankAccount) {
     isBackup: !!a.mainAccountId, mainAccountId: a.mainAccountId ?? '', ledgerAccountCode: a.ledgerAccountCode, detail1Code: a.detail1Code ?? '',
     detail2Code: a.detail2Code ?? '', collectionAccountCode: a.collectionAccountCode ?? '', bouncedAccountCode: a.bouncedAccountCode ?? '',
     collectionPriority: a.collectionPriority, isFacility: a.isFacility,
+    accountType: a.accountType ?? 'CurrentQardHasan', term: a.term ?? '', hasCards: !!a.cards?.length, cards: (a.cards ?? []).map(c => ({ ...c })),
   })
   editing.value = a
   showForm.value = true
@@ -208,6 +238,10 @@ async function save() {
     detail1Code: form.detail1Code || null, detail2Code: form.detail2Code || null,
     collectionAccountCode: form.collectionAccountCode || null, bouncedAccountCode: form.bouncedAccountCode || null,
     collectionPriority: form.collectionPriority, isFacility: form.isFacility,
+    accountType: form.accountType, term: form.accountType === 'ShortTermDeposit' ? form.term || null : null,
+    cards: form.hasCards && TYPES[form.accountType].cards
+      ? form.cards.filter(c => c.number.trim() || c.holderName.trim()).map(c => ({ number: toLatinDigits(c.number).replace(/\D/g, ''), holderName: c.holderName.trim() }))
+      : [],
   }
   busy.value = true
   const r = editing.value
@@ -256,7 +290,13 @@ onMounted(async () => {
       <fieldset>
         <legend>{{ t('مشخصات حساب', 'Account') }}</legend>
         <div class="tr-kind">
-          <label class="tr-check"><input v-model="form.isForeign" type="checkbox" :disabled="restLocked && !form.isBackup" /> {{ t('ارزی', 'Foreign currency') }}</label>
+          <label class="req type"><span>{{ t('نوع حساب', 'Kind of account') }}</span>
+            <SearchSelect v-model="form.accountType" :options="typeChoices" required :aria-label="t('نوع حساب', 'Kind of account')" />
+          </label>
+          <label v-if="form.accountType === 'ShortTermDeposit'" class="req"><span>{{ t('مدت سپرده', 'Term') }}</span>
+            <SearchSelect v-model="form.term" :options="termChoices" required :aria-label="t('مدت سپرده', 'Term')" />
+          </label>
+          <label v-if="TYPES[form.accountType].foreign" class="tr-check"><input v-model="form.isForeign" type="checkbox" :disabled="restLocked && !form.isBackup" /> {{ t('ارزی', 'Foreign currency') }}</label>
           <label v-if="form.isForeign" class="req"><span>{{ t('نوع ارز', 'Currency') }} <span class="star">*</span></span>
             <SearchSelect v-model="form.currencyCode" :options="foreignCurrencies.map(c => ({ value: c.code, label: c.name, hint: c.code }))" required :aria-label="t('نوع ارز', 'Currency')" />
           </label>
@@ -269,6 +309,22 @@ onMounted(async () => {
             <small v-if="!backupBlocked && !editing" class="muted">{{ t('بانک، شعبه و شهر از حساب جاری اصلی گرفته می‌شود.', 'Bank, branch and city come from the main account.') }}</small>
           </label>
           <p v-if="backupBlocked" class="tr-msg error wide" role="alert">{{ translate('BankAccount.MainAccountRequired', locale) }}</p>
+          <label v-if="TYPES[form.accountType].cards" class="tr-check"><input v-model="form.hasCards" type="checkbox" @change="form.hasCards && !form.cards.length && addCard()" /> {{ t('کارت بانک دارد', 'Has bank cards') }}</label>
+          <p v-if="!TYPES[form.accountType].cards || form.accountType !== 'CurrentQardHasan'" class="muted small wide">
+            {{ form.accountType === 'CurrentQardHasan' ? '' : t('این نوع حساب دسته چک ندارد.', 'This kind of account has no cheque books.') }}
+          </p>
+        </div>
+        <div v-if="form.hasCards && TYPES[form.accountType].cards" class="tr-cards">
+          <div v-for="(c, i) in form.cards" :key="i" class="tr-card">
+            <label class="req"><span>{{ t('شماره ۱۶ رقمی کارت بانک', '16-digit card number') }}</span>
+              <input v-model="c.number" dir="ltr" maxlength="19" inputmode="numeric" autocomplete="off" />
+            </label>
+            <label class="req"><span>{{ t('عنوان دارندهٔ کارت', 'Name on the card') }}</span>
+              <input v-model="c.holderName" :placeholder="t('نام شرکت یا دارندهٔ تنخواه', 'Company or petty-cash holder')" />
+            </label>
+            <button type="button" class="tr-link danger" @click="form.cards.splice(i, 1)">{{ t('حذف کارت', 'Remove') }}</button>
+          </div>
+          <button type="button" class="tr-link" @click="addCard">{{ t('+ کارت دیگر', '+ Another card') }}</button>
         </div>
       </fieldset>
       <fieldset :disabled="restLocked">
@@ -343,7 +399,7 @@ onMounted(async () => {
         <table class="tr-table">
           <thead>
             <tr>
-              <th>{{ t('شماره حساب', 'Number') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('شعبه', 'Branch') }}</th><th>{{ t('شهر', 'City') }}</th>
+              <th>{{ t('شماره حساب', 'Number') }}</th><th>{{ t('نوع حساب', 'Kind') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('شعبه', 'Branch') }}</th><th>{{ t('شهر', 'City') }}</th>
               <th>{{ t('ارز', 'Currency') }}</th><th>{{ t('معین', 'Ledger') }}</th><th>{{ t('تفصیل', 'Detail') }}</th><th>{{ t('اولویت', 'Priority') }}</th>
               <th>{{ t('پشتیبانِ', 'Backup of') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
             </tr>
@@ -351,6 +407,7 @@ onMounted(async () => {
           <tbody>
             <tr v-for="a in shown" :key="a.id" :class="{ inactive: !a.isActive }">
               <td dir="ltr">{{ a.accountNumber }}</td>
+              <td>{{ typeName(a) }}<span v-if="a.cards?.length" class="tr-tag">{{ t(`${num(a.cards.length)} کارت`, `${a.cards.length} cards`) }}</span></td>
               <td>{{ name(banks, a.bankId) }}</td><td>{{ a.branchName }}</td><td>{{ name(cities, a.cityId) }}</td><td>{{ a.currencyCode }}</td>
               <td dir="ltr" :title="ledgerName(a.ledgerAccountCode)">{{ a.ledgerAccountCode }}</td><td dir="ltr">{{ a.detail1Code }}</td>
               <td>{{ a.collectionPriority ? num(a.collectionPriority) : '' }}</td>
@@ -414,4 +471,7 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-link.danger { color: #b42318; }
 .tr-tag { background: #eef2f6; color: #52606d; border-radius: 4px; padding: 0 .3rem; font-size: .75rem; }
 .muted { color: #7b8794; }
+.tr-cards { display: grid; gap: .5rem; margin-top: .75rem; }
+.tr-card { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(12rem, 1fr) auto; gap: .75rem; align-items: end; }
+.type { min-width: 16rem; }
 </style>

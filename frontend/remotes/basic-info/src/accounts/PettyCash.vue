@@ -50,6 +50,14 @@ const fail = (code: string) => { message.value = { kind: 'error', text: translat
 const amount = (s: string) => Number(searchKey(s).replace(/[^0-9]/g, '')) || 0
 const ledgerChoices = computed<Choice[]>(() => ledger.value.filter(a => a.isPostable && a.isActive).map(a => ({ value: a.code, label: a.name, hint: a.code })))
 const holderChoices = computed<Choice[]>(() => holders.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
+/**
+ * Owner's report no. 4, item 5: money kept in the bank on a bank card ticks «کارت بانک» too; the name on the card starts as the
+ * petty-cash holder's name and can be changed.
+ */
+const holderName = computed(() => holders.value.find(d => d.code === form.holderDetailCode)?.name ?? '')
+watch(() => [form.keeping.card, holderName.value] as const, ([card, name]) => {
+  if (card && !form.keeping.cardHolderName && name) form.keeping.cardHolderName = name
+})
 const groupChoices = computed<Choice[]>(() => groups.value.filter(g => g.isActive && !form.groupIds.includes(g.id)).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
 const groupName = (id: string) => groups.value.find(g => g.id === id)?.name ?? '—'
 const ledgerName = (code: string) => ledger.value.find(a => a.code === code)?.name ?? ''
@@ -187,6 +195,7 @@ onMounted(async () => {
           <div class="keep-row"><label class="tr-check"><input v-model="form.keeping.cash" type="checkbox" /> {{ t('نقد', 'Cash') }}</label></div>
           <div class="keep-row">
             <label class="tr-check"><input v-model="form.keeping.card" type="checkbox" /> {{ t('کارت بانک', 'Bank card') }}</label>
+            <small v-if="form.keeping.bank && !form.keeping.card" class="muted">{{ t('اگر وجوه تنخواه در حساب بانکی روی کارت بانک است، «کارت بانک» را هم انتخاب کنید.', 'If the money is on a bank card, tick «Bank card» too.') }}</small>
             <template v-if="form.keeping.card">
               <label class="req"><span>{{ t('عنوان دارندهٔ کارت', 'Card holder') }}</span><input v-model="form.keeping.cardHolderName" /></label>
               <label class="req"><span>{{ t('شماره کارت (۱۶ رقم)', 'Card number (16 digits)') }}</span><input v-model="form.keeping.cardNumber" dir="ltr" inputmode="numeric" maxlength="19" placeholder="6037-9900-0000-0000" /></label>

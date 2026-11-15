@@ -57,6 +57,11 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             throw new DomainException("PettyCash.HolderTaken", "This holder already has a petty cash.");
         }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "bank_card")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("BankAccount.CardTaken", "This bank card belongs to another bank account.");
+        }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cash_desk")
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
@@ -86,7 +91,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
 {
     private const string Columns =
         "id, account_number, bank_id, branch_name, branch_code, city_id, opening_date, currency, main_account_id, ledger_account, " +
-        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, in_use";
+        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, in_use, account_type, term";
 
     public async Task<BankAccount?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -100,6 +105,15 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         await using var cmd = PostgresUnitOfWork.Current.Command(
             "SELECT EXISTS (SELECT 1 FROM accounts.bank_account WHERE number_key = @key AND id IS DISTINCT FROM @except)");
         cmd.Parameters.AddWithValue("key", numberKey);
+        cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlDbType.Uuid) { Value = (object?)exceptId ?? DBNull.Value });
+        return (bool)(await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+    }
+
+    public async Task<bool> CardTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT EXISTS (SELECT 1 FROM accounts.bank_card WHERE card_number = @card AND bank_account_id IS DISTINCT FROM @except)");
+        cmd.Parameters.AddWithValue("card", cardNumber);
         cmd.Parameters.Add(new NpgsqlParameter("except", NpgsqlDbType.Uuid) { Value = (object?)exceptId ?? DBNull.Value });
         return (bool)(await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
     }
@@ -119,14 +133,17 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
             "INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, branch_name, branch_code, city_id, opening_date, currency, " +
-            "main_account_id, ledger_account, detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version) " +
+            "main_account_id, ledger_account, detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, " +
+            "account_type, term) " +
             "VALUES (@id, @number, @key, @bank, @branch, @branchCode, @city, @opened, @currency, @main, @ledger, @d1, @d2, @collection, @bounced, " +
-            "@priority, @facility, @active, 1)"))
+            "@priority, @facility, @active, 1, @type, @term)"))
         {
             Bind(cmd, account);
             cmd.Parameters.Add(Nullable("main", NpgsqlDbType.Uuid, account.MainAccountId));
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
+
+        await WriteCardsAsync(tx, account, cancellationToken).ConfigureAwait(false);
 
         await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
         account.MarkSaved(1);
@@ -140,7 +157,8 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             "UPDATE accounts.bank_account SET account_number = @number, number_key = @key, bank_id = @bank, branch_name = @branch, " +
             "branch_code = @branchCode, city_id = @city, opening_date = @opened, currency = @currency, ledger_account = @ledger, detail1 = @d1, " +
             "detail2 = @d2, collection_account = @collection, bounced_account = @bounced, collection_priority = @priority, is_facility = @facility, " +
-            "is_active = @active, in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
+            "is_active = @active, in_use = @in_use, account_type = @type, term = @term, version = version + 1, updated_at = now() " +
+            "WHERE id = @id AND version = @expected"))
         {
             Bind(cmd, account);
             cmd.Parameters.AddWithValue("expected", account.Version);
@@ -149,6 +167,8 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
                 throw new ConcurrencyConflictException($"Bank account {account.Id} was changed by someone else.");
             }
         }
+
+        await WriteCardsAsync(tx, account, cancellationToken).ConfigureAwait(false);
 
         await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
         account.MarkSaved(account.Version + 1);
@@ -204,6 +224,30 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         cmd.Parameters.AddWithValue("in_use", a.IsInUse);
         cmd.Parameters.AddWithValue("facility", d.IsFacility);
         cmd.Parameters.AddWithValue("active", a.IsActive);
+        cmd.Parameters.AddWithValue("type", d.AccountType.ToString());
+        cmd.Parameters.Add(Nullable("term", NpgsqlDbType.Text, d.Term?.ToString()));
+    }
+
+    /// <summary>The account's cards are replaced as a whole (they are part of the account aggregate).</summary>
+    private static async Task WriteCardsAsync(TransactionContext tx, BankAccount account, CancellationToken ct)
+    {
+        await using (var del = tx.Command("DELETE FROM accounts.bank_card WHERE bank_account_id = @id"))
+        {
+            del.Parameters.AddWithValue("id", account.Id);
+            await del.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        var position = 0;
+        foreach (var card in account.Data.CardList)
+        {
+            await using var ins = tx.Command(
+                "INSERT INTO accounts.bank_card (card_number, bank_account_id, holder_name, position) VALUES (@card, @id, @holder, @position)");
+            ins.Parameters.AddWithValue("card", card.Number);
+            ins.Parameters.AddWithValue("id", account.Id);
+            ins.Parameters.AddWithValue("holder", card.HolderName);
+            ins.Parameters.AddWithValue("position", position++);
+            await ins.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
     }
 
     private static NpgsqlParameter Nullable(string name, NpgsqlDbType type, object? value) => new(name, type) { Value = value ?? DBNull.Value };
@@ -218,11 +262,38 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             var data = new BankAccountData(
                 r.GetString(1), r.GetGuid(2), S(3), S(4), r.IsDBNull(5) ? null : r.GetGuid(5),
                 r.IsDBNull(6) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(6)), r.GetString(7).Trim(),
-                new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.IsDBNull(14) ? null : r.GetInt16(14), r.GetBoolean(15));
+                new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.IsDBNull(14) ? null : r.GetInt16(14), r.GetBoolean(15),
+                Enum.Parse<BankAccountType>(r.GetString(19)), S(20) is { } term ? Enum.Parse<ShortTermPeriod>(term) : null);
             list.Add(BankAccount.Restore(r.GetGuid(0), data, r.IsDBNull(8) ? null : r.GetGuid(8), r.GetBoolean(16), r.GetInt64(17), r.GetBoolean(18)));
         }
 
-        return list;
+        await r.CloseAsync().ConfigureAwait(false);
+        if (list.Count == 0)
+        {
+            return list;
+        }
+
+        var cards = new Dictionary<Guid, List<BankCard>>();
+        await using (var c = PostgresUnitOfWork.Current.Command(
+            "SELECT bank_account_id, card_number, holder_name FROM accounts.bank_card WHERE bank_account_id = ANY(@ids) ORDER BY bank_account_id, position"))
+        {
+            c.Parameters.AddWithValue("ids", list.Select(a => a.Id).ToArray());
+            await using var cr = await c.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await cr.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var id = cr.GetGuid(0);
+                if (!cards.TryGetValue(id, out var l))
+                {
+                    cards[id] = l = [];
+                }
+
+                l.Add(new BankCard(cr.GetString(1), cr.GetString(2)));
+            }
+        }
+
+        return list.Select(a => cards.TryGetValue(a.Id, out var l)
+            ? BankAccount.Restore(a.Id, a.Data with { Cards = l }, a.MainAccountId, a.IsActive, a.Version, a.IsInUse)
+            : a).ToList();
     }
 }
 

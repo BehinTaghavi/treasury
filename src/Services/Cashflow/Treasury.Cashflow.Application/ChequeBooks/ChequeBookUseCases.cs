@@ -69,6 +69,12 @@ public sealed class ChequeBookUseCases(
             return Result<Guid>.Fail("ChequeBook.BankAccountInactive", "The bank account is switched off.");
         }
 
+        if (!account.HasCheques)
+        {
+            // Owner's report no. 4, item 1: only a current Qard-al-hasan account (سپرده قرض الحسنه جاری) has cheque books.
+            return Result<Guid>.Fail("ChequeBook.AccountHasNoCheques", "Only a current Qard-al-hasan account has cheque books.");
+        }
+
         try
         {
             // From now on the account is never deleted (owner's report no. 3, item 1).

@@ -49,6 +49,43 @@ public sealed class BankAccountPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task An_account_type_and_its_bank_cards_round_trip_report_4()
+    {
+        // Card numbers per test run, so the shared test database never sees one twice.
+        var seed = Math.Abs(_tag.GetHashCode()) % 100_000_000;
+        string Card(int i)
+        {
+            var body = $"60379{(seed + i) % 100_000_000:D8}00".Substring(0, 15);
+            for (var d = 0; d < 10; d++)
+            {
+                if (Treasury.Accounts.Domain.BankAccounts.BankAccount.IsCardNumber(body + d))
+                {
+                    return body + d;
+                }
+            }
+
+            throw new InvalidOperationException();
+        }
+
+        var form = Form("7") with
+        {
+            AccountType = Treasury.Accounts.Domain.BankAccounts.BankAccountType.ShortTermDeposit,
+            Term = Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod.ThreeMonths,
+            Cards = [new(Card(1), "شرکت نمونه"), new(Card(2), "علی رضایی")],
+        };
+        var r = await _useCases.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == r.Value);
+        Assert.Equal((Treasury.Accounts.Domain.BankAccounts.BankAccountType.ShortTermDeposit, (Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod?)Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod.ThreeMonths, false),
+            (v.AccountType, v.Term, v.HasCheques));
+        Assert.Equal([Card(1), Card(2)], v.Cards!.Select(c => c.Number));
+
+        Assert.True((await _useCases.ChangeAsync(new(Key(), r.Value, form with { Cards = [new(Card(2), "علی رضایی")] }, v.Version), CancellationToken.None)).IsSuccess);
+        Assert.Equal(Card(2), Assert.Single((await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == r.Value).Cards!).Number);
+        Assert.Equal("BankAccount.CardTaken", (await _useCases.RegisterAsync(new(Key(), Form("8") with { Cards = [new(Card(2), "x")] }), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task A_cash_desk_round_trips_and_its_name_is_unique()
     {
         var desks = new Treasury.Accounts.Application.CashDesks.CashDeskUseCases(

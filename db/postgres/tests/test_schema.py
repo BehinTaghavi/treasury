@@ -573,3 +573,32 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
             for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+
+
+def test_bank_account_types_and_one_account_per_bank_card(db):
+    # 027_accounts_bank_account_types.sql (owner's report no. 4, items 1, 2 and 4).
+    add = """INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account, collection_priority, is_facility,
+                 is_active, account_type, term) VALUES (%s, %s, %s, %s, %s, '1103', NULL, false, true, %s, %s)"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        a = uuid.uuid4()
+        c.execute(add, (a, "T-1", "9901", uuid.uuid4(), "IRR", "ShortTermDeposit", "SixMonths"))
+        assert c.execute("SELECT account_type FROM accounts.bank_account WHERE number_key = '9901'").fetchone()[0] == "ShortTermDeposit"
+        for row, error in (
+            (("T-2", "9902", "IRR", "ShortTermDeposit", None), psycopg.errors.CheckViolation),       # a short-term deposit has its term
+            (("T-3", "9903", "USD", "ShortTermDeposit", "Ordinary"), psycopg.errors.CheckViolation),  # and is in Rial
+            (("T-4", "9904", "IRR", "SavingsQardHasan", "Ordinary"), psycopg.errors.CheckViolation),  # only short-term deposits have a term
+        ):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), row[0], row[1], uuid.uuid4(), row[2], row[3], row[4]))
+        card = "INSERT INTO accounts.bank_card (card_number, bank_account_id, holder_name, position) VALUES (%s, %s, 'x', 0)"
+        c.execute(card, ("6037991234567893", a))
+        b = uuid.uuid4()
+        c.execute(add, (b, "T-5", "9905", uuid.uuid4(), "IRR", "CurrentQardHasan", None))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(card, ("6037991234567893", b))
+        c.execute("DELETE FROM accounts.bank_account WHERE id = %s", (a,))  # cards go with their account
+        assert c.execute("SELECT count(*) FROM accounts.bank_card WHERE card_number = '6037991234567893'").fetchone()[0] == 0
+        c.rollback()

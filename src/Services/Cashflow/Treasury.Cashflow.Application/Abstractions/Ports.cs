@@ -104,7 +104,8 @@ public interface IChequeFormatRepository
 }
 
 /// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
-public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive);
+/// <param name="HasCheques">The kind of account has cheque books: current Qard-al-hasan only (owner's report no. 4, item 1).</param>
+public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true);
 
 /// <summary>Answered by accounts-svc. Failure to reach it: DomainException "Accounts.Unavailable".</summary>
 public interface IBankAccountLookup

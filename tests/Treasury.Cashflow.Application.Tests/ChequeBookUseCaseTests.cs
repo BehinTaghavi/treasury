@@ -10,6 +10,7 @@ public sealed class FakeBankAccounts : IBankAccountLookup
 {
     public static readonly Guid Closed = Guid.NewGuid();
     public static readonly Guid Unknown = Guid.NewGuid();
+    public static readonly Guid Savings = Guid.NewGuid();
 
     public bool Down { get; set; }
 
@@ -29,7 +30,7 @@ public sealed class FakeBankAccounts : IBankAccountLookup
 
     public Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         Down ? throw new Treasury.BuildingBlocks.Domain.DomainException("Accounts.Unavailable", "down")
-        : Task.FromResult(id == Unknown ? null : new BankAccountFact(id, "0101-" + id.ToString()[..4], id != Closed));
+        : Task.FromResult(id == Unknown ? null : new BankAccountFact(id, "0101-" + id.ToString()[..4], id != Closed, HasCheques: id != Savings));
 }
 
 /// <summary>The cheque books screen: new-version manual item 6; corrections and deletions only while no sheet is used (owner, 11 Nov 2026).</summary>
@@ -64,6 +65,8 @@ public sealed class ChequeBookUseCaseTests : IDisposable
         Assert.Equal((50L, 0L, 50L, (long?)101001, true, false), (v.SheetCount, v.UsedSheets, v.RemainingSheets, v.NextSheet, v.IsActive, v.IsInUse));
         Assert.Equal("ChequeBook.BankAccountNotFound", (await _books.RegisterAsync(new(Key(), FakeBankAccounts.Unknown, "1234", 100001, 100010, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
         Assert.Equal("ChequeBook.BankAccountInactive", (await _books.RegisterAsync(new(Key(), FakeBankAccounts.Closed, "1234", 100001, 100010, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
+        // Owner's report no. 4, item 1: only a current Qard-al-hasan account has cheque books.
+        Assert.Equal("ChequeBook.AccountHasNoCheques", (await _books.RegisterAsync(new(Key(), FakeBankAccounts.Savings, "1234", 100001, 100010, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
         _accounts.Down = true;
         Assert.Equal("Accounts.Unavailable", (await _books.RegisterAsync(new(Key(), _account, "1234", 100001, 100010, null, "12345678", "1"), CancellationToken.None)).ErrorCode);
     }

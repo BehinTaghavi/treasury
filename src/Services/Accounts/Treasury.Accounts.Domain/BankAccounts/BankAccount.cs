@@ -23,7 +23,45 @@ public sealed record DetailFact(string Code, string? Type, bool IsActive, string
 /// </summary>
 public sealed record BankLedger(string AccountCode, string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode);
 
+/// <summary>
+/// Kinds of bank account (owner's report no. 4, item 1): current Qard-al-hasan deposit (سپرده قرض الحسنه جاری, the only kind with
+/// cheque books), savings Qard-al-hasan (قرض الحسنه پس انداز), short-term investment deposit (سپرده سرمایه گذاری کوتاه مدت: ordinary,
+/// 3-month or 6-month) and long-term investment deposit (سپرده سرمایه گذاری بلند مدت).
+/// </summary>
+public enum BankAccountType
+{
+    CurrentQardHasan,
+    SavingsQardHasan,
+    ShortTermDeposit,
+    LongTermDeposit,
+}
+
+/// <summary>Term of a short-term investment deposit (report no. 4, item 1: «عادی»، «سه ماهه»، «شش ماهه»).</summary>
+public enum ShortTermPeriod
+{
+    Ordinary,
+    ThreeMonths,
+    SixMonths,
+}
+
+/// <summary>A company bank card (کارت بانک حقوقی) of the account: 16-digit number and the name on the card (report no. 4, items 2 and 4).</summary>
+public sealed record BankCard(string Number, string HolderName);
+
+public static class BankAccountTypes
+{
+    /// <summary>Only a current Qard-al-hasan account has cheque books (report no. 4, item 1).</summary>
+    public static bool HasCheques(this BankAccountType type) => type == BankAccountType.CurrentQardHasan;
+
+    /// <summary>Current and savings Qard-al-hasan and short-term deposits may have company bank cards.</summary>
+    public static bool MayHaveCards(this BankAccountType type) => type is not BankAccountType.LongTermDeposit;
+
+    /// <summary>Current and savings Qard-al-hasan and long-term deposits may be in a foreign currency.</summary>
+    public static bool MayBeForeign(this BankAccountType type) => type is not BankAccountType.ShortTermDeposit;
+}
+
 /// <summary>Everything the user enters on the bank account form (manual section 5 "معرفی حساب‌های بانکی").</summary>
+/// <param name="AccountType">Chosen at the top of the form (report no. 4, item 2); accounts saved before it are current Qard-al-hasan.</param>
+/// <param name="Cards">The account's company bank cards; one account may have several, e.g. for different petty-cash holders (item 4).</param>
 public sealed record BankAccountData(
     string AccountNumber,
     Guid BankId,
@@ -34,7 +72,25 @@ public sealed record BankAccountData(
     string CurrencyCode,
     BankLedger Ledger,
     int? CollectionPriority,
-    bool IsFacility);
+    bool IsFacility,
+    BankAccountType AccountType = BankAccountType.CurrentQardHasan,
+    ShortTermPeriod? Term = null,
+    IReadOnlyList<BankCard>? Cards = null)
+{
+    public const int MaxCards = 50;
+
+    public IReadOnlyList<BankCard> CardList => Cards ?? [];
+
+    /// <summary>Records with a list compare the list's items, not the list object.</summary>
+    public bool Equals(BankAccountData? other) =>
+        other is not null && EqualityContract == other.EqualityContract
+        && (AccountNumber, BankId, BranchName, BranchCode, CityId, OpeningDate, CurrencyCode, Ledger, CollectionPriority, IsFacility, AccountType, Term)
+        == (other.AccountNumber, other.BankId, other.BranchName, other.BranchCode, other.CityId, other.OpeningDate, other.CurrencyCode, other.Ledger,
+            other.CollectionPriority, other.IsFacility, other.AccountType, other.Term)
+        && CardList.SequenceEqual(other.CardList);
+
+    public override int GetHashCode() => HashCode.Combine(AccountNumber, BankId, CurrencyCode, AccountType, Term, CardList.Count);
+}
 
 /// <summary>
 /// One of the company's bank accounts. Sources: new-version manual section 5; Access Form_Bankacc (required number, bank and
@@ -181,6 +237,13 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         var currency = (data.CurrencyCode ?? string.Empty).Trim().ToUpperInvariant();
         Require(CurrencyPattern().IsMatch(currency), "BankAccount.CurrencyInvalid", "The currency is a three-letter code; the Rial is IRR.");
 
+        // Owner's report no. 4, items 1 and 2: what each kind of account may have.
+        Require(Enum.IsDefined(data.AccountType), "BankAccount.TypeRequired", "Choose the kind of account.");
+        Require(data.AccountType != BankAccountType.ShortTermDeposit || data.Term is { } t && Enum.IsDefined(t), "BankAccount.TermRequired",
+            "A short-term deposit is ordinary, 3-month or 6-month.");
+        Require(currency == Rial || data.AccountType.MayBeForeign(), "BankAccount.CurrencyNotForType", "A short-term deposit is in Rial.");
+        var cards = CheckCards(data.CardList, data.AccountType);
+
         var l = data.Ledger ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account is required.");
         var accountCode = Clean(l.AccountCode) ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account (معین) is required."); // "حساب معين نامشخص است"
         var d1 = Clean(l.Detail1Code);
@@ -205,7 +268,51 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             BranchCode = Clean(data.BranchCode),
             CurrencyCode = currency,
             Ledger = new BankLedger(accountCode, d1, d2, collection, bounced),
+            Term = data.AccountType == BankAccountType.ShortTermDeposit ? data.Term : null,
+            Cards = cards,
         };
+    }
+
+    /// <summary>Cards: 16 digits with the Luhn check digit, the name on the card, each number once (report no. 4, items 2 and 4).</summary>
+    private static List<BankCard> CheckCards(IReadOnlyList<BankCard> cards, BankAccountType type)
+    {
+        Require(cards.Count == 0 || type.MayHaveCards(), "BankAccount.CardsNotForType", "A long-term deposit has no bank cards.");
+        Require(cards.Count <= BankAccountData.MaxCards, "BankAccount.TooManyCards", "Too many bank cards on one account.");
+        var clean = new List<BankCard>();
+        foreach (var card in cards)
+        {
+            var number = new string(PersianText.Key(card?.Number).Where(char.IsAsciiDigit).ToArray());
+            Require(IsCardNumber(number), "BankAccount.CardNumberInvalid", "A bank card number has 16 digits with a valid check digit.");
+            var holder = Clean(card!.HolderName);
+            Require(holder is not null, "BankAccount.CardHolderRequired", "Enter the name on the bank card.");
+            Require(clean.All(c => c.Number != number), "BankAccount.CardTwice", $"Card {number} is entered twice.");
+            clean.Add(new BankCard(number, holder!));
+        }
+
+        return clean;
+    }
+
+    /// <summary>Luhn check, as for petty-cash cards.</summary>
+    public static bool IsCardNumber(string digits)
+    {
+        if (digits.Length != 16 || !digits.All(char.IsAsciiDigit))
+        {
+            return false;
+        }
+
+        var sum = 0;
+        for (var i = 0; i < 16; i++)
+        {
+            var d = digits[15 - i] - '0';
+            if (i % 2 == 1)
+            {
+                d = d * 2 > 9 ? (d * 2) - 9 : d * 2;
+            }
+
+            sum += d;
+        }
+
+        return sum % 10 == 0;
     }
 
     private static LedgerAccountFact Postable(LedgerAccountFact? fact, string code)

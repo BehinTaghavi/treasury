@@ -55,10 +55,10 @@ public sealed class ReceiptPostgresTests : IDisposable
     [Fact]
     public async Task A_dollar_deposit_keeps_its_rate()
     {
-        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), Accounts.Dollar, DepositMethod.Pos, "POS-9", 100.5m, 600_000), CancellationToken.None);
+        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), Accounts.Dollar, DepositMethod.Transfer, "SW-9", 100.5m, 600_000), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
-        Assert.Equal(("BankDeposit", "Pos", "POS-9", 100.5m, "USD", (decimal?)600_000m, 60_300_000m), (v.Kind, v.Method, v.TrackingNumber, v.Amount, v.Currency, v.RateToRial, v.TotalRial));
+        Assert.Equal(("BankDeposit", "Transfer", "SW-9", 100.5m, "USD", (decimal?)600_000m, 60_300_000m), (v.Kind, v.Method, v.TrackingNumber, v.Amount, v.Currency, v.RateToRial, v.TotalRial));
     }
 
     [Fact]

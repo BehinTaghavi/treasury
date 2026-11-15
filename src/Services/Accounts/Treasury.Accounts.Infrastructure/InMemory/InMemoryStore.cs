@@ -157,6 +157,9 @@ public sealed class InMemoryBankAccountRepository(InMemoryAccountsDatabase db) :
     public Task<bool> NumberTakenAsync(string numberKey, Guid? exceptId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible().Any(s => s.Id != exceptId && BankAccount.NumberKeyOf(s.Data.AccountNumber) == numberKey));
 
+    public Task<bool> CardTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Any(s => s.Id != exceptId && s.Data.CardList.Any(c => c.Number == cardNumber)));
+
     public Task<bool> HasBackupAsync(Guid mainAccountId, Guid? exceptId, CancellationToken cancellationToken) =>
         Task.FromResult(Visible().Any(s => s.Id != exceptId && s.MainAccountId == mainAccountId));
 

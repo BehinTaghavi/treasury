@@ -40,6 +40,11 @@ public sealed class ChequeFormatUseCases(IUnitOfWork unitOfWork, IChequeFormatRe
                 return Result<Guid>.Fail("ChequeBook.BankAccountInactive", "The bank account is switched off.");
             }
 
+            if (!account.HasCheques)
+            {
+                return Result<Guid>.Fail("ChequeBook.AccountHasNoCheques", "Only a current Qard-al-hasan account has cheque books.");
+            }
+
             // From now on the account is never deleted (owner's report no. 3, item 1).
             await bankAccounts.MarkInUseAsync(accountId, cancellationToken).ConfigureAwait(false);
         }

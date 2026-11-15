@@ -164,5 +164,17 @@ public sealed class BankAccountUseCaseTests : IDisposable
         await Register(Form(number: "0101-903", d1: "100001"), main);
         Assert.Equal("BankAccount.HasBackup", (await _useCases.DeleteAsync(new(Key(), main, 1), CancellationToken.None)).ErrorCode);
     }
-}
 
+    [Fact]
+    public async Task A_bank_card_belongs_to_one_account_only_report_4_item_2()
+    {
+        BankAccountForm WithCard(string number) => Form(number) with { Cards = [new BankCard("6037991234567893", "شرکت نمونه")] };
+        var first = await _useCases.RegisterAsync(new(Guid.NewGuid().ToString(), WithCard("0101-111")), CancellationToken.None);
+        Assert.True(first.IsSuccess, first.ErrorCode);
+        Assert.Equal("BankAccount.CardTaken", (await _useCases.RegisterAsync(new(Guid.NewGuid().ToString(), WithCard("0101-222")), CancellationToken.None)).ErrorCode);
+        var view = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == first.Value);
+        Assert.Equal(("6037991234567893", BankAccountType.CurrentQardHasan, true), (Assert.Single(view.Cards!).Number, view.AccountType, view.HasCheques));
+        Assert.True((await _useCases.ChangeAsync(new(Guid.NewGuid().ToString(), first.Value, WithCard("0101-111") with { AccountType = BankAccountType.SavingsQardHasan }, view.Version), CancellationToken.None)).IsSuccess);
+        Assert.False((await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == first.Value).HasCheques);
+    }
+}

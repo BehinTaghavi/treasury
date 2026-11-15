@@ -21,7 +21,10 @@ public sealed record BankAccountForm(
     string? CollectionAccountCode,
     string? BouncedAccountCode,
     int? CollectionPriority,
-    bool IsFacility);
+    bool IsFacility,
+    BankAccountType AccountType = BankAccountType.CurrentQardHasan,
+    ShortTermPeriod? Term = null,
+    IReadOnlyList<BankCard>? Cards = null);
 
 /// <param name="IsBackup">"پشتیبان" ticked on the form; then <paramref name="MainAccountId"/> is required.</param>
 public sealed record RegisterBankAccountCommand(string IdempotencyKey, BankAccountForm Form, Guid? MainAccountId = null, bool IsBackup = false);
@@ -35,12 +38,14 @@ public sealed record DeleteBankAccountCommand(string IdempotencyKey, Guid Id, lo
 public sealed record BankAccountView(
     Guid Id, string AccountNumber, Guid BankId, string? BranchName, string? BranchCode, Guid? CityId, string? OpeningDate,
     string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode, string? Detail1Code, string? Detail2Code,
-    string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsFacility, bool IsActive, long Version, bool IsInUse = false)
+    string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsFacility, bool IsActive, long Version, bool IsInUse = false,
+    BankAccountType AccountType = BankAccountType.CurrentQardHasan, ShortTermPeriod? Term = null, IReadOnlyList<BankCard>? Cards = null, bool HasCheques = true)
 {
     public static BankAccountView From(BankAccount a) => new(
         a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.BranchName, a.Data.BranchCode, a.Data.CityId, a.Data.OpeningDate?.ToJalaliString(),
         a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode, a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code,
-        a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.CollectionPriority, a.Data.IsFacility, a.IsActive, a.Version, a.IsInUse);
+        a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.CollectionPriority, a.Data.IsFacility, a.IsActive, a.Version, a.IsInUse,
+        a.Data.AccountType, a.Data.Term, a.Data.CardList, a.Data.AccountType.HasCheques());
 }
 
 /// <summary>Use cases of the company's bank accounts (manual section 5). Each write is one command in one transaction.</summary>
@@ -72,6 +77,8 @@ public sealed class BankAccountUseCases(
                 return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined."); // "شماره حساب تكراري است"
             }
 
+            await EnsureCardsFreeAsync(account, ct).ConfigureAwait(false);
+
             await MarkInUseAsync(used, ct).ConfigureAwait(false);
             await accounts.AddAsync(account, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(account.Id);
@@ -87,6 +94,8 @@ public sealed class BankAccountUseCases(
             {
                 return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined.");
             }
+
+            await EnsureCardsFreeAsync(account, ct).ConfigureAwait(false);
 
             await MarkInUseAsync(used, ct).ConfigureAwait(false);
             await accounts.SaveAsync(account, ct).ConfigureAwait(false);
@@ -243,8 +252,23 @@ public sealed class BankAccountUseCases(
             currencyCode,
             new BankLedger(form.LedgerAccountCode, form.Detail1Code, form.Detail2Code, form.CollectionAccountCode, form.BouncedAccountCode),
             form.CollectionPriority,
-            form.IsFacility);
+            form.IsFacility,
+            form.AccountType,
+            form.Term,
+            form.Cards);
         return (data, new LedgerFacts(accountsByCode, detailsByCode), used);
+    }
+
+    /// <summary>A bank card belongs to one account only (owner's report no. 4, item 2: "کارت بانک متعلق به همان حساب بانکی خواهد بود").</summary>
+    private async Task EnsureCardsFreeAsync(BankAccount account, CancellationToken ct)
+    {
+        foreach (var card in account.Data.CardList)
+        {
+            if (await accounts.CardTakenAsync(card.Number, account.Id, ct).ConfigureAwait(false))
+            {
+                throw new DomainException("BankAccount.CardTaken", $"Card {card.Number} belongs to another bank account.");
+            }
+        }
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

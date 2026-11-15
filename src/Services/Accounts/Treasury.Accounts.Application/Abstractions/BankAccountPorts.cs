@@ -11,6 +11,9 @@ public interface IBankAccountRepository
     /// <summary>Is the number key (BankAccount.NumberKeyOf) already used by another account? Form_Bankacc: "شماره حساب تكراري است".</summary>
     Task<bool> NumberTakenAsync(string numberKey, Guid? exceptId, CancellationToken cancellationToken);
 
+    /// <summary>Does another account have this bank card (16 digits)?</summary>
+    Task<bool> CardTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken);
+
     /// <summary>Does another account already name <paramref name="mainAccountId"/> as its main account?</summary>
     Task<bool> HasBackupAsync(Guid mainAccountId, Guid? exceptId, CancellationToken cancellationToken);
 

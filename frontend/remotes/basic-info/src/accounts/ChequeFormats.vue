@@ -10,7 +10,7 @@ import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 
 type PrintType = 'Standard' | 'NewLarge' | 'NewestLarge' | 'OldLarge' | 'NewSmall' | 'NewestSmall' | 'OldSmall'
 interface Format { id: string; number: number; bankAccountId: string | null; printType: PrintType; hasImage: boolean; isActive: boolean; version: number }
-interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; isActive: boolean }
+interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; isActive: boolean; hasCheques?: boolean }
 interface Entry { id: string; name: string }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
@@ -51,7 +51,7 @@ const bankName = (id: string | undefined) => banks.value.find(b => b.id === id)?
 const STANDARD = 'standard'
 const accountChoices = computed<Choice[]>(() => [
   { value: STANDARD, label: t('چک استاندارد (برای همهٔ حساب‌های بانکی)', 'Standard cheque (all bank accounts)') },
-  ...accounts.value.map(a => ({ value: a.id, label: `${bankName(a.bankId)} · ${a.branchName ?? ''}`, hint: a.accountNumber, muted: !a.isActive })),
+  ...accounts.value.filter(a => a.hasCheques !== false || a.id === account.value).map(a => ({ value: a.id, label: `${bankName(a.bankId)} · ${a.branchName ?? ''}`, hint: a.accountNumber, muted: !a.isActive })),
 ])
 const chosenAccountId = computed(() => (account.value === STANDARD ? null : account.value))
 const shown = computed(() => formats.value.filter(f => f.bankAccountId === chosenAccountId.value))

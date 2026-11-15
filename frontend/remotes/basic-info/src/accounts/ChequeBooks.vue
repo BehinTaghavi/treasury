@@ -14,7 +14,7 @@ import { createApi, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
-interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; branchCode: string | null; isActive: boolean }
+interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; branchCode: string | null; isActive: boolean; hasCheques?: boolean }
 interface Entry { id: string; name: string }
 interface Book {
   id: string; bankAccountId: string; serial: string; firstSheet: number; lastSheet: number; sheetCount: number; usedSheets: number
@@ -53,7 +53,8 @@ const account = (id: string) => accounts.value.find(a => a.id === id)
 const bankName = (id: string | undefined) => banks.value.find(b => b.id === id)?.name ?? ''
 const accountLabel = (a: BankAccount | undefined) => (a ? `${bankName(a.bankId)} · ${a.branchName ?? ''}` : '')
 const accountChoices = computed<Choice[]>(() =>
-  accounts.value.filter(a => a.isActive || a.id === form.bankAccountId).map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber, muted: !a.isActive })))
+  // Only a current Qard-al-hasan account has cheque books (owner's report no. 4, item 1).
+  accounts.value.filter(a => (a.isActive && a.hasCheques !== false) || a.id === form.bankAccountId).map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber, muted: !a.isActive })))
 const filterChoices = computed<Choice[]>(() => accounts.value.map(a => ({ value: a.id, label: accountLabel(a), hint: a.accountNumber })))
 const chosen = computed(() => account(form.bankAccountId))
 const formatLabel = (f: Format | undefined) => (f
