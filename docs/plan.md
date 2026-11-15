@@ -26,6 +26,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 ## Done log
 | Date | What |
 |---|---|
+| 2026-11-15 | Pull request 8 merged into `main` on the owner's instruction (the work of 11–15 Nov, CI green; the reviewer's pass over it is still to come), so `main` matches the owner's test server. Home pages `README.md` / `README.en.md` and the reviewer's build-and-run guide brought in line with it |
 | 2026-11-15 | Reviewer's guide in Farsi (`docs/reviewer-guide.fa.md`): the code and its patterns explained, a pull-request review checklist, and a classified learning path for the technologies used |
 | 2026-11-15 | Pull requests 1–6 merged into `main` (CI green). Home page `README.md` rewritten in Farsi with the latest changes, status and next steps; English copy in `README.en.md` |
 | 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
