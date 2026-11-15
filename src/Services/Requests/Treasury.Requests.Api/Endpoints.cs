@@ -33,6 +33,25 @@ public static class Endpoints
         api.MapPut("/{id:guid}", async (Guid id, EditRequest r, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
             ToHttp(await u.EditAsync(new(Key(http), id, r.Input, r.Version), ct).ConfigureAwait(false)));
 
+        // Report no. 4, item 12: scans of the supporting documents. Multipart form with "file" and "version"; at most 5 MB.
+        api.MapPost("/{id:guid}/files", async (Guid id, IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] long version, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
+        {
+            if (file.Length > PaymentRequest.MaxAttachmentBytes)
+            {
+                return ToHttp(Result<Guid>.Fail("PaymentRequest.AttachmentTooLarge", "A scan is at most 5 MB."));
+            }
+
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            return ToHttp(await u.AttachFileAsync(Key(http), id, file.FileName, buffer.ToArray(), version, ct).ConfigureAwait(false));
+        }).DisableAntiforgery();
+
+        api.MapGet("/{id:guid}/files/{fileId:guid}", async (Guid id, Guid fileId, PaymentRequestUseCases u, CancellationToken ct) =>
+            await u.GetFileAsync(id, fileId, ct).ConfigureAwait(false) is { } f ? Results.File(f.Content, f.File.ContentType, f.File.FileName) : Results.NotFound());
+
+        api.MapPost("/{id:guid}/files/{fileId:guid}/delete", async (Guid id, Guid fileId, ChangeRequest r, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveFileAsync(Key(http), id, fileId, r.Version, ct).ConfigureAwait(false)));
+
         api.MapPost("/{id:guid}/{change:regex(^(approve|withdraw-approval|cancel)$)}", async (Guid id, string change, ChangeRequest r, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
             ToHttp(await u.ChangeAsync(new(Key(http), id, change, r.Version, r.Reason), ct).ConfigureAwait(false)));
     }
@@ -50,7 +69,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "PaymentRequest.NotFound" => StatusCodes.Status404NotFound,
+            "PaymentRequest.NotFound" or "PaymentRequest.AttachmentNotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Reference.Unavailable" or "Accounts.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

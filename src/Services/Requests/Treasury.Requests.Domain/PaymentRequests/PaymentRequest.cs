@@ -19,6 +19,10 @@ public enum PaymentMethod
     CardToCard,
 }
 
+/// <summary>A scanned supporting document of a request (owner's report no. 4, item 12: «تصویر اسکن شده ضمایم پرداخت»).</summary>
+/// <param name="ContentType">application/pdf, image/jpeg or image/png, read from the file itself.</param>
+public sealed record RequestAttachment(Guid Id, string FileName, string ContentType, int Size, string UploadedBy, DateTimeOffset UploadedAt);
+
 /// <summary>Registered by the requester, approved for payment, paid by treasury (Phase E), or cancelled.</summary>
 public enum PaymentRequestState
 {
@@ -84,6 +88,10 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public const int MaxPurposeLength = 300;
     public const int MaxAttachments = 999;
     public const int ForeignDecimals = 2;
+    public const int MaxAttachmentBytes = 5 * 1024 * 1024;
+    public const int MaxAttachmentFiles = 20;
+
+    private readonly List<RequestAttachment> _files = [];
 
     private PaymentRequest(Guid id, int number, int fiscalYear, string recordedBy)
         : base(id)
@@ -165,6 +173,9 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
 
     public string? CancelReason { get; private set; }
 
+    /// <summary>Scans attached to the request; the number of paper documents is <see cref="Attachments"/>.</summary>
+    public IReadOnlyList<RequestAttachment> Files => _files;
+
     public static PaymentRequest Register(Guid id, int number, PaymentRequestForm form, string userId)
     {
         ArgumentNullException.ThrowIfNull(form);
@@ -185,6 +196,35 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Require(form.Date.JalaliYear == FiscalYear, "PaymentRequest.OtherYear", "The date must stay in the request's fiscal year.");
         Apply(form);
         Raise(new PaymentRequestEdited(Id, userId));
+    }
+
+    /// <summary>
+    /// Attaches a scan (owner's report no. 4, item 12): PDF, JPEG or PNG, at most 5 MB, 20 files a request; only while the request is
+    /// not yet approved, so what was approved is what is paid. Returns the stored attachment.
+    /// </summary>
+    public RequestAttachment AttachFile(Guid id, string fileName, ReadOnlySpan<byte> content, string userId, DateTimeOffset at)
+    {
+        Require(State == PaymentRequestState.Registered, "PaymentRequest.NotEditable", "Only a request that is not yet approved can be changed.");
+        Require(content.Length > 0, "PaymentRequest.AttachmentEmpty", "The file is empty.");
+        Require(content.Length <= MaxAttachmentBytes, "PaymentRequest.AttachmentTooLarge", "A scan is at most 5 MB.");
+        Require(_files.Count < MaxAttachmentFiles, "PaymentRequest.TooManyAttachments", "At most 20 scans on one request.");
+        var type = FileTypeOf(content) ?? throw new DomainException("PaymentRequest.AttachmentType", "A scan is a PDF, JPEG or PNG file.");
+        // Only the file's own name: browsers on Windows may send the whole path, with \ or /.
+        var raw = (fileName ?? string.Empty).Trim();
+        var name = raw[(raw.LastIndexOfAny(['/', '\\']) + 1)..];
+        var file = new RequestAttachment(id, string.IsNullOrWhiteSpace(name) ? "scan" : name[..Math.Min(name.Length, 200)], type, content.Length, userId, at);
+        _files.Add(file);
+        Raise(new PaymentRequestFileAttached(Id, file.Id, file.FileName, userId));
+        return file;
+    }
+
+    public void RemoveFile(Guid fileId, string userId)
+    {
+        Require(State == PaymentRequestState.Registered, "PaymentRequest.NotEditable", "Only a request that is not yet approved can be changed.");
+        var i = _files.FindIndex(f => f.Id == fileId);
+        Require(i >= 0, "PaymentRequest.AttachmentNotFound", "The scan was not found.");
+        _files.RemoveAt(i);
+        Raise(new PaymentRequestFileRemoved(Id, fileId, userId));
     }
 
     /// <summary>«تایید پرداخت»: the request goes to the list of requests approved for payment.</summary>
@@ -214,7 +254,8 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Raise(new PaymentRequestCancelled(Id, CancelReason, userId));
     }
 
-    public static PaymentRequest Restore(Guid id, int number, int fiscalYear, string recordedBy, PaymentRequestSnapshotData d, long version)
+    public static PaymentRequest Restore(
+        Guid id, int number, int fiscalYear, string recordedBy, PaymentRequestSnapshotData d, long version, IEnumerable<RequestAttachment>? files = null)
     {
         ArgumentNullException.ThrowIfNull(d);
         var r = new PaymentRequest(id, number, fiscalYear, recordedBy)
@@ -227,6 +268,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             DepartmentId = d.DepartmentId, HasMainBeneficiaries = d.HasMainBeneficiaries, Attachments = d.Attachments, Note = d.Note,
             State = d.State, ApprovedBy = d.ApprovedBy, ApprovedAt = d.ApprovedAt, CancelReason = d.CancelReason,
         };
+        r._files.AddRange(files ?? []);
         r.SetLoadedVersion(version);
         return r;
     }
@@ -339,6 +381,12 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         return sum % 10 == 0;
     }
 
+    private static string? FileTypeOf(ReadOnlySpan<byte> b) =>
+        b.Length >= 4 && b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46 ? "application/pdf"
+        : b.Length >= 8 && b[..8].SequenceEqual(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }) ? "image/png"
+        : b.Length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF ? "image/jpeg"
+        : null;
+
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     private static void Require(bool condition, string code, string message)
@@ -367,5 +415,9 @@ public sealed record PaymentRequestApproved(
     Guid PaymentRequestId, int Number, int FiscalYear, decimal Amount, string Currency, PaymentMethod Method, int Priority, string UserId) : DomainEvent;
 
 public sealed record PaymentRequestApprovalWithdrawn(Guid PaymentRequestId, string UserId) : DomainEvent;
+
+public sealed record PaymentRequestFileAttached(Guid PaymentRequestId, Guid FileId, string FileName, string UserId) : DomainEvent;
+
+public sealed record PaymentRequestFileRemoved(Guid PaymentRequestId, Guid FileId, string UserId) : DomainEvent;
 
 public sealed record PaymentRequestCancelled(Guid PaymentRequestId, string Reason, string UserId) : DomainEvent;

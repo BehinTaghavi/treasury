@@ -8,12 +8,14 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { methods, stateNames, useLookups } from './lookups'
+import { openFile, sizeText, type RequestFile } from './files'
 
 interface Request {
   id: string; number: number; date: string; requesterName: string; beneficiaryName: string; beneficiaryDetailCode: string; purposeGroupName: string
   purpose: string; reference1: string | null; amount: number; currency: string; method: string; priority: number; transferAccount: string | null
   cardNumber: string | null; payFromKind: string | null; payFromId: string | null; dueDate: string | null; hasMainBeneficiaries: boolean
   attachments: number; note: string | null; state: string; recordedBy: string; approvedBy: string | null; cancelReason: string | null; version: number
+  files: RequestFile[] | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number; approved?: boolean }>(),
@@ -126,7 +128,7 @@ onMounted(async () => { await L.load(); await load() })
             <td class="num">{{ r.date }}</td>
             <td>{{ r.requesterName }}</td>
             <td>{{ r.beneficiaryName }} <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
-            <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span></td>
+            <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span> <span v-if="r.files?.length" class="tr-tag" :title="t('تصاویر ضمائم', 'Scans')">📎 {{ num(r.files.length) }}</span></td>
             <td>{{ methodName(r.method) }}</td>
             <td class="num">{{ money(r.amount) }} <span v-if="r.currency !== 'IRR'">{{ r.currency }}</span></td>
             <td class="num">{{ num(r.priority) }}</td>
@@ -159,6 +161,12 @@ onMounted(async () => { await L.load(); await load() })
         <template v-if="selected.attachments"> · {{ t('ضمائم', 'Attachments') }}: {{ num(selected.attachments) }}</template>
       </p>
       <p v-if="selected.note" class="small">{{ selected.note }}</p>
+      <p v-if="selected.files?.length" class="small">{{ t('تصاویر ضمائم', 'Scans') }}:
+        <template v-for="f in selected.files" :key="f.id">
+          <button type="button" class="tr-link" @click="openFile(apiBase, token, selected!.id, f.id)">{{ f.fileName }}</button>
+          <span class="muted">({{ sizeText(f.size, fa) }})</span>
+        </template>
+      </p>
       <p v-if="selected.cancelReason" class="tr-msg error">{{ t('علت ابطال', 'Reason') }}: {{ selected.cancelReason }}</p>
       <div v-if="selected.state === 'Registered' || selected.state === 'Approved'" class="tr-buttons">
         <button v-if="!cancel.open" type="button" class="tr-secondary" @click="cancel.open = true">{{ t('ابطال درخواست', 'Cancel request') }}</button>

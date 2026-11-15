@@ -135,4 +135,44 @@ public sealed class PaymentRequestTests
         Assert.Equal(PaymentRequestState.Cancelled, r.State);
         Assert.Equal("PaymentRequest.CannotCancel", Code(() => r.Cancel("again", User)));
     }
+
+    private static readonly byte[] Pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34];
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0];
+
+    [Fact]
+    public void Scans_are_attached_as_pdf_jpeg_or_png_report_4_item_12()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(), User);
+        var f = r.AttachFile(Guid.NewGuid(), @"C:\scans\invoice 12.pdf", Pdf, User, DateTimeOffset.UnixEpoch);
+        Assert.Equal(("invoice 12.pdf", "application/pdf", 8), (f.FileName, f.ContentType, f.Size));
+        Assert.Equal("image/png", r.AttachFile(Guid.NewGuid(), "b.png", Png, User, DateTimeOffset.UnixEpoch).ContentType);
+        Assert.Equal("PaymentRequest.AttachmentType", Code(() => r.AttachFile(Guid.NewGuid(), "x.docx", [0x50, 0x4B, 3, 4], User, DateTimeOffset.UnixEpoch)));
+        Assert.Equal("PaymentRequest.AttachmentEmpty", Code(() => r.AttachFile(Guid.NewGuid(), "x.pdf", [], User, DateTimeOffset.UnixEpoch)));
+        Assert.Equal("PaymentRequest.AttachmentTooLarge", Code(() => r.AttachFile(Guid.NewGuid(), "x.pdf", new byte[PaymentRequest.MaxAttachmentBytes + 1], User, DateTimeOffset.UnixEpoch)));
+        r.RemoveFile(f.Id, User);
+        Assert.Single(r.Files);
+        Assert.Equal("PaymentRequest.AttachmentNotFound", Code(() => r.RemoveFile(f.Id, User)));
+    }
+
+    [Fact]
+    public void An_approved_request_keeps_its_scans()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(), User);
+        var f = r.AttachFile(Guid.NewGuid(), "a.pdf", Pdf, User, DateTimeOffset.UnixEpoch);
+        r.Approve("manager", DateTimeOffset.UnixEpoch);
+        Assert.Equal("PaymentRequest.NotEditable", Code(() => r.AttachFile(Guid.NewGuid(), "b.pdf", Pdf, User, DateTimeOffset.UnixEpoch)));
+        Assert.Equal("PaymentRequest.NotEditable", Code(() => r.RemoveFile(f.Id, User)));
+    }
+
+    [Fact]
+    public void At_most_20_scans()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(), User);
+        for (var i = 0; i < PaymentRequest.MaxAttachmentFiles; i++)
+        {
+            r.AttachFile(Guid.NewGuid(), $"{i}.pdf", Pdf, User, DateTimeOffset.UnixEpoch);
+        }
+
+        Assert.Equal("PaymentRequest.TooManyAttachments", Code(() => r.AttachFile(Guid.NewGuid(), "x.pdf", Pdf, User, DateTimeOffset.UnixEpoch)));
+    }
 }

@@ -54,6 +54,21 @@ public sealed class PaymentRequestPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_scan_is_stored_with_its_request_and_removed_with_it()
+    {
+        var id = (await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None)).Value;
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 9, 8, 7];
+        var file = await _requests.AttachFileAsync(Key(), id, "slip.jpg", jpeg, 1, CancellationToken.None);
+        Assert.True(file.IsSuccess, file.ErrorCode);
+        var v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("slip.jpg", "image/jpeg", 7), (Assert.Single(v.Files!).FileName, v.Files![0].ContentType, v.Files[0].Size));
+        Assert.Contains(await _requests.ListAsync(1405, null, CancellationToken.None), r => r.Id == id && r.Files!.Count == 1);
+        Assert.Equal(jpeg, (await _requests.GetFileAsync(id, file.Value, CancellationToken.None))!.Value.Content);
+        Assert.True((await _requests.RemoveFileAsync(Key(), id, file.Value, 2, CancellationToken.None)).IsSuccess);
+        Assert.Null(await _requests.GetFileAsync(id, file.Value, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Numbers_follow_each_other_within_a_year()
     {
         var a = await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None);

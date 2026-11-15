@@ -121,6 +121,24 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task Scans_are_attached_read_back_and_removed_until_approval()
+    {
+        var id = await Register(Input());
+        byte[] pdf = [0x25, 0x50, 0x44, 0x46, 1, 2, 3];
+        var file = await _requests.AttachFileAsync(Key(), id, "invoice.pdf", pdf, 1, CancellationToken.None);
+        Assert.True(file.IsSuccess, file.ErrorCode);
+        var v = await View(id);
+        Assert.Equal(("invoice.pdf", 2L), (Assert.Single(v.Files!).FileName, v.Version));
+        var stored = (await _requests.GetFileAsync(id, file.Value, CancellationToken.None))!.Value;
+        Assert.Equal(pdf, stored.Content);
+        Assert.True((await _requests.RemoveFileAsync(Key(), id, file.Value, 2, CancellationToken.None)).IsSuccess);
+        Assert.Null(await _requests.GetFileAsync(id, file.Value, CancellationToken.None));
+        Assert.True((await _requests.AttachFileAsync(Key(), id, "b.pdf", pdf, 3, CancellationToken.None)).IsSuccess);
+        await _requests.ChangeAsync(new(Key(), id, "approve", 4), CancellationToken.None);
+        Assert.Equal("PaymentRequest.NotEditable", (await _requests.AttachFileAsync(Key(), id, "c.pdf", pdf, 5, CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task The_same_key_twice_registers_one_request()
     {
         var key = Key();

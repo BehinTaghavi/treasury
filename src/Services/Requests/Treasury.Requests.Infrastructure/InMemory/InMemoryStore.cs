@@ -30,11 +30,12 @@ public sealed record OutboxMessage(Guid Id, string Type, string Payload, DateTim
 }
 
 /// <summary>Stored form of a payment request (immutable, so a transaction's copy never leaks into committed state).</summary>
-public sealed record PaymentRequestSnapshot(Guid Id, int Number, int FiscalYear, string RecordedBy, PaymentRequestSnapshotData Data, long Version)
+public sealed record PaymentRequestSnapshot(
+    Guid Id, int Number, int FiscalYear, string RecordedBy, PaymentRequestSnapshotData Data, long Version, IReadOnlyList<RequestAttachment>? Files = null)
 {
-    public static PaymentRequestSnapshot From(PaymentRequest r, long version) => new(r.Id, r.Number, r.FiscalYear, r.RecordedBy, r.Data(), version);
+    public static PaymentRequestSnapshot From(PaymentRequest r, long version) => new(r.Id, r.Number, r.FiscalYear, r.RecordedBy, r.Data(), version, [.. r.Files]);
 
-    public PaymentRequest ToDomain() => PaymentRequest.Restore(Id, Number, FiscalYear, RecordedBy, Data, Version);
+    public PaymentRequest ToDomain() => PaymentRequest.Restore(Id, Number, FiscalYear, RecordedBy, Data, Version, Files);
 }
 
 /// <summary>In-memory storage for local runs and tests: one transaction at a time, all-or-nothing commit, version checks, outbox.</summary>
@@ -43,6 +44,7 @@ public sealed class InMemoryRequestsDatabase : IDisposable
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, PaymentRequestSnapshot> Requests = [];
     internal readonly Dictionary<int, int> Numbers = [];
+    internal readonly Dictionary<Guid, byte[]> FileContents = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -66,6 +68,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, PaymentRequestSnapshot> Requests { get; } = [];
 
     public Dictionary<int, int> Numbers { get; } = [];
+
+    public Dictionary<Guid, byte[]?> FileContents { get; } = []; // null: removed
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -99,6 +103,18 @@ public sealed class InMemoryUnitOfWork(InMemoryRequestsDatabase db) : IUnitOfWor
                 foreach (var (year, n) in pending.Numbers)
                 {
                     db.Numbers[year] = n;
+                }
+
+                foreach (var (id, content) in pending.FileContents)
+                {
+                    if (content is null)
+                    {
+                        db.FileContents.Remove(id);
+                    }
+                    else
+                    {
+                        db.FileContents[id] = content;
+                    }
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -156,13 +172,26 @@ public sealed class InMemoryPaymentRequestRepository(InMemoryRequestsDatabase db
         return Task.CompletedTask;
     }
 
-    public Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken)
+    public Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken, (Guid FileId, byte[] Content)? newFile = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         long stored;
+        IReadOnlyList<RequestAttachment> before;
         lock (db.Gate)
         {
             stored = db.Requests.TryGetValue(request.Id, out var s) ? s.Version : 0;
+            before = s?.Files ?? [];
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        foreach (var gone in before.Where(f => request.Files.All(x => x.Id != f.Id)))
+        {
+            pending.FileContents[gone.Id] = null;
+        }
+
+        if (newFile is { } nf)
+        {
+            pending.FileContents[nf.FileId] = nf.Content;
         }
 
         if (stored != request.Version)
@@ -172,6 +201,20 @@ public sealed class InMemoryPaymentRequestRepository(InMemoryRequestsDatabase db
 
         Stage(request, request.Version + 1);
         return Task.CompletedTask;
+    }
+
+    public Task<(RequestAttachment File, byte[] Content)?> GetFileAsync(Guid requestId, Guid fileId, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            if (db.Requests.TryGetValue(requestId, out var s) && s.Files?.FirstOrDefault(f => f.Id == fileId) is { } file
+                && db.FileContents.TryGetValue(fileId, out var content))
+            {
+                return Task.FromResult<(RequestAttachment, byte[])?>((file, content));
+            }
+
+            return Task.FromResult<(RequestAttachment, byte[])?>(null);
+        }
     }
 
     public Task<IReadOnlyList<PaymentRequest>> ListAsync(int fiscalYear, PaymentRequestState? state, CancellationToken cancellationToken)

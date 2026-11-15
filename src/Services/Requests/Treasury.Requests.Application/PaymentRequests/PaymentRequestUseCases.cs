@@ -40,14 +40,15 @@ public sealed record PaymentRequestView(
     Guid BeneficiaryId, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string PurposeGroupName, string Purpose,
     string? Reference1, string? Reference2, decimal Amount, string Currency, string Method, int Priority, string? TransferAccount, string? CardNumber,
     string? PayFromKind, Guid? PayFromId, string? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
-    string State, string RecordedBy, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, long Version)
+    string State, string RecordedBy, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, long Version,
+    IReadOnlyList<RequestAttachment>? Files = null)
 {
     public static PaymentRequestView From(PaymentRequest r) => new(
         r.Id, r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.RequesterId, r.RequesterName, r.RequesterDepartmentId, r.CostCenterCode,
         r.BeneficiaryId, r.BeneficiaryDetailCode, r.BeneficiaryName, r.PurposeGroupId, r.PurposeGroupName, r.Purpose, r.Reference1, r.Reference2,
         r.Amount, r.Currency, r.Method.ToString(), r.Priority, r.TransferAccount, r.CardNumber, r.PayFromKind?.ToString(), r.PayFromId,
         r.DueDate?.ToJalaliString(), r.DepartmentId, r.HasMainBeneficiaries, r.Attachments, r.Note, r.State.ToString(), r.RecordedBy, r.ApprovedBy,
-        r.ApprovedAt, r.CancelReason, r.Version);
+        r.ApprovedAt, r.CancelReason, r.Version, r.Files);
 }
 
 /// <summary>
@@ -111,6 +112,28 @@ public sealed class PaymentRequestUseCases(
             await requests.SaveAsync(request, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(request.Id);
         }, cancellationToken);
+
+    /// <summary>Attaches a scan to a request that is not yet approved (owner's report no. 4, item 12). Returns the new file's id.</summary>
+    public Task<Result<Guid>> AttachFileAsync(string idempotencyKey, Guid id, string fileName, byte[] content, long expectedVersion, CancellationToken cancellationToken) =>
+        Run(idempotencyKey, async ct =>
+        {
+            var request = await LoadAsync(id, expectedVersion, ct).ConfigureAwait(false);
+            var file = request.AttachFile(Guid.NewGuid(), fileName, content, currentUser.UserId, clock.GetUtcNow());
+            await requests.SaveAsync(request, ct, (file.Id, content)).ConfigureAwait(false);
+            return Result<Guid>.Ok(file.Id);
+        }, cancellationToken);
+
+    public Task<Result<Guid>> RemoveFileAsync(string idempotencyKey, Guid id, Guid fileId, long expectedVersion, CancellationToken cancellationToken) =>
+        Run(idempotencyKey, async ct =>
+        {
+            var request = await LoadAsync(id, expectedVersion, ct).ConfigureAwait(false);
+            request.RemoveFile(fileId, currentUser.UserId);
+            await requests.SaveAsync(request, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(request.Id);
+        }, cancellationToken);
+
+    public Task<(RequestAttachment File, byte[] Content)?> GetFileAsync(Guid id, Guid fileId, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(ct => requests.GetFileAsync(id, fileId, ct), cancellationToken);
 
     public Task<PaymentRequestView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>

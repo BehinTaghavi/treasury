@@ -528,7 +528,7 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -571,7 +571,7 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 

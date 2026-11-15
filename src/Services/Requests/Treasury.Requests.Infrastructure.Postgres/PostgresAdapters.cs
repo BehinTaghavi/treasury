@@ -79,7 +79,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         await using var cmd = PostgresUnitOfWork.Current.Command($"SELECT {Columns} FROM requests.payment_request WHERE id = @id");
         cmd.Parameters.AddWithValue("id", id);
         var list = await ReadAsync(cmd, cancellationToken).ConfigureAwait(false);
-        return list.Count == 0 ? null : list[0];
+        return list.Count == 0 ? null : (await WithFilesAsync(list, cancellationToken).ConfigureAwait(false))[0];
     }
 
     public async Task<int> NextNumberAsync(int fiscalYear, CancellationToken cancellationToken)
@@ -110,7 +110,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         request.MarkSaved(1);
     }
 
-    public async Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken)
+    public async Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken, (Guid FileId, byte[] Content)? newFile = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         var tx = PostgresUnitOfWork.Current;
@@ -131,8 +131,81 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             }
         }
 
+        // Scans removed from the request go; a scan just attached is stored with its content.
+        await using (var del = tx.Command("DELETE FROM requests.request_file WHERE fiscal_year = @year AND request_id = @id AND NOT (file_id = ANY(@keep))"))
+        {
+            del.Parameters.AddWithValue("year", request.FiscalYear);
+            del.Parameters.AddWithValue("id", request.Id);
+            del.Parameters.AddWithValue("keep", request.Files.Select(f => f.Id).ToArray());
+            await del.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        if (newFile is { } nf && request.Files.FirstOrDefault(f => f.Id == nf.FileId) is { } meta)
+        {
+            await using var ins = tx.Command(
+                "INSERT INTO requests.request_file (fiscal_year, file_id, request_id, file_name, content_type, size, uploaded_by, uploaded_at, content) " +
+                "VALUES (@year, @file, @id, @name, @type, @size, @by, @at, @content)");
+            ins.Parameters.AddWithValue("year", request.FiscalYear);
+            ins.Parameters.AddWithValue("file", meta.Id);
+            ins.Parameters.AddWithValue("id", request.Id);
+            ins.Parameters.AddWithValue("name", meta.FileName);
+            ins.Parameters.AddWithValue("type", meta.ContentType);
+            ins.Parameters.AddWithValue("size", meta.Size);
+            ins.Parameters.AddWithValue("by", meta.UploadedBy);
+            ins.Parameters.AddWithValue("at", meta.UploadedAt);
+            ins.Parameters.Add(new NpgsqlParameter("content", NpgsqlDbType.Bytea) { Value = nf.Content });
+            await ins.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await PostgresOutbox.WriteAsync(tx, request.PendingEvents, cancellationToken).ConfigureAwait(false);
         request.MarkSaved(request.Version + 1);
+    }
+
+    public async Task<(RequestAttachment File, byte[] Content)?> GetFileAsync(Guid requestId, Guid fileId, CancellationToken cancellationToken)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT file_name, content_type, size, uploaded_by, uploaded_at, content FROM requests.request_file WHERE request_id = @id AND file_id = @file");
+        cmd.Parameters.AddWithValue("id", requestId);
+        cmd.Parameters.AddWithValue("file", fileId);
+        await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        if (!await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        return (new RequestAttachment(fileId, r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetString(3), r.GetFieldValue<DateTimeOffset>(4)),
+            r.GetFieldValue<byte[]>(5));
+    }
+
+    /// <summary>Adds the scans' names and sizes (not their content) to requests read from the table.</summary>
+    private static async Task<IReadOnlyList<PaymentRequest>> WithFilesAsync(IReadOnlyList<PaymentRequest> list, CancellationToken ct)
+    {
+        if (list.Count == 0)
+        {
+            return list;
+        }
+
+        var files = new Dictionary<Guid, List<RequestAttachment>>();
+        await using (var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT request_id, file_id, file_name, content_type, size, uploaded_by, uploaded_at FROM requests.request_file WHERE request_id = ANY(@ids) ORDER BY uploaded_at"))
+        {
+            cmd.Parameters.AddWithValue("ids", list.Select(r => r.Id).ToArray());
+            await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await r.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var id = r.GetGuid(0);
+                if (!files.TryGetValue(id, out var l))
+                {
+                    files[id] = l = [];
+                }
+
+                l.Add(new RequestAttachment(r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetInt32(4), r.GetString(5), r.GetFieldValue<DateTimeOffset>(6)));
+            }
+        }
+
+        return list.Select(x => files.TryGetValue(x.Id, out var l)
+            ? PaymentRequest.Restore(x.Id, x.Number, x.FiscalYear, x.RecordedBy, x.Data(), x.Version, l)
+            : x).ToList();
     }
 
     public async Task<IReadOnlyList<PaymentRequest>> ListAsync(int fiscalYear, PaymentRequestState? state, CancellationToken cancellationToken)
@@ -141,7 +214,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             $"SELECT {Columns} FROM requests.payment_request WHERE fiscal_year = @year AND (@state::text IS NULL OR state = @state)");
         cmd.Parameters.AddWithValue("year", fiscalYear);
         cmd.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = (object?)state?.ToString() ?? DBNull.Value });
-        return await ReadAsync(cmd, cancellationToken).ConfigureAwait(false);
+        return await WithFilesAsync(await ReadAsync(cmd, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
     }
 
     private static void Bind(NpgsqlCommand cmd, PaymentRequest r)

@@ -12,8 +12,14 @@ public interface IPaymentRequestRepository
 
     Task AddAsync(PaymentRequest request, CancellationToken cancellationToken);
 
-    /// <summary>Saves changes. Throws ConcurrencyConflictException when someone else saved first.</summary>
-    Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken);
+    /// <summary>
+    /// Saves changes. Throws ConcurrencyConflictException when someone else saved first. With <paramref name="newFile"/>, also stores
+    /// the content of a scan just attached; scans removed from the request are deleted with it.
+    /// </summary>
+    Task SaveAsync(PaymentRequest request, CancellationToken cancellationToken, (Guid FileId, byte[] Content)? newFile = null);
+
+    /// <summary>The content of one scan of a request; null when unknown.</summary>
+    Task<(RequestAttachment File, byte[] Content)?> GetFileAsync(Guid requestId, Guid fileId, CancellationToken cancellationToken);
 
     /// <summary>Requests of a year, newest first; in one state or all.</summary>
     Task<IReadOnlyList<PaymentRequest>> ListAsync(int fiscalYear, PaymentRequestState? state, CancellationToken cancellationToken);

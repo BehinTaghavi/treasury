@@ -10,12 +10,13 @@ import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, t
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { methods, useLookups, type Purpose } from './lookups'
+import { ACCEPT, openFile, sizeText, uploadFile, type RequestFile } from './files'
 
 interface View {
   id: string; number: number; date: string; requesterId: string; beneficiaryId: string; purposeGroupId: string; purpose: string
   reference1: string | null; reference2: string | null; amount: number; currency: string; method: string; priority: number
   transferAccount: string | null; cardNumber: string | null; payFromId: string | null; dueDate: string | null; departmentId: string | null
-  hasMainBeneficiaries: boolean; attachments: number; note: string | null; version: number
+  hasMainBeneficiaries: boolean; attachments: number; note: string | null; version: number; files: RequestFile[] | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; editId?: string | null }>(),
@@ -33,6 +34,46 @@ const empty = () => ({
 })
 const form = reactive(empty())
 const editing = ref<{ number: number; version: number } | null>(null)
+/** Scans (report no. 4, item 12): already stored ones when correcting, chosen ones waiting to be sent with a new request. */
+const storedFiles = ref<RequestFile[]>([])
+const queued = ref<File[]>([])
+function chooseFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  const chosen = Array.from(input.files ?? [])
+  input.value = ''
+  if (editing.value && props.editId) void sendFiles(props.editId, chosen)
+  else queued.value.push(...chosen)
+}
+/** Sends scans one by one; each one changes the request's version. Returns the reasons of the refused ones. */
+async function sendFiles(id: string, files: File[]): Promise<string[]> {
+  const refused: string[] = []
+  for (const f of files) {
+    const version = editing.value?.version ?? 1
+    const reason = await uploadFile(props.apiBase, props.token, id, version, f, props.locale)
+    if (reason) refused.push(`${f.name}: ${reason}`)
+    if (editing.value) await load(id)
+    else if (!reason) currentVersion++
+  }
+  if (refused.length) show('error', refused.join('؛ '))
+  return refused
+}
+let currentVersion = 1
+/** A new request: its id is known only once it is saved; versions then count up from 1 with each scan. */
+async function sendFilesForNew(id: string): Promise<string[]> {
+  const refused: string[] = []
+  for (const f of queued.value) {
+    const reason = await uploadFile(props.apiBase, props.token, id, currentVersion, f, props.locale)
+    if (reason) refused.push(`${f.name}: ${reason}`)
+    else currentVersion++
+  }
+  return refused
+}
+async function removeStored(f: RequestFile) {
+  if (!editing.value || !props.editId) return
+  const r = await api.post<string>(`/api/requests/payment-requests/${props.editId}/files/${f.id}/delete`, { version: editing.value.version })
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  await load(props.editId)
+}
 const purposes = ref<Purpose[]>([])
 
 const requester = computed(() => L.requesters.value.find(r => r.id === form.requesterId))
@@ -84,6 +125,7 @@ async function load(id: string) {
     departmentId: v.departmentId ?? '', attachments: String(v.attachments), note: v.note ?? '',
   })
   editing.value = { number: v.number, version: v.version }
+  storedFiles.value = v.files ?? []
 }
 
 /** A purpose typed here that the group does not list yet is added to it (decision of 13 Nov 2026). */
@@ -123,9 +165,14 @@ async function save() {
       show('ok', t(`درخواست شمارهٔ ${editing.value.number.toLocaleString('fa-IR')} اصلاح شد.`, `Request no. ${editing.value.number} corrected.`))
       await load(r.value)
     } else {
+      currentVersion = 1
+      const sent = queued.value.length ? await sendFilesForNew(r.value) : []
       const v = await api.get<View>(`/api/requests/payment-requests/${r.value}`)
       const no = v.ok ? (fa.value ? v.value.number.toLocaleString('fa-IR') : String(v.value.number)) : ''
-      show('ok', t(`درخواست وجه شمارهٔ ${no} ثبت شد و منتظر تایید است.`, `Payment request no. ${no} saved; it waits for approval.`))
+      const saved = t(`درخواست وجه شمارهٔ ${no} ثبت شد و منتظر تایید است.`, `Payment request no. ${no} saved; it waits for approval.`)
+      if (sent.length) show('error', `${saved} ${t('الصاق نشد', 'Not attached')}: ${sent.join('؛ ')}`)
+      else show('ok', saved + (v.ok && v.value.files?.length ? t(` ${v.value.files.length.toLocaleString('fa-IR')} تصویر ضمیمه الصاق شد.`, ` ${v.value.files.length} scan(s) attached.`) : ''))
+      queued.value = []
       Object.assign(form, { ...empty(), requesterId: form.requesterId, date: form.date })
     }
     emit('saved', r.value)
@@ -213,6 +260,24 @@ onMounted(async () => {
       <label class="full">{{ t('توضیحات', 'Note') }} <input v-model="form.note" maxlength="500" /></label>
     </fieldset>
 
+    <fieldset>
+      <legend>{{ t('تصویر اسکن ضمائم', 'Scanned attachments') }}</legend>
+      <label class="full">{{ t('افزودن فایل (PDF، JPG یا PNG، حداکثر ۵ مگابایت)', 'Add files (PDF, JPG or PNG, up to 5 MB)') }}
+        <input type="file" :accept="ACCEPT" multiple @change="chooseFiles" />
+      </label>
+      <ul v-if="storedFiles.length || queued.length" class="tr-files full">
+        <li v-for="f in storedFiles" :key="f.id">
+          <button type="button" class="tr-link" @click="openFile(apiBase, token, editId!, f.id)">{{ f.fileName }}</button>
+          <span class="muted small">{{ sizeText(f.size, fa) }}</span>
+          <button type="button" class="tr-link danger" @click="removeStored(f)">{{ t('حذف', 'Remove') }}</button>
+        </li>
+        <li v-for="(f, i) in queued" :key="'q' + i">
+          {{ f.name }} <span class="muted small">{{ sizeText(f.size, fa) }} – {{ t('پس از ثبت الصاق می‌شود', 'sent when the request is saved') }}</span>
+          <button type="button" class="tr-link danger" @click="queued.splice(i, 1)">{{ t('حذف', 'Remove') }}</button>
+        </li>
+      </ul>
+    </fieldset>
+
     <div class="tr-buttons">
       <button type="submit" :disabled="saving">{{ editing ? t('ذخیرهٔ اصلاح (Ctrl+Enter)', 'Save correction (Ctrl+Enter)') : t('ثبت درخواست (Ctrl+Enter)', 'Save request (Ctrl+Enter)') }}</button>
       <button v-if="editing" type="button" class="tr-secondary" @click="emit('closed')">{{ t('بازگشت به فهرست', 'Back to the list') }}</button>
@@ -224,4 +289,6 @@ onMounted(async () => {
 <style scoped src="./requests.css"></style>
 <style scoped>
 .full { grid-column: 1 / -1; }
+.tr-files { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.tr-files li { display: flex; gap: .5rem; align-items: center; }
 </style>
