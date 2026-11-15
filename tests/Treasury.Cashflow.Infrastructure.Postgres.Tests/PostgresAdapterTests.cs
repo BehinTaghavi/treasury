@@ -42,7 +42,8 @@ public sealed class PostgresAdapterTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"),
-            new AnyBankAccount());
+            new AnyBankAccount(),
+            TimeProvider.System);
         _books = new ChequeBookUseCases(_unitOfWork, new PostgresChequeBookRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource), new PostgresChequeFormatRepository());
     }
 
@@ -178,6 +179,7 @@ public sealed class PostgresAdapterTests : IDisposable
     {
         // Received in 1404, deposited in 1404, cleared in 1405 (doc 7.4): the clearing step lives in the 1405 partition.
         var id = (await _useCases.ReceiveAsync(Receive(Key(), date: "1404/12/20") with { DueDate = "1405/01/10" }, CancellationToken.None)).Value;
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1404/12/25", Destination: "حساب جاری ملت"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RecordCleared, "1405/01/15", Reference: "R-1"), CancellationToken.None)).IsSuccess);
 
@@ -186,10 +188,37 @@ public sealed class PostgresAdapterTests : IDisposable
         Assert.Equal("حساب جاری ملت", view.Destination);
         Assert.Equal(["Receive", "DepositForCollection", "RecordCleared"], view.History.Select(h => h.Action));
         Assert.Equal("R-1", view.History[2].Reference);
-        Assert.Equal(3L, view.Version);
+        Assert.Equal(4L, view.Version); // received, ticked «ثبت صیادی شد», deposited, cleared
+        Assert.NotNull(view.SayadRegisteredAt);
+        Assert.Equal("clerk-1", view.SayadRegisteredBy);
         Assert.Equal(2L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.instrument_event_fy1404 WHERE instrument_id = @id", ("id", id)));
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.instrument_event_fy1405 WHERE instrument_id = @id", ("id", id)));
-        Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.outbox WHERE payload->>'InstrumentId' = @id", ("id", id.ToString())));
+        // Three steps and the tick's own event (InstrumentSayadRegistrationChanged).
+        Assert.Equal(4L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.outbox WHERE payload->>'InstrumentId' = @id", ("id", id.ToString())));
+    }
+
+    [Fact]
+    public async Task The_sayad_tick_is_stored_with_its_moment_and_user_and_can_be_removed_owner_15_Nov_2026()
+    {
+        var id = (await _useCases.ReceiveAsync(Receive(Key()), CancellationToken.None)).Value;
+        Assert.Equal("Instrument.SayadNotRegistered",
+            (await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "ملت"), CancellationToken.None)).ErrorCode);
+
+        var before = DateTimeOffset.UtcNow.AddSeconds(-5);
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
+        var ticked = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal("clerk-1", ticked.SayadRegisteredBy);
+        Assert.True(ticked.SayadRegisteredAt >= before && ticked.SayadRegisteredAt <= DateTimeOffset.UtcNow.AddSeconds(5));
+        Assert.Contains("DepositForCollection", ticked.AllowedActions);
+        Assert.Equal(1L, await _db.ScalarAsync<long>(
+            "SELECT count(*) FROM cashflow.instrument WHERE id = @id AND sayad_registered_at IS NOT NULL AND sayad_registered_by = 'clerk-1'", ("id", id)));
+
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, false), CancellationToken.None)).IsSuccess);
+        var removed = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Null(removed.SayadRegisteredAt);
+        Assert.Null(removed.SayadRegisteredBy);
+        Assert.Equal(2L, await _db.ScalarAsync<long>(
+            "SELECT count(*) FROM cashflow.outbox WHERE type = 'InstrumentSayadRegistrationChanged' AND payload->>'InstrumentId' = @id", ("id", id.ToString())));
     }
 
     [Fact]
@@ -207,6 +236,7 @@ public sealed class PostgresAdapterTests : IDisposable
     {
         var id = (await _useCases.ReceiveAsync(Receive(Key()), CancellationToken.None)).Value;
         var stale = await _unitOfWork.ExecuteAsync(ct => _instruments.GetAsync(id, ct), CancellationToken.None);
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "ملت"), CancellationToken.None)).IsSuccess);
 
         stale!.ReturnToIssuer(FiscalDate.ParseJalali("1405/08/04"), "clerk-2", null);
@@ -223,13 +253,14 @@ public sealed class PostgresAdapterTests : IDisposable
     public async Task The_database_refuses_a_step_in_a_closed_fiscal_year_even_if_the_application_allowed_it()
     {
         var id = (await _useCases.ReceiveAsync(Receive(Key(), date: "1403/11/01"), CancellationToken.None)).Value;
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
         await _db.ExecuteAsync("SELECT cashflow.close_fiscal_year(1403)");
 
         // The development policy still says 1403 is open; the closed-year trigger is the last line of defence (ADR 0003).
         var error = await Assert.ThrowsAsync<PostgresException>(() =>
             _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1403/11/05", Destination: "ملت"), CancellationToken.None));
         Assert.Equal("P0001", error.SqlState);
-        Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT version FROM cashflow.instrument WHERE id = @id", ("id", id)));
+        Assert.Equal(2L, await _db.ScalarAsync<long>("SELECT version FROM cashflow.instrument WHERE id = @id", ("id", id))); // received, ticked «ثبت صیادی شد»
     }
 
     [Fact]

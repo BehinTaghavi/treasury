@@ -30,7 +30,7 @@ public sealed class VoucherUseCaseTests : IDisposable
             new InMemoryUnitOfWork(_db), new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), _bank, _reference,
             policies, new InMemoryIdempotencyStore(_db), new Treasurer(), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store), _requests);
         _instruments = new InstrumentUseCases(new InMemoryUnitOfWork(_db), new InMemoryInstrumentRepository(_db), new InMemoryChequeBookRepository(_db),
-            new InMemoryIdempotencyStore(_db), policies, policies, policies, new Treasurer(), _bank);
+            new InMemoryIdempotencyStore(_db), policies, policies, policies, new Treasurer(), _bank, TimeProvider.System);
         _vouchers = new VoucherUseCases(new InMemoryUnitOfWork(_db), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store),
             new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), _bank, _reference,
             new InMemoryIdempotencyStore(_db), new Treasurer(), TimeProvider.System);
@@ -141,6 +141,7 @@ public sealed class VoucherUseCaseTests : IDisposable
         var cheque = (await _receipts.GetAsync(receipt, CancellationToken.None))!.Instruments![0].Id;
         Assert.Empty(await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None));
 
+        Assert.True((await _instruments.SetSayadRegistrationAsync(new(Key(), cheque, true), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordCleared, "1405/10/02"), CancellationToken.None)).IsSuccess);
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
@@ -163,6 +164,7 @@ public sealed class VoucherUseCaseTests : IDisposable
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.SetSayadRegistrationAsync(new(Key(), cheque, true), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28", Note: "امضا ناقص"), CancellationToken.None)).IsSuccess);
 
@@ -226,6 +228,7 @@ public sealed class VoucherUseCaseTests : IDisposable
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.SetSayadRegistrationAsync(new(Key(), cheque, true), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.Equal("Instrument.BounceNoticeRequired",
             (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordBounced, "1405/10/02", Note: "کسری"), CancellationToken.None)).ErrorCode);

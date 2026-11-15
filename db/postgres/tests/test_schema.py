@@ -668,6 +668,24 @@ def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_a
         c.rollback()
 
 
+def test_a_cheque_keeps_the_moment_and_user_of_its_sayad_tick(db):
+    # 033_cashflow_sayad_registration.sql (owner, 15 Nov 2026: «ثبت صیادی شد» before a cheque goes to the bank or its beneficiary).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405)
+        assert c.execute("SELECT sayad_registered_at, sayad_registered_by FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone() == (None, None)
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = '2026-11-15 10:35+03:30', sayad_registered_by = 'treasurer' WHERE id = %s", (iid,))
+        at = c.execute("SELECT sayad_registered_at AT TIME ZONE 'UTC' FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0]
+        assert (at.hour, at.minute) == (7, 5)
+        # The moment and the user go together: neither is kept without the other.
+        for half in ("sayad_registered_at = NULL", "sayad_registered_by = NULL"):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE cashflow.instrument SET {half} WHERE id = %s", (iid,))
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = NULL, sayad_registered_by = NULL WHERE id = %s", (iid,))
+        c.rollback()
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

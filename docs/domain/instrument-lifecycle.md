@@ -10,7 +10,7 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | Old | New state | Reached by | From | Old form | Kinds |
 |---|---|---|---|---|---|
 | 11 | InCashDesk | Receive | — | D_Check | all |
-| 12 | DepositedForCollection | DepositForCollection (needs collection account) | InCashDesk | D_Check_Vag_m | ordinary, bank cheque |
+| 12 | DepositedForCollection | DepositForCollection (needs collection account; a cheque must be ticked «ثبت صیادی شد» first) | InCashDesk | D_Check_Vag_m | ordinary, bank cheque |
 | 13 | Cleared | RecordCleared | DepositedForCollection | D_Check_vos_m | all |
 | 14 | Bounced | RecordBounced | DepositedForCollection | D_Check_vos_m, Checkbacked | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | InCashDesk | D_Check_Od_m | all |
@@ -31,7 +31,7 @@ Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-c
 |---|---|---|---|---|
 | 20 | BeingIssued | PrepareIssue (approved payment) | — | Porder |
 | 21 | Issued | Issue (reserves a sheet of the cheque book) | BeingIssued | Check_Print_single |
-| 22 | Delivered | Deliver | Issued | Check_deliv_m |
+| 22 | Delivered | Deliver (a cheque must be ticked «ثبت صیادی شد» first) | Issued | Check_deliv_m |
 | 26 | Cancelled | Cancel (needs reason) | BeingIssued, Issued | Check_Print_single |
 | 21/22 + Vos, RegVos | PaidByBank | RecordPaidByBank | Issued, Delivered | Check_p_vos_m |
 | 21/22 + Backed, RegVos | BouncedAtBank | RecordBouncedAtBank | Issued, Delivered | Check_p_vos_m |
@@ -59,4 +59,12 @@ Every step belongs to the fiscal year in which it happens; the instrument belong
 ## Date rules for new operations
 - **N1** (new, Q6): a step may not be dated before the previous step of the same instrument.
 - **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. The same applies to **bounces** (`Instrument.BouncedBeforeDueDate`; answer to Q11, 10 Nov 2026).
+
+## «ثبت صیادی شد» (owner, 15 Nov 2026)
+Every cheque is recorded in the banks' Sayad system before it goes to the bank or to its beneficiary. The user ticks «ثبت صیادی شد» on the cheque and the system keeps the computer's date and time and the user. It is **not a state and not a step** (the table of transitions is unchanged, no voucher): it is a condition of two steps.
+- **Received cheque**, current or post-dated: no `DepositForCollection` before the tick (`Instrument.SayadNotRegistered`); the step is not offered until then.
+- **Issued cheque**: no `Deliver` before the tick. The tick is possible once the cheque has its number (state Issued).
+- Only cheques (ordinary, guarantee, bank, post-dated); notes and instalments are not in Sayad.
+- The tick can be removed only while the step it guards is still ahead (in the cash desk or back from the bank; issued and not delivered). A cheque back from the bank keeps its tick.
+- Not in the old program (`Lcash.mdb` is older than Sayad). Migrated cheques arrive without a tick; those still in the cash desk must be ticked before they are deposited (Q39).
 

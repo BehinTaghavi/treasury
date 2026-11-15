@@ -44,6 +44,8 @@ By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the la
 | [#2](https://github.com/BehinTaghavi/treasury/pull/2) | Owner's review of the receipts screen | Main menu order: Dashboard, Basic information, Payment requests, Payments, Receipts, Reports. Rule N2: a received cheque cannot be cleared or bounced before its due date; depositing it for collection earlier stays allowed. |
 | [#1](https://github.com/BehinTaghavi/treasury/pull/1) | Phase A: first real build | Full build with NuGet packages and no warnings, PostgreSQL adapter tests on PostgreSQL 17, the whole system run with Docker Compose and `deploy/smoke-test.sh`, and CI with four jobs: `dotnet`, `database-and-migration`, `frontend`, `compose`. Test server on the owner's Windows PC, started with a double-click: `docs/test-server-windows.md`. |
 
+**Waiting for review (not in `main` yet):** «ثبت صیادی شد» (owner's request, 15 Nov 2026). Every cheque must be recorded in the banks' Sayad system before it goes to the bank: on the screen «عملیات چک‌های دریافتی» each cheque has the tick box «ثبت صیادی شد», and ticking it keeps the computer's date and time and the user under it. Until it is ticked, a received cheque (current or post-dated) cannot be chosen for deposit at the bank. The same rule for an issued cheque before it is handed to its beneficiary is already in the domain; its tick box comes with the payment form (Phase E). Questions Q37–Q39 are in `docs/domain/open-questions.md`.
+
 Before these, the first package (Phase 0) was loaded on 9 Nov 2026: repository skeleton, the cheque and cheque-book domain model, the database schema, the migration tool, the Nuxt shell with the receipts screen, the design document, and the old programs' source for reference.
 
 ## Current status
@@ -52,12 +54,12 @@ Phase A is almost finished. Basic Information (Phase B) is built and waits for r
 
 | Part | What is built | Tests |
 |---|---|---|
-| `cashflow-svc` | Lifecycle of received and issued cheques and notes with rule N2; cheque types with their scans and cheque books (series, serial, Sayad ID); receipts (cash, bank deposit, cheques and notes); the steps of a received cheque after receipt; treasury vouchers | Domain, use-case and PostgreSQL tests |
+| `cashflow-svc` | Lifecycle of received and issued cheques and notes with rule N2; cheque types with their scans and cheque books (series, serial, Sayad ID); receipts (cash, bank deposit, cheques and notes); the steps of a received cheque after receipt; «ثبت صیادی شد» before a received cheque is deposited at the bank and before an issued cheque is delivered; treasury vouchers | Domain, use-case and PostgreSQL tests |
 | `reference-svc` | Currencies, country/province/city (Iran's cities pre-filled), bank names; code lengths, chart of accounts and تفصیل with Excel import, allowed تفصیل types; references (عطف), purpose groups and purposes; organisational units, requesters of funds, beneficiaries | Domain, use-case, Excel-reader and PostgreSQL tests |
 | `accounts-svc` | The company's bank accounts with their kinds and bank cards, cash desks, petty cash, opening balances | Domain, use-case and PostgreSQL tests |
 | `requests-svc` | Payment requests: request, approval, cancellation, the list approved for payment, scanned attachments, payment by an endorsed cheque | Domain, use-case and PostgreSQL tests |
 | Architecture rules | Layers depend inward only; no service references another service's code | Architecture tests |
-| Database | One schema per service (scripts 000 to 032), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
+| Database | One schema per service (scripts 000 to 033), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
 | Migration tool | Old cheques moved to the new schema with a reconciliation report; Jalali dates checked day by day against .NET for 1380–1420 | Migration tests |
 | User interface | Nuxt 4 shell and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
 | Deployment | Docker Compose for one client's server, and the Windows test server | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |

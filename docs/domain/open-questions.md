@@ -54,3 +54,13 @@ Proposal: `received-cheque-steps.md`.
 | Q34 | Your table says «اسناد **درخ**واست شده» for a bounce and «اسناد **واخ**واست شده» for a returned endorsed cheque. Is it **one account** (واخواست = protested)? | **Answered 15 Nov 2026: one account, «اسناد واخواست شده»** (the table's «درخواست شده» was a typing error; corrected everywhere). | Probably a typing difference. |
 | Q35 | When several cheques are deposited together on **one slip** (or collected on one statement date), is it **one voucher** for the slip or one per cheque? | **Answered 15 Nov 2026: one voucher per cheque.** | Your answer "one voucher for each operation" can mean either. |
 | Q36 | **Endorsement and payment requests:** must every endorsement («خرج چک») pay an **approved payment request** (the request then becomes paid), or is the request optional? (Your answer repeated the question.) | **Answered 15 Nov 2026: yes, every endorsement pays an approved payment request** (in full or in part; the request is paid when its payments reach its amount; a returned endorsed cheque takes its payment back). | Decides whether the endorsement screen must choose an approved request. |
+
+## «ثبت صیادی شد» (owner, 15 Nov 2026)
+
+Built as the owner described: a received cheque is not deposited at the bank, and an issued cheque is not handed to its beneficiary, before «ثبت صیادی شد» is ticked; the tick keeps the computer's date and time (`docs/decisions.md`).
+
+| # | Question | Current behaviour | Why |
+|---|---|---|---|
+| Q37 | **Endorsing («خرج چک»):** must a received cheque also be ticked «ثبت صیادی شد» before it is endorsed to someone else? | Not required: only the deposit at the bank waits for the tick. An endorsement already needs the tracking number of the Sayad transfer. | You named the deposit at the bank; in the Sayad system a cheque can only be transferred after it was confirmed there. |
+| Q38 | **A tick set by mistake:** may the user remove it? | Yes, while the cheque is still in the cash desk (issued cheque: not yet delivered); after the deposit or delivery it cannot be changed. Each tick and removal is kept with user and time in the system's event log. | A tick on the wrong cheque must be correctable; after the cheque left, the tick is part of its history. |
+| Q39 | **Cheques already in the cash desk** (on the test server now, and the old program's cheques at go-live): must each one be ticked before it is deposited, or should they count as already recorded in Sayad? | Each one must be ticked; nothing is ticked automatically. | Your rule covers every cheque; at go-live there may be many cheques in the cash desk that are already in Sayad. |
