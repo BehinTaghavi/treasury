@@ -1,26 +1,123 @@
-# Treasury (Accounts Receivable / Payable) — new version
+<div dir="rtl">
 
-Replacement of the Access program `Lcash.mdb` and the unfinished MVC version, built as DDD microservice modules (.NET 10),
-PostgreSQL 17 partitioned by fiscal year, and Nuxt 4 micro-frontends. Pilot client: Iran Nazho Co.
+# سامانهٔ خزانه‌داری (دریافت و پرداخت)، نسخهٔ جدید
 
-**Start here:** `CLAUDE.md` (rules and commands) → `docs/plan.md` (what is next) → `docs/decisions.md` → `docs/architecture.md` → `docs/getting-started.md`. Design document: `docs/assessment.md` (Farsi: `docs/assessment.fa.md`). Old systems for reference: `legacy/`. For the reviewer, in Farsi: `docs/reviewer-guide.fa.md` (how the code is built, a review checklist, and a learning path per technology).
+نسخهٔ انگلیسی: [README.en.md](README.en.md)
 
-## Status — Phase A, first real build (10 Nov 2026)
+## این مخزن چیست؟
 
-| Part | State | Verified how |
+این مخزن نسخهٔ جدید ماژول **خزانه‌داری** نرم‌افزار ERP است: چک‌ها و اسناد دریافتی و پرداختی، دریافت‌ها، پرداخت‌ها، تنخواه، درخواست وجه و صدور سند حسابداری برای دفتر کل.
+
+این سامانه جایگزین دو برنامهٔ قبلی می‌شود:
+
+- برنامهٔ Access به نام `Lcash.mdb` که بیش از ۲۰ سال در حال کار بوده است؛
+- نسخهٔ ASP.NET MVC که نیمه‌کاره مانده است.
+
+نسخهٔ MVC تعمیر نمی‌شود. سامانه از نو ساخته می‌شود و هر بخش تا زمانی که پذیرفته نشده، در کنار برنامهٔ قدیمی کار می‌کند. قواعد کسب‌وکار از روی برنامهٔ قدیمی (پوشهٔ `legacy`) استخراج می‌شود و هر قاعده آزمون خودش را دارد. مشتری آزمایشی (پایلوت) **شرکت ایران ناژو** است.
+
+| موضوع | انتخاب |
+|---|---|
+| سمت سرور | ‎.NET 10، معماری Clean Architecture و DDD، هر سرویس در پوشهٔ خودش با چهار لایهٔ Domain، Application، Infrastructure و Api |
+| پایگاه داده | PostgreSQL 17، یک پایگاه داده برای هر شرکت، یک schema برای هر سرویس، جدول‌های تراکنشی بخش‌بندی‌شده بر اساس سال مالی |
+| رابط کاربری | پوستهٔ Nuxt 4 و micro-frontendهای Vue که با Module Federation 2.0 در زمان اجرا بارگذاری می‌شوند |
+| احراز هویت | Keycloak |
+| استقرار | Docker Compose روی سرور خود مشتری (یا ArvanCloud) |
+
+## روش کار در این پروژه
+
+- مالک محصول مدیرعامل شرکت است و قواعد کسب‌وکار را او تأیید می‌کند. هر تصمیم تأییدشده در `docs/decisions.md` ثبت می‌شود.
+- کد را Claude Code می‌نویسد و یک مهندس، هر Pull Request را در GitHub بازبینی می‌کند. شاخهٔ `main` محافظت‌شده است: یک تأیید و CI سبز.
+- توضیح هر Pull Request دو بخش دارد: «What changed, in plain words» برای مالک محصول و «Technical notes» برای بازبین.
+- اسناد به انگلیسی نوشته می‌شوند و انگلیسی مرجع است. آنچه کارشناس دامنه می‌خواند نسخهٔ فارسی هم دارد (فایل‌هایی با پسوند `fa.md`).
+- دادهٔ واقعی مشتری، فایل پشتیبان پایگاه داده و هیچ رمزی وارد این مخزن نمی‌شود.
+
+## آخرین تغییرات
+
+تا ۲۴ آبان ۱۴۰۵ (15 Nov 2026) شش Pull Request در `main` ادغام شده است. آخرین اجرای CI روی `main` پس از این ادغام‌ها سبز است.
+
+| Pull Request | موضوع | چه چیزی اضافه شد |
 |---|---|---|
-| Instrument lifecycle + cheque book (domain) | Built | 49 unit tests, each tied to the old program's behaviour |
-| Use cases (receive, state changes, issue cheque with sheet reservation) | Built | 12 tests incl. 40 parallel issues from one book |
-| Clean Architecture rules | Enforced | 7 architecture tests (incl. the PostgreSQL adapter assembly) |
-| Cashflow HTTP API | Built | In memory and with PostgreSQL, called over HTTP through the gateway |
-| Chart of accounts and تفصیل copied from the accounting system (Excel import with preview, allowed تفصیل types) | Built | 22 domain + 6 use-case + 9 Excel-reader tests, a PostgreSQL scenario with 10,000 تفصیل; checked locally with Iran Nazho Co.'s real exports (not in the repository) |
-| The company's bank accounts (`accounts-svc`, manual section 5) | Built | 15 domain + 13 use-case + 5 PostgreSQL tests (incl. duplicate numbers in Persian digits, one backup per main account); browser check with the real chart of accounts |
-| Basic information lists (`reference-svc`): currencies, country/province/city, bank names | Built | 20 domain + 13 use-case + 7 PostgreSQL tests (incl. concurrent duplicate names, Arabic/Persian letters); browser check of the Basic Information screen |
-| PostgreSQL schema, fiscal-year partitions, closed-year freeze, roles | Built | 10 tests on PostgreSQL 17 |
-| PostgreSQL adapters (Npgsql) | Built | 14 integration tests on PostgreSQL 17 as the `cashflow_svc` role, incl. 25 parallel issues from one book |
-| Keycloak token validation in the API | Compiled | **Not yet run** (needs the `treasury` realm, Phase B); Keycloak itself runs in Docker Compose |
-| Migration of old cheques + reconciliation report | Built | 21 tests incl. end-to-end load into PostgreSQL; Jalali dates checked day by day against .NET for 1380–1420 |
-| Nuxt 4 shell + receipts micro-frontend (Module Federation) | Built | 7 UI-kit tests; browser test: receive, send for collection, duplicate warning, invalid date |
-| Docker Compose (compact on-premises profile) | Runs | `deploy/smoke-test.sh` + browser check; CI job `compose` on every pull request |
+| [#6](https://github.com/BehinTaghavi/treasury/pull/6) | کد مشترک اجرای فرمان‌ها | هر سه سرویس نسخهٔ جداگانه‌ای از یک کد داشتند: کلید تکرارناپذیری درخواست، یک تراکنش برای هر فرمان و تبدیل نقض قاعده به کد خطا. این کد اکنون یک بار در `src/BuildingBlocks/Treasury.BuildingBlocks.Application` قرار دارد. رفتار سامانه تغییری نکرده است. |
+| [#5](https://github.com/BehinTaghavi/treasury/pull/5) | اطلاعات پایه، گام ۳: حساب‌های بانکی شرکت | سرویس جدید `accounts-svc` و صفحهٔ آن: شمارهٔ حساب، بانک، شعبه، ارز، حساب معین بانک با تفصیل اول و دوم، حساب‌های اسناد در جریان وصول و چک‌های برگشتی، و حساب پشتیبان. شمارهٔ حساب تکراری پذیرفته نمی‌شود (ارقام فارسی و لاتین یکسان حساب می‌شوند). هر حساب اصلی حداکثر یک حساب پشتیبان از همان بانک دارد. حساب حذف نمی‌شود، غیرفعال می‌شود. |
+| [#4](https://github.com/BehinTaghavi/treasury/pull/4) | اطلاعات پایه، گام ۲: کدینگ حساب‌ها و تفصیل | ساختار حساب با چهار سطح ثابت (گروه، کل، معین، معین در معین) و تفصیل شناور؛ طول کدها برای هر شرکت تنظیم می‌شود. حساب‌ها و تفصیل‌ها از فایل‌های Excel سیستم حسابداری وارد می‌شوند، با پیش‌نمایش پیش از ثبت. ورود دوباره چیزی را حذف نمی‌کند. برای هر حساب، انواع تفصیل مجاز تعیین می‌شود. با فایل‌های واقعی ایران ناژو آزموده شد: ۶۳۴ حساب و ۹٬۶۲۸ تفصیل، بدون ردیف ردشده (فایل‌ها در مخزن نیستند). قواعد صدور سند هم نوشته شد: `docs/domain/posting-rules.fa.md`. |
+| [#3](https://github.com/BehinTaghavi/treasury/pull/3) | اطلاعات پایه، گام ۱: فهرست‌های ساده | سرویس جدید `reference-svc`: ارزها، کشور و استان و شهر، و نام بانک‌ها، همراه با فهرست‌های پیش‌فرض. micro-frontend جدید «اطلاعات پایه» در رابط کاربری. |
+| [#2](https://github.com/BehinTaghavi/treasury/pull/2) | بازبینی مالک محصول از صفحهٔ دریافت‌ها | ترتیب منوی اصلی: داشبورد، اطلاعات پایه، درخواست وجه، پرداخت‌ها، دریافت‌ها، گزارش‌ها. قاعدهٔ N2: چک دریافتی پیش از تاریخ سررسید وصول یا برگشت نمی‌شود؛ واگذاری به بانک پیش از سررسید مجاز است. |
+| [#1](https://github.com/BehinTaghavi/treasury/pull/1) | فاز A: اولین build واقعی | build کامل با بسته‌های NuGet بدون هشدار، آزمون adapterهای PostgreSQL روی PostgreSQL 17، اجرای کل سامانه با Docker Compose و `deploy/smoke-test.sh`، و CI با چهار کار `dotnet`، `database-and-migration`، `frontend` و `compose`. سرور آزمایشی روی ویندوز مالک محصول با دوبار کلیک راه‌اندازی می‌شود: `docs/test-server-windows.md`. |
 
-Open business questions: `docs/domain/open-questions.md`.
+پیش از این‌ها، بستهٔ اول (فاز ۰) در ۱۸ آبان ۱۴۰۵ وارد مخزن شد: اسکلت مخزن، مدل دامنهٔ چک و دسته‌چک، schema پایگاه داده، ابزار مهاجرت، پوستهٔ Nuxt و صفحهٔ دریافت‌ها، سند طراحی و کد برنامه‌های قدیمی برای مراجعه.
+
+## وضعیت فعلی
+
+فاز A تقریباً تمام شده و فاز B (اطلاعات پایه و ورود کاربران) شروع شده است.
+
+| بخش | چه چیزی ساخته شده | آزمون‌ها |
+|---|---|---|
+| `cashflow-svc` | چرخهٔ عمر چک و سفتهٔ دریافتی و پرداختی، دسته‌چک و رزرو برگ هنگام صدور، قاعدهٔ N2، و API آن | ۵۳ آزمون دامنه، ۱۲ آزمون مورد کاربرد (از جمله ۴۰ صدور هم‌زمان از یک دسته‌چک)، ۱۴ آزمون PostgreSQL |
+| `reference-svc` | ارزها، کشور و استان و شهر، نام بانک‌ها؛ طول کدها، کدینگ حساب‌ها و تفصیل با ورود از Excel؛ انواع تفصیل مجاز | ۴۳ آزمون دامنه، ۱۹ آزمون مورد کاربرد، ۹ آزمون خوانندهٔ Excel، ۸ آزمون PostgreSQL |
+| `accounts-svc` | حساب‌های بانکی شرکت (بخش ۵ راهنمای کاربری) | ۱۵ آزمون دامنه، ۱۳ آزمون مورد کاربرد، ۵ آزمون PostgreSQL |
+| قواعد معماری | وابستگی لایه‌ها فقط به سمت داخل؛ هیچ سرویسی به کد سرویس دیگر ارجاع نمی‌دهد | ۱۴ آزمون معماری |
+| پایگاه داده | schema هر سرویس، بخش‌بندی بر اساس سال مالی، قفل سال مالی بسته‌شده، و نقش جداگانه برای هر سرویس که schema سرویس دیگر را نمی‌بیند | ۱۴ آزمون روی PostgreSQL 17 |
+| ابزار مهاجرت | انتقال چک‌های قدیمی به schema جدید با گزارش مغایرت‌گیری؛ تبدیل تاریخ شمسی برای سال‌های ۱۳۸۰ تا ۱۴۲۰ روز به روز با ‎.NET مقایسه شده است | ۲۳ آزمون |
+| رابط کاربری | پوستهٔ Nuxt 4 و دو micro-frontend: «دریافت‌ها» و «اطلاعات پایه» | ۹ آزمون ui-kit و بررسی در مرورگر |
+| استقرار | Docker Compose برای سرور یک مشتری، و سرور آزمایشی روی ویندوز | `deploy/smoke-test.sh` و کار `compose` در CI برای هر Pull Request |
+| ورود کاربران با Keycloak | اعتبارسنجی توکن در API کامپایل شده است | **هنوز اجرا نشده است**؛ در ادامهٔ فاز B انجام می‌شود |
+
+در مجموع ۲۰۵ آزمون ‎.NET وجود دارد. ۲۷ آزمون به PostgreSQL نیاز دارند و در CI اجرا می‌شوند. یک آزمون فقط با فایل‌های واقعی مشتری و به‌صورت محلی اجرا می‌شود.
+
+## قدم‌های بعدی
+
+برنامهٔ کامل و فازهای A تا G در `docs/plan.md` است.
+
+- **باقی‌ماندهٔ فاز A:** اجرای آزمایشی مهاجرت روی نسخهٔ بی‌نام‌شدهٔ دادهٔ ایران ناژو (`Cashnajoo86`)، و یادداشت‌های استقرار برای سرور پایلوت.
+- **ادامهٔ فاز B:** عطف‌ها، گروه بابت و بابت‌ها، صندوق‌ها و دسته‌چک‌ها در اطلاعات پایه؛ سپس استفادهٔ فرم دریافت‌ها از این اطلاعات؛ سپس ورود کاربران با Keycloak.
+- **فازهای بعد:** درخواست وجه (C)، دریافت‌ها و چرخهٔ کامل چک (D)، پرداخت‌ها و چاپ چک (E)، سند حسابداری (F)، گزارش‌ها و پایلوت کامل (G).
+- **پرسش‌های باز کسب‌وکار:** پرسش‌های Q1 تا Q10 در `docs/domain/open-questions.fa.md` هنوز پاسخ داده نشده‌اند.
+
+## ساختار مخزن
+
+| مسیر | محتوا |
+|---|---|
+| `src/Services/Cashflow` | چک‌ها و اسناد، دسته‌چک (بعدها: دریافت، پرداخت، تنخواه) |
+| `src/Services/Reference` | فهرست‌های اطلاعات پایه و نسخهٔ کدینگ حساب‌ها |
+| `src/Services/Accounts` | حساب‌های بانکی شرکت |
+| `src/BuildingBlocks` | تنها کد مشترک بین سرویس‌ها: `FiscalDate`، `PersianText`، `Result`، `CommandRunner` |
+| `tests` | آزمون‌های دامنه، مورد کاربرد، adapterهای PostgreSQL و معماری |
+| `db/postgres` | اسکریپت‌های schema، توابع بخش‌بندی و آزمون‌های schema |
+| `tools/migration` | انتقال دادهٔ قدیمی به schema جدید با گزارش مغایرت‌گیری |
+| `frontend` | پوسته (`shell`)، micro-frontendها (`remotes`) و اجزای مشترک (`packages/ui-kit`) |
+| `deploy` | Docker Compose، gateway و اسکریپت‌های ویندوز |
+| `docs` | برنامه، تصمیم‌ها، معماری، ADRها، یادداشت‌های دامنه و سند طراحی |
+| `legacy` | برنامهٔ Access قدیمی و نسخهٔ MVC، فقط برای مراجعه؛ رمزها پوشانده شده‌اند |
+
+## اجرا و آزمون
+
+پیش‌نیازها (جزئیات در `docs/getting-started.md`):
+
+- سمت سرور: ‎.NET SDK 10
+- رابط کاربری: Node.js 22 و pnpm 10
+- ابزار مهاجرت و آزمون‌های پایگاه داده: Python 3.11 یا بالاتر
+- پایگاه داده: PostgreSQL 17 یا Docker
+
+فرمان‌های اصلی:
+
+</div>
+
+```bash
+dotnet build Treasury.slnx
+dotnet test
+cd frontend && pnpm install && pnpm test && pnpm build
+docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build && deploy/smoke-test.sh
+```
+
+<div dir="rtl">
+
+## برای بازبین: از کجا شروع کنم؟
+
+1. فایل `CLAUDE.md`: قواعد هر تغییر و فرمان‌ها.
+2. فایل `docs/plan.md`: فازها، کارهای انجام‌شده و کار بعدی.
+3. فایل `docs/decisions.md`: تصمیم‌های تأییدشده با تاریخ و دلیل.
+4. فایل `docs/architecture.md` و پوشهٔ `docs/adr`: خلاصهٔ معماری و تصمیم‌های معماری.
+5. پوشهٔ `docs/domain`: چرخهٔ عمر اسناد، قواعد صدور سند و پرسش‌های باز (هر کدام با نسخهٔ فارسی).
+6. فایل `docs/assessment.fa.md`: سند کامل طراحی (انگلیسی: `docs/assessment.md`).
+
+</div>
