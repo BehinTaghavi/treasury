@@ -13,6 +13,7 @@ PostgreSQL 17 partitioned by fiscal year, and Nuxt 4 micro-frontends. Pilot clie
 | Use cases (receive, state changes, issue cheque with sheet reservation) | Built | 12 tests incl. 40 parallel issues from one book |
 | Clean Architecture rules | Enforced | 7 architecture tests (incl. the PostgreSQL adapter assembly) |
 | Cashflow HTTP API | Built | In memory and with PostgreSQL, called over HTTP through the gateway |
+| Chart of accounts and تفصیل copied from the accounting system (Excel import with preview, allowed تفصیل types) | Built | 22 domain + 6 use-case + 9 Excel-reader tests, a PostgreSQL scenario with 10,000 تفصیل; checked locally with Iran Nazho Co.'s real exports (not in the repository) |
 | Basic information lists (`reference-svc`): currencies, country/province/city, bank names | Built | 20 domain + 13 use-case + 7 PostgreSQL tests (incl. concurrent duplicate names, Arabic/Persian letters); browser check of the Basic Information screen |
 | PostgreSQL schema, fiscal-year partitions, closed-year freeze, roles | Built | 10 tests on PostgreSQL 17 |
 | PostgreSQL adapters (Npgsql) | Built | 14 integration tests on PostgreSQL 17 as the `cashflow_svc` role, incl. 25 parallel issues from one book |

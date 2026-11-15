@@ -30,7 +30,17 @@ if (!usePostgres)
     builder.Services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
     builder.Services.AddSingleton<ICatalogueRepository, InMemoryCatalogueRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
+    builder.Services.AddSingleton<InMemoryLedgerRepository>();
+    builder.Services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<InMemoryLedgerRepository>());
+    builder.Services.AddSingleton<ILedgerQueries>(sp => sp.GetRequiredService<InMemoryLedgerRepository>());
 }
+
+// Reading the accounting system's Excel exports (needs the ExcelDataReader package; offline builds refuse imports with a clear code).
+#if WITH_PACKAGES
+builder.Services.AddSingleton<ILedgerExportReader, Treasury.Reference.Infrastructure.Excel.ExcelLedgerExportReader>();
+#else
+builder.Services.AddSingleton<ILedgerExportReader, UnavailableExportReader>();
+#endif
 
 // Identity: Keycloak (OpenID Connect), same rules as cashflow-svc. Login comes after Basic Information (docs/decisions.md).
 var keycloakAuthority = builder.Configuration["Keycloak:Authority"];
@@ -54,6 +64,7 @@ if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(keycloakAu
 }
 
 builder.Services.AddSingleton<CatalogueUseCases>();
+builder.Services.AddSingleton<Treasury.Reference.Application.Ledger.LedgerUseCases>();
 
 var app = builder.Build();
 
@@ -66,6 +77,7 @@ if (!string.IsNullOrWhiteSpace(keycloakAuthority))
 app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "reference" }));
 app.MapCatalogueEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
+app.MapLedgerEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 
 // A new client database starts with usable lists (currencies, provinces and capitals, banks); see DefaultLists.
 await DefaultLists.SeedAsync(app.Services.GetRequiredService<CatalogueUseCases>(), CancellationToken.None).ConfigureAwait(false);
