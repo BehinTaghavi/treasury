@@ -4,6 +4,7 @@ Every decision the product owner has confirmed, newest first. Add a row in the s
 
 | Date | Decision | Reason / notes | Source |
 |---|---|---|---|
+| 2026-11-10 | **Test server: the CEO's own Windows PC**, reachable only from that PC (`localhost`) until the Keycloak login exists. Started and stopped with double-click files (`docs/test-server-windows.md`). | No separate server needed for Phase A testing; the system has no login yet, so it must not be reachable from the network. Office server or ArvanCloud can follow for the early pilot. | CEO, 10 Nov 2026 |
 | 2026-11-09 | **Delivery model:** Claude Code (cloud sessions) writes the code; one remote engineer reviews every pull request on GitHub; the CEO is product owner and merges. `main` is protected: 1 approval + green CI. | No in-house team available. See setup guide (claude.ai doc "Building the Treasury system with Claude Code — setup guide"). | CEO, 9 Nov 2026 |
 | 2026-11-09 | **Phases revised** to A–G with three gates (early pilot after payment requests, parallel month-end after vouchers, full pilot sign-off). See `docs/plan.md`. | Smaller steps for a one-reviewer setup. | Setup guide, section 7 |
 | 2026-11-09 | **Documentation in English and Farsi:** English is the master; Farsi copies for what the domain expert reads (`docs/assessment.fa.md`, `docs/domain/*.fa.md`), updated in the same change. | Owner preference. | CEO, 9 Nov 2026 |
@@ -18,6 +19,6 @@ Every decision the product owner has confirmed, newest first. Add a row in the s
 ## Still open
 - Answers to Q1–Q10 (`docs/domain/open-questions.md`).
 - Names: domain expert (currently the CEO) and the reviewer's GitHub account.
-- Test server location (office or ArvanCloud).
+- Pilot server location for Iran Nazho Co. (office server or ArvanCloud), needed before the early pilot (Phase C).
 - Who makes the anonymised copy of Iran Nazho Co.'s data, and where.
 - Legal check on sanctions rules for the Iran pilot (raised 9 Nov 2026).

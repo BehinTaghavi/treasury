@@ -275,11 +275,13 @@ public sealed class InstrumentUseCases(
         },
         cancellationToken);
 
-    public async Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken)
-    {
-        var instrument = await instruments.GetAsync(id, cancellationToken).ConfigureAwait(false);
-        return instrument is null ? null : InstrumentView.From(instrument);
-    }
+    /// <summary>Reads run in a unit of work too: the PostgreSQL adapters need its connection (found by the adapter integration tests).</summary>
+    public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct =>
+        {
+            var instrument = await instruments.GetAsync(id, ct).ConfigureAwait(false);
+            return instrument is null ? null : InstrumentView.From(instrument);
+        }, cancellationToken);
 
     private async Task EnsureOpenAsync(FiscalDate date, CancellationToken ct)
     {

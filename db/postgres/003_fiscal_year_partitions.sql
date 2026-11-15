@@ -15,6 +15,10 @@ BEGIN
     EXECUTE format(
         'CREATE TABLE IF NOT EXISTS cashflow.%I PARTITION OF cashflow.instrument_event FOR VALUES IN (%s)',
         'instrument_event_fy' || p_year, p_year);
+    -- Partitions belong to treasury_owner whoever opened the year (often an administrator), so that
+    -- re-running the schema scripts can still grant on every table (apply.sh must stay safe to run again).
+    EXECUTE format('ALTER TABLE cashflow.%I OWNER TO treasury_owner', 'instrument_fy' || p_year);
+    EXECUTE format('ALTER TABLE cashflow.%I OWNER TO treasury_owner', 'instrument_event_fy' || p_year);
 END
 $$;
 

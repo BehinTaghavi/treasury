@@ -1,0 +1,7 @@
+# Shell scripts run inside Linux containers, also when the files come from a Windows PC.
+*.sh text eol=lf
+# Windows double-click scripts are stored with CRLF line endings exactly as Windows needs them.
+*.cmd -text
+# The old program's source (1,200+ files) stays in the repository but is left out of GitHub ZIP downloads:
+# the owner's test PC does not need it, and antivirus scanners can stop the extraction on old VBA code.
+legacy/** export-ignore

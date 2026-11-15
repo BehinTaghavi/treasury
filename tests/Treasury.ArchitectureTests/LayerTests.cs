@@ -40,6 +40,21 @@ public sealed class LayerTests
     public void Infrastructure_does_not_depend_on_the_web_layer() =>
         Assert.True(References(Infrastructure).All(r => !r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) && r != "Treasury.Cashflow.Api"));
 
+    /// <summary>Every infrastructure assembly next to the tests (Infrastructure, and Infrastructure.Postgres when built with NuGet).</summary>
+    [Fact]
+    public void No_infrastructure_assembly_depends_on_the_web_layer()
+    {
+        var assemblies = Directory.GetFiles(AppContext.BaseDirectory, "Treasury.Cashflow.Infrastructure*.dll")
+            .Select(f => Assembly.LoadFrom(f))
+            .ToList();
+        Assert.NotEmpty(assemblies);
+        foreach (var assembly in assemblies)
+        {
+            var offending = References(assembly).Where(r => r.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) || r == "Treasury.Cashflow.Api").ToList();
+            Assert.True(offending.Count == 0, $"{assembly.GetName().Name} references {string.Join(", ", offending)}");
+        }
+    }
+
     [Fact]
     public void Domain_types_expose_no_public_setters()
     {
