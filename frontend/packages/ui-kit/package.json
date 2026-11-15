@@ -7,7 +7,8 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./SearchSelect.vue": "./src/SearchSelect.vue"
+    "./SearchSelect.vue": "./src/SearchSelect.vue",
+    "./AmountInput.vue": "./src/AmountInput.vue"
   },
   "scripts": {
     "test": "vitest run"

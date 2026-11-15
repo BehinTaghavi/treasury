@@ -14,7 +14,7 @@ const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
 
 const tabs = [
-  { id: 'Instruments', title: ['دریافت چک و سفته', 'Cheques and notes'] },
+  { id: 'Instruments', title: ['دریافت چک', 'Cheques'] },
   { id: 'Cash', title: ['دریافت نقدی', 'Cash'] },
   { id: 'BankDeposit', title: ['واریز به حساب / کارتخوان', 'Bank deposit / POS'] },
   { id: 'list', title: ['فهرست دریافت‌ها', 'Receipts list'] },
@@ -22,7 +22,7 @@ const tabs = [
 type Tab = (typeof tabs)[number]['id']
 const tab = ref<Tab>('Instruments')
 const hints: Record<string, [string, string]> = {
-  Instruments: ['چک‌ها و سفته‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند. چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
+  Instruments: ['چک‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند (سفته‌ها فرم جداگانه خواهند داشت). چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
     'Cheques and notes of one payer are saved on one receipt. Current or post-dated follows the due date; a foreign-currency cheque needs its currency and rate.'],
   Cash: ['وجه نقد دریافتی به صندوق؛ ارز همان ارز صندوق است.', 'Cash received into a cash desk, in the cash desk\'s currency.'],
   BankDeposit: ['واریز مستقیم مشتری به حساب بانکی شرکت: فیش، حواله (ساتنا/پایا)، کارتخوان یا کارت به کارت.',

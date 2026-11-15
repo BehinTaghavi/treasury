@@ -63,6 +63,13 @@ public sealed class ReceiptTests
             Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.Transfer, null, Money.Rials(1_000), User)).Code);
     }
 
+    [Theory]
+    [InlineData(DepositMethod.Pos)]
+    [InlineData(DepositMethod.CardToCard)]
+    public void A_foreign_currency_account_takes_cash_deposits_and_transfers_only_report_4_item_7(DepositMethod method) =>
+        Assert.Equal("Receipt.MethodNotForForeignCurrency", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, method, null, Money.Foreign(10, "USD", 600_000), User)).Code);
+
     [Fact]
     public void Old_required_fields_payer_purpose_D_Naghd()
     {

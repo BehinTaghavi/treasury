@@ -9,7 +9,7 @@ public enum PettyCashRecovery
     Cash,
     Cheque,
 
-    /// <summary>Topped up onto the holder's bank card (owner's report no. 2, item 13: "کارت عابر بانک").</summary>
+    /// <summary>Topped up onto the holder's bank card «کارت بانک» (owner's report no. 2, item 13; called so everywhere, report no. 4, item 3).</summary>
     BankCard,
 }
 

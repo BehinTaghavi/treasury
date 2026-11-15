@@ -8,6 +8,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
@@ -17,7 +18,7 @@ interface Fund {
   id: string; holderDetailCode: string; holderName: string | null; ledgerAccountCode: string; amount: number; settleLimit: number; payCeiling: number
   allowedPurposeGroupIds: string[]; recovery: Recovery; isActive: boolean; version: number; createdOn: string | null; keeping: Keeping | null
 }
-const RECOVERY: Record<Recovery, [string, string]> = { Cash: ['نقدی', 'Cash'], Cheque: ['چک', 'Cheque'], BankCard: ['کارت عابر بانک', 'Bank card'] }
+const RECOVERY: Record<Recovery, [string, string]> = { Cash: ['نقدی', 'Cash'], Cheque: ['چک', 'Cheque'], BankCard: ['کارت بانک', 'Bank card'] }
 const noKeeping = (): Keeping => ({ bank: false, bankAccountName: '', bankAccountNumber: '', cash: false, card: false, cardHolderName: '', cardNumber: '' })
 interface LedgerAccount { code: string; name: string; isPostable: boolean; isActive: boolean; detail1Types: string[] }
 interface Detail { code: string; name: string; isActive: boolean }
@@ -166,11 +167,11 @@ onMounted(async () => {
           <SearchSelect v-model="form.holderDetailCode" :options="holderChoices" remote required :aria-label="t('دارندهٔ تنخواه', 'Holder')"
                         :none-text="t('تفصیلی پیدا نشد؛ دارنده باید ابتدا در سیستم مالی تعریف شود', 'Not found; define the holder in the accounting system first')" @search="onSearch" />
         </label>
-        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><input v-model="form.amount" dir="ltr" inputmode="numeric" @blur="form.amount = amount(form.amount) ? money(amount(form.amount)) : ''" /></label>
-        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><input v-model="form.settleLimit" dir="ltr" inputmode="numeric" @blur="form.settleLimit = amount(form.settleLimit) ? money(amount(form.settleLimit)) : ''" />
+        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.amount" :decimals="0" /></label>
+        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.settleLimit" :decimals="0" />
           <small class="muted">{{ t('کمتر از مبلغ تنخواه. وقتی جمع هزینه‌ها به این مبلغ رسید، تنخواه واریز و ترمیم می‌شود.', 'Below the amount. When expenses reach it, the petty cash is settled and topped up.') }}</small>
         </label>
-        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><input v-model="form.payCeiling" dir="ltr" inputmode="numeric" @blur="form.payCeiling = amount(form.payCeiling) ? money(amount(form.payCeiling)) : ''" />
+        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.payCeiling" :decimals="0" />
           <small class="muted">{{ t('بیشترین مبلغ یک پرداخت؛ حداکثر برابر حد واریز.', 'Largest single payment; at most the settlement limit.') }}</small>
         </label>
         <label class="req"><span>{{ t('تاریخ ایجاد', 'Created on') }} <span class="star">*</span></span><input v-model="form.createdOn" dir="ltr" placeholder="1405/08/22" /></label>
@@ -207,7 +208,7 @@ onMounted(async () => {
           <span class="lbl">{{ t('نحوهٔ ترمیم', 'Top-up') }}</span>
           <label class="tr-check"><input v-model="form.recovery" type="radio" value="Cash" /> {{ t('نقدی', 'Cash') }}</label>
           <label class="tr-check"><input v-model="form.recovery" type="radio" value="Cheque" /> {{ t('چک', 'Cheque') }}</label>
-          <label class="tr-check"><input v-model="form.recovery" type="radio" value="BankCard" /> {{ t('کارت عابر بانک', 'Bank card') }}</label>
+          <label class="tr-check"><input v-model="form.recovery" type="radio" value="BankCard" /> {{ t('کارت بانک', 'Bank card') }}</label>
         </div>
       </fieldset>
       <div class="tr-buttons">

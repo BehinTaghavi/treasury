@@ -7,11 +7,12 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
 
 type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
-type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque' | 'PromissoryNote' | 'GuaranteeNote'
+type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
 interface Line {
   key: number; kind: LineKind; number: string; dueDate: string; currency: string; amount: string; rate: string
   bankId: string; branchName: string; branchCode: string; accountNumber: string; accountHolder: string; city: string; outOfTown: boolean; sayadId: string
@@ -30,16 +31,19 @@ const lineKinds: { value: LineKind; fa: string; en: string }[] = [
   { value: 'OrdinaryCheque', fa: 'چک', en: 'Cheque' },
   { value: 'BankCheque', fa: 'چک بانکی (رمزدار)', en: 'Bank cheque' },
   { value: 'GuaranteeCheque', fa: 'چک تضمینی (انتظامی)', en: 'Guarantee cheque' },
-  { value: 'PromissoryNote', fa: 'سفته', en: 'Promissory note' },
-  { value: 'GuaranteeNote', fa: 'سفته تضمینی (انتظامی)', en: 'Guarantee note' },
+  // Promissory notes get forms of their own later (owner's report no. 4, item 13).
 ]
 const methods = [
-  { value: 'DepositSlip', fa: 'فیش واریزی', en: 'Deposit slip' },
-  { value: 'Transfer', fa: 'حواله / انتقال (ساتنا، پایا)', en: 'Transfer (Satna, Paya)' },
+  { value: 'DepositSlip', fa: 'واریز نقدی (فیش واریزی)', en: 'Cash deposit (slip)' },
+  { value: 'Transfer', fa: 'حواله بانکی (ساتنا، پایا)', en: 'Bank transfer (Satna, Paya)' },
   { value: 'Pos', fa: 'کارتخوان (POS)', en: 'Card reader (POS)' },
   { value: 'CardToCard', fa: 'کارت به کارت', en: 'Card to card' },
 ]
 const isCheque = (k: LineKind) => k.endsWith('Cheque')
+/** A foreign-currency account takes cash deposits and bank transfers only (owner's report no. 4, item 7). */
+const methodChoices = computed<Choice[]>(() => methods
+  .filter(m => accountCurrency.value === 'IRR' || m.value === 'DepositSlip' || m.value === 'Transfer')
+  .map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 
 // ---- header (every kind) ----
@@ -71,6 +75,7 @@ const deskChoices = computed<Choice[]>(() => L.desks.value.filter(d => d.isActiv
 const bankAccountChoices = computed<Choice[]>(() => L.bankAccounts.value.filter(a => a.isActive).map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
 const accountCurrency = computed(() =>
   (props.kind === 'Cash' ? L.desks.value.find(d => d.id === money1.accountId)?.currencyCode : L.bankAccounts.value.find(a => a.id === money1.accountId)?.currencyCode) ?? 'IRR')
+watch(accountCurrency, () => { if (!methodChoices.value.some(c => c.value === money1.method)) money1.method = 'DepositSlip' })
 const rialOf = (amount: string, currency: string, rate: string) => {
   const a = parseAmount(amount)
   if (a === null) return null
@@ -243,14 +248,14 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
           <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />
         </label>
         <label>{{ t('نوع واریز', 'Paid in by') }}
-          <SearchSelect v-model="money1.method" :options="methods.map(m => ({ value: m.value, label: fa ? m.fa : m.en }))" required :aria-label="t('نوع واریز', 'Paid in by')" />
+          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Paid in by')" />
         </label>
         <label>{{ money1.method === 'Pos' ? t('شماره پیگیری / مرجع', 'Tracking / reference no.') : money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری', 'Tracking no.') }}
           <input v-model="money1.tracking" dir="ltr" />
         </label>
       </template>
-      <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <input v-model="money1.amount" inputmode="decimal" dir="ltr" /></label>
-      <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <input v-model="money1.rate" inputmode="decimal" dir="ltr" /></label>
+      <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" /></label>
+      <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" /></label>
       <label v-if="accountCurrency !== 'IRR'">{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="money(total)" readonly /></label>
     </fieldset>
 
@@ -265,14 +270,14 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
         <label>{{ t('نوع', 'Kind') }}
           <SearchSelect v-model="l.kind" :options="kindChoices" required :aria-label="t('نوع', 'Kind')" />
         </label>
-        <label class="req">{{ isCheque(l.kind) ? t('شماره چک', 'Cheque no.') : t('شماره سفته', 'Note no.') }} <input v-model="l.number" dir="ltr" /></label>
+        <label class="req">{{ t('شماره چک', 'Cheque no.') }} <input v-model="l.number" dir="ltr" /></label>
         <label :class="{ req: !isGuarantee(l.kind) }">{{ t('سررسید', 'Due date') }} <input v-model="l.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
         <label>{{ t('ارز', 'Currency') }}
           <SearchSelect v-model="l.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
         </label>
-        <label class="req">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <input v-model="l.amount" inputmode="decimal" dir="ltr" /></label>
+        <label class="req">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <AmountInput v-model="l.amount" :decimals="l.currency === 'IRR' ? 0 : 2" /></label>
         <template v-if="l.currency !== 'IRR'">
-          <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <input v-model="l.rate" inputmode="decimal" dir="ltr" /></label>
+          <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="l.rate" :decimals="4" /></label>
           <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="linesRial[i] === null ? '' : money(linesRial[i]!)" readonly /></label>
         </template>
         <template v-if="isCheque(l.kind)">
@@ -288,12 +293,6 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
             <SearchSelect v-model="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" />
           </label>
           <label class="tr-check"><input v-model="l.outOfTown" type="checkbox" /> {{ t('خارج از مرکز', 'Out of town') }}</label>
-        </template>
-        <template v-else>
-          <label>{{ t('ضامن اول', 'First guarantor') }} <input v-model="l.g1Name" /></label>
-          <label>{{ t('کد / شناسهٔ ملی ضامن اول', 'National code') }} <input v-model="l.g1Code" maxlength="11" dir="ltr" inputmode="numeric" /></label>
-          <label>{{ t('ضامن دوم', 'Second guarantor') }} <input v-model="l.g2Name" /></label>
-          <label>{{ t('کد / شناسهٔ ملی ضامن دوم', 'National code') }} <input v-model="l.g2Code" maxlength="11" dir="ltr" inputmode="numeric" /></label>
         </template>
       </fieldset>
       <div class="tr-buttons">

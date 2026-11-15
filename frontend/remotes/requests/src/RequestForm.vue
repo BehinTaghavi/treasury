@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { methods, useLookups, type Purpose } from './lookups'
 
@@ -167,7 +168,7 @@ onMounted(async () => {
                       :none-text="t('ذینفعی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'Not found; define it in Basic Information first')" />
       </label>
       <label class="tr-check"><input v-model="form.hasMainBeneficiaries" type="checkbox" /> {{ t('پرداخت جمعی دارد (ذینفعان اصلی دارد)', 'Paid on to main beneficiaries') }}</label>
-      <label class="req">{{ t('مبلغ', 'Amount') }} <input v-model="form.amount" inputmode="decimal" dir="ltr" /></label>
+      <label class="req">{{ t('مبلغ', 'Amount') }} <AmountInput v-model="form.amount" :decimals="form.currency === 'IRR' ? 0 : 2" /></label>
       <label>{{ t('ارز', 'Currency') }}
         <SearchSelect v-model="form.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
       </label>
@@ -186,8 +187,9 @@ onMounted(async () => {
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="form.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="form.ref2" /></label>
-      <label v-if="departmentChoices.length">{{ t('بخش', 'Department') }}
-        <SearchSelect v-model="form.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش', 'Department')" />
+      <!-- Owner's report no. 4, item 11: titled «بخش درخواست کننده». -->
+      <label v-if="departmentChoices.length">{{ t('بخش درخواست کننده', 'Requesting department') }}
+        <SearchSelect v-model="form.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش درخواست کننده', 'Requesting department')" />
       </label>
     </fieldset>
 

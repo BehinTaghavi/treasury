@@ -163,6 +163,9 @@ public sealed class Receipt : AggregateRoot<Guid>
         ArgumentNullException.ThrowIfNull(bankAccount);
         Require(bankAccount.Kind == ReceiptAccountKind.BankAccount, "Receipt.AccountKindWrong", "A deposit is received into a bank account.");
         Require(Enum.IsDefined(method), "Receipt.DepositMethodRequired", "Choose how the money was paid in (old: \"نوع واريز نامشخص است\").");
+        // Owner's report no. 4, item 7: a foreign-currency account receives cash deposits and bank transfers (فیش واریزی، حواله).
+        Require(string.Equals(bankAccount.CurrencyCode.Trim(), "IRR", StringComparison.OrdinalIgnoreCase) || method is DepositMethod.DepositSlip or DepositMethod.Transfer,
+            "Receipt.MethodNotForForeignCurrency", "A foreign-currency account receives cash deposits and bank transfers only.");
         return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId);
     }
 
