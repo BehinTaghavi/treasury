@@ -41,6 +41,8 @@ Open http://localhost:8080 → "دریافت‌ها". The smoke test writes one 
 
 On a Windows PC without the command line (the product owner's test server): `docs/test-server-windows.md`.
 
+For the reviewer, in Farsi, with only Git and Docker (pick `main` or a pull request, build, run, look at the screens, logs, reset, troubleshooting): `docs/reviewer-run-guide.fa.md`. Her guide to the code and to reviewing a pull request is `docs/reviewer-guide.fa.md`.
+
 ## Migrating old cheques
 See `tools/migration/README.md`.
 
