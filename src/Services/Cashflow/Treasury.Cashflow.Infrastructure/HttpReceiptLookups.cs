@@ -36,20 +36,20 @@ internal static class ServiceHttp
 /// </summary>
 public sealed class HttpReceiptAccountLookup(HttpClient http) : IReceiptAccountLookup
 {
-    private sealed record Desk(Guid Id, string Name, string CurrencyCode, bool IsActive);
+    private sealed record Desk(Guid Id, string Name, string CurrencyCode, bool IsActive, string? LedgerAccountCode, string? HolderDetailCode);
 
-    private sealed record Account(Guid Id, string AccountNumber, string CurrencyCode, bool IsActive);
+    private sealed record Account(Guid Id, string AccountNumber, string CurrencyCode, bool IsActive, string? LedgerAccountCode, string? Detail1Code);
 
     public async Task<ReceiptAccountFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken)
     {
         // accounts-svc lists cash desks (a handful per company); there is no route for one desk.
         var desks = await ServiceHttp.GetAsync<Desk[]>(http, "api/accounts/cash-desks?includeInactive=true", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) ?? [];
-        return desks.Where(d => d.Id == id).Select(d => new ReceiptAccountFact(ReceiptAccountKind.CashDesk, d.Id, d.Name, d.CurrencyCode, d.IsActive)).FirstOrDefault();
+        return desks.Where(d => d.Id == id).Select(d => new ReceiptAccountFact(ReceiptAccountKind.CashDesk, d.Id, d.Name, d.CurrencyCode, d.IsActive, d.LedgerAccountCode, d.HolderDetailCode)).FirstOrDefault();
     }
 
     public async Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Account>(http, $"api/accounts/bank-accounts/{id}", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) is { } a
-            ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, a.Id, a.AccountNumber, a.CurrencyCode, a.IsActive)
+            ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, a.Id, a.AccountNumber, a.CurrencyCode, a.IsActive, a.LedgerAccountCode, a.Detail1Code)
             : null;
 }
 
@@ -58,7 +58,14 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
 {
     private sealed record Detail(string Code, string Name, bool IsActive, string? Role = null);
 
-    private sealed record Group(Guid Id, string Name, string Direction, bool IsActive);
+    private sealed record Group(Guid Id, string Name, string Direction, bool IsActive, string? LedgerAccountCode);
+
+    private sealed record Ledger(string Code, string Name, bool IsPostable, bool IsActive);
+
+    public async Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<Ledger>(http, $"api/reference/ledger/accounts/{Uri.EscapeDataString(code)}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } l
+            ? new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(l.Code, l.Name, l.IsPostable, l.IsActive)
+            : null;
 
     private sealed record Entry(Guid Id, string Name);
 
@@ -69,7 +76,7 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
 
     public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Group>(http, $"api/reference/purpose-groups/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } g
-            ? new PurposeGroupFact(g.Id, g.Name, g.Direction == "Receipt", g.IsActive)
+            ? new PurposeGroupFact(g.Id, g.Name, g.Direction == "Receipt", g.IsActive, g.LedgerAccountCode)
             : null;
 
     public async Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>

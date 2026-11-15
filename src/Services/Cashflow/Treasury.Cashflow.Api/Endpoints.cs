@@ -16,6 +16,8 @@ public sealed record ActionRequest(string Date, string? Destination, string? Not
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
 
+public sealed record TemplateAccountRequest(string? Code);
+
 public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool PartlyUsed = false, int? SerialDigits = null);
 
 public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool? PartlyUsed = null, int? SerialDigits = null);
@@ -94,6 +96,36 @@ public static class Endpoints
             ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/receipts/{id}"));
 
+        // Vouchers (owner's report no. 4, item 8): the template's fixed accounts, the voucher of a receipt or a cheque step, previews
+        // of the receipt forms, and the treasurer's confirmation.
+        api.MapGet("/voucher-template", async (Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.GetTemplateAsync(ct).ConfigureAwait(false)));
+
+        api.MapPut("/voucher-template/{account}", async (Treasury.Cashflow.Domain.Vouchers.FixedAccount account, TemplateAccountRequest r, HttpRequest http,
+            Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SetTemplateAccountAsync(Key(http), account, r.Code, ct).ConfigureAwait(false), _ => "/api/cashflow/voucher-template"));
+
+        api.MapGet("/receipts/{id:guid}/voucher", async (Guid id, Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            await u.ReceiptVoucherAsync(id, ct).ConfigureAwait(false) is { } v ? Results.Ok(v) : Results.NotFound());
+
+        api.MapPost("/receipts/{id:guid}/voucher/confirm", async (Guid id, HttpRequest http, Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ConfirmReceiptVoucherAsync(Key(http), id, ct).ConfigureAwait(false), _ => $"/api/cashflow/receipts/{id}/voucher"));
+
+        api.MapGet("/instruments/{id:guid}/vouchers", async (Guid id, Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ChequeVouchersAsync(id, ct).ConfigureAwait(false)));
+
+        api.MapPost("/instruments/{id:guid}/vouchers/{step:int}/confirm", async (Guid id, int step, HttpRequest http, Treasury.Cashflow.Application.Vouchers.VoucherUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ConfirmChequeVoucherAsync(Key(http), id, step, ct).ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}/vouchers"));
+
+        api.MapPost("/receipts/cash/voucher-preview", async (CashReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewCashAsync(new RecordCashReceiptCommand("preview", r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
+
+        api.MapPost("/receipts/bank/voucher-preview", async (BankReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
+
+        api.MapPost("/receipts/instruments/voucher-preview", async (InstrumentReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewInstrumentsAsync(new RecordInstrumentReceiptCommand("preview", r.Header, r.Instruments), ct).ConfigureAwait(false)));
+
         // Cheque books screen (Basic Information, manual item 6).
         api.MapGet("/cheque-books", async (Guid? bankAccountId, bool? includeInactive, ChequeBookUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.ListAsync(bankAccountId, includeInactive ?? false, ct).ConfigureAwait(false)));
@@ -157,6 +189,13 @@ public static class Endpoints
     }
 
     private static string Key(HttpRequest http) => http.Headers[IdempotencyHeader].ToString();
+
+    /// <summary>A preview of an incomplete form answers 422 with the first rule it breaks, like a save would.</summary>
+    private static IResult Preview(Result<Treasury.Cashflow.Application.Vouchers.VoucherView> result) =>
+        result.IsSuccess
+            ? Results.Ok(result.Value)
+            : Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: result.ErrorCode, detail: result.ErrorMessage,
+                extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
 
     /// <summary>Rule violations become 422 with the stable error code; the UI shows the translated text, never exception details.</summary>
     private static IResult ToHttp<T>(Result<T> result, Func<T, string> location)

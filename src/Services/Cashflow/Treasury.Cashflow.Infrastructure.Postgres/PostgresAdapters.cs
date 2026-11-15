@@ -23,6 +23,8 @@ public static class PostgresRegistration
         services.AddSingleton<IInstrumentRepository, PostgresInstrumentRepository>();
         services.AddSingleton<IChequeBookRepository, PostgresChequeBookRepository>();
         services.AddSingleton<IReceiptRepository, PostgresReceiptRepository>();
+        services.AddSingleton<IVoucherTemplateRepository, PostgresVoucherTemplateRepository>();
+        services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
@@ -74,6 +76,11 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             throw new DomainException("ChequeFormat.InUse", "Cheque books are printed with this type.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName?.StartsWith("voucher", StringComparison.Ordinal) == true)
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Voucher.AlreadyConfirmed", "This voucher is already confirmed.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cheque_sheet")
         {

@@ -12,6 +12,7 @@ export interface Department { id: string; number: number; name: string; isActive
 export interface CashDesk { id: string; name: string; currencyCode: string; isActive: boolean }
 export interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; currencyCode: string; isActive: boolean }
 export interface Detail { code: string; name: string; type: string | null; isActive: boolean }
+export interface LedgerAccount { code: string; name: string }
 
 export function useLookups(api: TreasuryApi) {
   const banks = ref<Entry[]>([])
@@ -22,9 +23,10 @@ export function useLookups(api: TreasuryApi) {
   const departments = ref<Department[]>([])
   const desks = ref<CashDesk[]>([])
   const bankAccounts = ref<BankAccount[]>([])
+  const ledger = ref<LedgerAccount[]>([])
 
   async function load() {
-    const [b, c, ci, r, g, d, k, a] = await Promise.all([
+    const [b, c, ci, r, g, d, k, a, l] = await Promise.all([
       api.get<Entry[]>('/api/reference/banks'),
       api.get<Entry[]>('/api/reference/currencies'),
       api.get<Entry[]>('/api/reference/cities'),
@@ -33,6 +35,8 @@ export function useLookups(api: TreasuryApi) {
       api.get<Department[]>('/api/reference/departments'),
       api.get<CashDesk[]>('/api/accounts/cash-desks?includeInactive=true'),
       api.get<BankAccount[]>('/api/accounts/bank-accounts?includeInactive=true'),
+      // Names of the accounts on vouchers (owner's report no. 4, item 8).
+      api.get<LedgerAccount[]>('/api/reference/ledger/accounts?includeInactive=true'),
     ])
     if (b.ok) banks.value = b.value
     if (c.ok) currencies.value = c.value
@@ -42,8 +46,10 @@ export function useLookups(api: TreasuryApi) {
     if (d.ok) departments.value = d.value
     if (k.ok) desks.value = k.value
     if (a.ok) bankAccounts.value = a.value
+    if (l.ok) ledger.value = l.value
   }
 
+  const accountName = (code: string) => ledger.value.find(x => x.code === code)?.name
   const bankName = (id: string | null | undefined) => banks.value.find(b => b.id === id)?.name ?? ''
   const accountTitle = (a: BankAccount) => `${bankName(a.bankId)} – ${a.accountNumber}${a.branchName ? ` (${a.branchName})` : ''}`
 
@@ -61,5 +67,5 @@ export function useLookups(api: TreasuryApi) {
     return found
   }
 
-  return { banks, currencies, cities, references, groups, departments, desks, bankAccounts, load, bankName, accountTitle, searchDetails }
+  return { banks, currencies, cities, references, groups, departments, desks, bankAccounts, ledger, load, accountName, bankName, accountTitle, searchDetails }
 }

@@ -18,11 +18,11 @@ public sealed class FakeReceiptAccounts : IReceiptAccountLookup
     public static readonly Guid DollarBank = Guid.NewGuid();
 
     public Task<ReceiptAccountFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(
-        id == Desk || id == ClosedDesk ? new ReceiptAccountFact(ReceiptAccountKind.CashDesk, id, "صندوق", "IRR", id == Desk) : null);
+        id == Desk || id == ClosedDesk ? new ReceiptAccountFact(ReceiptAccountKind.CashDesk, id, "صندوق", "IRR", id == Desk, "1101", "500001") : null);
 
     public Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(
-        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true)
-        : id == DollarBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "USD-1", "USD", true) : null);
+        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true, "1102", "600001")
+        : id == DollarBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "USD-1", "USD", true, "1103", "600002") : null);
 }
 
 /// <summary>reference-svc stand-in: two payers (one switched off), a receipt and a payment purpose group, two banks.</summary>
@@ -46,10 +46,19 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     });
 
     public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Check(
-        id == SalesGroup ? new PurposeGroupFact(id, "وجوه حاصل فروش", true, true) : id == PaymentGroup ? new PurposeGroupFact(id, "خرید مواد", false, true) : null);
+        id == SalesGroup ? new PurposeGroupFact(id, "وجوه حاصل فروش", true, true, "4101") : id == PaymentGroup ? new PurposeGroupFact(id, "خرید مواد", false, true) : null);
 
     public Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         Check(id == Mellat ? "بانک ملت" : id == Melli ? "بانک ملی" : null);
+
+    /// <summary>The chart: 1201, 1202, 1203, 9101, 9201 take entries; 12 has a lower level; 1299 is inactive.</summary>
+    public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Check(code switch
+    {
+        "1201" or "1202" or "1203" or "9101" or "9201" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "حساب " + code, true, true),
+        "12" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "کل", false, true),
+        "1299" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "قدیمی", true, false),
+        _ => null,
+    });
 
     public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {
@@ -67,6 +76,7 @@ public sealed class ReceiptUseCaseTests : IDisposable
     private readonly InMemoryDatabase _db = new();
     private readonly FakeBankAccounts _bankAccounts = new();
     private readonly FakeReceiptReference _reference = new();
+    private readonly InMemoryVoucherStore _vouchers = new();
     private readonly ReceiptUseCases _receipts;
 
     public ReceiptUseCaseTests()
@@ -74,7 +84,8 @@ public sealed class ReceiptUseCaseTests : IDisposable
         var uow = new InMemoryUnitOfWork(_db);
         _receipts = new ReceiptUseCases(
             uow, new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), _bankAccounts, _reference,
-            new DevelopmentPolicies().OpenYear(1405), new InMemoryIdempotencyStore(_db), new User());
+            new DevelopmentPolicies().OpenYear(1405), new InMemoryIdempotencyStore(_db), new User(),
+            new InMemoryVoucherTemplateRepository(_vouchers), new InMemoryConfirmedVoucherRepository(_vouchers));
     }
 
     public void Dispose() => _db.Dispose();

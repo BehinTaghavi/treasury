@@ -4,12 +4,15 @@
  * deposit slip, transfer, POS or card-to-card (old D_variz), and cheques and promissory notes from one payer (old D_Check with
  * «ثبت چک بعدی»). Current or post-dated is decided by the due date; Rial or foreign currency by the account or by each cheque.
  * Ctrl+Enter saves. Errors are shown from the API's codes, translated.
+ * The voucher the receipt will produce is shown at the bottom while the form is filled (owner's report no. 4, item 8); the treasurer
+ * confirms it from the receipts list after saving.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
+import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
 type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
@@ -155,34 +158,55 @@ function lineBody(l: Line) {
   }
 }
 
-async function save() {
-  message.value = null
-  if (!normaliseJalali(header.date)) return show('error', translate('FiscalDate.Invalid', props.locale))
-  if (!header.payer) return show('error', translate('Receipt.PayerRequired', props.locale))
-  if (!header.groupId) return show('error', translate('Receipt.PurposeGroupRequired', props.locale))
-  if (!header.purpose.trim()) return show('error', translate('Receipt.PurposeRequired', props.locale))
-  let path: string
-  let body: Record<string, unknown>
+/** The request the form makes, or the code of the first thing missing (checked again by the server). */
+function request(): { path: string; body: Record<string, unknown> } | { error: string } {
+  if (!normaliseJalali(header.date)) return { error: 'FiscalDate.Invalid' }
+  if (!header.payer) return { error: 'Receipt.PayerRequired' }
+  if (!header.groupId) return { error: 'Receipt.PurposeGroupRequired' }
+  if (!header.purpose.trim()) return { error: 'Receipt.PurposeRequired' }
   if (props.kind === 'Instruments') {
     for (const l of lines.value) {
-      if (parseAmount(l.amount) === null) return show('error', translate('Money.NotPositive', props.locale))
-      if (l.dueDate && !normaliseJalali(l.dueDate)) return show('error', translate('FiscalDate.Invalid', props.locale))
-      if (l.currency !== 'IRR' && parseAmount(l.rate) === null) return show('error', translate('Money.InvalidRate', props.locale))
-      if (isCheque(l.kind) && !l.sayadId.trim()) return show('error', translate('Receipt.SayadIdRequired', props.locale))
+      if (parseAmount(l.amount) === null) return { error: 'Money.NotPositive' }
+      if (l.dueDate && !normaliseJalali(l.dueDate)) return { error: 'FiscalDate.Invalid' }
+      if (l.currency !== 'IRR' && parseAmount(l.rate) === null) return { error: 'Money.InvalidRate' }
+      if (isCheque(l.kind) && !l.sayadId.trim()) return { error: 'Receipt.SayadIdRequired' }
     }
-    path = '/api/cashflow/receipts/instruments'
-    body = { header: headerBody(), instruments: lines.value.map(lineBody) }
-  } else {
-    if (!money1.accountId) return show('error', translate('Receipt.AccountNotFound', props.locale))
-    const amount = parseAmount(money1.amount)
-    if (amount === null) return show('error', translate('Money.NotPositive', props.locale))
-    const rate = accountCurrency.value === 'IRR' ? null : parseAmount(money1.rate)
-    if (accountCurrency.value !== 'IRR' && rate === null) return show('error', translate('Money.InvalidRate', props.locale))
-    path = props.kind === 'Cash' ? '/api/cashflow/receipts/cash' : '/api/cashflow/receipts/bank'
-    body = props.kind === 'Cash'
-      ? { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate }
-      : { header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate }
+    return { path: '/api/cashflow/receipts/instruments', body: { header: headerBody(), instruments: lines.value.map(lineBody) } }
   }
+  if (!money1.accountId) return { error: 'Receipt.AccountNotFound' }
+  const amount = parseAmount(money1.amount)
+  if (amount === null) return { error: 'Money.NotPositive' }
+  const rate = accountCurrency.value === 'IRR' ? null : parseAmount(money1.rate)
+  if (accountCurrency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
+  return props.kind === 'Cash'
+    ? { path: '/api/cashflow/receipts/cash', body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
+    : { path: '/api/cashflow/receipts/bank', body: { header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate } }
+}
+
+// ---- the voucher at the bottom of the form (nothing is saved) ----
+const preview = ref<Voucher | null>(null)
+const previewHint = ref('')
+let previewTimer: ReturnType<typeof setTimeout> | undefined
+let previewRun = 0
+watch([header, money1, lines], () => {
+  clearTimeout(previewTimer)
+  previewTimer = setTimeout(refreshPreview, 400)
+}, { deep: true })
+async function refreshPreview() {
+  const run = ++previewRun
+  const req = request()
+  if ('error' in req) { preview.value = null; previewHint.value = translate(req.error, props.locale); return }
+  const r = await api.post<Voucher>(`${req.path}/voucher-preview`, req.body)
+  if (run !== previewRun) return
+  preview.value = r.ok ? r.value : null
+  previewHint.value = r.ok ? '' : translate(r.code, props.locale)
+}
+
+async function save() {
+  message.value = null
+  const req = request()
+  if ('error' in req) return show('error', translate(req.error, props.locale))
+  const { path, body } = req
 
   saving.value = true
   try {
@@ -306,6 +330,9 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
       <button type="submit" :disabled="saving">{{ t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
+    <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
+    <p v-else class="muted small">{{ t('سند حسابداری این رسید پس از تکمیل فرم اینجا نمایش داده می‌شود.', 'The voucher of this receipt is shown here once the form is filled in.') }}
+      <template v-if="previewHint"> ({{ previewHint }})</template></p>
   </form>
 </template>
 

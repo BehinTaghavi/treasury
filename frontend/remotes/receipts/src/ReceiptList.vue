@@ -3,11 +3,14 @@
  * Receipts of a fiscal year, newest first, with a search box. Opening a receipt shows its cheques and notes with their state and
  * the steps the server allows next (send for collection, collected, bounced, return, endorse). A cash or bank receipt typed by
  * mistake is cancelled with a reason; a cheque is returned to the payer instead.
+ * The receipt's voucher and the vouchers of each cheque's later steps (deposit, collected, bounced) are shown with «تایید سند»
+ * (owner's report no. 4, item 8: one voucher per receipt or operation, the treasurer confirms).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
+import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Instrument {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
@@ -85,8 +88,43 @@ async function load() {
 }
 
 async function open(id: string) {
-  const r = await api.get<Receipt>(`/api/cashflow/receipts/${id}`)
+  const [r, v] = await Promise.all([api.get<Receipt>(`/api/cashflow/receipts/${id}`), api.get<Voucher>(`/api/cashflow/receipts/${id}/voucher`)])
   if (r.ok) selected.value = r.value
+  voucher.value = v.ok ? v.value : null
+  for (const k of Object.keys(steps)) delete steps[k]
+}
+
+// ---- vouchers ----
+const voucher = ref<Voucher | null>(null)
+const steps = reactive<Record<string, Voucher[]>>({})
+const confirming = ref(false)
+async function confirmReceiptVoucher() {
+  const r0 = selected.value
+  if (!r0 || confirming.value) return
+  confirming.value = true
+  const r = await api.post<string>(`/api/cashflow/receipts/${r0.id}/voucher/confirm`, {})
+  confirming.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  show('ok', t('سند رسید تایید شد.', 'The receipt\'s voucher is confirmed.'))
+  await open(r0.id)
+}
+async function loadSteps(id: string) {
+  const r = await api.get<Voucher[]>(`/api/cashflow/instruments/${id}/vouchers`)
+  if (r.ok) steps[id] = r.value
+  else show('error', translate(r.code, props.locale))
+}
+function toggleSteps(id: string) {
+  if (steps[id]) delete steps[id]
+  else void loadSteps(id)
+}
+async function confirmStep(id: string, step: number) {
+  if (confirming.value) return
+  confirming.value = true
+  const r = await api.post<string>(`/api/cashflow/instruments/${id}/vouchers/${step}/confirm`, {})
+  confirming.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  show('ok', t('سند تایید شد.', 'Voucher confirmed.'))
+  await loadSteps(id)
 }
 
 // ---- cancel a cash / bank receipt ----
@@ -186,7 +224,7 @@ onMounted(async () => { await L.load(); await load() })
       <p v-if="selected.note" class="small">{{ selected.note }}</p>
       <p v-if="selected.state === 'Cancelled'" class="tr-msg error">{{ t(`ابطال شده در ${selected.cancelledOn}: ${selected.cancelReason}`, `Cancelled on ${selected.cancelledOn}: ${selected.cancelReason}`) }}</p>
 
-      <div v-if="selected.kind !== 'Instruments' && selected.state === 'Recorded'" class="tr-buttons">
+      <div v-if="selected.kind !== 'Instruments' && selected.state === 'Recorded' && !voucher?.confirmedBy" class="tr-buttons">
         <button v-if="!cancel.open" type="button" class="tr-secondary" @click="cancel.open = true">{{ t('ابطال رسید', 'Cancel receipt') }}</button>
         <template v-else>
           <label>{{ t('تاریخ ابطال', 'Date') }} <input v-model="cancel.date" dir="ltr" /></label>
@@ -233,12 +271,24 @@ onMounted(async () => { await L.load(); await load() })
                 <td>
                   <button v-for="a in i.allowedActions.filter(x => x !== 'DepositForCollection')" :key="a" type="button" class="tr-link"
                           @click="pending = { id: i.id, action: a, date: todayJalali(), destination: '', note: '' }">{{ name(actionNames, a) }}</button>
+                  <button type="button" class="tr-link" @click="toggleSteps(i.id)">{{ steps[i.id] ? t('بستن اسناد مراحل', 'Hide step vouchers') : t('اسناد مراحل چک', 'Step vouchers') }}</button>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
+        <template v-for="i in selected.instruments" :key="'v' + i.id">
+          <div v-if="steps[i.id]">
+            <h4>{{ t(`اسناد مراحل چک ${i.number}`, `Vouchers of the steps of cheque ${i.number}`) }}</h4>
+            <p v-if="!steps[i.id]!.length" class="muted small">{{ t('هنوز واگذاری، وصول یا برگشتی ثبت نشده است.', 'No deposit, collection or bounce recorded yet.') }}</p>
+            <VoucherTable v-for="v in steps[i.id]" :key="v.step" :voucher="v" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming"
+                          @confirm="confirmStep(i.id, v.step)" />
+          </div>
+        </template>
       </template>
+
+      <VoucherTable v-if="voucher" :voucher="voucher" :locale="locale" :account-name="L.accountName" :can-confirm="selected.state === 'Recorded'" :busy="confirming"
+                    @confirm="confirmReceiptVoucher" />
     </section>
   </div>
 </template>

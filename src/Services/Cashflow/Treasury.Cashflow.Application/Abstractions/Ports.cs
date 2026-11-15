@@ -43,6 +43,24 @@ public interface IReceiptRepository
     Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken);
 }
 
+/// <summary>The company's codes of the fixed accounts of the voucher template (owner's report no. 4, item 8).</summary>
+public interface IVoucherTemplateRepository
+{
+    Task<Treasury.Cashflow.Domain.Vouchers.VoucherTemplate> GetAsync(CancellationToken cancellationToken);
+
+    Task SaveAsync(Treasury.Cashflow.Domain.Vouchers.VoucherTemplate voucherTemplate, CancellationToken cancellationToken);
+}
+
+/// <summary>Vouchers the treasurer confirmed, one per receipt or cheque step.</summary>
+public interface IConfirmedVoucherRepository
+{
+    Task<Treasury.Cashflow.Domain.Vouchers.ConfirmedVoucher?> FindAsync(Treasury.Cashflow.Domain.Vouchers.VoucherSource source, Guid sourceId, int stepNumber, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Treasury.Cashflow.Domain.Vouchers.ConfirmedVoucher>> ListBySourceAsync(Guid sourceId, CancellationToken cancellationToken);
+
+    Task AddAsync(Treasury.Cashflow.Domain.Vouchers.ConfirmedVoucher voucher, CancellationToken cancellationToken);
+}
+
 /// <summary>Answered by accounts-svc (ADR 0001): a cash desk or bank account a receipt is booked to; null when unknown.</summary>
 public interface IReceiptAccountLookup
 {
@@ -61,6 +79,9 @@ public interface IReceiptReferenceLookup
 
     /// <summary>Name of a bank in the bank-names list; null when unknown.</summary>
     Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>A ledger account of the chart (copy of the accounting system); null when unknown.</summary>
+    Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
     /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
@@ -108,7 +129,8 @@ public interface IChequeFormatRepository
 
 /// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
 /// <param name="HasCheques">The kind of account has cheque books: current Qard-al-hasan only (owner's report no. 4, item 1).</param>
-public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true, string CurrencyCode = "IRR");
+public sealed record BankAccountFact(
+    Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true, string CurrencyCode = "IRR", string? LedgerAccountCode = null, string? Detail1Code = null);
 
 /// <summary>Answered by accounts-svc. Failure to reach it: DomainException "Accounts.Unavailable".</summary>
 public interface IBankAccountLookup

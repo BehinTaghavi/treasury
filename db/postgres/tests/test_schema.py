@@ -528,7 +528,7 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -571,7 +571,7 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -602,3 +602,46 @@ def test_bank_account_types_and_one_account_per_bank_card(db):
         c.execute("DELETE FROM accounts.bank_account WHERE id = %s", (a,))  # cards go with their account
         assert c.execute("SELECT count(*) FROM accounts.bank_card WHERE card_number = '6037991234567893'").fetchone()[0] == 0
         c.rollback()
+
+
+def test_a_voucher_is_confirmed_once_per_receipt_or_cheque_step_and_read_only_in_a_closed_year(db):
+    # 030_cashflow_vouchers.sql (owner's report no. 4, item 8: "one voucher for each receipt or operation, Treasurer confirms").
+    add = """INSERT INTO cashflow.voucher (fiscal_year, id, source, source_id, step, operation, voucher_date, lines, total_rial, confirmed_by, confirmed_at)
+             VALUES (%s, %s, %s, %s, %s, 'دریافت نقدی', %s, '[]', 1000, 'treasurer', now())"""
+    with psycopg.connect(db) as c:
+        names = {r[0] for r in c.execute("SELECT relname FROM pg_class WHERE relname LIKE 'voucher_fy14%'")}
+        assert {"voucher_fy1404", "voucher_fy1405"} <= names
+        c.execute("SET ROLE cashflow_svc")
+        receipt, cheque = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (1405, uuid.uuid4(), "Receipt", receipt, 0, date(2026, 11, 15)))
+        c.execute(add, (1405, uuid.uuid4(), "ChequeStep", cheque, 2, date(2026, 11, 15)))
+        for row, error in (
+            (("Receipt", receipt, 0), psycopg.errors.UniqueViolation),    # one voucher per receipt
+            (("ChequeStep", cheque, 2), psycopg.errors.UniqueViolation),  # and per cheque step
+            (("Receipt", uuid.uuid4(), 1), psycopg.errors.CheckViolation),  # a receipt's voucher is step 0
+            (("ChequeStep", uuid.uuid4(), 0), psycopg.errors.CheckViolation),
+        ):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, (1405, uuid.uuid4(), row[0], row[1], row[2], date(2026, 11, 15)))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # a confirmed voucher is never changed by the service
+            with c.transaction():
+                c.execute("UPDATE cashflow.voucher SET total_rial = 1")
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('ChequesInCollection', '1202')")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('Other', '1')")
+        c.execute(add, (1404, uuid.uuid4(), "Receipt", uuid.uuid4(), 0, date(2025, 11, 15)))
+        c.commit()
+
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+    try:
+        with psycopg.connect(db) as c:
+            with pytest.raises(psycopg.errors.RaiseException):
+                c.execute(add, (1404, uuid.uuid4(), "Receipt", uuid.uuid4(), 0, date(2025, 11, 16)))
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")

@@ -14,6 +14,7 @@ import CashDesks from './accounts/CashDesks.vue'
 import ChequeBooks from './accounts/ChequeBooks.vue'
 import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
+import VoucherTemplate from './accounts/VoucherTemplate.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
@@ -58,6 +59,8 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'departments', title: ['بخش‌ها (واحد سازمانی)', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
   { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
+  // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.
+  { id: 'voucher-template', title: ['شابلون اسناد خزانه داری', 'Treasury voucher template'] },
 ]
 
 const selected = ref(sections[0]!.id)
@@ -90,6 +93,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <Departments v-else-if="selected === 'departments'" :key="'departments' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <VoucherTemplate v-else-if="selected === 'voucher-template'" :key="'voucher-template' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>
 </template>

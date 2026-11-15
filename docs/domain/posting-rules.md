@@ -38,9 +38,15 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | عودت چک پرداختنی صادره نزد ذینفع و ابطال آن | اسناد پرداختنی | ذینفع | بستانکاران یا ... | ذینفع |
 | عملیات | عودت چک‌های خرج شده توسط ما به دیگران (پس از برگشت) | اسناد واخواست شده | ذینفع | بستانکاران یا ... | ذینفع |
 
-Plan (owner's report no. 4, item 8): a Basic Information page «شابلون اسناد خزانه داری» holds the company's account codes for the
-fixed accounts of this table (e.g. اسناد نزد صندوق، چک های در جریان وصول، چک انتظامی به نفع شرکت، طرف حساب انتظامی); the purpose
-group, bank account, cash desk and petty cash supply their own accounts. Each receipt and cheque step then shows its voucher lines at
-the bottom of its form; a confirmed voucher is sent to the accounting system once it is connected. Open points are in the reply to
-report no. 4 (debit account of money paid straight into a bank, one collection account or each bank's «معین واگذاری», voucher per
-operation or per day).
+Built (owner's report no. 4, item 8, and his answers of 15 Nov 2026): a Basic Information page «شابلون اسناد خزانه داری» holds the
+company's account codes for the fixed accounts of this table: اسناد نزد صندوق / اسناد دریافتنی، چک های در جریان وصول، اسناد درخواست
+شده، چک انتظامی به نفع شرکت، طرف حساب انتظامی. The purpose group, bank account and cash desk supply their own accounts.
+
+- Money paid straight into a bank account: Dr the bank account's معین with the bank account's تفصیل / Cr purpose group, payer.
+- «چک های در جریان وصول» is one account for all banks; its تفصیل is the bank account's تفصیل.
+- One voucher for each receipt or operation (each step of a cheque); the treasurer confirms it. A voucher with an account not set
+  cannot be confirmed; a confirmed voucher keeps its lines and its receipt can no longer be cancelled.
+
+Built so far: receipts (cash, bank, cheques, guarantee cheques) and the received cheque's deposit at the bank, collected and bounced
+(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). Next with their screens: payments, petty cash, notes, returns and the other
+operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

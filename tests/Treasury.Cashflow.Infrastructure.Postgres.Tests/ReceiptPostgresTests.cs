@@ -25,7 +25,8 @@ public sealed class ReceiptPostgresTests : IDisposable
         _dataSource = NpgsqlDataSource.Create(db.Service);
         _receipts = new ReceiptUseCases(
             new PostgresUnitOfWork(_dataSource), new PostgresReceiptRepository(), new PostgresInstrumentRepository(), new Accounts(), new BankAccounts(),
-            new Reference(), new DevelopmentPolicies().OpenYear(1405), new PostgresIdempotencyStore(_dataSource), new User());
+            new Reference(), new DevelopmentPolicies().OpenYear(1405), new PostgresIdempotencyStore(_dataSource), new User(),
+            new PostgresVoucherTemplateRepository(), new PostgresConfirmedVoucherRepository());
     }
 
     public void Dispose() => _dataSource.Dispose();
@@ -89,6 +90,34 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Contains(await useCases.ListReceivedAsync(InstrumentState.DepositedForCollection, CancellationToken.None), i => i.Id == cheque.Id);
     }
 
+    [Fact]
+    public async Task A_confirmed_voucher_is_kept_once_with_its_lines_and_stops_cancellation()
+    {
+        var vouchers = new Treasury.Cashflow.Application.Vouchers.VoucherUseCases(new PostgresUnitOfWork(_dataSource), new PostgresVoucherTemplateRepository(),
+            new PostgresConfirmedVoucherRepository(), new PostgresReceiptRepository(), new PostgresInstrumentRepository(), new Accounts(), new BankAccounts(), new Reference(),
+            new PostgresIdempotencyStore(_dataSource), new User(), TimeProvider.System);
+        Assert.True((await vouchers.SetTemplateAccountAsync(Key(), Treasury.Cashflow.Domain.Vouchers.FixedAccount.ChequesInCashDesk, "1201", CancellationToken.None)).IsSuccess);
+        var template = await vouchers.GetTemplateAsync(CancellationToken.None);
+        Assert.Equal("1201", template.Single(a => a.Account == "ChequesInCashDesk").Code);
+
+        var number = Guid.NewGuid().ToString("N")[..8];
+        var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
+            [new(InstrumentKind.OrdinaryCheque, number, "1405/12/01", new MoneyInput(500, "EUR", 700_000), Bank, SayadId: "1234567890123456")]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var confirmed = await vouchers.ConfirmReceiptVoucherAsync(Key(), r.Value, CancellationToken.None);
+        Assert.True(confirmed.IsSuccess, confirmed.ErrorCode);
+
+        var v = (await vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(("clerk-1", "1405/08/23", 350_000_000m), (v.ConfirmedBy, v.Date, v.TotalDebit));
+        Assert.Equal([(true, "1201", "200015", (decimal?)500m, "EUR"), (false, "4101", "200015", (decimal?)500m, "EUR")],
+            v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.ForeignAmount, l.Currency)));
+        Assert.Equal("Voucher.AlreadyConfirmed", (await vouchers.ConfirmReceiptVoucherAsync(Key(), r.Value, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.VoucherConfirmed", (await _receipts.CancelAsync(new(Key(), r.Value, "1405/08/24", "اشتباه", 1), CancellationToken.None)).ErrorCode);
+
+        Assert.True((await vouchers.SetTemplateAccountAsync(Key(), Treasury.Cashflow.Domain.Vouchers.FixedAccount.ChequesInCashDesk, "", CancellationToken.None)).IsSuccess);
+        Assert.Null((await vouchers.GetTemplateAsync(CancellationToken.None)).Single(a => a.Account == "ChequesInCashDesk").Code);
+    }
+
     private sealed class EuroBank : IBankAccountLookup
     {
         public static readonly Guid Id = Guid.NewGuid();
@@ -120,9 +149,12 @@ public sealed class ReceiptPostgresTests : IDisposable
     {
         public Task<PayerFact?> PayerAsync(string detailCode, CancellationToken cancellationToken) => Task.FromResult<PayerFact?>(new(detailCode, "شرکت نمونه", true));
 
-        public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PurposeGroupFact?>(new(id, "وجوه حاصل فروش", true, true));
+        public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PurposeGroupFact?>(new(id, "وجوه حاصل فروش", true, true, "4101"));
 
         public Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<string?>("بانک ملت");
+
+        public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
+            Task.FromResult<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?>(new(code, "حساب " + code, true, true));
 
         public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
     }

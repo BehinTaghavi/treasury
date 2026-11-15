@@ -38,10 +38,12 @@ public enum ReceiptAccountKind
 }
 
 /// <summary>A cash desk or one of our bank accounts as accounts-svc describes it when a receipt is recorded.</summary>
-public sealed record ReceiptAccountFact(ReceiptAccountKind Kind, Guid Id, string Name, string CurrencyCode, bool IsActive);
+/// <param name="LedgerAccountCode">Its معین, for the voucher (owner's report no. 4, item 8).</param>
+/// <param name="DetailCode">Its تفصیل: the cash desk holder's, or the bank account's تفصیل 1.</param>
+public sealed record ReceiptAccountFact(ReceiptAccountKind Kind, Guid Id, string Name, string CurrencyCode, bool IsActive, string? LedgerAccountCode = null, string? DetailCode = null);
 
-/// <summary>A purpose group (گروه بابت) as reference-svc describes it.</summary>
-public sealed record PurposeGroupFact(Guid Id, string Name, bool IsForReceipts, bool IsActive);
+/// <summary>A purpose group (گروه بابت) as reference-svc describes it; its معین is the other side of the voucher.</summary>
+public sealed record PurposeGroupFact(Guid Id, string Name, bool IsForReceipts, bool IsActive, string? LedgerAccountCode = null);
 
 /// <summary>A payer's تفصیل as reference-svc describes it (old: Person + Tafno, "پرداخت كننده نامشخص است").</summary>
 /// <param name="MayPay">Its type is a customer or a person/company (owner, 14 Nov 2026, answer to Q22).</param>

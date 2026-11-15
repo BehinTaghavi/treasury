@@ -2,9 +2,11 @@ using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;
+using Treasury.Cashflow.Application.Vouchers;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Domain.Receipts;
+using Treasury.Cashflow.Domain.Vouchers;
 
 namespace Treasury.Cashflow.Application.Receipts;
 
@@ -101,7 +103,9 @@ public sealed class ReceiptUseCases(
     IReceiptReferenceLookup reference,
     IFiscalPeriodPolicy fiscalPeriods,
     IIdempotencyStore idempotency,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IVoucherTemplateRepository templates,
+    IConfirmedVoucherRepository vouchers)
 {
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -111,12 +115,8 @@ public sealed class ReceiptUseCases(
     public Task<Result<Guid>> RecordCashAsync(RecordCashReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
-            var desk = await accounts.CashDeskAsync(command.CashDeskId, ct).ConfigureAwait(false)
-                ?? throw new DomainException("Receipt.AccountNotFound", "The cash desk was not found.");
-            var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
-            var number = await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Cash, ct).ConfigureAwait(false);
-            var receipt = Receipt.RecordCash(Guid.NewGuid(), number, header, desk, Amount(command.Amount, desk.CurrencyCode, command.RateToRial), currentUser.UserId);
-            await reference.MarkInUseAsync("purpose-groups", header.PurposeGroup.Id, ct).ConfigureAwait(false);
+            var (receipt, _) = await BuildCashAsync(command, preview: false, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
             await receipts.AddAsync(receipt, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(receipt.Id);
         }, cancellationToken);
@@ -124,16 +124,11 @@ public sealed class ReceiptUseCases(
     public Task<Result<Guid>> RecordBankDepositAsync(RecordBankReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
-            var account = await accounts.BankAccountAsync(command.BankAccountId, ct).ConfigureAwait(false)
-                ?? throw new DomainException("Receipt.AccountNotFound", "The bank account was not found.");
-            var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
-            var number = await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.BankDeposit, ct).ConfigureAwait(false);
-            var receipt = Receipt.RecordBankDeposit(
-                Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId);
+            var (receipt, account) = await BuildBankDepositAsync(command, preview: false, ct).ConfigureAwait(false);
 
             // A bank account with a receipt is "in use" and can no longer be deleted (owner, 14 Nov 2026).
             await bankAccounts.MarkInUseAsync(account.Id, ct).ConfigureAwait(false);
-            await reference.MarkInUseAsync("purpose-groups", header.PurposeGroup.Id, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
             await receipts.AddAsync(receipt, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(receipt.Id);
         }, cancellationToken);
@@ -146,50 +141,8 @@ public sealed class ReceiptUseCases(
     public Task<Result<Guid>> RecordInstrumentsAsync(RecordInstrumentReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
-            ArgumentNullException.ThrowIfNull(command.Instruments);
-            if (command.Instruments.Count > MaxInstruments)
-            {
-                throw new DomainException("Receipt.TooManyInstruments", $"At most {MaxInstruments} cheques and notes on one receipt.");
-            }
-
-            var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
-            var receiptId = Guid.NewGuid();
-            var payer = CounterpartyRef.ForDetail(header.Payer.DetailCode, header.Payer.Name);
-            var user = currentUser.UserId;
-            var created = new List<Instrument>();
-            var seen = new HashSet<(string?, string)>();
-            var duplicate = false;
-            foreach (var line in command.Instruments)
-            {
-                string? bankName = null;
-                if (line.BankId is { } bankId)
-                {
-                    bankName = await reference.BankNameAsync(bankId, ct).ConfigureAwait(false)
-                        ?? throw new DomainException("Instrument.BankNotFound", "The bank was not found in the bank-names list.");
-                }
-
-                var instrument = Instrument.Receive(
-                    Guid.NewGuid(), line.Kind, line.Number, bankName, line.Amount.ToMoney(), date,
-                    string.IsNullOrWhiteSpace(line.DueDate) ? null : FiscalDate.ParseJalali(line.DueDate), payer, header.Purpose, user,
-                    new ReceivedInstrumentDetails(line.BankId, line.BranchName, line.BranchCode, line.AccountNumber, line.AccountHolder, line.City,
-                        line.OutOfTown, line.SayadId, line.Guarantors),
-                    receiptId);
-                if (!seen.Add((instrument.BankName, instrument.Number!)))
-                {
-                    throw new DomainException("Receipt.SameInstrumentTwice", $"Cheque or note {instrument.Number} is entered twice on this receipt.");
-                }
-
-                if (instrument.BankName is { } bank && (await instruments.FindReceivedAsync(bank, instrument.Number!, ct).ConfigureAwait(false)).Count > 0)
-                {
-                    duplicate = true;
-                }
-
-                created.Add(instrument);
-            }
-
-            var number = await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Instruments, ct).ConfigureAwait(false);
-            var receipt = Receipt.RecordInstruments(receiptId, number, header, created, user);
-            await reference.MarkInUseAsync("purpose-groups", header.PurposeGroup.Id, ct).ConfigureAwait(false);
+            var (receipt, created, duplicate) = await BuildInstrumentsAsync(command, preview: false, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
             foreach (var bankId in command.Instruments.Select(l => l.BankId).OfType<Guid>().Distinct())
             {
                 await reference.MarkInUseAsync("banks", bankId, ct).ConfigureAwait(false);
@@ -204,6 +157,117 @@ public sealed class ReceiptUseCases(
             return duplicate ? Result<Guid>.Ok(receipt.Id, InstrumentUseCases.PossibleDuplicateWarning) : Result<Guid>.Ok(receipt.Id);
         }, cancellationToken);
 
+    /// <summary>
+    /// The voucher the receipt form will produce, shown at the bottom of the form before saving (owner's report no. 4, item 8). Nothing is
+    /// saved and no receipt number is taken; an incomplete form answers with the first rule it breaks.
+    /// </summary>
+    public Task<Result<VoucherView>> PreviewCashAsync(RecordCashReceiptCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
+        {
+            var (receipt, desk) = await BuildCashAsync(command, preview: true, ct).ConfigureAwait(false);
+            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(desk.LedgerAccountCode, desk.DetailCode));
+        }, cancellationToken);
+
+    public Task<Result<VoucherView>> PreviewBankDepositAsync(RecordBankReceiptCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
+        {
+            var (receipt, account) = await BuildBankDepositAsync(command, preview: true, ct).ConfigureAwait(false);
+            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(account.LedgerAccountCode, account.DetailCode));
+        }, cancellationToken);
+
+    public Task<Result<VoucherView>> PreviewInstrumentsAsync(RecordInstrumentReceiptCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
+        {
+            var (receipt, created, _) = await BuildInstrumentsAsync(command, preview: true, ct).ConfigureAwait(false);
+            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null);
+        }, cancellationToken);
+
+    private async Task<Result<VoucherView>> PreviewAsync(
+        Func<CancellationToken, Task<(Receipt Receipt, IReadOnlyList<Instrument> Instruments, LedgerSide? Account)>> build, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await unitOfWork.ExecuteAsync(async ct =>
+            {
+                var (receipt, created, account) = await build(ct).ConfigureAwait(false);
+                var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
+                var template = await templates.GetAsync(ct).ConfigureAwait(false);
+                var voucher = ReceiptVouchers.ForReceipt(receipt, created, account, group?.LedgerAccountCode, template);
+                return Result<VoucherView>.Ok(VoucherView.From(voucher with { Operation = ReceiptVouchers.OperationName(receipt.Kind) }, "Receipt", 0));
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (DomainException ex)
+        {
+            return Result<VoucherView>.Fail(ex.Code, ex.Message);
+        }
+    }
+
+    private async Task<(Receipt Receipt, ReceiptAccountFact Desk)> BuildCashAsync(RecordCashReceiptCommand command, bool preview, CancellationToken ct)
+    {
+        var desk = await accounts.CashDeskAsync(command.CashDeskId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Receipt.AccountNotFound", "The cash desk was not found.");
+        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Cash, ct).ConfigureAwait(false);
+        return (Receipt.RecordCash(Guid.NewGuid(), number, header, desk, Amount(command.Amount, desk.CurrencyCode, command.RateToRial), currentUser.UserId), desk);
+    }
+
+    private async Task<(Receipt Receipt, ReceiptAccountFact Account)> BuildBankDepositAsync(RecordBankReceiptCommand command, bool preview, CancellationToken ct)
+    {
+        var account = await accounts.BankAccountAsync(command.BankAccountId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Receipt.AccountNotFound", "The bank account was not found.");
+        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.BankDeposit, ct).ConfigureAwait(false);
+        return (Receipt.RecordBankDeposit(
+            Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId), account);
+    }
+
+    private async Task<(Receipt Receipt, List<Instrument> Created, bool Duplicate)> BuildInstrumentsAsync(RecordInstrumentReceiptCommand command, bool preview, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(command.Instruments);
+        if (command.Instruments.Count > MaxInstruments)
+        {
+            throw new DomainException("Receipt.TooManyInstruments", $"At most {MaxInstruments} cheques and notes on one receipt.");
+        }
+
+        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var receiptId = Guid.NewGuid();
+        var payer = CounterpartyRef.ForDetail(header.Payer.DetailCode, header.Payer.Name);
+        var user = currentUser.UserId;
+        var created = new List<Instrument>();
+        var seen = new HashSet<(string?, string)>();
+        var duplicate = false;
+        foreach (var line in command.Instruments)
+        {
+            string? bankName = null;
+            if (line.BankId is { } bankId)
+            {
+                bankName = await reference.BankNameAsync(bankId, ct).ConfigureAwait(false)
+                    ?? throw new DomainException("Instrument.BankNotFound", "The bank was not found in the bank-names list.");
+            }
+
+            var instrument = Instrument.Receive(
+                Guid.NewGuid(), line.Kind, line.Number, bankName, line.Amount.ToMoney(), date,
+                string.IsNullOrWhiteSpace(line.DueDate) ? null : FiscalDate.ParseJalali(line.DueDate), payer, header.Purpose, user,
+                new ReceivedInstrumentDetails(line.BankId, line.BranchName, line.BranchCode, line.AccountNumber, line.AccountHolder, line.City,
+                    line.OutOfTown, line.SayadId, line.Guarantors),
+                receiptId);
+            if (!seen.Add((instrument.BankName, instrument.Number!)))
+            {
+                throw new DomainException("Receipt.SameInstrumentTwice", $"Cheque or note {instrument.Number} is entered twice on this receipt.");
+            }
+
+            if (instrument.BankName is { } bank && (await instruments.FindReceivedAsync(bank, instrument.Number!, ct).ConfigureAwait(false)).Count > 0)
+            {
+                duplicate = true;
+            }
+
+            created.Add(instrument);
+        }
+
+        var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Instruments, ct).ConfigureAwait(false);
+        return (Receipt.RecordInstruments(receiptId, number, header, created, user), created, duplicate);
+    }
+
     public Task<Result<Guid>> CancelAsync(CancelReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
@@ -216,6 +280,12 @@ public sealed class ReceiptUseCases(
             if (receipt.Version != command.ExpectedVersion)
             {
                 throw new ConcurrencyConflictException("The receipt was changed by someone else.");
+            }
+
+            // A confirmed voucher stands: the receipt is no longer cancelled (a reversing voucher comes with the accounting link).
+            if (await vouchers.FindAsync(VoucherSource.Receipt, receipt.Id, 0, ct).ConfigureAwait(false) is not null)
+            {
+                return Result<Guid>.Fail("Receipt.VoucherConfirmed", "The receipt's voucher is confirmed; it can no longer be cancelled.");
             }
 
             var date = FiscalDate.ParseJalali(command.Date);
