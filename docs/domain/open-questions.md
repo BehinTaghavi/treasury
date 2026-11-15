@@ -40,3 +40,16 @@ Q12–Q18 are about cheque printing, in [cheque-printing.md](cheque-printing.md)
 | Q27 | May an **approved** request be corrected (the manual allows the approver to edit fields without *)? | No: the approval is withdrawn («برداشتن تایید»), the request corrected, then approved again. | Keeps what was approved exactly what is paid. |
 | Q28 | **Attachments** («اسکن ضمائم»): should the scans be uploaded with the request now, or is the number of attachments enough until the documents service is built? | Only the number of attachments. | Scans need a documents store (planned `documents-svc`). |
 | Q29 | When a request is paid by **several cheques or from several accounts** (manual: «پرداخت یک درخواست وجه از طریق چند فقره چک»), and for «پرداخت جمعی», are the details entered at payment time? | Yes, planned for the payment screens (Phase E). | As the manual describes. |
+
+## Received cheque steps (owner's item 14, 15 Nov 2026)
+
+Proposal: `received-cheque-steps.md`.
+
+| # | Question | Proposed behaviour | Why |
+|---|---|---|---|
+| Q30 | **Cancelling a received cheque** «به دستور مدیریت»: should a manager **approve it in the system** (the treasurer records «درخواست ابطال», the manager presses «تایید ابطال»), or does the treasurer cancel it and type the order's number and date? Who may approve? | Two steps in the system: request by the treasurer, approval by a manager. | Keeps management's order in the system with the cheque. |
+| Q31 | **Replacing a cheque («تعویض»):** may the new cheques differ from the old one in **amount** or **number** (one cheque replaced by two, or with a late-payment amount)? Does the replacement get a **cheque receipt number**? | One or more new cheques from the same payer; their total equals the old cheque's amount (a difference is a separate receipt); recorded as a cheque receipt marked «تعویض چک …». | The voucher moves exactly the old cheque's amount. |
+| Q32 | **Endorsing («خرج چک»):** is the receiver chosen from Basic Information → «ذینفعان» or any تفصیل? Must it pay an **approved payment request** (which then becomes paid)? Record the **Sayad transfer** tracking number? (The new manual says endorsement is no longer possible; your item 14 keeps it.) | A beneficiary; payment purpose group and purpose; payment request optional; Sayad tracking number optional. | The manual's voucher: debit «بستانکاران / حساب‌های پرداختنی» of the receiver. |
+| Q33 | After the bank **returns** a cheque to the company (c), can it be **deposited again**, and can the company **later ask for a bounce notice** (e) for it? | Yes, both. | The manual lists «عودت شده از نزد بانک» as a state of its own. |
+| Q34 | Your table says «اسناد **درخ**واست شده» for a bounce and «اسناد **واخ**واست شده» for a returned endorsed cheque. Is it **one account** (واخواست = protested)? | One fixed account «اسناد واخواست شده». | Probably a typing difference. |
+| Q35 | When several cheques are deposited together on **one slip** (or collected on one statement date), is it **one voucher** for the slip or one per cheque? | One per cheque (as built). | Your answer "one voucher for each operation" can mean either. |
