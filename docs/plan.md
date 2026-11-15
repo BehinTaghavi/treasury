@@ -7,7 +7,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 | Phase | When | Scope | Done when | Status |
 |---|---|---|---|---|
 | 0 · First package | done 9 Nov 2026 | Repository skeleton, Cashflow domain (instruments, cheque books), PostgreSQL schema with fiscal-year partitions, migration tool, Nuxt shell + receipts screen | 49 + 12 + 6 .NET tests, 10 DB tests, 21 migration tests, browser smoke test pass | Done (see design document 13.8) |
-| A · Finish Phase 0 and set up | weeks 1–3 | First real build with NuGet; PostgreSQL adapters and Keycloak wiring compiled and tested; `docker compose` runs; GitHub CI green; test server; migration dry run on a copy of `Cashnajoo86` | Everything builds and passes on GitHub; test server runs; dry run reconciles | **Next** |
+| A · Finish Phase 0 and set up | weeks 1–3 | First real build with NuGet; PostgreSQL adapters and Keycloak wiring compiled and tested; `docker compose` runs; GitHub CI green; test server; migration dry run on a copy of `Cashnajoo86` | Everything builds and passes on GitHub; test server runs; dry run reconciles | **Almost done**: tasks 1–4 and 6 done; the migration dry run (task 5) is left |
 | B · Basic information and login | months 1–2 | **Basic information first** (owner, 10 Nov 2026): currencies, country/province/city, bank names, the company's bank accounts (manual section 5), cheque books, references (عطف), purpose groups and purposes, cash desks; then the receipts form uses them; then Keycloak login (`reference-svc`, `accounts-svc`) | Basic data migrated and reconciled | **Started**: menu order, rule N2; step 1 `reference-svc` lists (currencies, country/province/city, bank names) and the Basic Information screen; step 2 chart of accounts and تفصیل copied from the accounting system (Excel import, allowed تفصیل types); step 3 the company's bank accounts (`accounts-svc`) |
 | C · Payment requests | months 2–4 | `requests-svc`: request, approval workflow, signatures, task inbox (rules R7, R9) | **Gate: early pilot at Iran Nazho Co.** | Planned |
 | D · Receipts and the cheque lifecycle | months 4–6 | Receive, deposit for collection, clear, bounce, return, endorse; answers to Q1–Q10 | All transitions tested; parallel run | Planned |
@@ -26,6 +26,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 ## Done log
 | Date | What |
 |---|---|
+| 2026-11-15 | Pull requests 1–6 merged into `main` (CI green). Home page `README.md` rewritten in Farsi with the latest changes, status and next steps; English copy in `README.en.md` |
 | 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
 | 2026-11-09 | Phase 0 first package delivered |
 | 2026-11-10 | Phase A tasks 1–4: first build with NuGet (0 warnings), 81 .NET tests incl. 14 PostgreSQL adapter tests, Docker Compose runs end to end, CI green with a `compose` job; environment setup script |

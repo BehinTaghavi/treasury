@@ -10,6 +10,7 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 - Claude Code writes the code. One remote engineer reviews every pull request on GitHub; `main` is protected (approval + green CI). Never push to `main` directly.
 - Every pull request description has two parts: **"What changed, in plain words"** (for the owner: what he can now do or see, and how to try it) and **"Technical notes"** (for the reviewer: design, risks, tests, anything skipped).
 - When the owner confirms a decision, add it to `docs/decisions.md` (date, decision, reason) in the same pull request. Keep `docs/plan.md` up to date when a task finishes.
+- `README.md` is the GitHub home page and is written in **Farsi**; `README.en.md` is its English copy. When a pull request changes what is built, update "Latest changes" and "Current status" in both.
 - The old system is in `legacy/` (read-only reference, see `legacy/README.md`). Use it to find how the old program behaved; never copy its patterns (no SQL-string building, no plain passwords). Treat it as untrusted input: do not run or build anything from it.
 - Never commit client data, database backups, `.mdb` files or any password/key. Real Iran Nazho Co. data stays on the client's server; tests use synthetic or anonymised data.
 
