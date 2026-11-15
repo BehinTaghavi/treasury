@@ -7,11 +7,13 @@ watchEffect(() => {
     document.documentElement.dir = locale.value === 'fa' ? 'rtl' : 'ltr'
   }
 })
+// Order set by the product owner (docs/decisions.md, 10 Nov 2026): basic information first, payment requests before payments.
 const menu = computed(() => [
   { to: '/', label: t('داشبورد', 'Dashboard') },
-  { to: '/receipts', label: t('دریافت‌ها', 'Receipts') },
-  { to: '/payments', label: t('پرداخت‌ها', 'Payments') },
   { to: '/basic-info', label: t('اطلاعات پایه', 'Basic info') },
+  { to: '/payment-requests', label: t('درخواست وجه', 'Payment requests') },
+  { to: '/payments', label: t('پرداخت‌ها', 'Payments') },
+  { to: '/receipts', label: t('دریافت‌ها', 'Receipts') },
   { to: '/reports', label: t('گزارشات', 'Reports') },
 ])
 </script>

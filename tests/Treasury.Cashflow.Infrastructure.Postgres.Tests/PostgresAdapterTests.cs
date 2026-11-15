@@ -121,7 +121,7 @@ public sealed class PostgresAdapterTests : IDisposable
     public async Task Collection_path_stores_each_step_once_in_the_fiscal_year_it_happens_in()
     {
         // Received in 1404, deposited in 1404, cleared in 1405 (doc 7.4): the clearing step lives in the 1405 partition.
-        var id = (await _useCases.ReceiveAsync(Receive(Key(), date: "1404/12/20"), CancellationToken.None)).Value;
+        var id = (await _useCases.ReceiveAsync(Receive(Key(), date: "1404/12/20") with { DueDate = "1405/01/10" }, CancellationToken.None)).Value;
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1404/12/25", Destination: "حساب جاری ملت"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RecordCleared, "1405/01/15", Reference: "R-1"), CancellationToken.None)).IsSuccess);
 
