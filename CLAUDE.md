@@ -10,6 +10,7 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 - Claude Code writes the code. One remote engineer reviews every pull request on GitHub; `main` is protected (approval + green CI). Never push to `main` directly.
 - Every pull request description has two parts: **"What changed, in plain words"** (for the owner: what he can now do or see, and how to try it) and **"Technical notes"** (for the reviewer: design, risks, tests, anything skipped).
 - When the owner confirms a decision, add it to `docs/decisions.md` (date, decision, reason) in the same pull request. Keep `docs/plan.md` up to date when a task finishes.
+- `README.md` is the GitHub home page and is written in **Farsi**; `README.en.md` is its English copy. When a pull request changes what is built, update "Latest changes" and "Current status" in both.
 - The old system is in `legacy/` (read-only reference, see `legacy/README.md`). Use it to find how the old program behaved; never copy its patterns (no SQL-string building, no plain passwords). Treat it as untrusted input: do not run or build anything from it.
 - Never commit client data, database backups, `.mdb` files or any password/key. Real Iran Nazho Co. data stays on the client's server; tests use synthetic or anonymised data.
 
@@ -44,10 +45,10 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 Offline mode exists because some workspaces cannot reach NuGet: a small shim (`tests/Treasury.TestShim`) replaces xUnit and the PostgreSQL/Keycloak packages are left out. Do not use xUnit features the shim lacks without adding them to the shim.
 
 ## Where things are
-- `src/Services/Cashflow` — receipts, payments, instruments, petty cash (only instruments and cheque books so far).
+- `src/Services/Cashflow` — receipts, instruments and their steps, cheque types and cheque books, treasury vouchers (payments not built yet). `src/Services/Reference` — Basic Information lists and the copy of the chart of accounts. `src/Services/Accounts` — bank accounts, cash desks, petty cash, opening balances. `src/Services/Requests` — payment requests.
 - `db/postgres` — schema scripts (`apply.sh`), partition functions, schema tests.
 - `tools/migration` — old data → new schema, with reconciliation reports.
 - `frontend/shell`, `frontend/remotes/*`, `frontend/packages/ui-kit` — UI.
 - `deploy` — Docker Compose for one client's server (compact profile).
-- `docs` — `plan.md` (phases, what is done/next), `decisions.md`, `assessment.md` (+ `.fa.md`), architecture, ADRs, domain notes, open questions.
+- `docs` — `plan.md` (phases, what is done/next), `decisions.md`, `assessment.md` (+ `.fa.md`), architecture, ADRs, domain notes, open questions. Two hand-run guides follow `deploy/` and must be updated in the same pull request when it changes (new service, new `.env` variable, new port or screen): `test-server-windows.md` (owner, double-click) and `reviewer-run-guide.fa.md` (reviewer, Farsi, Git + Docker only).
 - `legacy` — old Access program (VBA, queries), MVC source, recovered stored procedures, schema, user manuals; passwords masked.
