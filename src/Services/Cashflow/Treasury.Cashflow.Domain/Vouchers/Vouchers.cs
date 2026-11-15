@@ -16,7 +16,7 @@ public enum FixedAccount
     /// <summary>«چک های در جریان وصول»: one account for all banks, with the bank account's تفصیل (owner, 15 Nov 2026).</summary>
     ChequesInCollection,
 
-    /// <summary>«اسناد درخواست شده»: cheques the bank returned unpaid, with the payer's تفصیل.</summary>
+    /// <summary>«اسناد واخواست شده»: cheques the bank returned unpaid, with the payer's تفصیل.</summary>
     ProtestedCheques,
 
     /// <summary>«چک انتظامی به نفع شرکت»: guarantee cheques received.</summary>
@@ -149,7 +149,7 @@ public static class ReceiptVouchers
             new VoucherLine(true, bank.AccountCode, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "وصول")),
             Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "وصول")));
 
-    /// <summary>«برگشت چک واگذاری توسط بانک»: Dr «اسناد درخواست شده» (payer) / Cr «چک های در جریان وصول» (bank account's تفصیل).</summary>
+    /// <summary>«برگشت چک واگذاری توسط بانک»: Dr «اسناد واخواست شده» (payer) / Cr «چک های در جریان وصول» (bank account's تفصیل).</summary>
     public static Voucher ForBounced(Instrument cheque, LedgerSide bank, FiscalDate date, VoucherTemplate template) =>
         Pair("برگشت چک توسط بانک", cheque, date,
             Fixed(true, template, FixedAccount.ProtestedCheques, cheque.Counterparty.DetailCode, cheque.Amount.ToRial(), Text(cheque, "برگشت")),

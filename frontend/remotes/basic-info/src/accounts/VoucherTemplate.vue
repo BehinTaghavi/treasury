@@ -27,7 +27,7 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     use: ['یک حساب برای همهٔ بانک‌ها؛ تفصیل: تفصیل حساب بانکی', 'One account for all banks; detail: the bank account\'s detail'],
   },
   ProtestedCheques: {
-    title: ['اسناد درخواست شده (چک برگشتی)', 'Protested (bounced) cheques'],
+    title: ['اسناد واخواست شده (چک برگشتی)', 'Protested (bounced) cheques'],
     use: ['بدهکار هنگام برگشت چک از بانک؛ تفصیل: پرداخت کننده', 'Debited when the bank returns a cheque; detail: the payer'],
   },
   GuaranteeChequesForCompany: {

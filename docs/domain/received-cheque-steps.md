@@ -10,7 +10,7 @@ number and date, (f) cancellation in any state by management's order, done by th
 company's debts, (h) return of an endorsed cheque. The old program had one form per step (manual: «ثبت وصول / برگشت / عودت
 چک‌های واگذاری», «خرج چک‌های دریافتی», «عودت چک نزد صندوق», «ابطال»).
 
-Status: **proposal, waiting for the owner's answers to Q30–Q35** (`open-questions.md`). Steps (a) and (b) and the bounce without its
+Status: **proposal, waiting for the owner's answers to Q30–Q33 and Q35** (Q34 answered) (`open-questions.md`). Steps (a) and (b) and the bounce without its
 notice number are already built.
 
 ## 1. Mechanism
@@ -52,7 +52,7 @@ of the company bank account.
 | (a) deposit | bank account, deposit slip no., date | «چک‌های در جریان وصول» · bank | «اسناد نزد صندوق» · payer | owner's table — built |
 | (b) collected | date (after checking the statement), reference | bank account's معین · bank | «چک‌های در جریان وصول» · bank | owner's table — built |
 | (c) returned to the company | date, bank's note | «اسناد نزد صندوق» · payer | «چک‌های در جریان وصول» · bank | owner's table «عودت چک واگذاری توسط بانک» |
-| (e) bounced | **bounce notice no. and date** (required), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (Q34) |
+| (e) bounced | **bounce notice no. and date** (required), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
 | (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» · payer | Q31 |
 | (f) cancelled | management's approval, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
 | (g) endorsed | endorsee (ذینفع), payment purpose group and purpose, optional payment request, Sayad transfer tracking no. | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |

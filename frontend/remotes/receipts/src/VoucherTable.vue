@@ -26,7 +26,7 @@ const money = (n: number) => formatAmount(n, props.locale)
 const fixedNames: Record<string, [string, string]> = {
   ChequesInCashDesk: ['اسناد نزد صندوق (اسناد دریافتنی)', 'Cheques in the cash desk'],
   ChequesInCollection: ['چک‌های در جریان وصول', 'Cheques in collection'],
-  ProtestedCheques: ['اسناد درخواست شده (برگشتی)', 'Protested cheques'],
+  ProtestedCheques: ['اسناد واخواست شده (برگشتی)', 'Protested cheques'],
   GuaranteeChequesForCompany: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
   GuaranteeCounterpart: ['طرف حساب انتظامی', 'Guarantee counterpart'],
 }
