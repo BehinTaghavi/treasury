@@ -8,7 +8,7 @@ using Treasury.Reference.Domain.Catalogue;
 
 namespace Treasury.Reference.Infrastructure.Postgres;
 
-// Written against Npgsql 10 and db/postgres/004_reference_catalogue.sql.
+// Written against Npgsql 10 and db/postgres/004_reference_catalogue.sql, 007_reference_catalogue_corrections.sql.
 // Integration tests against PostgreSQL 17: tests/Treasury.Reference.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
@@ -19,6 +19,8 @@ public static class PostgresRegistration
         services.AddSingleton(NpgsqlDataSource.Create(connectionString));
         services.AddSingleton<IUnitOfWork, PostgresUnitOfWork>();
         services.AddSingleton<ICatalogueRepository, PostgresCatalogueRepository>();
+        services.AddSingleton<IPurposeRepository, PostgresPurposeRepository>();
+        services.AddSingleton<IOrganizationRepository, PostgresOrganizationRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         services.AddSingleton<PostgresLedgerRepository>();
         services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<PostgresLedgerRepository>());
@@ -51,6 +53,47 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
         }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName is "department" or "requester" or "beneficiary")
+        {
+            // Two users saved the same number, name or تفصیل at the same moment: the indexes decide.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName switch
+            {
+                "department_unique_number" => new DomainException("Department.NumberTaken", "This department number is already used."),
+                "department_unique_name" => new DomainException("Department.NameTaken", "This department already exists."),
+                "requester_unique_number" => new DomainException("Requester.NumberTaken", "This requester number is already used."),
+                _ => new DomainException("Beneficiary.DetailTaken", "This تفصیل is already a beneficiary."),
+            };
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName is "requester_department" or "beneficiary_bank")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName == "beneficiary_bank"
+                ? new DomainException("Catalogue.InUse", "This bank is named by a beneficiary.")
+                : new DomainException("Department.HasRequesters", "Requesters belong to this department.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName is "purpose_group" or "purpose")
+        {
+            // Two users saved the same description (or got the same next group number) at the same moment.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw ex.ConstraintName switch
+            {
+                "purpose_group_unique_number" => new DomainException("PurposeGroup.NumberTaken", "Another group got this number at the same moment; save again."),
+                "purpose_group_unique_name" => new DomainException("PurposeGroup.NameTaken", "This description is already a group of this kind."),
+                _ => new DomainException("Purpose.NameTaken", "This purpose is already in the group."),
+            };
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName is "purpose_group_reference1" or "purpose_group_reference2")
+        {
+            // A reference was deleted while a group was being saved with it (normally refused earlier: the group marks it in use first).
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Catalogue.InUse", "This entry is used by a purpose group.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName == "purpose_group")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("PurposeGroup.HasPurposes", "Delete the purposes of this group first.");
+        }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "catalogue_item")
         {
             // Two users added the same name (or currency code) at the same moment: the index decides, the second gets the normal message.
@@ -58,6 +101,12 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             throw ex.ConstraintName == "catalogue_item_unique_currency"
                 ? new DomainException("Catalogue.CodeTaken", "This currency already exists.")
                 : new DomainException("Catalogue.NameTaken", "This name is already in the list.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.TableName == "catalogue_item")
+        {
+            // A province or city was added under the entry while it was being deleted.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Catalogue.HasChildren", "Entries under this one must be deleted first.");
         }
         catch
         {
@@ -73,7 +122,7 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
 
 public sealed class PostgresCatalogueRepository : ICatalogueRepository
 {
-    private const string Columns = "id, kind, parent_id, name, code, is_active, version";
+    private const string Columns = "id, kind, parent_id, name, code, is_active, version, in_use";
 
     public async Task<CatalogueItem?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -129,10 +178,13 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
         ArgumentNullException.ThrowIfNull(item);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE reference.catalogue_item SET name = @name, name_key = @key, is_active = @active, version = version + 1, updated_at = now() " +
-            "WHERE id = @id AND version = @expected"))
+            "UPDATE reference.catalogue_item SET name = @name, name_key = @key, parent_id = @parent, code = @code, is_active = @active, " +
+            "in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
         {
             cmd.Parameters.AddWithValue("name", item.Name);
+            cmd.Parameters.Add(new NpgsqlParameter("parent", NpgsqlDbType.Uuid) { Value = (object?)item.ParentId ?? DBNull.Value });
+            cmd.Parameters.Add(new NpgsqlParameter("code", NpgsqlDbType.Char) { Value = (object?)item.Code ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("in_use", item.IsInUse);
             cmd.Parameters.AddWithValue("key", item.NameKey);
             cmd.Parameters.AddWithValue("active", item.IsActive);
             cmd.Parameters.AddWithValue("id", item.Id);
@@ -145,6 +197,25 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
 
         await PostgresOutbox.WriteAsync(tx, item.PendingEvents, cancellationToken).ConfigureAwait(false);
         item.MarkSaved(item.Version + 1);
+    }
+
+    public async Task DeleteAsync(CatalogueItem item, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        var tx = PostgresUnitOfWork.Current;
+        // "NOT in_use": another service may have marked the entry in the meantime; then the delete is refused like a conflict.
+        await using (var cmd = tx.Command("DELETE FROM reference.catalogue_item WHERE id = @id AND version = @expected AND NOT in_use"))
+        {
+            cmd.Parameters.AddWithValue("id", item.Id);
+            cmd.Parameters.AddWithValue("expected", item.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Entry {item.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, item.PendingEvents, cancellationToken).ConfigureAwait(false);
+        item.MarkSaved(item.Version);
     }
 
     public async Task<IReadOnlyList<CatalogueItem>> ListAsync(CatalogueKind kind, Guid? parentId, bool includeInactive, CancellationToken cancellationToken)
@@ -170,7 +241,8 @@ public sealed class PostgresCatalogueRepository : ICatalogueRepository
                 r.GetString(3),
                 r.IsDBNull(4) ? null : r.GetString(4).Trim(),
                 r.GetBoolean(5),
-                r.GetInt64(6)));
+                r.GetInt64(6),
+                r.GetBoolean(7)));
         }
 
         return list;

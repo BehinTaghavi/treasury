@@ -19,7 +19,7 @@ public sealed record SetDetailTypesCommand(string IdempotencyKey, string Code, I
 /// </summary>
 public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository ledger, ILedgerQueries queries, IIdempotencyStore idempotency)
 {
-    public const int MaxSearchResults = 200;
+    public const int MaxSearchResults = 1000;
 
     private static readonly JsonSerializerOptions Json = new();
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
@@ -101,10 +101,49 @@ public sealed class LedgerUseCases(IUnitOfWork unitOfWork, ILedgerRepository led
         unitOfWork.ExecuteAsync(ct => queries.AccountsAsync(postableOnly, includeInactive, ct), cancellationToken);
 
     /// <summary>Search by code or name (Arabic/Persian letters alike), optionally of one type; at most <see cref="MaxSearchResults"/> rows.</summary>
-    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken) =>
-        unitOfWork.ExecuteAsync(
-            ct => queries.SearchDetailsAsync(PersianText.Key(search), string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct),
-            cancellationToken);
+    /// <param name="roles">Only تفصیل of these roles (staff, cost centres, organisational units: owner, 13 Nov 2026); null or empty: any.</param>
+    /// <param name="costCentersOnly">Same as roles = cost centres: marked as cost centres or of a cost-centre type.</param>
+    public Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(
+        string? search, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false, int skip = 0,
+        IReadOnlyCollection<DetailRole>? roles = null) =>
+        unitOfWork.ExecuteAsync(async ct =>
+        {
+            var (types, centers) = await RoleFilterAsync(roles, costCentersOnly, ct).ConfigureAwait(false);
+            return await queries.SearchDetailsAsync(PersianText.Key(search), TypeOrNull(type), includeInactive, Math.Clamp(take, 1, MaxSearchResults), ct, centers, Math.Max(0, skip), types)
+                .ConfigureAwait(false);
+        }, cancellationToken);
+
+    /// <summary>The number of تفصیل the same search finds, for "1–100 of 9,628" and the next/previous page buttons.</summary>
+    public Task<int> CountDetailsAsync(
+        string? search, string? type, bool includeInactive, bool costCentersOnly, CancellationToken cancellationToken, IReadOnlyCollection<DetailRole>? roles = null) =>
+        unitOfWork.ExecuteAsync(async ct =>
+        {
+            var (types, centers) = await RoleFilterAsync(roles, costCentersOnly, ct).ConfigureAwait(false);
+            return await queries.CountDetailsAsync(PersianText.Key(search), TypeOrNull(type), includeInactive, centers, ct, types).ConfigureAwait(false);
+        }, cancellationToken);
+
+    /// <summary>The types that have the asked roles; marked cost centres count when cost centres are asked.</summary>
+    private async Task<(IReadOnlyList<string>? Types, bool Centers)> RoleFilterAsync(IReadOnlyCollection<DetailRole>? roles, bool costCentersOnly, CancellationToken ct)
+    {
+        var asked = (roles ?? []).ToHashSet();
+        if (costCentersOnly)
+        {
+            asked.Add(DetailRole.CostCentre);
+        }
+
+        if (asked.Count == 0)
+        {
+            return (null, false);
+        }
+
+        var types = (await queries.DetailTypesAsync(ct).ConfigureAwait(false))
+            .Where(t => DetailRoles.Of(t.Type) is { } r && asked.Contains(r))
+            .Select(t => t.Type)
+            .ToList();
+        return (types, asked.Contains(DetailRole.CostCentre));
+    }
+
+    private static string? TypeOrNull(string? type) => string.IsNullOrWhiteSpace(type) ? null : PersianText.Clean(type);
 
     /// <summary>One account by code (asked by accounts-svc when a bank account names it).</summary>
     public Task<LedgerAccountView?> AccountAsync(string code, CancellationToken cancellationToken) =>

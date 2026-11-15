@@ -4,5 +4,6 @@
     <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Api\Treasury.Cashflow.Api.csproj" />
     <ProjectReference Include="..\..\src\Services\Reference\Treasury.Reference.Api\Treasury.Reference.Api.csproj" />
     <ProjectReference Include="..\..\src\Services\Accounts\Treasury.Accounts.Api\Treasury.Accounts.Api.csproj" />
+    <ProjectReference Include="..\..\src\Services\Requests\Treasury.Requests.Api\Treasury.Requests.Api.csproj" />
   </ItemGroup>
 </Project>

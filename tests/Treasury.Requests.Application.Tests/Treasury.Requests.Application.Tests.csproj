@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Services\Requests\Treasury.Requests.Infrastructure\Treasury.Requests.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

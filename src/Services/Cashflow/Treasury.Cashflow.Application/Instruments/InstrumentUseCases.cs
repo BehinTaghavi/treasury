@@ -35,9 +35,9 @@ public sealed record ChangeInstrumentStateCommand(
     string Date,
     string? Destination = null,
     string? Note = null,
-    string? Reference = null);
+    string? Reference = null,
+    string? DocumentDate = null);
 
-public sealed record RegisterChequeBookCommand(string IdempotencyKey, Guid BankAccountId, string Serial, long FirstSheet, long LastSheet);
 
 public sealed record IssueChequeCommand(
     string IdempotencyKey,
@@ -53,7 +53,19 @@ public sealed record IssueChequeCommand(
     string PayeeName,
     string Purpose);
 
-public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note);
+/// <param name="SlipNumber">Deposit slip number («شماره فیش واگذاری»).</param>
+public sealed record DepositChequeCommand(string IdempotencyKey, Guid InstrumentId, Guid BankAccountId, string Date, string? SlipNumber = null);
+
+public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note, StepDetailsView? Details = null);
+
+/// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
+public sealed record StepDetailsView(
+    Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
+    Guid? PaymentRequestId = null)
+{
+    public static StepDetailsView? From(StepDetails? d) => d is null ? null
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+}
 
 public sealed record InstrumentView(
     Guid Id,
@@ -73,7 +85,13 @@ public sealed record InstrumentView(
     int OriginFiscalYear,
     IReadOnlyList<string> AllowedActions,
     IReadOnlyList<InstrumentHistoryView> History,
-    long Version)
+    long Version,
+    decimal? RateToRial = null,
+    Guid? ReceiptId = null,
+    bool IsPostDated = false,
+    ReceivedInstrumentDetails? Details = null,
+    Guid? CollectionAccountId = null,
+    string? CounterpartyDetailCode = null)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -92,8 +110,15 @@ public sealed record InstrumentView(
         i.State.ToString(),
         i.OriginFiscalYear,
         i.AllowedActions().Select(a => a.ToString()).ToList(),
-        i.History.Select(h => new InstrumentHistoryView(h.Action.ToString(), h.From?.ToString(), h.To.ToString(), h.Date.ToJalaliString(), h.UserId, h.Reference, h.Note)).ToList(),
-        i.Version);
+        i.History.Select(h => new InstrumentHistoryView(h.Action.ToString(), h.From?.ToString(), h.To.ToString(), h.Date.ToJalaliString(), h.UserId, h.Reference, h.Note,
+            StepDetailsView.From(h.Details))).ToList(),
+        i.Version,
+        i.Amount.RateToRial,
+        i.ReceiptId,
+        i.IsPostDated,
+        i.Direction == InstrumentDirection.Received ? i.Details : null,
+        i.CollectionAccountId,
+        i.Counterparty.DetailCode);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -107,7 +132,8 @@ public sealed class InstrumentUseCases(
     IFiscalPeriodPolicy fiscalPeriods,
     IBankBalanceQuery bankBalances,
     IPaymentApprovalQuery paymentApprovals,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IBankAccountLookup bankAccountLookup)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -168,11 +194,16 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);
                     break;
-                case InstrumentAction.Endorse:
-                    instrument.Endorse(command.Destination ?? string.Empty, date, user, command.Note);
+                case InstrumentAction.ReturnFromBank:
+                    instrument.ReturnFromBank(date, user, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
+                    break;
+                case InstrumentAction.Cancel when instrument.Direction == InstrumentDirection.Received:
+                    // Owner's item 14 (f), answer to Q30: the treasurer types the number and date of management's order.
+                    instrument.CancelReceived(date, user, command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate),
+                        command.Note);
                     break;
                 case InstrumentAction.Cancel:
                     instrument.Cancel(date, user, command.Note ?? string.Empty);
@@ -189,20 +220,15 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.Receive:
                 case InstrumentAction.PrepareIssue:
                 case InstrumentAction.Issue:
+                case InstrumentAction.Endorse:
+                case InstrumentAction.Replace:
+                case InstrumentAction.RecordEndorsementReturned:
                 default:
                     return Result<Guid>.Fail("Instrument.ActionNotSupportedHere", $"Use the dedicated command for '{command.Action}'.");
             }
 
             await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(instrument.Id);
-        }, id => id.ToString(), Guid.Parse, cancellationToken);
-
-    public Task<Result<Guid>> RegisterChequeBookAsync(RegisterChequeBookCommand command, CancellationToken cancellationToken) =>
-        _runner.RunAsync(command.IdempotencyKey, async ct =>
-        {
-            var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet);
-            await chequeBooks.AddAsync(book, ct).ConfigureAwait(false);
-            return Result<Guid>.Ok(book.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
 
     /// <summary>
@@ -264,7 +290,8 @@ public sealed class InstrumentUseCases(
                 command.BankAccountId,
                 command.PaymentId,
                 currentUser.UserId);
-            instrument.Issue(book.Id, sheet.ToString(CultureInfo.InvariantCulture), issueDate, currentUser.UserId);
+            // The cheque number keeps the leading zeros of the printed serial (owner, 12 Nov 2026).
+            instrument.Issue(book.Id, book.SerialText(sheet), issueDate, currentUser.UserId);
 
             await chequeBooks.SaveAsync(book, ct).ConfigureAwait(false);
             await instruments.AddAsync(instrument, ct).ConfigureAwait(false);
@@ -279,6 +306,34 @@ public sealed class InstrumentUseCases(
         cancellationToken);
 
     /// <summary>Reads run in a unit of work too: the PostgreSQL adapters need its connection (found by the adapter integration tests).</summary>
+    /// <summary>
+    /// Deposits a received cheque at one of our bank accounts for collection (owner's report no. 4, item 9). The account is checked
+    /// with accounts-svc and marked in use; the deposit may be before the due date (rule N2 only stops clearing early).
+    /// </summary>
+    public Task<Result<Guid>> DepositForCollectionAsync(DepositChequeCommand command, CancellationToken cancellationToken) =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
+        {
+            var instrument = await instruments.GetAsync(command.InstrumentId, ct).ConfigureAwait(false);
+            if (instrument is null)
+            {
+                return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
+            }
+
+            var date = FiscalDate.ParseJalali(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            var account = await bankAccountLookup.GetAsync(command.BankAccountId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Instrument.CollectionAccountNotFound", "The bank account is not one of the company's bank accounts.");
+            instrument.DepositForCollection(new CollectionAccount(account.Id, account.AccountNumber, account.CurrencyCode, account.IsActive), date, currentUser.UserId, command.SlipNumber);
+            await bankAccountLookup.MarkInUseAsync(account.Id, ct).ConfigureAwait(false);
+            await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(instrument.Id);
+        }, id => id.ToString(), Guid.Parse, cancellationToken);
+
+    /// <summary>Received cheques in a state, by due date: in the cash desk (to deposit) or at the bank (to record collected or bounced).</summary>
+    public Task<IReadOnlyList<InstrumentView>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync<IReadOnlyList<InstrumentView>>(async ct =>
+            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(InstrumentView.From).ToList(), cancellationToken);
+
     public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>
         {

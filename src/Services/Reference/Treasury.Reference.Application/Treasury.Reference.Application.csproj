@@ -7,4 +7,8 @@
     <ProjectReference Include="..\Treasury.Reference.Domain\Treasury.Reference.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Treasury.BuildingBlocks.Application\Treasury.BuildingBlocks.Application.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Iran's cities by province (owner, 11 Nov 2026); see the file header for source and licence. -->
+    <EmbeddedResource Include="Catalogue\IranCities.csv" LogicalName="Treasury.Reference.IranCities.csv" />
+  </ItemGroup>
 </Project>

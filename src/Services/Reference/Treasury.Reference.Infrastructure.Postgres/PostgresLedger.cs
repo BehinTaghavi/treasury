@@ -185,16 +185,20 @@ public sealed class PostgresLedgerRepository : ILedgerRepository, ILedgerQueries
         return list;
     }
 
-    public async Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken)
+    private const string DetailFilter =
+        "WHERE (@all OR is_active) AND (@type::text IS NULL OR type = @type) " +
+        "AND (CASE WHEN @types::text[] IS NULL THEN (NOT @centers OR is_cost_center) ELSE (type = ANY(@types) OR (@centers AND is_cost_center)) END) " +
+        "AND (@pattern = '%%' OR code LIKE @pattern OR name_key LIKE @pattern)";
+
+    public async Task<IReadOnlyList<DetailAccountView>> SearchDetailsAsync(
+        string searchKey, string? type, bool includeInactive, int take, CancellationToken cancellationToken, bool costCentersOnly = false, int skip = 0,
+        IReadOnlyList<string>? anyOfTypes = null)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT code, name, type, is_cost_center, is_active FROM reference.detail_account " +
-            "WHERE (@all OR is_active) AND (@type::text IS NULL OR type = @type) " +
-            "AND (@pattern = '%%' OR code LIKE @pattern OR name_key LIKE @pattern) ORDER BY code LIMIT @take");
-        cmd.Parameters.AddWithValue("all", includeInactive);
-        cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = (object?)type ?? DBNull.Value });
-        cmd.Parameters.AddWithValue("pattern", "%" + searchKey.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%");
+            $"SELECT code, name, type, is_cost_center, is_active FROM reference.detail_account {DetailFilter} ORDER BY code LIMIT @take OFFSET @skip");
+        DetailFilterParameters(cmd, searchKey, type, includeInactive, costCentersOnly, anyOfTypes);
         cmd.Parameters.AddWithValue("take", take);
+        cmd.Parameters.AddWithValue("skip", skip);
         var list = new List<DetailAccountView>();
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
@@ -203,6 +207,23 @@ public sealed class PostgresLedgerRepository : ILedgerRepository, ILedgerQueries
         }
 
         return list;
+    }
+
+    public async Task<int> CountDetailsAsync(
+        string searchKey, string? type, bool includeInactive, bool costCentersOnly, CancellationToken cancellationToken, IReadOnlyList<string>? anyOfTypes = null)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command($"SELECT count(*)::int FROM reference.detail_account {DetailFilter}");
+        DetailFilterParameters(cmd, searchKey, type, includeInactive, costCentersOnly, anyOfTypes);
+        return (int)(await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+    }
+
+    private static void DetailFilterParameters(NpgsqlCommand cmd, string searchKey, string? type, bool includeInactive, bool costCentersOnly, IReadOnlyList<string>? anyOfTypes)
+    {
+        cmd.Parameters.Add(new NpgsqlParameter("types", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = anyOfTypes is null ? DBNull.Value : anyOfTypes.ToArray() });
+        cmd.Parameters.AddWithValue("all", includeInactive);
+        cmd.Parameters.Add(new NpgsqlParameter("type", NpgsqlDbType.Text) { Value = (object?)type ?? DBNull.Value });
+        cmd.Parameters.AddWithValue("pattern", "%" + searchKey.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%");
+        cmd.Parameters.AddWithValue("centers", costCentersOnly);
     }
 
     public async Task<IReadOnlyList<DetailTypeView>> DetailTypesAsync(CancellationToken cancellationToken)

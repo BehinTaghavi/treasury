@@ -31,6 +31,9 @@ if (!usePostgres)
     builder.Services.AddSingleton<InMemoryAccountsDatabase>();
     builder.Services.AddSingleton<IUnitOfWork, InMemoryUnitOfWork>();
     builder.Services.AddSingleton<IBankAccountRepository, InMemoryBankAccountRepository>();
+    builder.Services.AddSingleton<ICashDeskRepository, InMemoryCashDeskRepository>();
+    builder.Services.AddSingleton<IPettyCashRepository, InMemoryPettyCashRepository>();
+    builder.Services.AddSingleton<IOpeningBalanceRepository, InMemoryOpeningBalanceRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 }
 
@@ -64,6 +67,9 @@ if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(keycloakAu
 }
 
 builder.Services.AddScoped<BankAccountUseCases>();
+builder.Services.AddScoped<Treasury.Accounts.Application.CashDesks.CashDeskUseCases>();
+builder.Services.AddScoped<Treasury.Accounts.Application.PettyCash.PettyCashUseCases>();
+builder.Services.AddScoped<Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases>();
 
 var app = builder.Build();
 
@@ -76,6 +82,9 @@ if (!string.IsNullOrWhiteSpace(keycloakAuthority))
 app.UseAuthorization();
 app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "accounts" }));
 app.MapBankAccountEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
+app.MapCashDeskEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
+app.MapPettyCashEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
+app.MapOpeningBalanceEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 
 await app.RunAsync().ConfigureAwait(false);
 

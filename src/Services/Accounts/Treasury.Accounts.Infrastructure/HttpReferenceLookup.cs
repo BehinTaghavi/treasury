@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.Accounts.Domain.PettyCash;
 using Treasury.BuildingBlocks.Domain;
 
 namespace Treasury.Accounts.Infrastructure;
@@ -16,7 +17,9 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
 
     private sealed record Account(string Code, bool IsActive, bool IsPostable, string[] Detail1Types, string[] Detail2Types);
 
-    private sealed record Detail(string Code, string? Type, bool IsActive);
+    private sealed record Group(Guid Id, string Direction, bool IsActive);
+
+    private sealed record Detail(string Code, string? Type, bool IsActive, string? Name = null, string? Role = null);
 
     public Task<ReferenceEntry?> BankAsync(Guid id, CancellationToken cancellationToken) => EntryAsync($"api/reference/banks/{id}", cancellationToken);
 
@@ -37,7 +40,38 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
     public async Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken)
     {
         var d = await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false);
-        return d is null ? null : new DetailFact(d.Code, d.Type, d.IsActive);
+        return d is null ? null : new DetailFact(d.Code, d.Type, d.IsActive, d.Role);
+    }
+
+    public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
+        await GetAsync<Group>($"api/reference/purpose-groups/{id}", cancellationToken).ConfigureAwait(false) is { } g
+            ? new PurposeGroupFact(g.Id, g.Direction == "Payment", g.IsActive)
+            : null;
+
+    public async Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
+        (await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false))?.Name;
+
+    public async Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
+    {
+        var path = $"api/reference/{list}/{id}/in-use";
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
+            // Marking is the same every time, so one fixed key per entry is enough.
+            request.Headers.Add("Idempotency-Key", $"in-use:{id}");
+            using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return false;
+            }
+
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            throw new DomainException("Reference.Unavailable", $"reference-svc could not answer ({path}): {ex.Message}");
+        }
     }
 
     private async Task<ReferenceEntry?> EntryAsync(string path, CancellationToken ct)

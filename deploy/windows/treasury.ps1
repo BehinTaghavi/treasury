@@ -34,6 +34,69 @@ function Invoke-Compose([string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { Fail "Docker reported a problem (see the lines above). Take a screenshot of this window and send it to Claude." }
 }
 
+# On a slow or unreliable internet connection a download can break off in the middle of a build.
+# Downloaded packages are kept (Docker build cache), so trying again only fetches what is missing.
+function Invoke-Build {
+    $attempts = 3
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        & docker compose -f $compose --env-file $envFile build
+        if ($LASTEXITCODE -eq 0) { return }
+        if ($attempt -lt $attempts) {
+            Write-Host ''
+            Say "The build stopped, usually because a download broke off. Trying again (attempt $($attempt + 1) of $attempts); what was already downloaded is kept..."
+        }
+    }
+    Fail "Docker could not build the system after $attempts attempts (see the lines above). Check the internet connection, then take a screenshot of this window and send it to Claude."
+}
+
+# A start or update that was interrupted (Docker Desktop restarted, the PC slept) can leave a half-replaced container behind,
+# named like "45d15a55486e_treasury-remote-receipts-1", and Docker Desktop on Windows sometimes keeps a removed container's
+# name ("treasury-remote-receipts-1") busy after 'docker compose down'. The next start then fails with
+# "Conflict. The container name ... is already in use". Containers hold no data (the database is in the 'pgdata' volume),
+# so every Treasury container can be removed by name and created again.
+function Remove-LeftoverContainers([switch]$All) {
+    $ErrorActionPreference = 'Continue'
+    $pattern = '^[0-9a-f]{12}_treasury-'
+    if ($All) { $pattern = '^([0-9a-f]{12}_)?treasury-' }
+    $names = & docker ps -a --format '{{.Names}}' 2> $null | Where-Object { $_ -match $pattern }
+    foreach ($name in $names) {
+        Say "Removing an old container: $name"
+        & docker rm -f $name *> $null
+    }
+}
+
+# The id in "... is already in use by container "75bb0b38..."": removed by id when its name is no longer listed.
+function Remove-ConflictingContainer([string]$output) {
+    $ErrorActionPreference = 'Continue'
+    foreach ($m in [regex]::Matches($output, 'in use by container \\?"?([0-9a-f]{12,64})')) {
+        $id = $m.Groups[1].Value
+        Say "Removing the container that holds a Treasury name: $($id.Substring(0, 12))"
+        & docker rm -f $id *> $null
+    }
+}
+
+function Start-Containers {
+    # 'Continue' for the whole function: Windows PowerShell 5.1 stops the script when Docker's error output is redirected.
+    $ErrorActionPreference = 'Continue'
+    Remove-LeftoverContainers
+    $attempts = 4
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        $lines = New-Object System.Collections.Generic.List[string]
+        & docker compose -f $compose --env-file $envFile up -d --remove-orphans 2>&1 | ForEach-Object { $text = "$_"; $lines.Add($text); Write-Host $text }
+        $exit = $LASTEXITCODE
+        $output = $lines -join "`n"
+        if ($exit -eq 0) { return }
+        if ($attempt -eq $attempts) { break }
+        Write-Host ''
+        Say "Starting stopped with a problem. Removing the old containers (your test data is kept) and trying again ($($attempt + 1) of $attempts)..."
+        & docker compose -f $compose --env-file $envFile down --remove-orphans *> $null   # no -v: the data volume stays
+        Remove-ConflictingContainer $output
+        Remove-LeftoverContainers -All
+        Start-Sleep -Seconds (5 * $attempt)   # gives Docker Desktop time to release the names
+    }
+    Fail "Docker reported a problem (see the lines above). Restart Docker Desktop (right-click its whale icon, Restart) and run Start Treasury again; if it happens again, take a screenshot of this window and send it to Claude."
+}
+
 # Windows PowerShell 5.1 turns a program's error output into a script-stopping error when it is redirected,
 # so the checks below run with 'Continue'.
 function Test-Docker {
@@ -72,6 +135,7 @@ function Get-RequiredSettings {
         'CASHFLOW_DB_PASSWORD'    = (New-Password)
         'REFERENCE_DB_PASSWORD'   = (New-Password)
         'ACCOUNTS_DB_PASSWORD'    = (New-Password)
+        'REQUESTS_DB_PASSWORD'    = (New-Password)
         'KEYCLOAK_ADMIN_PASSWORD' = (New-Password)
         'GATEWAY_PORT'            = '8080'
         'GATEWAY_ADDRESS'         = '127.0.0.1'
@@ -122,7 +186,8 @@ function Start-Treasury {
     Wait-ForDocker
     Initialize-Settings
     Say 'Building and starting the Treasury system. The first time this downloads about 2 GB and takes 10-20 minutes...'
-    Invoke-Compose @('up', '-d', '--build')
+    Invoke-Build
+    Start-Containers
 
     Say 'Waiting for the system to answer...'
     $ready = $false

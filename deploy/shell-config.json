@@ -1,7 +1,8 @@
 {
   "remotes": {
     "receipts": "/remotes/receipts/mf-manifest.json",
-    "basicinfo": "/remotes/basic-info/mf-manifest.json"
+    "basicinfo": "/remotes/basic-info/mf-manifest.json",
+    "requests": "/remotes/requests/mf-manifest.json"
   },
   "apiBase": ""
 }

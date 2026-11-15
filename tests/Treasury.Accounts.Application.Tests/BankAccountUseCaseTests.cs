@@ -18,7 +18,7 @@ public sealed class BankAccountUseCaseTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private static BankAccountForm Form(string number = "0101-123-456", Guid? bank = null, string? d1 = "100000", bool foreign = false, string? currency = null, bool priority = false) =>
+    private static BankAccountForm Form(string number = "0101-123-456", Guid? bank = null, string? d1 = "100000", bool foreign = false, string? currency = null, int? priority = null) =>
         new(number, bank ?? FakeReference.Mellat, "شعبه بازار", "1234", FakeReference.Tehran, "1400/01/15", foreign, currency,
             "1103", d1, null, "130100", "130101", priority, IsFacility: false);
 
@@ -94,8 +94,10 @@ public sealed class BankAccountUseCaseTests : IDisposable
     public async Task Accounts_with_collection_priority_come_first_and_switched_off_ones_leave_the_form_lists()
     {
         var plain = await Register(Form(number: "100"));
-        var priority = await Register(Form(number: "200", priority: true));
-        Assert.Equal([priority, plain], (await _useCases.ListAsync(false, CancellationToken.None)).Select(v => v.Id));
+        var priority = await Register(Form(number: "200", priority: 1));
+        var third = await Register(Form(number: "050", priority: 3));
+        Assert.Equal([priority, third, plain], (await _useCases.ListAsync(false, CancellationToken.None)).Select(v => v.Id));
+        Assert.True((await _useCases.SetActiveAsync(new(Key(), third, false, 1), CancellationToken.None)).IsSuccess);
 
         Assert.True((await _useCases.SetActiveAsync(new(Key(), plain, false, 1), CancellationToken.None)).IsSuccess);
         Assert.Equal([priority], (await _useCases.ListAsync(false, CancellationToken.None)).Select(v => v.Id));
@@ -114,10 +116,65 @@ public sealed class BankAccountUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task Ticking_backup_without_a_main_account_saves_nothing_owner_item_10()
+    {
+        var r = await _useCases.RegisterAsync(new(Key(), Form(), MainAccountId: null, IsBackup: true), CancellationToken.None);
+        Assert.Equal("BankAccount.MainAccountRequired", r.ErrorCode);
+        Assert.Empty(_db.OutboxMessages);
+    }
+
+    [Fact]
+    public async Task The_bank_city_and_foreign_currency_are_marked_in_use_in_reference_svc_so_they_cannot_be_deleted()
+    {
+        await Register(Form(foreign: true, currency: "USD"));
+        Assert.Equal(
+            [("banks", FakeReference.Mellat), ("cities", FakeReference.Tehran), ("currencies", FakeReference.CurrencyIds["USD"])],
+            _reference.MarkedInUse);
+    }
+
+    [Fact]
+    public async Task A_refused_form_marks_nothing_in_use()
+    {
+        await _useCases.RegisterAsync(new(Key(), Form(d1: "111078")), CancellationToken.None);
+        Assert.Empty(_reference.MarkedInUse);
+    }
+
+    [Fact]
     public async Task When_reference_svc_cannot_answer_nothing_is_saved()
     {
         _reference.Down = true;
         Assert.Equal("Reference.Unavailable", (await _useCases.RegisterAsync(new(Key(), Form()), CancellationToken.None)).ErrorCode);
         Assert.Empty(_db.OutboxMessages);
+    }
+
+    [Fact]
+    public async Task An_unused_account_is_deleted_a_used_one_and_a_main_with_a_backup_are_not_owner_report_3()
+    {
+        var free = await Register(Form(number: "0101-900"));
+        Assert.True((await _useCases.DeleteAsync(new(Key(), free, 1), CancellationToken.None)).IsSuccess);
+        Assert.DoesNotContain(await _useCases.ListAsync(true, CancellationToken.None), a => a.Id == free);
+
+        var used = await Register(Form(number: "0101-901"));
+        Assert.True((await _useCases.MarkInUseAsync(Key(), used, CancellationToken.None)).IsSuccess);
+        var view = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == used);
+        Assert.True(view.IsInUse);
+        Assert.Equal("BankAccount.InUse", (await _useCases.DeleteAsync(new(Key(), used, view.Version), CancellationToken.None)).ErrorCode);
+
+        var main = await Register(Form(number: "0101-902"));
+        await Register(Form(number: "0101-903", d1: "100001"), main);
+        Assert.Equal("BankAccount.HasBackup", (await _useCases.DeleteAsync(new(Key(), main, 1), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_bank_card_belongs_to_one_account_only_report_4_item_2()
+    {
+        BankAccountForm WithCard(string number) => Form(number) with { Cards = [new BankCard("6037991234567893", "شرکت نمونه")] };
+        var first = await _useCases.RegisterAsync(new(Guid.NewGuid().ToString(), WithCard("0101-111")), CancellationToken.None);
+        Assert.True(first.IsSuccess, first.ErrorCode);
+        Assert.Equal("BankAccount.CardTaken", (await _useCases.RegisterAsync(new(Guid.NewGuid().ToString(), WithCard("0101-222")), CancellationToken.None)).ErrorCode);
+        var view = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == first.Value);
+        Assert.Equal(("6037991234567893", BankAccountType.CurrentQardHasan, true), (Assert.Single(view.Cards!).Number, view.AccountType, view.HasCheques));
+        Assert.True((await _useCases.ChangeAsync(new(Guid.NewGuid().ToString(), first.Value, WithCard("0101-111") with { AccountType = BankAccountType.SavingsQardHasan }, view.Version), CancellationToken.None)).IsSuccess);
+        Assert.False((await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == first.Value).HasCheques);
     }
 }

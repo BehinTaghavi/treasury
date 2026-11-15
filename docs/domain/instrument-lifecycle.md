@@ -14,7 +14,16 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 13 | Cleared | RecordCleared | DepositedForCollection | D_Check_vos_m | all |
 | 14 | Bounced | RecordBounced | DepositedForCollection | D_Check_vos_m, Checkbacked | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | InCashDesk | D_Check_Od_m | all |
-| 16 | Endorsed | Endorse (needs endorsee) | InCashDesk | D_Check_Kh_m | ordinary, bank cheque |
+| 16 | Endorsed | Endorse (receiver تفصیل, payment purpose group, purpose, Sayad tracking no.) | InCashDesk | D_Check_Kh_m | ordinary, bank cheque |
+| — | ReturnedFromBank (عودت شده از بانک) | ReturnFromBank | DepositedForCollection | owner's item 14 (c) | all |
+| 12 | DepositedForCollection | DepositForCollection again | ReturnedFromBank | owner's item 14, Q33 | ordinary, bank cheque |
+| 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
+| 14 | Bounced | RecordEndorsementReturned (bounce notice no.) | Endorsed | owner's item 14 (h) | all |
+| 15 | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | manual | all |
+| — | Replaced (تعویض شده) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, ReturnedFromBank, Bounced | owner's item 14 (d), Q31 | not guarantee |
+| — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, ReturnedFromBank, Bounced | owner's item 14 (f), Q30 | all |
+
+Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-cheque-steps.md`. Bounced and Endorsed are no longer final.
 
 ## Issued (old Dp = 2)
 

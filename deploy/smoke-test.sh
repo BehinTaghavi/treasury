@@ -19,6 +19,7 @@ location="$(curl -s -o /dev/null -w '%{redirect_url}' "$base/receipts")"
 [[ "$(status "$base/remotes/receipts/mf-manifest.json")" == 200 ]] || fail "receipts micro-frontend manifest missing"
 [[ "$(status "$base/remotes/receipts/remoteEntry.js")" == 200 ]] || fail "receipts micro-frontend entry missing"
 [[ "$(status "$base/remotes/basic-info/mf-manifest.json")" == 200 ]] || fail "basic information micro-frontend manifest missing"
+[[ "$(status "$base/remotes/requests/mf-manifest.json")" == 200 ]] || fail "payment requests micro-frontend manifest missing"
 
 # Basic Information (reference-svc -> PostgreSQL as reference_svc): the default lists are there on a new database.
 for _ in $(seq 1 60); do
@@ -34,6 +35,13 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 [[ "$(status "$base/api/accounts/bank-accounts?includeInactive=true")" == 200 ]] || fail "bank account list (accounts-svc) does not answer"
+
+# Payment requests (requests-svc -> PostgreSQL as requests_svc).
+for _ in $(seq 1 60); do
+  [[ "$(status "$base/api/requests/payment-requests?year=1405")" == 200 ]] && break
+  sleep 2
+done
+[[ "$(status "$base/api/requests/payment-requests?year=1405")" == 200 ]] || fail "payment request list (requests-svc) does not answer"
 
 # Keycloak must advertise the address users actually use (host and port), or logins and token checks fail.
 for _ in $(seq 1 60); do
@@ -53,4 +61,4 @@ curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheq
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 
-echo "OK: shell, receipts and basic information micro-frontends, Keycloak, and the cashflow, reference and accounts APIs with PostgreSQL work at $base"
+echo "OK: shell, receipts, basic information and payment requests micro-frontends, Keycloak, and the cashflow, reference, accounts and requests APIs with PostgreSQL work at $base"

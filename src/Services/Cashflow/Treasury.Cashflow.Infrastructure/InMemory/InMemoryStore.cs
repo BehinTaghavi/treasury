@@ -5,6 +5,7 @@ using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
+using Treasury.Cashflow.Domain.Receipts;
 
 namespace Treasury.Cashflow.Infrastructure.InMemory;
 
@@ -17,7 +18,11 @@ public sealed class InMemoryDatabase : IDisposable
 {
     internal readonly object Gate = new();
     internal readonly Dictionary<Guid, InstrumentSnapshot> Instruments = [];
+    internal readonly Dictionary<Guid, ReceiptSnapshot> Receipts = [];
+    internal readonly Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers = [];
     internal readonly Dictionary<Guid, ChequeBookSnapshot> ChequeBooks = [];
+    internal readonly Dictionary<Guid, ChequeFormatSnapshot> ChequeFormats = [];
+    internal readonly Dictionary<Guid, (string Type, byte[] Data)> ChequeImages = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
     internal readonly SemaphoreSlim TransactionLock = new(1, 1);
@@ -40,7 +45,17 @@ internal sealed class PendingChanges
 {
     public Dictionary<Guid, InstrumentSnapshot> Instruments { get; } = [];
 
+    public Dictionary<Guid, ReceiptSnapshot> Receipts { get; } = [];
+
+    public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
+
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
+
+    public HashSet<Guid> DeletedChequeBooks { get; } = [];
+
+    public Dictionary<Guid, ChequeFormatSnapshot?> ChequeFormats { get; } = []; // null: deleted
+
+    public Dictionary<Guid, (string Type, byte[] Data)> ChequeImages { get; } = [];
 
     public Dictionary<string, string> Idempotency { get; } = [];
 
@@ -69,9 +84,42 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                     db.Instruments[id] = s;
                 }
 
+                foreach (var (id, s) in pending.Receipts)
+                {
+                    db.Receipts[id] = s;
+                }
+
+                foreach (var (key, n) in pending.ReceiptNumbers)
+                {
+                    db.ReceiptNumbers[key] = n;
+                }
+
                 foreach (var (id, s) in pending.ChequeBooks)
                 {
                     db.ChequeBooks[id] = s;
+                }
+
+                foreach (var id in pending.DeletedChequeBooks)
+                {
+                    db.ChequeBooks.Remove(id);
+                }
+
+                foreach (var (id, s) in pending.ChequeFormats)
+                {
+                    if (s is null)
+                    {
+                        db.ChequeFormats.Remove(id);
+                        db.ChequeImages.Remove(id);
+                    }
+                    else
+                    {
+                        db.ChequeFormats[id] = s;
+                    }
+                }
+
+                foreach (var (id, image) in pending.ChequeImages)
+                {
+                    db.ChequeImages[id] = image;
                 }
 
                 foreach (var (key, value) in pending.Idempotency)
@@ -155,12 +203,111 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            IReadOnlyList<Instrument> list = db.Instruments.Values
+                .Where(s => s.Direction == InstrumentDirection.Received && s.State == state)
+                .OrderBy(s => s.DueDate ?? DateOnly.MaxValue).ThenBy(s => s.Number, StringComparer.Ordinal)
+                .Select(s => s.ToDomain()).ToList();
+            return Task.FromResult(list);
+        }
+    }
+
+    public Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            var staged = InMemoryUnitOfWork.Pending?.Instruments ?? [];
+            IReadOnlyList<Instrument> list = db.Instruments.Values.Where(s => !staged.ContainsKey(s.Id)).Concat(staged.Values)
+                .Where(s => s.ReceiptId == receiptId).Select(s => s.ToDomain()).ToList();
+            return Task.FromResult(list);
+        }
+    }
+
     private static void Stage(Instrument instrument, long newVersion)
     {
         var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
         pending.Instruments[instrument.Id] = InstrumentSnapshot.From(instrument, newVersion);
         pending.Outbox.AddRange(instrument.PendingEvents.Select(OutboxMessage.From));
         instrument.MarkSaved(newVersion);
+    }
+}
+
+public sealed class InMemoryReceiptRepository(InMemoryDatabase db) : IReceiptRepository
+{
+    public Task<Receipt?> GetAsync(Guid id, CancellationToken cancellationToken)
+    {
+        if (InMemoryUnitOfWork.Pending?.Receipts.TryGetValue(id, out var staged) == true)
+        {
+            return Task.FromResult<Receipt?>(staged.ToDomain());
+        }
+
+        lock (db.Gate)
+        {
+            return Task.FromResult(db.Receipts.TryGetValue(id, out var s) ? s.ToDomain() : null);
+        }
+    }
+
+    public Task<int> NextNumberAsync(int fiscalYear, ReceiptKind kind, CancellationToken cancellationToken)
+    {
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        if (!pending.ReceiptNumbers.TryGetValue((fiscalYear, kind), out var last))
+        {
+            lock (db.Gate)
+            {
+                last = db.ReceiptNumbers.TryGetValue((fiscalYear, kind), out var n) ? n : 0;
+            }
+        }
+
+        pending.ReceiptNumbers[(fiscalYear, kind)] = last + 1;
+        return Task.FromResult(last + 1);
+    }
+
+    public Task AddAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        Stage(receipt, 1);
+        return Task.CompletedTask;
+    }
+
+    public Task SaveAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        long stored;
+        lock (db.Gate)
+        {
+            stored = db.Receipts.TryGetValue(receipt.Id, out var s) ? s.Version : 0;
+        }
+
+        if (stored != receipt.Version)
+        {
+            throw new ConcurrencyConflictException($"Receipt {receipt.Id} was changed by someone else.");
+        }
+
+        Stage(receipt, receipt.Version + 1);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            IReadOnlyList<Receipt> list = db.Receipts.Values
+                .Where(s => s.FiscalYear == fiscalYear && (kind is null || s.Kind == kind))
+                .OrderByDescending(s => s.Date).ThenByDescending(s => s.Number)
+                .Select(s => s.ToDomain()).ToList();
+            return Task.FromResult(list);
+        }
+    }
+
+    private static void Stage(Receipt receipt, long newVersion)
+    {
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        pending.Receipts[receipt.Id] = ReceiptSnapshot.From(receipt, newVersion);
+        pending.Outbox.AddRange(receipt.PendingEvents.Select(OutboxMessage.From));
+        receipt.MarkSaved(newVersion);
     }
 }
 
@@ -206,12 +353,153 @@ public sealed class InMemoryChequeBookRepository(InMemoryDatabase db) : IChequeB
         return Task.CompletedTask;
     }
 
+    public Task DeleteAsync(ChequeBook book, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        lock (db.Gate)
+        {
+            if (!db.ChequeBooks.TryGetValue(book.Id, out var s) || s.Version != book.Version)
+            {
+                throw new ConcurrencyConflictException($"Cheque book {book.Id} was changed by someone else.");
+            }
+        }
+
+        pending.DeletedChequeBooks.Add(book.Id);
+        pending.Outbox.AddRange(book.PendingEvents.Select(OutboxMessage.From));
+        book.MarkSaved(book.Version);
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken)
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, ChequeBookSnapshot>(db.ChequeBooks);
+            if (pending is not null)
+            {
+                foreach (var (id, s) in pending.ChequeBooks)
+                {
+                    all[id] = s;
+                }
+
+                foreach (var id in pending.DeletedChequeBooks)
+                {
+                    all.Remove(id);
+                }
+            }
+
+            return Task.FromResult<IReadOnlyList<ChequeBook>>(all.Values
+                .Where(s => (bankAccountId is null || s.BankAccountId == bankAccountId) && (includeInactive || s.IsActive))
+                .Select(s => s.ToDomain()).ToList());
+        }
+    }
+
     private static void Stage(ChequeBook book, long newVersion)
     {
         var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
         pending.ChequeBooks[book.Id] = ChequeBookSnapshot.From(book, newVersion);
         pending.Outbox.AddRange(book.PendingEvents.Select(OutboxMessage.From));
         book.MarkSaved(newVersion);
+    }
+}
+
+public sealed class InMemoryChequeFormatRepository(InMemoryDatabase db) : IChequeFormatRepository
+{
+    public Task<ChequeFormat?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Visible().GetValueOrDefault(id)?.ToDomain());
+
+    public Task<IReadOnlyList<ChequeFormat>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ChequeFormat>>(Visible().Values
+            .Where(s => (bankAccountId is null || s.BankAccountId == bankAccountId) && (includeInactive || s.IsActive)).Select(s => s.ToDomain()).ToList());
+
+    public Task<int> NextNumberAsync(CancellationToken cancellationToken) => Task.FromResult(Visible().Values.Select(s => s.Number).DefaultIfEmpty(0).Max() + 1);
+
+    public Task<bool> IsUsedAsync(Guid id, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            var staged = InMemoryUnitOfWork.Pending?.ChequeBooks.Values ?? Enumerable.Empty<ChequeBookSnapshot>();
+            return Task.FromResult(db.ChequeBooks.Values.Concat(staged).Any(b => b.FormatId == id));
+        }
+    }
+
+    public Task AddAsync(ChequeFormat format, CancellationToken cancellationToken) => Write(format, 1, null, null);
+
+    public Task SaveAsync(ChequeFormat format, CancellationToken cancellationToken, byte[]? image = null)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        return Write(format, format.Version + 1, format.Version, image);
+    }
+
+    public Task DeleteAsync(ChequeFormat format, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        Check(format.Id, format.Version);
+        var pending = Pending();
+        pending.ChequeFormats[format.Id] = null;
+        pending.Outbox.AddRange(format.PendingEvents.Select(OutboxMessage.From));
+        format.MarkSaved(format.Version);
+        return Task.CompletedTask;
+    }
+
+    public Task<(string ContentType, byte[] Data)?> GetImageAsync(Guid id, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            return Task.FromResult<(string, byte[])?>(db.ChequeImages.TryGetValue(id, out var i) ? (i.Type, i.Data) : null);
+        }
+    }
+
+    private Task Write(ChequeFormat format, long newVersion, long? expected, byte[]? image)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+        if (expected is { } v)
+        {
+            Check(format.Id, v);
+        }
+
+        var pending = Pending();
+        pending.ChequeFormats[format.Id] = ChequeFormatSnapshot.From(format, newVersion);
+        if (image is not null && format.ImageType is { } type)
+        {
+            pending.ChequeImages[format.Id] = (type, image);
+        }
+
+        pending.Outbox.AddRange(format.PendingEvents.Select(OutboxMessage.From));
+        format.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+
+    private void Check(Guid id, long expected)
+    {
+        if (Visible().GetValueOrDefault(id)?.Version != expected)
+        {
+            throw new ConcurrencyConflictException($"Cheque type {id} was changed by someone else.");
+        }
+    }
+
+    private static PendingChanges Pending() => InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+
+    private Dictionary<Guid, ChequeFormatSnapshot> Visible()
+    {
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, ChequeFormatSnapshot>(db.ChequeFormats);
+            foreach (var (id, s) in InMemoryUnitOfWork.Pending?.ChequeFormats ?? [])
+            {
+                if (s is null)
+                {
+                    all.Remove(id);
+                }
+                else
+                {
+                    all[id] = s;
+                }
+            }
+
+            return all;
+        }
     }
 }
 

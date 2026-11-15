@@ -119,6 +119,11 @@ public static class Assert
         if (actual is null || !actual.Contains(expected, StringComparison.Ordinal)) throw new AssertException($"'{actual}' does not contain '{expected}'.");
     }
 
+    public static void Contains(string expected, string? actual, StringComparison comparison)
+    {
+        if (actual is null || !actual.Contains(expected, comparison)) throw new AssertException($"'{actual}' does not contain '{expected}'.");
+    }
+
     public static void DoesNotContain(string expected, string? actual)
     {
         if (actual is not null && actual.Contains(expected, StringComparison.Ordinal)) throw new AssertException($"'{actual}' should not contain '{expected}'.");

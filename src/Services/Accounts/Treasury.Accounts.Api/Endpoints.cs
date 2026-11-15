@@ -3,11 +3,19 @@ using Treasury.BuildingBlocks.Application;
 
 namespace Treasury.Accounts.Api;
 
-public sealed record RegisterBankAccountRequest(BankAccountForm Form, Guid? MainAccountId);
+public sealed record RegisterBankAccountRequest(BankAccountForm Form, Guid? MainAccountId, bool IsBackup = false);
 
 public sealed record ChangeBankAccountRequest(BankAccountForm Form, long Version);
 
 public sealed record VersionRequest(long Version);
+
+/// <param name="Version">Version of the entry being corrected; null for a new one.</param>
+public sealed record OpeningBalanceRequest(
+    Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind Kind, Guid AccountId, int FiscalYear, string Date, decimal Amount, decimal? RialEquivalent, long? Version);
+
+public sealed record PettyCashChangeRequest(Treasury.Accounts.Application.PettyCash.PettyCashForm Form, long Version);
+
+public sealed record CashDeskChangeRequest(Treasury.Accounts.Application.CashDesks.CashDeskForm Form, long Version);
 
 public static class Endpoints
 {
@@ -23,14 +31,85 @@ public static class Endpoints
         api.MapGet("/", async (bool? includeInactive, BankAccountUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
 
+        api.MapGet("/{id:guid}", async (Guid id, BankAccountUseCases useCases, CancellationToken ct) =>
+            await useCases.GetAsync(id, ct).ConfigureAwait(false) is { } view ? Results.Ok(view) : Results.NotFound());
+
         api.MapPost("/", async (RegisterBankAccountRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.RegisterAsync(new RegisterBankAccountCommand(Key(http), r.Form, r.MainAccountId), ct).ConfigureAwait(false)));
+            ToHttp(await useCases.RegisterAsync(new RegisterBankAccountCommand(Key(http), r.Form, r.MainAccountId, r.IsBackup), ct).ConfigureAwait(false)));
 
         api.MapPut("/{id:guid}", async (Guid id, ChangeBankAccountRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeAsync(new ChangeBankAccountCommand(Key(http), id, r.Form, r.Version), ct).ConfigureAwait(false)));
 
         api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.SetActiveAsync(new SetBankAccountActiveCommand(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
+
+        // Owner's report no. 3, item 1: delete an account nothing uses.
+        api.MapPost("/{id:guid}/delete", async (Guid id, VersionRequest r, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.DeleteAsync(new DeleteBankAccountCommand(Key(http), id, r.Version), ct).ConfigureAwait(false)));
+
+        // cashflow-svc calls this before saving a cheque book, cheque type or cheque that names the account.
+        api.MapPost("/{id:guid}/in-use", async (Guid id, HttpRequest http, BankAccountUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.MarkInUseAsync(Key(http), id, ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Cash desks (manual item 10) under /api/accounts/cash-desks; same conventions as bank accounts.</summary>
+    public static void MapCashDeskEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/cash-desks");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (bool? includeInactive, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+
+        api.MapPost("/", async (Treasury.Accounts.Application.CashDesks.CashDeskForm form, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RegisterAsync(new(Key(http), form), ct).ConfigureAwait(false)));
+
+        api.MapPut("/{id:guid}", async (Guid id, CashDeskChangeRequest r, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ChangeAsync(new(Key(http), id, r.Form, r.Version), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.CashDesks.CashDeskUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.SetActiveAsync(new(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Petty cash holders (manual item 11) under /api/accounts/petty-cash.</summary>
+    public static void MapPettyCashEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/petty-cash");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (bool? includeInactive, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+        api.MapPost("/", async (Treasury.Accounts.Application.PettyCash.PettyCashForm form, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RegisterAsync(Key(http), form, ct).ConfigureAwait(false)));
+        api.MapPut("/{id:guid}", async (Guid id, PettyCashChangeRequest r, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ChangeAsync(Key(http), id, r.Form, r.Version, ct).ConfigureAwait(false)));
+        api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.PettyCash.PettyCashUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SetActiveAsync(Key(http), id, change == "activate", r.Version, ct).ConfigureAwait(false)));
+    }
+
+    /// <summary>Opening balances (موجودی اول دوره) under /api/accounts/opening-balances (owner, 14 Nov 2026).</summary>
+    public static void MapOpeningBalanceEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/opening-balances");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (int year, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(year, ct).ConfigureAwait(false)));
+
+        api.MapPut("/", async (OpeningBalanceRequest r, HttpRequest http, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            ToHttp(await u.EnterAsync(new(Key(http), r.Kind, r.AccountId, r.FiscalYear, r.Date, r.Amount, r.RialEquivalent, r.Version), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/delete", async (Guid id, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveAsync(new(Key(http), id, r.Version), ct).ConfigureAwait(false)));
     }
 
     private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();
@@ -46,7 +125,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
-            "BankAccount.NotFound" => StatusCodes.Status404NotFound,
+            "BankAccount.NotFound" or "CashDesk.NotFound" or "PettyCash.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

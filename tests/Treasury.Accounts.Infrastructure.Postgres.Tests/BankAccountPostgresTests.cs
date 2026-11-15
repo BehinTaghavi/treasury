@@ -19,14 +19,15 @@ public sealed class BankAccountPostgresTests : IDisposable
         _db = db;
         _db.Require();
         _dataSource = NpgsqlDataSource.Create(db.ServiceAs("accounts_svc"));
-        _useCases = new BankAccountUseCases(new PostgresUnitOfWork(_dataSource), new PostgresBankAccountRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        _useCases = new BankAccountUseCases(new PostgresUnitOfWork(_dataSource), new PostgresBankAccountRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource),
+            new PostgresOpeningBalanceRepository());
     }
 
     public void Dispose() => _dataSource.Dispose();
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private BankAccountForm Form(string suffix, string? d1 = "100000", bool priority = false) =>
+    private BankAccountForm Form(string suffix, string? d1 = "100000", int? priority = null) =>
         new($"0101-{_tag}-{suffix}", FakeReference.Mellat, "شعبه بازار", "1234", FakeReference.Tehran, "1400/01/15", false, null,
             "1103", d1, null, "130100", "130101", priority, IsFacility: true);
 
@@ -45,6 +46,89 @@ public sealed class BankAccountPostgresTests : IDisposable
         var v = (await _useCases.ListAsync(true, CancellationToken.None)).Single(x => x.Id == r.Value);
         Assert.Equal(("1400/01/15", "IRR", "100000", "130101", true, 1L), (v.OpeningDate, v.CurrencyCode, v.Detail1Code, v.BouncedAccountCode, v.IsFacility, v.Version));
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE payload->>'BankAccountId' = @id", ("id", r.Value.ToString())));
+    }
+
+    [Fact]
+    public async Task An_account_type_and_its_bank_cards_round_trip_report_4()
+    {
+        // Card numbers per test run, so the shared test database never sees one twice.
+        var seed = Math.Abs(_tag.GetHashCode()) % 100_000_000;
+        string Card(int i)
+        {
+            var body = $"60379{(seed + i) % 100_000_000:D8}00".Substring(0, 15);
+            for (var d = 0; d < 10; d++)
+            {
+                if (Treasury.Accounts.Domain.BankAccounts.BankAccount.IsCardNumber(body + d))
+                {
+                    return body + d;
+                }
+            }
+
+            throw new InvalidOperationException();
+        }
+
+        var form = Form("7") with
+        {
+            AccountType = Treasury.Accounts.Domain.BankAccounts.BankAccountType.ShortTermDeposit,
+            Term = Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod.ThreeMonths,
+            Cards = [new(Card(1), "شرکت نمونه"), new(Card(2), "علی رضایی")],
+        };
+        var r = await _useCases.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == r.Value);
+        Assert.Equal((Treasury.Accounts.Domain.BankAccounts.BankAccountType.ShortTermDeposit, (Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod?)Treasury.Accounts.Domain.BankAccounts.ShortTermPeriod.ThreeMonths, false),
+            (v.AccountType, v.Term, v.HasCheques));
+        Assert.Equal([Card(1), Card(2)], v.Cards!.Select(c => c.Number));
+
+        Assert.True((await _useCases.ChangeAsync(new(Key(), r.Value, form with { Cards = [new(Card(2), "علی رضایی")] }, v.Version), CancellationToken.None)).IsSuccess);
+        Assert.Equal(Card(2), Assert.Single((await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == r.Value).Cards!).Number);
+        Assert.Equal("BankAccount.CardTaken", (await _useCases.RegisterAsync(new(Key(), Form("8") with { Cards = [new(Card(2), "x")] }), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_cash_desk_round_trips_and_its_name_is_unique()
+    {
+        var desks = new Treasury.Accounts.Application.CashDesks.CashDeskUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresCashDeskRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        var form = new Treasury.Accounts.Application.CashDesks.CashDeskForm("صندوق " + _tag, "130100", "111078", null, false, null, "1405/08/22");
+        var r = await desks.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.Equal("CashDesk.NameTaken", (await desks.RegisterAsync(new(Key(), form with { Name = "صندوق  " + _tag }), CancellationToken.None)).ErrorCode);
+        var v = (await desks.ListAsync(true, CancellationToken.None)).Single(d => d.Id == r.Value);
+        Assert.Equal(("130100", "111078", "IRR", 1L, "1405/08/22"), (v.LedgerAccountCode, v.HolderDetailCode, v.CurrencyCode, v.Version, v.CreatedOn));
+        Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE type = 'CashDeskChanged' AND payload->>'CashDeskId' = @id", ("id", r.Value.ToString())));
+    }
+
+    [Fact]
+    public async Task A_petty_cash_round_trips_with_its_amounts_and_purpose_groups()
+    {
+        var funds = new Treasury.Accounts.Application.PettyCash.PettyCashUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresPettyCashRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        // One petty cash per holder and the test database is kept between runs: register once, then change.
+        var form = new Treasury.Accounts.Application.PettyCash.PettyCashForm(
+            "111078", "130100", 75_000_000_000, 60_000_000_000, 1_000_000_000, [FakeReference.Expenses], Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.BankCard,
+            "1405/08/22", new Treasury.Accounts.Domain.PettyCash.PettyCashKeeping(true, "جاری تنخواه", "0101-555", true, true, "علی رضایی", "6037991234567893"));
+        var existing = (await funds.ListAsync(true, CancellationToken.None)).FirstOrDefault(f => f.HolderDetailCode == "111078");
+        var r = existing is null
+            ? await funds.RegisterAsync(Key(), form, CancellationToken.None)
+            : await funds.ChangeAsync(Key(), existing.Id, form, existing.Version, CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await funds.ListAsync(true, CancellationToken.None)).Single(f => f.Id == r.Value);
+        Assert.Equal((75_000_000_000m, 60_000_000_000m, 1_000_000_000m), (v.Amount, v.SettleLimit, v.PayCeiling));
+        Assert.Equal([FakeReference.Expenses], v.AllowedPurposeGroupIds);
+        Assert.Equal(("1405/08/22", "6037991234567893", Treasury.Accounts.Domain.PettyCash.PettyCashRecovery.BankCard), (v.CreatedOn, v.Keeping!.CardNumber, v.Recovery));
+        Assert.Equal("PettyCash.HolderTaken", (await funds.RegisterAsync(Key(), form, CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task The_collection_priority_is_stored_as_a_number_or_none()
+    {
+        var first = await _useCases.RegisterAsync(new(Key(), Form("p1", priority: 3)), CancellationToken.None);
+        var none = await _useCases.RegisterAsync(new(Key(), Form("p2")), CancellationToken.None);
+        Assert.True(first.IsSuccess && none.IsSuccess, first.ErrorCode ?? none.ErrorCode);
+        var views = await _useCases.ListAsync(true, CancellationToken.None);
+        Assert.Equal((int?)3, views.Single(v => v.Id == first.Value).CollectionPriority);
+        Assert.Null(views.Single(v => v.Id == none.Value).CollectionPriority);
     }
 
     [Fact]
@@ -75,4 +159,24 @@ public sealed class BankAccountPostgresTests : IDisposable
         Assert.DoesNotContain(await _useCases.ListAsync(false, CancellationToken.None), x => x.Id == id);
         Assert.Equal("شعبه مرکزی", (await _useCases.ListAsync(true, CancellationToken.None)).Single(x => x.Id == id).BranchName);
     }
+
+    [Fact]
+    public async Task An_opening_balance_round_trips_is_carried_to_the_next_year_and_keeps_the_account_from_deletion()
+    {
+        var balances = new Treasury.Accounts.Application.OpeningBalances.OpeningBalanceUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresOpeningBalanceRepository(), new PostgresBankAccountRepository(), new PostgresCashDeskRepository(),
+            new PostgresPettyCashRepository(), new PostgresIdempotencyStore(_dataSource));
+        var bank = await _useCases.RegisterAsync(new(Key(), Form("ob")), CancellationToken.None);
+        Assert.True(bank.IsSuccess, bank.ErrorCode);
+        var kind = Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind.BankAccount;
+        var r = await balances.EnterAsync(new(Key(), kind, bank.Value, 1405, "1405/08/24", -2_500_000, null), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.True((await balances.EnterAsync(new(Key(), kind, bank.Value, 1405, "1405/08/25", 3_000_000, null, 1), CancellationToken.None)).IsSuccess);
+
+        var mine = (await balances.ListAsync(1405, CancellationToken.None)).Single(v => v.AccountId == bank.Value);
+        Assert.Equal(("1405/08/25", 3_000_000m, 2L), (mine.Entry!.Date, mine.Entry.Amount, mine.Entry.Version));
+        Assert.Equal(1405, (await balances.ListAsync(1407, CancellationToken.None)).Single(v => v.AccountId == bank.Value).Carried!.FromYear);
+        Assert.Equal("BankAccount.InUse", (await _useCases.DeleteAsync(new(Key(), bank.Value, 1), CancellationToken.None)).ErrorCode);
+    }
 }
+

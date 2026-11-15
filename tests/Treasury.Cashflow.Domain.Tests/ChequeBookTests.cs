@@ -7,7 +7,7 @@ namespace Treasury.Cashflow.Domain.Tests;
 public sealed class ChequeBookTests
 {
     private static ChequeBook Book(long first = 100_101, long last = 100_125) =>
-        ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "97/12", first, last);
+        ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "9712", first, last);
 
     [Fact]
     public void Hands_out_sheets_in_order()
@@ -31,17 +31,17 @@ public sealed class ChequeBookTests
     [Fact]
     public void Skips_sheets_that_were_typed_or_voided()
     {
-        var book = Book(1, 4);
-        book.Reserve(1);
-        book.Void(2, "پاره شد");
-        Assert.Equal(3, book.ReserveNext());
+        var book = Book(200_001, 200_004);
+        book.Reserve(200_001);
+        book.Void(200_002, "پاره شد");
+        Assert.Equal(200_003, book.ReserveNext());
     }
 
     [Fact]
     public void Deactivates_when_no_unused_sheet_remains()
     {
         // Old message: "برگهاي دسته چك تمام شد.دسته چك غيرفعال خواهد شد"
-        var book = Book(1, 2);
+        var book = Book(200_001, 200_002);
         book.ReserveNext();
         book.ReserveNext();
         Assert.False(book.IsActive);
@@ -52,16 +52,168 @@ public sealed class ChequeBookTests
     [Fact]
     public void A_voided_sheet_needs_a_reason_and_cannot_be_issued()
     {
-        var book = Book(1, 5);
-        Assert.Equal("ChequeBook.VoidReasonRequired", Assert.Throws<DomainException>(() => book.Void(3, " ")).Code);
-        book.Void(3, "خط خوردگی");
-        Assert.Equal("ChequeBook.SheetAlreadyUsed", Assert.Throws<DomainException>(() => book.Reserve(3)).Code);
+        var book = Book(200_001, 200_005);
+        Assert.Equal("ChequeBook.VoidReasonRequired", Assert.Throws<DomainException>(() => book.Void(200_003, " ")).Code);
+        book.Void(200_003, "خط خوردگی");
+        Assert.Equal("ChequeBook.SheetAlreadyUsed", Assert.Throws<DomainException>(() => book.Reserve(200_003)).Code);
     }
 
     [Theory]
-    [InlineData(0L, 10L)]
-    [InlineData(20L, 10L)]
-    [InlineData(1L, 2000L)]
-    public void Rejects_invalid_ranges(long first, long last) =>
-        Assert.Throws<DomainException>(() => ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "x", first, last));
+    [InlineData(0L, 10L, "ChequeBook.InvalidRange")]
+    [InlineData(200_020L, 200_010L, "ChequeBook.InvalidRange")]
+    [InlineData(200_001L, 200_101L, "ChequeBook.TooManySheets")]
+    [InlineData(1_001L, 1_050L, "ChequeBook.SerialInvalid")]
+    [InlineData(99_999_990L, 100_000_009L, "ChequeBook.SerialInvalid")]
+    public void Rejects_invalid_ranges_owner_12_nov(long first, long last, string code) =>
+        Assert.Equal(code, Assert.Throws<DomainException>(() => ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", first, last)).Code);
+
+    [Theory]
+    [InlineData("1234", "1234")]
+    [InlineData(" ۱۲۳۴ ", "1234")]
+    public void The_series_is_four_digits_written_in_any_digits(string typed, string stored)
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), typed, 567_801, 567_850);
+        Assert.Equal(stored, book.Serial);
+        Assert.Equal("1234/567801", book.SheetLabel(567_801));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("123")]
+    [InlineData("12345")]
+    [InlineData("12/34")]
+    [InlineData("الف")]
+    public void A_series_that_is_not_four_digits_is_refused(string typed) =>
+        Assert.Equal("ChequeBook.SeriesInvalid", Assert.Throws<DomainException>(() => ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), typed, 567_801, 567_850)).Code);
+
+    [Fact]
+    public void An_exhausted_book_cannot_be_switched_on_again()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 200_001, 200_001);
+        book.ReserveNext();
+        Assert.False(book.IsActive);
+        Assert.Equal("ChequeBook.Exhausted", Assert.Throws<DomainException>(book.Activate).Code);
+    }
+
+    [Fact]
+    public void Books_of_one_account_never_share_sheet_numbers_whatever_their_series()
+    {
+        var account = Guid.NewGuid();
+        var a = ChequeBook.Register(Guid.NewGuid(), account, "1111", 300_100, 300_150);
+        Assert.True(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "1111", 300_150, 300_200)));
+        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "1111", 300_151, 300_200)));
+        Assert.True(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), account, "2222", 300_120, 300_130)));
+        Assert.False(a.Overlaps(ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1111", 300_120, 300_130)));
+        Assert.False(a.Overlaps(a));
+    }
+
+    [Fact]
+    public void Correcting_raises_one_event_and_an_unchanged_book_none()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 200_001, 200_050);
+        book.MarkSaved(1);
+        book.Correct("1234", 200_001, 200_050);
+        Assert.Empty(book.PendingEvents);
+        book.Correct("5678", 200_011, 200_060);
+        Assert.Equal(("5678", 200_011L, 200_060L), (book.Serial, book.FirstSheet, book.LastSheet));
+        Assert.IsType<ChequeBookCorrected>(Assert.Single(book.PendingEvents));
+    }
+
+    [Fact]
+    public void The_sayad_id_of_a_sheet_is_the_typed_four_digits_the_books_eight_and_the_sheets_serial_owner_12_nov()
+    {
+        var sayad = ChequeBookSayad.Create("۱۲۳۴۵۶۷۸", "0021");
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_850, sayad);
+        Assert.Equal(("12345678", 21, 70), (book.Sayad!.Middle, book.Sayad.FirstSerial, book.Sayad.LastSerial(book.SheetCount)));
+        Assert.Equal("9876123456780021", book.SayadIdOf(567_801, "9876"));
+        Assert.Equal("9876123456780030", book.SayadIdOf(567_810, "۹۸۷۶"));
+        Assert.Equal("ChequeBook.SayadPrefixInvalid", Assert.Throws<DomainException>(() => book.SayadIdOf(567_801, "98")).Code);
+        Assert.Equal("ChequeBook.SheetOutOfRange", Assert.Throws<DomainException>(() => book.SayadIdOf(567_851, "9876")).Code);
+        Assert.Equal("ChequeBook.SayadMissing", Assert.Throws<DomainException>(() => Book().SayadIdOf(100_101, "9876")).Code);
+    }
+
+    [Theory]
+    [InlineData("", "", "ChequeBook.SayadRequired")]
+    [InlineData("1234567", "1", "ChequeBook.SayadMiddleInvalid")]
+    [InlineData("123456789", "1", "ChequeBook.SayadMiddleInvalid")]
+    [InlineData("12345678", "", "ChequeBook.SayadSerialInvalid")]
+    [InlineData("12345678", "10000", "ChequeBook.SayadSerialInvalid")]
+    public void Sayad_numbers_are_eight_middle_digits_and_a_four_digit_serial(string middle, string first, string code) =>
+        Assert.Equal(code, Assert.Throws<DomainException>(() => ChequeBookSayad.Create(middle, first)).Code);
+
+    [Fact]
+    public void The_sayad_serials_of_a_book_stay_within_four_digits() =>
+        Assert.Equal("ChequeBook.SayadSerialInvalid", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_850, ChequeBookSayad.Create("12345678", "9990"))).Code);
+
+    private static readonly ChequeBookSayad Sayad = ChequeBookSayad.Create("12345678", "1");
+
+    [Theory]
+    [InlineData(25)]
+    [InlineData(50)]
+    [InlineData(100)]
+    public void A_new_book_has_25_50_or_100_sheets_owner_12_nov(int sheets) =>
+        Assert.Equal(sheets, ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_800 + sheets, Sayad).SheetCount);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(24)]
+    [InlineData(30)]
+    [InlineData(99)]
+    public void A_new_book_of_another_size_is_refused_owner_12_nov(int sheets) =>
+        Assert.Equal("ChequeBook.SheetCountInvalid", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_800 + sheets, Sayad)).Code);
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(17)]
+    [InlineData(100)]
+    public void A_partly_used_book_at_go_live_has_any_number_of_unused_sheets_up_to_100_owner_12_nov(int sheets)
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_834, 567_833 + sheets, ChequeBookSayad.Create("12345678", "34"), partlyUsed: true);
+        Assert.Equal((sheets, true, 567_834L), ((int)book.SheetCount, book.PartlyUsed, book.ReserveNext()));
+    }
+
+    [Fact]
+    public void A_partly_used_book_still_has_at_most_100_sheets() =>
+        Assert.Equal("ChequeBook.TooManySheets", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_901, null, partlyUsed: true)).Code);
+
+    [Fact]
+    public void Correcting_keeps_or_changes_the_partly_used_answer()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_811, 567_850, Sayad, partlyUsed: true);
+        book.Correct("1234", 567_811, 567_830);
+        Assert.True(book.PartlyUsed);
+        Assert.Equal("ChequeBook.SheetCountInvalid", Assert.Throws<DomainException>(() => book.Correct("1234", 567_811, 567_830, null, partlyUsed: false)).Code);
+        book.Correct("1234", 567_801, 567_850, null, partlyUsed: false);
+        Assert.Equal((50L, false), (book.SheetCount, book.PartlyUsed));
+    }
+
+    [Fact]
+    public void A_serial_may_start_with_0_and_keeps_its_zero_owner_12_nov()
+    {
+        var book = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 56_701, 56_725, Sayad, serialDigits: 6);
+        Assert.Equal((6, "056701", "1234/056725"), (book.SerialDigits, book.SerialText(book.FirstSheet), book.SheetLabel(56_725)));
+        var eight = ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", 1, 25, Sayad, serialDigits: 8);
+        Assert.Equal("1234/00000001", eight.SheetLabel(1));
+    }
+
+    [Theory]
+    [InlineData(56_701L, 56_725L, 5)]          // fewer than 6 digits
+    [InlineData(56_701L, 56_725L, 9)]          // more than 8 digits
+    [InlineData(999_990L, 1_000_014L, 6)]      // the last serial no longer fits in 6 digits
+    public void A_serial_typed_with_leading_zeros_still_has_6_to_8_digits(long first, long last, int digits) =>
+        Assert.Equal("ChequeBook.SerialInvalid", Assert.Throws<DomainException>(() =>
+            ChequeBook.Register(Guid.NewGuid(), Guid.NewGuid(), "1234", first, last, Sayad, serialDigits: digits)).Code);
+
+    [Fact]
+    public void Without_a_typed_width_the_serial_has_the_digits_of_the_first_sheet()
+    {
+        var book = ChequeBook.Restore(Guid.NewGuid(), Guid.NewGuid(), "1234", 567_801, 567_850, true, [], 1);
+        Assert.Equal((6, "1234/567801"), (book.SerialDigits, book.SheetLabel(567_801)));
+        book.Correct("1234", 56_701, 56_750, null, null, serialDigits: 6);
+        Assert.Equal("056701", book.SerialText(book.FirstSheet));
+    }
 }
+

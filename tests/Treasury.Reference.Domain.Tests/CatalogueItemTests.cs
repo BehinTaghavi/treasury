@@ -42,6 +42,69 @@ public sealed class CatalogueItemTests
     }
 
     [Fact]
+    public void A_city_can_move_to_another_province_of_the_right_kind_owner_item_6()
+    {
+        var isfahan = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Province, "اصفهان", Iran);
+        var tehranProvince = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Province, "تهران", Iran);
+        var city = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.City, "اصفهان", isfahan);
+        city.MarkSaved(1);
+
+        city.Edit("تهران", tehranProvince);
+        Assert.Equal(("تهران", tehranProvince.Id), (city.Name, city.ParentId));
+        Assert.Equal(tehranProvince.Id, Assert.IsType<CatalogueItemChanged>(Assert.Single(city.PendingEvents)).ParentId);
+        Assert.Equal("Catalogue.WrongParent", Assert.Throws<DomainException>(() => city.Edit("تهران", Iran)).Code);
+        isfahan.Deactivate();
+        Assert.Equal("Catalogue.ParentInactive", Assert.Throws<DomainException>(() => city.Edit("اصفهان", isfahan)).Code);
+    }
+
+    [Fact]
+    public void A_currency_code_can_be_corrected_until_the_currency_is_used_owner_item_2()
+    {
+        var qatar = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Currency, "ریال قطر", code: "QAR");
+        qatar.Edit("دینار کویت", code: "kwd");
+        Assert.Equal(("دینار کویت", "KWD"), (qatar.Name, qatar.Code));
+        Assert.True(qatar.MarkInUse());
+        Assert.False(qatar.MarkInUse());
+        Assert.Equal("Catalogue.CodeInUse", Assert.Throws<DomainException>(() => qatar.Edit("دینار کویت", code: "QAR")).Code);
+        qatar.Edit("دینار کویت", code: "KWD"); // the same code is not a change
+
+        var rial = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Currency, "ریال", code: "IRR");
+        Assert.Equal("Catalogue.RialCodeFixed", Assert.Throws<DomainException>(() => rial.Edit("ریال", code: "IRT")).Code);
+        Assert.Equal("Catalogue.CodeNotAllowed", Assert.Throws<DomainException>(() => Iran.Edit("ایران", code: "IRN")).Code);
+    }
+
+    [Fact]
+    public void Only_an_unused_entry_without_entries_under_it_can_be_deleted_owner_items_6_and_9()
+    {
+        var bank = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Bank, "بانک اشتباه");
+        bank.MarkSaved(1);
+        Assert.Equal("Catalogue.HasChildren", Assert.Throws<DomainException>(() => Iran.Delete(hasChildren: true)).Code);
+        bank.Delete(hasChildren: false);
+        Assert.IsType<CatalogueItemDeleted>(Assert.Single(bank.PendingEvents));
+
+        var used = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.City, "کرج", CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Province, "البرز", Iran));
+        used.MarkInUse();
+        Assert.Equal("Catalogue.InUse", Assert.Throws<DomainException>(() => used.Delete(hasChildren: false)).Code);
+        var rial = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Currency, "ریال", code: "IRR");
+        Assert.Equal("Catalogue.RialCannotBeDeleted", Assert.Throws<DomainException>(() => rial.Delete(hasChildren: false)).Code);
+    }
+
+    [Theory]
+    [InlineData("بانک آینده", "آینده")]
+    [InlineData("بانك ملي ايران", "ملی ایران")]
+    [InlineData("پست بانک ایران", "پست ایران")]
+    public void Bank_names_are_compared_without_the_word_bank_owner_item_8(string a, string b) =>
+        Assert.Equal(
+            CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Bank, a).MatchKey,
+            CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Bank, b).MatchKey);
+
+    [Fact]
+    public void Other_lists_keep_the_word_bank_in_the_comparison() =>
+        Assert.NotEqual(
+            CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Country, "بانک مرکزی").MatchKey,
+            CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Country, "مرکزی").MatchKey);
+
+    [Fact]
     public void Nothing_can_be_added_under_an_inactive_parent()
     {
         var province = CatalogueItem.Add(Guid.NewGuid(), CatalogueKind.Province, "البرز", Iran);

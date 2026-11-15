@@ -54,6 +54,37 @@ public sealed class CataloguePostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_city_moves_province_a_currency_code_is_corrected_and_both_are_stored()
+    {
+        var country = (await Add(CatalogueKind.Country, "کشور ج " + _tag)).Value;
+        var a = (await Add(CatalogueKind.Province, "الف " + _tag, country)).Value;
+        var b = (await Add(CatalogueKind.Province, "ب " + _tag, country)).Value;
+        var city = (await Add(CatalogueKind.City, "شهر ج " + _tag, a)).Value;
+        Assert.True((await _useCases.EditAsync(new(Key(), city, "شهر د " + _tag, 1, b), CancellationToken.None)).IsSuccess);
+        Assert.Equal(b, await _db.ScalarAsync<Guid>("SELECT parent_id FROM reference.catalogue_item WHERE id = @id", ("id", city)));
+
+        var code = "Q" + (char)('A' + Random.Shared.Next(26)) + (char)('A' + Random.Shared.Next(26));
+        var currency = (await Add(CatalogueKind.Currency, "ارز " + _tag, code: code)).Value;
+        var newCode = "Z" + code[1..];
+        Assert.True((await _useCases.EditAsync(new(Key(), currency, "ارز " + _tag, 1, Code: newCode), CancellationToken.None)).IsSuccess);
+        Assert.Equal(newCode, (await _db.ScalarAsync<string>("SELECT code FROM reference.catalogue_item WHERE id = @id", ("id", currency))).Trim());
+    }
+
+    [Fact]
+    public async Task An_unused_entry_is_deleted_and_an_entry_marked_in_use_stays()
+    {
+        var mistake = (await Add(CatalogueKind.Bank, "بانک اشتباه " + _tag)).Value;
+        Assert.True((await _useCases.DeleteAsync(new(Key(), mistake, 1), CancellationToken.None)).IsSuccess);
+        Assert.Equal(0L, await _db.ScalarAsync<long>("SELECT count(*) FROM reference.catalogue_item WHERE id = @id", ("id", mistake)));
+        Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM reference.outbox WHERE type = 'CatalogueItemDeleted' AND payload->>'ItemId' = @id", ("id", mistake.ToString())));
+
+        var used = (await Add(CatalogueKind.Bank, "بانک در گردش " + _tag)).Value;
+        Assert.True((await _useCases.MarkInUseAsync(new(Key(), used), CancellationToken.None)).IsSuccess);
+        Assert.True(await _db.ScalarAsync<bool>("SELECT in_use FROM reference.catalogue_item WHERE id = @id", ("id", used)));
+        Assert.Equal("Catalogue.InUse", (await _useCases.DeleteAsync(new(Key(), used, 2), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task A_name_with_arabic_letters_is_the_same_name()
     {
         Assert.True((await Add(CatalogueKind.Bank, "بانک ملی " + _tag)).IsSuccess);

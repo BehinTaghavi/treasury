@@ -55,13 +55,14 @@ public sealed class LayerTests
         }
     }
 
-    private static readonly string[] Services = ["Cashflow", "Reference", "Accounts"];
+    private static readonly string[] Services = ["Cashflow", "Reference", "Accounts", "Requests"];
 
     /// <summary>Every service follows the same layer rules (one folder per service, CLAUDE.md). Services do not reference each other.</summary>
     [Theory]
     [InlineData("Cashflow")]
     [InlineData("Reference")]
     [InlineData("Accounts")]
+    [InlineData("Requests")]
     public void Each_service_keeps_its_layers_and_does_not_reference_another_service(string service)
     {
         Assembly Load(string layer) => Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"Treasury.{service}.{layer}.dll"));
@@ -94,6 +95,7 @@ public sealed class LayerTests
     [InlineData("Cashflow")]
     [InlineData("Reference")]
     [InlineData("Accounts")]
+    [InlineData("Requests")]
     public void Each_service_uses_the_shared_application_block(string service) =>
         Assert.Contains("Treasury.BuildingBlocks.Application",
             References(Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"Treasury.{service}.Application.dll"))));

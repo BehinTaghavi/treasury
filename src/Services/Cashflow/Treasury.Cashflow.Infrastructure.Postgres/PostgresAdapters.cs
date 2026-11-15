@@ -22,6 +22,10 @@ public static class PostgresRegistration
         services.AddSingleton<IUnitOfWork>(sp => sp.GetRequiredService<PostgresUnitOfWork>());
         services.AddSingleton<IInstrumentRepository, PostgresInstrumentRepository>();
         services.AddSingleton<IChequeBookRepository, PostgresChequeBookRepository>();
+        services.AddSingleton<IReceiptRepository, PostgresReceiptRepository>();
+        services.AddSingleton<IVoucherTemplateRepository, PostgresVoucherTemplateRepository>();
+        services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
+        services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -62,6 +66,22 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             return result;
         }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cheque_format")
+        {
+            // Two users added a type at the same moment: the indexes decide.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("ChequeFormat.Taken", "This bank account already has this cheque type (or the print number was taken; save again).");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.ForeignKeyViolation && ex.ConstraintName == "cheque_book_format")
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("ChequeFormat.InUse", "Cheque books are printed with this type.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.ConstraintName?.StartsWith("voucher", StringComparison.Ordinal) == true)
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("Voucher.AlreadyConfirmed", "This voucher is already confirmed.");
+        }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cheque_sheet")
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
@@ -81,9 +101,14 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
 
 public sealed class PostgresInstrumentRepository : IInstrumentRepository
 {
+    private static readonly System.Text.Json.JsonSerializerOptions StepJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private const string Columns =
         "origin_fiscal_year, id, direction, kind, number, bank_name, bank_account_id, cheque_book_id, payment_id, amount, currency, rate_to_rial, " +
-        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version";
+        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version, receipt_id, counterparty_detail_code, details, " +
+        "collection_account_id";
+
+    private static readonly System.Text.Json.JsonSerializerOptions DetailsJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     public async Task<Instrument?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -116,7 +141,11 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
                     State: Enum.Parse<InstrumentState>(r.GetString(18)),
                     OriginFiscalYear: r.GetInt32(0),
                     History: [],
-                    Version: r.GetInt64(19));
+                    Version: r.GetInt64(19),
+                    ReceiptId: r.IsDBNull(20) ? null : r.GetGuid(20),
+                    Details: r.IsDBNull(22) ? null : System.Text.Json.JsonSerializer.Deserialize<ReceivedInstrumentDetails>(r.GetString(22), DetailsJson),
+                    CounterpartyDetailCode: r.IsDBNull(21) ? null : r.GetString(21),
+                    CollectionAccountId: r.IsDBNull(23) ? null : r.GetGuid(23));
             }
         }
 
@@ -127,7 +156,7 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
 
         var history = new List<HistorySnapshot>();
         await using (var cmd = tx.Command(
-            "SELECT action, from_state, to_state, event_date, user_id, reference, note FROM cashflow.instrument_event WHERE instrument_id = @id ORDER BY seq"))
+            "SELECT action, from_state, to_state, event_date, user_id, reference, note, details FROM cashflow.instrument_event WHERE instrument_id = @id ORDER BY seq"))
         {
             cmd.Parameters.AddWithValue("id", id);
             await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -140,7 +169,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
                     r.GetFieldValue<DateOnly>(3),
                     r.GetString(4),
                     r.IsDBNull(5) ? null : r.GetString(5),
-                    r.IsDBNull(6) ? null : r.GetString(6)));
+                    r.IsDBNull(6) ? null : r.GetString(6),
+                    r.IsDBNull(7) ? null : System.Text.Json.JsonSerializer.Deserialize<StepDetailsSnapshot>(r.GetString(7), StepJson)));
             }
         }
 
@@ -171,7 +201,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         var s = InstrumentSnapshot.From(instrument, 1);
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.instrument ({Columns}, amount_rial) VALUES " +
-            "(@year, @id, @direction, @kind, @number, @bank, @account, @book, @payment, @amount, @currency, @rate, @issue, @due, @cp, @cpname, @purpose, @destination, @state, 1, @rial)"))
+            "(@year, @id, @direction, @kind, @number, @bank, @account, @book, @payment, @amount, @currency, @rate, @issue, @due, @cp, @cpname, @purpose, @destination, @state, 1, " +
+            "@receipt, @cpcode, @details, @collection, @rial)"))
         {
             BindInstrument(cmd, s, instrument.Amount.ToRial());
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -189,11 +220,13 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         var s = InstrumentSnapshot.From(instrument, instrument.Version + 1);
         await using (var cmd = tx.Command(
             "UPDATE cashflow.instrument SET number = @number, cheque_book_id = @book, destination = @destination, state = @state, " +
+            "collection_account_id = @collection, " +
             "version = version + 1, updated_at = now() WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
         {
             cmd.Parameters.AddWithValue("number", (object?)s.Number ?? DBNull.Value);
             cmd.Parameters.AddWithValue("book", (object?)s.ChequeBookId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("destination", (object?)s.Destination ?? DBNull.Value);
+            cmd.Parameters.Add(new NpgsqlParameter("collection", NpgsqlDbType.Uuid) { Value = (object?)s.CollectionAccountId ?? DBNull.Value });
             cmd.Parameters.AddWithValue("state", s.State.ToString());
             cmd.Parameters.AddWithValue("year", s.OriginFiscalYear);
             cmd.Parameters.AddWithValue("id", s.Id);
@@ -218,8 +251,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
             var h = s.History[i];
             // The step belongs to the fiscal year in which it happens (doc 7.4).
             await using var cmd = tx.Command(
-                "INSERT INTO cashflow.instrument_event (fiscal_year, instrument_year, instrument_id, seq, action, from_state, to_state, event_date, user_id, reference, note) " +
-                "VALUES (cashflow.fiscal_year_of(@date), @iyear, @iid, @seq, @action, @from, @to, @date, @user, @ref, @note)");
+                "INSERT INTO cashflow.instrument_event (fiscal_year, instrument_year, instrument_id, seq, action, from_state, to_state, event_date, user_id, reference, note, details) " +
+                "VALUES (cashflow.fiscal_year_of(@date), @iyear, @iid, @seq, @action, @from, @to, @date, @user, @ref, @note, @details)");
             cmd.Parameters.AddWithValue("date", h.Date);
             cmd.Parameters.AddWithValue("iyear", s.OriginFiscalYear);
             cmd.Parameters.AddWithValue("iid", s.Id);
@@ -230,6 +263,10 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
             cmd.Parameters.AddWithValue("user", h.UserId);
             cmd.Parameters.AddWithValue("ref", (object?)h.Reference ?? DBNull.Value);
             cmd.Parameters.AddWithValue("note", (object?)h.Note ?? DBNull.Value);
+            cmd.Parameters.Add(new NpgsqlParameter("details", NpgsqlTypes.NpgsqlDbType.Jsonb)
+            {
+                Value = h.Details is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(h.Details, StepJson),
+            });
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
     }
@@ -256,6 +293,58 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         cmd.Parameters.AddWithValue("destination", (object?)s.Destination ?? DBNull.Value);
         cmd.Parameters.AddWithValue("state", s.State.ToString());
         cmd.Parameters.AddWithValue("rial", amountRial);
+        cmd.Parameters.AddWithValue("receipt", (object?)s.ReceiptId ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("collection", NpgsqlDbType.Uuid) { Value = (object?)s.CollectionAccountId ?? DBNull.Value });
+        cmd.Parameters.AddWithValue("cpcode", (object?)s.CounterpartyDetailCode ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("details", NpgsqlDbType.Jsonb)
+        {
+            Value = s.Details is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(s.Details, DetailsJson),
+        });
+    }
+
+    public async Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+        await using (var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT id FROM cashflow.instrument WHERE direction = 'Received' AND state = @state ORDER BY due_date NULLS LAST, number"))
+        {
+            cmd.Parameters.AddWithValue("state", state.ToString());
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(r.GetGuid(0));
+            }
+        }
+
+        var list = new List<Instrument>();
+        foreach (var id in ids)
+        {
+            list.Add((await GetAsync(id, cancellationToken).ConfigureAwait(false))!);
+        }
+
+        return list;
+    }
+
+    public async Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+        await using (var cmd = PostgresUnitOfWork.Current.Command("SELECT id FROM cashflow.instrument WHERE receipt_id = @receipt ORDER BY created_at, number"))
+        {
+            cmd.Parameters.AddWithValue("receipt", receiptId);
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(r.GetGuid(0));
+            }
+        }
+
+        var list = new List<Instrument>();
+        foreach (var id in ids)
+        {
+            list.Add((await GetAsync(id, cancellationToken).ConfigureAwait(false))!);
+        }
+
+        return list;
     }
 }
 
@@ -267,13 +356,14 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ChequeBookSnapshot? head = null;
         // Row lock: a second user issuing from the same book waits here until the first transaction ends.
         await using (var cmd = tx.Command(
-            "SELECT bank_account_id, serial, first_sheet, last_sheet, is_active, version FROM cashflow.cheque_book WHERE id = @id FOR UPDATE"))
+            "SELECT bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id, sayad_middle, sayad_first, partly_used, serial_digits FROM cashflow.cheque_book WHERE id = @id FOR UPDATE"))
         {
             cmd.Parameters.AddWithValue("id", id);
             await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
             if (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                head = new ChequeBookSnapshot(id, r.GetGuid(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetBoolean(4), new Dictionary<long, SheetUse>(), r.GetInt64(5));
+                head = new ChequeBookSnapshot(id, r.GetGuid(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3), r.GetBoolean(4), new Dictionary<long, SheetUse>(), r.GetInt64(5),
+                    r.IsDBNull(6) ? null : r.GetGuid(6), r.IsDBNull(7) ? null : r.GetString(7), r.IsDBNull(8) ? null : r.GetInt16(8), r.GetBoolean(9), r.IsDBNull(10) ? null : r.GetInt16(10));
             }
         }
 
@@ -302,8 +392,11 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ArgumentNullException.ThrowIfNull(book);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, is_active, version) VALUES (@id, @account, @serial, @first, @last, @active, 1)"))
+            "INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id, sayad_middle, sayad_first, partly_used, serial_digits) " +
+            "VALUES (@id, @account, @serial, @first, @last, @active, 1, @format, @sayad_middle, @sayad_first, @partly_used, @serial_digits)"))
         {
+            SayadParameters(cmd, book);
+            cmd.Parameters.Add(new NpgsqlParameter("format", NpgsqlDbType.Uuid) { Value = (object?)book.FormatId ?? DBNull.Value });
             cmd.Parameters.AddWithValue("id", book.Id);
             cmd.Parameters.AddWithValue("account", book.BankAccountId);
             cmd.Parameters.AddWithValue("serial", book.Serial);
@@ -324,8 +417,14 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         ArgumentNullException.ThrowIfNull(book);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE cashflow.cheque_book SET is_active = @active, version = version + 1 WHERE id = @id AND version = @expected"))
+            "UPDATE cashflow.cheque_book SET serial = @serial, first_sheet = @first, last_sheet = @last, is_active = @active, format_id = @format, " +
+            "sayad_middle = @sayad_middle, sayad_first = @sayad_first, partly_used = @partly_used, serial_digits = @serial_digits, version = version + 1 WHERE id = @id AND version = @expected"))
         {
+            SayadParameters(cmd, book);
+            cmd.Parameters.Add(new NpgsqlParameter("format", NpgsqlDbType.Uuid) { Value = (object?)book.FormatId ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("serial", book.Serial);
+            cmd.Parameters.AddWithValue("first", book.FirstSheet);
+            cmd.Parameters.AddWithValue("last", book.LastSheet);
             cmd.Parameters.AddWithValue("active", book.IsActive);
             cmd.Parameters.AddWithValue("id", book.Id);
             cmd.Parameters.AddWithValue("expected", book.Version);
@@ -338,6 +437,67 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
         await InsertNewSheetsAsync(tx, book, cancellationToken).ConfigureAwait(false);
         await PostgresOutbox.WriteAsync(tx, book.PendingEvents, cancellationToken).ConfigureAwait(false);
         book.MarkSaved(book.Version + 1);
+    }
+
+    public async Task DeleteAsync(ChequeBook book, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(book);
+        var tx = PostgresUnitOfWork.Current;
+        // "NOT EXISTS": a sheet issued since the book was loaded refuses the delete (the book row lock normally prevents that).
+        await using (var cmd = tx.Command(
+            "DELETE FROM cashflow.cheque_book b WHERE id = @id AND version = @expected AND NOT EXISTS (SELECT 1 FROM cashflow.cheque_sheet s WHERE s.cheque_book_id = b.id)"))
+        {
+            cmd.Parameters.AddWithValue("id", book.Id);
+            cmd.Parameters.AddWithValue("expected", book.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Cheque book {book.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, book.PendingEvents, cancellationToken).ConfigureAwait(false);
+        book.MarkSaved(book.Version);
+    }
+
+    public async Task<IReadOnlyList<ChequeBook>> ListAsync(Guid? bankAccountId, bool includeInactive, CancellationToken cancellationToken)
+    {
+        var tx = PostgresUnitOfWork.Current;
+        var heads = new List<ChequeBookSnapshot>();
+        await using (var cmd = tx.Command(
+            "SELECT id, bank_account_id, serial, first_sheet, last_sheet, is_active, version, format_id, sayad_middle, sayad_first, partly_used, serial_digits FROM cashflow.cheque_book " +
+            "WHERE (@account::uuid IS NULL OR bank_account_id = @account) AND (@all OR is_active)"))
+        {
+            cmd.Parameters.Add(new NpgsqlParameter("account", NpgsqlDbType.Uuid) { Value = (object?)bankAccountId ?? DBNull.Value });
+            cmd.Parameters.AddWithValue("all", includeInactive);
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                heads.Add(new ChequeBookSnapshot(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.GetInt64(3), r.GetInt64(4), r.GetBoolean(5), new Dictionary<long, SheetUse>(), r.GetInt64(6),
+                    r.IsDBNull(7) ? null : r.GetGuid(7), r.IsDBNull(8) ? null : r.GetString(8), r.IsDBNull(9) ? null : r.GetInt16(9), r.GetBoolean(10), r.IsDBNull(11) ? null : r.GetInt16(11)));
+            }
+        }
+
+        var sheets = heads.ToDictionary(h => h.Id, _ => new Dictionary<long, SheetUse>());
+        if (heads.Count > 0)
+        {
+            await using var cmd = tx.Command("SELECT cheque_book_id, sheet, sheet_use FROM cashflow.cheque_sheet WHERE cheque_book_id = ANY(@ids)");
+            cmd.Parameters.AddWithValue("ids", heads.Select(h => h.Id).ToArray());
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                sheets[r.GetGuid(0)][r.GetInt64(1)] = Enum.Parse<SheetUse>(r.GetString(2));
+            }
+        }
+
+        return heads.Select(h => (h with { UsedSheets = sheets[h.Id] }).ToDomain()).ToList();
+    }
+
+    private static void SayadParameters(NpgsqlCommand cmd, ChequeBook book)
+    {
+        cmd.Parameters.Add(new NpgsqlParameter("sayad_middle", NpgsqlDbType.Char) { Value = (object?)book.Sayad?.Middle ?? DBNull.Value });
+        cmd.Parameters.Add(new NpgsqlParameter("sayad_first", NpgsqlDbType.Smallint) { Value = book.Sayad is { } s ? (object)(short)s.FirstSerial : DBNull.Value });
+        cmd.Parameters.AddWithValue("partly_used", book.PartlyUsed);
+        cmd.Parameters.Add(new NpgsqlParameter("serial_digits", NpgsqlDbType.Smallint) { Value = (short)book.SerialDigits });
     }
 
     private static async Task InsertNewSheetsAsync(TransactionContext tx, ChequeBook book, CancellationToken ct)

@@ -30,10 +30,21 @@ public sealed class FakeReference : IReferenceLookup
     {
         ["100000"] = new("100000", "بانكها", true),
         ["100001"] = new("100001", "بانكها", true),
-        ["111078"] = new("111078", "اشخاص وشركتها", true),
+        ["111078"] = new("111078", "اشخاص وشركتها", true, "Staff"),
+        ["600046"] = new("600046", "كاركنان دفتر", true, "Staff"),
     };
 
     public bool Down { get; set; }
+
+    /// <summary>Entries marked in use, as (list, id).</summary>
+    public List<(string List, Guid Id)> MarkedInUse { get; } = [];
+
+    public async Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
+    {
+        await Answer<object>(true);
+        MarkedInUse.Add((list, id));
+        return true;
+    }
 
     public Task<ReferenceEntry?> BankAsync(Guid id, CancellationToken cancellationToken) => Answer(_banks.GetValueOrDefault(id));
 
@@ -41,11 +52,29 @@ public sealed class FakeReference : IReferenceLookup
         Answer(id == Tehran ? new ReferenceEntry(Tehran, "تهران", null, true) : null);
 
     public Task<ReferenceEntry?> CurrencyAsync(string code, CancellationToken cancellationToken) =>
-        Answer(code is "IRR" or "USD" or "EUR" ? new ReferenceEntry(Guid.NewGuid(), code, code, true) : null);
+        Answer(code is "IRR" or "USD" or "EUR" ? new ReferenceEntry(CurrencyIds[code], code, code, true) : null);
+
+    public static readonly IReadOnlyDictionary<string, Guid> CurrencyIds = new Dictionary<string, Guid>
+    {
+        ["IRR"] = Guid.NewGuid(), ["USD"] = Guid.NewGuid(), ["EUR"] = Guid.NewGuid(),
+    };
 
     public Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Answer(_accounts.GetValueOrDefault(code));
 
     public Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken) => Answer(_details.GetValueOrDefault(code));
+
+    public static readonly Guid Expenses = Guid.NewGuid();
+    public static readonly Guid Advances = Guid.NewGuid();
+    public static readonly Guid SalesReceipts = Guid.NewGuid();
+
+    public Task<Treasury.Accounts.Domain.PettyCash.PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
+        Answer(id == Expenses ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, true, true)
+            : id == Advances ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, true, true)
+            : id == SalesReceipts ? new Treasury.Accounts.Domain.PettyCash.PurposeGroupFact(id, false, true)
+            : null);
+
+    public Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
+        Answer(_details.ContainsKey(code) ? $"تفصیل {code}" : null);
 
     private Task<T?> Answer<T>(T? value) =>
         Down ? throw new Treasury.BuildingBlocks.Domain.DomainException("Reference.Unavailable", "down") : Task.FromResult(value);

@@ -10,7 +10,12 @@ namespace Treasury.Accounts.Domain.BankAccounts;
 public sealed record LedgerAccountFact(string Code, bool IsActive, bool IsPostable, IReadOnlySet<string> Detail1Types, IReadOnlySet<string> Detail2Types);
 
 /// <summary>What reference-svc says about a تفصیل account.</summary>
-public sealed record DetailFact(string Code, string? Type, bool IsActive);
+/// <param name="Role">Staff, CostCentre or OrgUnit as reference-svc reads it from the type (owner, 13 Nov 2026); null otherwise.</param>
+public sealed record DetailFact(string Code, string? Type, bool IsActive, string? Role = null)
+{
+    /// <summary>Who may hold a cash desk or a petty cash: staff, cost centres, organisational units (owner's report no. 2, item 3).</summary>
+    public bool MayHold => Role is "Staff" or "CostCentre" or "OrgUnit";
+}
 
 /// <summary>
 /// The accounting side of a bank account (manual section 5): the معین / معین در معین of the account with its تفصیل 1 and 2,
@@ -18,7 +23,45 @@ public sealed record DetailFact(string Code, string? Type, bool IsActive);
 /// </summary>
 public sealed record BankLedger(string AccountCode, string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode);
 
+/// <summary>
+/// Kinds of bank account (owner's report no. 4, item 1): current Qard-al-hasan deposit (سپرده قرض الحسنه جاری, the only kind with
+/// cheque books), savings Qard-al-hasan (قرض الحسنه پس انداز), short-term investment deposit (سپرده سرمایه گذاری کوتاه مدت: ordinary,
+/// 3-month or 6-month) and long-term investment deposit (سپرده سرمایه گذاری بلند مدت).
+/// </summary>
+public enum BankAccountType
+{
+    CurrentQardHasan,
+    SavingsQardHasan,
+    ShortTermDeposit,
+    LongTermDeposit,
+}
+
+/// <summary>Term of a short-term investment deposit (report no. 4, item 1: «عادی»، «سه ماهه»، «شش ماهه»).</summary>
+public enum ShortTermPeriod
+{
+    Ordinary,
+    ThreeMonths,
+    SixMonths,
+}
+
+/// <summary>A company bank card (کارت بانک حقوقی) of the account: 16-digit number and the name on the card (report no. 4, items 2 and 4).</summary>
+public sealed record BankCard(string Number, string HolderName);
+
+public static class BankAccountTypes
+{
+    /// <summary>Only a current Qard-al-hasan account has cheque books (report no. 4, item 1).</summary>
+    public static bool HasCheques(this BankAccountType type) => type == BankAccountType.CurrentQardHasan;
+
+    /// <summary>Current and savings Qard-al-hasan and short-term deposits may have company bank cards.</summary>
+    public static bool MayHaveCards(this BankAccountType type) => type is not BankAccountType.LongTermDeposit;
+
+    /// <summary>Current and savings Qard-al-hasan and long-term deposits may be in a foreign currency.</summary>
+    public static bool MayBeForeign(this BankAccountType type) => type is not BankAccountType.ShortTermDeposit;
+}
+
 /// <summary>Everything the user enters on the bank account form (manual section 5 "معرفی حساب‌های بانکی").</summary>
+/// <param name="AccountType">Chosen at the top of the form (report no. 4, item 2); accounts saved before it are current Qard-al-hasan.</param>
+/// <param name="Cards">The account's company bank cards; one account may have several, e.g. for different petty-cash holders (item 4).</param>
 public sealed record BankAccountData(
     string AccountNumber,
     Guid BankId,
@@ -28,17 +71,42 @@ public sealed record BankAccountData(
     FiscalDate? OpeningDate,
     string CurrencyCode,
     BankLedger Ledger,
-    bool HasCollectionPriority,
-    bool IsFacility);
+    int? CollectionPriority,
+    bool IsFacility,
+    BankAccountType AccountType = BankAccountType.CurrentQardHasan,
+    ShortTermPeriod? Term = null,
+    IReadOnlyList<BankCard>? Cards = null)
+{
+    public const int MaxCards = 50;
+
+    public IReadOnlyList<BankCard> CardList => Cards ?? [];
+
+    /// <summary>Records with a list compare the list's items, not the list object.</summary>
+    public bool Equals(BankAccountData? other) =>
+        other is not null && EqualityContract == other.EqualityContract
+        && (AccountNumber, BankId, BranchName, BranchCode, CityId, OpeningDate, CurrencyCode, Ledger, CollectionPriority, IsFacility, AccountType, Term)
+        == (other.AccountNumber, other.BankId, other.BranchName, other.BranchCode, other.CityId, other.OpeningDate, other.CurrencyCode, other.Ledger,
+            other.CollectionPriority, other.IsFacility, other.AccountType, other.Term)
+        && CardList.SequenceEqual(other.CardList);
+
+    public override int GetHashCode() => HashCode.Combine(AccountNumber, BankId, CurrencyCode, AccountType, Term, CardList.Count);
+}
 
 /// <summary>
 /// One of the company's bank accounts. Sources: new-version manual section 5; Access Form_Bankacc (required number, bank and
 /// معین; number not twice; accounts without a lower level only; Rial by default); MVC BanksController (backup accounts).
 /// A backup account (حساب پشتیبان) belongs to a main current account of the same bank, defined first.
+/// Owner's report of 11 Nov 2026: branch, branch code, city, تفصیل, collection and bounced-cheque accounts are required too
+/// (item 12); collection priority is a number 1–5, 1 the highest (item 15); a backup needs its main account (item 10).
 /// </summary>
 public sealed partial class BankAccount : AggregateRoot<Guid>
 {
     public const string Rial = "IRR";
+
+    /// <summary>Collection priority (اولویت واگذاری): 1 is the highest, 5 the lowest; none for an account not used for collection.</summary>
+    public const int HighestPriority = 1;
+
+    public const int LowestPriority = 5;
 
     private BankAccount(Guid id, BankAccountData data, Guid? mainAccountId)
         : base(id)
@@ -57,14 +125,20 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
 
     public bool IsActive { get; private set; }
 
+    /// <summary>A cheque book, cheque type or cheque names this account (recorded by cashflow-svc); then it is never deleted.</summary>
+    public bool IsInUse { get; private set; }
+
     /// <summary>Comparison key of the account number: digits only, Persian/Arabic digits as 0-9 (Form_Bankacc: "شماره حساب تكراري است").</summary>
     public string NumberKey => NumberKeyOf(Data.AccountNumber);
 
     /// <param name="main">The main account when registering a backup account, as loaded by the use case.</param>
     /// <param name="mainAlreadyHasBackup">Whether another backup account already points to <paramref name="main"/>.</param>
+    /// <param name="isBackup">The user ticked "پشتیبان"; then <paramref name="main"/> is required.</param>
     public static BankAccount Register(
-        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false)
+        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false, bool isBackup = false)
     {
+        // Owner, 11 Nov 2026 (item 10): "ابتدا حسابجاری مربوط به این حساب پشتیبان را تعریف نموده ..." – never saved as an ordinary account.
+        Require(!isBackup || main is not null, "BankAccount.MainAccountRequired", "A backup account needs its main current account, defined first.");
         var clean = Validate(data, ledger);
         if (main is not null)
         {
@@ -73,6 +147,8 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             Require(main.IsActive, "BankAccount.MainAccountInactive", "The main account is inactive.");
             Require(!main.IsBackup, "BankAccount.MainAccountIsBackup", "A backup account cannot be the main account of another one.");
             Require(main.Data.BankId == clean.BankId, "BankAccount.MainAccountOtherBank", "The main account must be at the same bank.");
+            // Owner, 13 Nov 2026: Rial with Rial, a foreign currency with the same foreign currency.
+            Require(main.Data.CurrencyCode == clean.CurrencyCode, "BankAccount.MainAccountOtherCurrency", "A backup account has the currency of its main account.");
             Require(!mainAlreadyHasBackup, "BankAccount.MainAccountHasBackup", "This main account already has a backup account.");
         }
 
@@ -86,6 +162,7 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
     {
         var clean = Validate(data, ledger);
         Require(!IsBackup || clean.BankId == Data.BankId, "BankAccount.MainAccountOtherBank", "A backup account stays at the bank of its main account.");
+        Require(!IsBackup || clean.CurrencyCode == Data.CurrencyCode, "BankAccount.MainAccountOtherCurrency", "A backup account keeps the currency of its main account.");
         if (clean == Data)
         {
             return;
@@ -100,9 +177,33 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
 
     public void Activate() => SetActive(true);
 
-    public static BankAccount Restore(Guid id, BankAccountData data, Guid? mainAccountId, bool isActive, long version)
+    /// <summary>Marks the account as used by another service's data; false when it already was.</summary>
+    public bool MarkInUse()
     {
-        var account = new BankAccount(id, data, mainAccountId) { IsActive = isActive };
+        if (IsInUse)
+        {
+            return false;
+        }
+
+        IsInUse = true;
+        return true;
+    }
+
+    /// <summary>
+    /// Deletes an account typed by mistake (owner's report no. 3, item 1: "حذف در شرایطی قابل انجام است که حساب مربوطه گردش نداشته
+    /// باشد"): only while no cheque book, cheque type or cheque names it, and while no backup account points to it.
+    /// </summary>
+    /// <param name="hasTransactions">The account has a transaction such as an opening balance (owner, 14 Nov 2026).</param>
+    public void Delete(bool hasBackup, bool hasTransactions = false)
+    {
+        Require(!IsInUse && !hasTransactions, "BankAccount.InUse", "Cheque books, cheques or transactions name this account; switch it off instead.");
+        Require(!hasBackup, "BankAccount.HasBackup", "A backup account belongs to this account; delete the backup first.");
+        Raise(new BankAccountDeleted(Id));
+    }
+
+    public static BankAccount Restore(Guid id, BankAccountData data, Guid? mainAccountId, bool isActive, long version, bool isInUse = false)
+    {
+        var account = new BankAccount(id, data, mainAccountId) { IsActive = isActive, IsInUse = isInUse };
         account.SetLoadedVersion(version);
         return account;
     }
@@ -128,8 +229,20 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         var number = PersianText.Clean(data.AccountNumber);
         Require(NumberKeyOf(number).Length > 0, "BankAccount.NumberRequired", "The account number is required."); // "شماره حساب نامشخص است"
         Require(data.BankId != Guid.Empty, "BankAccount.BankRequired", "The bank is required."); // "نام بانك نامشخص است"
+        Require(Clean(data.BranchName) is not null, "BankAccount.BranchNameRequired", "The branch name is required.");
+        Require(Clean(data.BranchCode) is not null, "BankAccount.BranchCodeRequired", "The branch code is required.");
+        Require(data.CityId is { } city && city != Guid.Empty, "BankAccount.CityRequired", "The city is required.");
+        Require(data.CollectionPriority is null or (>= HighestPriority and <= LowestPriority), "BankAccount.CollectionPriorityInvalid",
+            $"The collection priority is a number from {HighestPriority} (highest) to {LowestPriority}.");
         var currency = (data.CurrencyCode ?? string.Empty).Trim().ToUpperInvariant();
         Require(CurrencyPattern().IsMatch(currency), "BankAccount.CurrencyInvalid", "The currency is a three-letter code; the Rial is IRR.");
+
+        // Owner's report no. 4, items 1 and 2: what each kind of account may have.
+        Require(Enum.IsDefined(data.AccountType), "BankAccount.TypeRequired", "Choose the kind of account.");
+        Require(data.AccountType != BankAccountType.ShortTermDeposit || data.Term is { } t && Enum.IsDefined(t), "BankAccount.TermRequired",
+            "A short-term deposit is ordinary, 3-month or 6-month.");
+        Require(currency == Rial || data.AccountType.MayBeForeign(), "BankAccount.CurrencyNotForType", "A short-term deposit is in Rial.");
+        var cards = CheckCards(data.CardList, data.AccountType);
 
         var l = data.Ledger ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account is required.");
         var accountCode = Clean(l.AccountCode) ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account (معین) is required."); // "حساب معين نامشخص است"
@@ -138,20 +251,15 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         Require(d2 is null || d1 is not null, "BankAccount.Detail2WithoutDetail1", "تفصیل دوم needs تفصیل اول.");
 
         var account = Postable(ledger.Account(accountCode), accountCode);
+        Require(d1 is not null, "BankAccount.DetailRequired", "تفصیل اول (usually the bank account's own تفصیل) is required.");
         CheckDetail(1, account.Detail1Types, d1, d1 is null ? null : ledger.Detail(d1), accountCode);
         CheckDetail(2, account.Detail2Types, d2, d2 is null ? null : ledger.Detail(d2), accountCode);
 
-        var collection = Clean(l.CollectionAccountCode);
-        var bounced = Clean(l.BouncedAccountCode);
-        if (collection is not null)
-        {
-            Postable(ledger.Account(collection), collection);
-        }
-
-        if (bounced is not null)
-        {
-            Postable(ledger.Account(bounced), bounced);
-        }
+        // The collection account may be the bank's own account (owner, 11 Nov 2026, item 14); nothing compares them.
+        var collection = Clean(l.CollectionAccountCode) ?? throw new DomainException("BankAccount.CollectionAccountRequired", "The collection account (معین واگذاری) is required.");
+        var bounced = Clean(l.BouncedAccountCode) ?? throw new DomainException("BankAccount.BouncedAccountRequired", "The bounced-cheque account (معین برگشتی) is required.");
+        Postable(ledger.Account(collection), collection);
+        Postable(ledger.Account(bounced), bounced);
 
         return data with
         {
@@ -160,7 +268,51 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             BranchCode = Clean(data.BranchCode),
             CurrencyCode = currency,
             Ledger = new BankLedger(accountCode, d1, d2, collection, bounced),
+            Term = data.AccountType == BankAccountType.ShortTermDeposit ? data.Term : null,
+            Cards = cards,
         };
+    }
+
+    /// <summary>Cards: 16 digits with the Luhn check digit, the name on the card, each number once (report no. 4, items 2 and 4).</summary>
+    private static List<BankCard> CheckCards(IReadOnlyList<BankCard> cards, BankAccountType type)
+    {
+        Require(cards.Count == 0 || type.MayHaveCards(), "BankAccount.CardsNotForType", "A long-term deposit has no bank cards.");
+        Require(cards.Count <= BankAccountData.MaxCards, "BankAccount.TooManyCards", "Too many bank cards on one account.");
+        var clean = new List<BankCard>();
+        foreach (var card in cards)
+        {
+            var number = new string(PersianText.Key(card?.Number).Where(char.IsAsciiDigit).ToArray());
+            Require(IsCardNumber(number), "BankAccount.CardNumberInvalid", "A bank card number has 16 digits with a valid check digit.");
+            var holder = Clean(card!.HolderName);
+            Require(holder is not null, "BankAccount.CardHolderRequired", "Enter the name on the bank card.");
+            Require(clean.All(c => c.Number != number), "BankAccount.CardTwice", $"Card {number} is entered twice.");
+            clean.Add(new BankCard(number, holder!));
+        }
+
+        return clean;
+    }
+
+    /// <summary>Luhn check, as for petty-cash cards.</summary>
+    public static bool IsCardNumber(string digits)
+    {
+        if (digits.Length != 16 || !digits.All(char.IsAsciiDigit))
+        {
+            return false;
+        }
+
+        var sum = 0;
+        for (var i = 0; i < 16; i++)
+        {
+            var d = digits[15 - i] - '0';
+            if (i % 2 == 1)
+            {
+                d = d * 2 > 9 ? (d * 2) - 9 : d * 2;
+            }
+
+            sum += d;
+        }
+
+        return sum % 10 == 0;
     }
 
     private static LedgerAccountFact Postable(LedgerAccountFact? fact, string code)
@@ -217,10 +369,12 @@ public sealed class LedgerFacts(IReadOnlyDictionary<string, LedgerAccountFact> a
 /// <summary>A bank account was registered, edited, switched off or on. Cashflow and posting keep their copies from it.</summary>
 public sealed record BankAccountChanged(
     Guid BankAccountId, string AccountNumber, Guid BankId, string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode,
-    string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode, bool HasCollectionPriority, bool IsActive) : DomainEvent
+    string? Detail1Code, string? Detail2Code, string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsActive) : DomainEvent
 {
     public static BankAccountChanged From(BankAccount a) => new(
         a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode,
         a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code, a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode,
-        a.Data.HasCollectionPriority, a.IsActive);
+        a.Data.CollectionPriority, a.IsActive);
 }
+
+public sealed record BankAccountDeleted(Guid BankAccountId) : DomainEvent;

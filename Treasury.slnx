@@ -27,6 +27,13 @@
     <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure.Postgres/Treasury.Reference.Infrastructure.Postgres.csproj" />
     <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure/Treasury.Reference.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Requests/">
+    <Project Path="src/Services/Requests/Treasury.Requests.Api/Treasury.Requests.Api.csproj" />
+    <Project Path="src/Services/Requests/Treasury.Requests.Application/Treasury.Requests.Application.csproj" />
+    <Project Path="src/Services/Requests/Treasury.Requests.Domain/Treasury.Requests.Domain.csproj" />
+    <Project Path="src/Services/Requests/Treasury.Requests.Infrastructure.Postgres/Treasury.Requests.Infrastructure.Postgres.csproj" />
+    <Project Path="src/Services/Requests/Treasury.Requests.Infrastructure/Treasury.Requests.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Treasury.Accounts.Application.Tests/Treasury.Accounts.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Accounts.Domain.Tests/Treasury.Accounts.Domain.Tests.csproj" />
@@ -39,6 +46,9 @@
     <Project Path="tests/Treasury.Reference.Domain.Tests/Treasury.Reference.Domain.Tests.csproj" />
     <Project Path="tests/Treasury.Reference.Infrastructure.Excel.Tests/Treasury.Reference.Infrastructure.Excel.Tests.csproj" />
     <Project Path="tests/Treasury.Reference.Infrastructure.Postgres.Tests/Treasury.Reference.Infrastructure.Postgres.Tests.csproj" />
+    <Project Path="tests/Treasury.Requests.Application.Tests/Treasury.Requests.Application.Tests.csproj" />
+    <Project Path="tests/Treasury.Requests.Domain.Tests/Treasury.Requests.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.Requests.Infrastructure.Postgres.Tests/Treasury.Requests.Infrastructure.Postgres.Tests.csproj" />
     <Project Path="tests/Treasury.TestShim/Treasury.TestShim.csproj" />
   </Folder>
 </Solution>

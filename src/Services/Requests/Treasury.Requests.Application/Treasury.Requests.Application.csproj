@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Application layer of requests-svc: use cases and ports. Depends only on the domain. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Requests.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Requests.Domain\Treasury.Requests.Domain.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Treasury.BuildingBlocks.Application\Treasury.BuildingBlocks.Application.csproj" />
+  </ItemGroup>
+</Project>

@@ -37,6 +37,11 @@ describe('api client', () => {
     const result = await api.post('/api/x', {})
     expect(result).toEqual({ ok: false, code: 'Instrument.InvalidTransition', status: 422 })
   })
+  it('reads a bare number as the value (the تفصیل count, owner report no. 2)', async () => {
+    const api = createApi({ fetchImpl: (async () => new Response('250', { status: 200 })) as unknown as typeof fetch })
+    expect(await api.get<number>('/x')).toEqual({ ok: true, value: 250, warnings: [] })
+  })
+
   it('reports network failures as a code, not an exception', async () => {
     const api = createApi({ fetchImpl: (async () => { throw new TypeError('offline') }) as unknown as typeof fetch })
     expect(await api.get('/api/x')).toEqual({ ok: false, code: 'Network.Error', status: 0 })

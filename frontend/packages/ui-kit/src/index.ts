@@ -1,3 +1,4 @@
 export * from './format'
 export * from './i18n'
 export * from './api'
+export * from './words'

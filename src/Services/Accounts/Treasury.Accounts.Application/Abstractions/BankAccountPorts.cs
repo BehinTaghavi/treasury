@@ -1,4 +1,6 @@
 using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.Accounts.Domain.CashDesks;
+using Treasury.Accounts.Domain.PettyCash;
 
 namespace Treasury.Accounts.Application.Abstractions;
 
@@ -9,6 +11,9 @@ public interface IBankAccountRepository
     /// <summary>Is the number key (BankAccount.NumberKeyOf) already used by another account? Form_Bankacc: "شماره حساب تكراري است".</summary>
     Task<bool> NumberTakenAsync(string numberKey, Guid? exceptId, CancellationToken cancellationToken);
 
+    /// <summary>Does another account have this bank card (16 digits)?</summary>
+    Task<bool> CardTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken);
+
     /// <summary>Does another account already name <paramref name="mainAccountId"/> as its main account?</summary>
     Task<bool> HasBackupAsync(Guid mainAccountId, Guid? exceptId, CancellationToken cancellationToken);
 
@@ -16,7 +21,38 @@ public interface IBankAccountRepository
 
     Task SaveAsync(BankAccount account, CancellationToken cancellationToken);
 
+    /// <summary>Removes the account (version-checked; refused when it was marked in use meanwhile).</summary>
+    Task DeleteAsync(BankAccount account, CancellationToken cancellationToken);
+
     Task<IReadOnlyList<BankAccount>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+}
+
+public interface ICashDeskRepository
+{
+    Task<CashDesk?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Is the name (CashDesk.NameKey) already used by another cash desk?</summary>
+    Task<bool> NameTakenAsync(string nameKey, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task AddAsync(CashDesk desk, CancellationToken cancellationToken);
+
+    Task SaveAsync(CashDesk desk, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<CashDesk>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+}
+
+public interface IPettyCashRepository
+{
+    Task<PettyCashFund?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Does another petty cash have this holder? (one petty cash per holder)</summary>
+    Task<bool> HolderTakenAsync(string holderDetailCode, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task AddAsync(PettyCashFund fund, CancellationToken cancellationToken);
+
+    Task SaveAsync(PettyCashFund fund, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<PettyCashFund>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 }
 
 /// <summary>An entry of a reference-svc list (bank name, city, currency) as reference-svc returns it.</summary>
@@ -38,4 +74,38 @@ public interface IReferenceLookup
     Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
     Task<DetailFact?> DetailAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>A purpose group of reference-svc; null when unknown.</summary>
+    Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Name of a تفصیل (e.g. the holder of a cash desk); null when unknown.</summary>
+    Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Tells reference-svc that a bank account is about to name this entry (<paramref name="list"/>: banks, cities, currencies),
+    /// so it can no longer be deleted there. Called before the save; false when the entry no longer exists.
+    /// </summary>
+    Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }
+
+/// <summary>Opening balances (موجودی اول دوره) of bank accounts, cash desks and petty cash.</summary>
+public interface IOpeningBalanceRepository
+{
+    Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance?> FindAsync(
+        Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, int fiscalYear, CancellationToken cancellationToken);
+
+    /// <summary>Every entry of years up to and including <paramref name="fiscalYear"/> (for the balance carried to it).</summary>
+    Task<IReadOnlyList<Treasury.Accounts.Domain.OpeningBalances.OpeningBalance>> ListUpToAsync(int fiscalYear, CancellationToken cancellationToken);
+
+    /// <summary>Does the account have any opening balance? Then it has a transaction and is never deleted (owner, 14 Nov 2026).</summary>
+    Task<bool> AnyForAccountAsync(Treasury.Accounts.Domain.OpeningBalances.BalanceAccountKind kind, Guid accountId, CancellationToken cancellationToken);
+
+    Task AddAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+
+    Task SaveAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+
+    Task DeleteAsync(Treasury.Accounts.Domain.OpeningBalances.OpeningBalance balance, CancellationToken cancellationToken);
+}
+
