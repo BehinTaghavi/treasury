@@ -50,27 +50,51 @@ function Invoke-Build {
 }
 
 # A start or update that was interrupted (Docker Desktop restarted, the PC slept) can leave a half-replaced container behind,
-# named like "45d15a55486e_treasury-remote-receipts-1"; the next start then fails with
+# named like "45d15a55486e_treasury-remote-receipts-1", and Docker Desktop on Windows sometimes keeps a removed container's
+# name ("treasury-remote-receipts-1") busy after 'docker compose down'. The next start then fails with
 # "Conflict. The container name ... is already in use". Containers hold no data (the database is in the 'pgdata' volume),
-# so they can be removed and created again.
-function Remove-LeftoverContainers {
+# so every Treasury container can be removed by name and created again.
+function Remove-LeftoverContainers([switch]$All) {
     $ErrorActionPreference = 'Continue'
-    $names = & docker ps -a --format '{{.Names}}' 2> $null | Where-Object { $_ -match '^[0-9a-f]{12}_treasury-' }
+    $pattern = '^[0-9a-f]{12}_treasury-'
+    if ($All) { $pattern = '^([0-9a-f]{12}_)?treasury-' }
+    $names = & docker ps -a --format '{{.Names}}' 2> $null | Where-Object { $_ -match $pattern }
     foreach ($name in $names) {
-        Say "Removing a container left over from an interrupted start: $name"
+        Say "Removing an old container: $name"
         & docker rm -f $name *> $null
     }
 }
 
+# The id in "... is already in use by container "75bb0b38..."": removed by id when its name is no longer listed.
+function Remove-ConflictingContainer([string]$output) {
+    $ErrorActionPreference = 'Continue'
+    foreach ($m in [regex]::Matches($output, 'in use by container \\?"?([0-9a-f]{12,64})')) {
+        $id = $m.Groups[1].Value
+        Say "Removing the container that holds a Treasury name: $($id.Substring(0, 12))"
+        & docker rm -f $id *> $null
+    }
+}
+
 function Start-Containers {
+    # 'Continue' for the whole function: Windows PowerShell 5.1 stops the script when Docker's error output is redirected.
+    $ErrorActionPreference = 'Continue'
     Remove-LeftoverContainers
-    & docker compose -f $compose --env-file $envFile up -d --remove-orphans
-    if ($LASTEXITCODE -eq 0) { return }
-    Write-Host ''
-    Say 'Starting stopped with a problem. Removing the containers (your test data is kept) and trying once more...'
-    & docker compose -f $compose --env-file $envFile down --remove-orphans   # no -v: the data volume stays
-    Remove-LeftoverContainers
-    Invoke-Compose @('up', '-d', '--remove-orphans')
+    $attempts = 4
+    for ($attempt = 1; $attempt -le $attempts; $attempt++) {
+        $lines = New-Object System.Collections.Generic.List[string]
+        & docker compose -f $compose --env-file $envFile up -d --remove-orphans 2>&1 | ForEach-Object { $text = "$_"; $lines.Add($text); Write-Host $text }
+        $exit = $LASTEXITCODE
+        $output = $lines -join "`n"
+        if ($exit -eq 0) { return }
+        if ($attempt -eq $attempts) { break }
+        Write-Host ''
+        Say "Starting stopped with a problem. Removing the old containers (your test data is kept) and trying again ($($attempt + 1) of $attempts)..."
+        & docker compose -f $compose --env-file $envFile down --remove-orphans *> $null   # no -v: the data volume stays
+        Remove-ConflictingContainer $output
+        Remove-LeftoverContainers -All
+        Start-Sleep -Seconds (5 * $attempt)   # gives Docker Desktop time to release the names
+    }
+    Fail "Docker reported a problem (see the lines above). Restart Docker Desktop (right-click its whale icon, Restart) and run Start Treasury again; if it happens again, take a screenshot of this window and send it to Claude."
 }
 
 # Windows PowerShell 5.1 turns a program's error output into a script-stopping error when it is redirected,
