@@ -96,7 +96,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
 {
     private const string Columns =
         "origin_fiscal_year, id, direction, kind, number, bank_name, bank_account_id, cheque_book_id, payment_id, amount, currency, rate_to_rial, " +
-        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version, receipt_id, counterparty_detail_code, details";
+        "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version, receipt_id, counterparty_detail_code, details, " +
+        "collection_account_id";
 
     private static readonly System.Text.Json.JsonSerializerOptions DetailsJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
@@ -134,7 +135,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
                     Version: r.GetInt64(19),
                     ReceiptId: r.IsDBNull(20) ? null : r.GetGuid(20),
                     Details: r.IsDBNull(22) ? null : System.Text.Json.JsonSerializer.Deserialize<ReceivedInstrumentDetails>(r.GetString(22), DetailsJson),
-                    CounterpartyDetailCode: r.IsDBNull(21) ? null : r.GetString(21));
+                    CounterpartyDetailCode: r.IsDBNull(21) ? null : r.GetString(21),
+                    CollectionAccountId: r.IsDBNull(23) ? null : r.GetGuid(23));
             }
         }
 
@@ -190,7 +192,7 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.instrument ({Columns}, amount_rial) VALUES " +
             "(@year, @id, @direction, @kind, @number, @bank, @account, @book, @payment, @amount, @currency, @rate, @issue, @due, @cp, @cpname, @purpose, @destination, @state, 1, " +
-            "@receipt, @cpcode, @details, @rial)"))
+            "@receipt, @cpcode, @details, @collection, @rial)"))
         {
             BindInstrument(cmd, s, instrument.Amount.ToRial());
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -208,11 +210,13 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         var s = InstrumentSnapshot.From(instrument, instrument.Version + 1);
         await using (var cmd = tx.Command(
             "UPDATE cashflow.instrument SET number = @number, cheque_book_id = @book, destination = @destination, state = @state, " +
+            "collection_account_id = @collection, " +
             "version = version + 1, updated_at = now() WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
         {
             cmd.Parameters.AddWithValue("number", (object?)s.Number ?? DBNull.Value);
             cmd.Parameters.AddWithValue("book", (object?)s.ChequeBookId ?? DBNull.Value);
             cmd.Parameters.AddWithValue("destination", (object?)s.Destination ?? DBNull.Value);
+            cmd.Parameters.Add(new NpgsqlParameter("collection", NpgsqlDbType.Uuid) { Value = (object?)s.CollectionAccountId ?? DBNull.Value });
             cmd.Parameters.AddWithValue("state", s.State.ToString());
             cmd.Parameters.AddWithValue("year", s.OriginFiscalYear);
             cmd.Parameters.AddWithValue("id", s.Id);
@@ -276,11 +280,35 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         cmd.Parameters.AddWithValue("state", s.State.ToString());
         cmd.Parameters.AddWithValue("rial", amountRial);
         cmd.Parameters.AddWithValue("receipt", (object?)s.ReceiptId ?? DBNull.Value);
+        cmd.Parameters.Add(new NpgsqlParameter("collection", NpgsqlDbType.Uuid) { Value = (object?)s.CollectionAccountId ?? DBNull.Value });
         cmd.Parameters.AddWithValue("cpcode", (object?)s.CounterpartyDetailCode ?? DBNull.Value);
         cmd.Parameters.Add(new NpgsqlParameter("details", NpgsqlDbType.Jsonb)
         {
             Value = s.Details is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(s.Details, DetailsJson),
         });
+    }
+
+    public async Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+        await using (var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT id FROM cashflow.instrument WHERE direction = 'Received' AND state = @state ORDER BY due_date NULLS LAST, number"))
+        {
+            cmd.Parameters.AddWithValue("state", state.ToString());
+            await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+            while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+            {
+                ids.Add(r.GetGuid(0));
+            }
+        }
+
+        var list = new List<Instrument>();
+        foreach (var id in ids)
+        {
+            list.Add((await GetAsync(id, cancellationToken).ConfigureAwait(false))!);
+        }
+
+        return list;
     }
 
     public async Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken)

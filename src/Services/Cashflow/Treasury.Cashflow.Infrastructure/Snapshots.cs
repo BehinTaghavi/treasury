@@ -33,7 +33,8 @@ public sealed record InstrumentSnapshot(
     long Version,
     Guid? ReceiptId = null,
     ReceivedInstrumentDetails? Details = null,
-    string? CounterpartyDetailCode = null)
+    string? CounterpartyDetailCode = null,
+    Guid? CollectionAccountId = null)
 {
     public static InstrumentSnapshot From(Instrument i, long version) => new(
         i.Id, i.Direction, i.Kind, i.Number, i.BankName, i.BankAccountId, i.ChequeBookId, i.PaymentId,
@@ -41,7 +42,7 @@ public sealed record InstrumentSnapshot(
         i.IssueDate.Value, i.DueDate?.Value, i.Counterparty.Id, i.Counterparty.DisplayName, i.Purpose, i.Destination,
         i.State, i.OriginFiscalYear,
         i.History.Select(h => new HistorySnapshot(h.Action, h.From, h.To, h.Date.Value, h.UserId, h.Reference, h.Note)).ToList(),
-        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode);
+        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode, i.CollectionAccountId);
 
     public Instrument ToDomain() => Instrument.Restore(
         Id, Direction, Kind, Number, BankName, BankAccountId, ChequeBookId, PaymentId,
@@ -49,7 +50,7 @@ public sealed record InstrumentSnapshot(
         new FiscalDate(IssueDate), DueDate is { } d ? new FiscalDate(d) : null,
         new CounterpartyRef(CounterpartyId, CounterpartyName, CounterpartyDetailCode), Purpose, Destination, State, OriginFiscalYear,
         History.Select(h => new InstrumentHistoryEntry(h.Action, h.From, h.To, new FiscalDate(h.Date), h.UserId, h.Reference, h.Note)),
-        Version, ReceiptId, Details);
+        Version, ReceiptId, Details, CollectionAccountId);
 }
 
 /// <summary>Flat, storable form of a receipt. Dates are ISO dates.</summary>

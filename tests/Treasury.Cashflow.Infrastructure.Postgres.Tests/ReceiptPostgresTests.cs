@@ -79,6 +79,23 @@ public sealed class ReceiptPostgresTests : IDisposable
         var note = v.Instruments.Single(i => i.Number == "N" + number);
         Assert.Equal("0123456789", Assert.Single(note.Details!.GuarantorList).NationalCode);
         Assert.Equal(350_000_000m + 20_000_000m, v.TotalRial);
+
+        // Report no. 4, item 9: deposited for collection at a company account, read back with the account.
+        var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new EuroBank());
+        Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque.Id, EuroBank.Id, "1405/08/25", "SLIP-9"), CancellationToken.None)).IsSuccess);
+        var deposited = (await useCases.GetAsync(cheque.Id, CancellationToken.None))!;
+        Assert.Equal(("DepositedForCollection", (Guid?)EuroBank.Id), (deposited.State, deposited.CollectionAccountId));
+        Assert.Contains(await useCases.ListReceivedAsync(InstrumentState.DepositedForCollection, CancellationToken.None), i => i.Id == cheque.Id);
+    }
+
+    private sealed class EuroBank : IBankAccountLookup
+    {
+        public static readonly Guid Id = Guid.NewGuid();
+
+        public Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<BankAccountFact?>(new(id, "EUR-1", true, true, "EUR"));
+
+        public Task MarkInUseAsync(Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class Accounts : IReceiptAccountLookup

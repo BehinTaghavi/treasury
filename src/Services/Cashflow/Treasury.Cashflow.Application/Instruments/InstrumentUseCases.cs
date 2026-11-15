@@ -52,6 +52,9 @@ public sealed record IssueChequeCommand(
     string PayeeName,
     string Purpose);
 
+/// <param name="SlipNumber">Deposit slip number («شماره فیش واگذاری»).</param>
+public sealed record DepositChequeCommand(string IdempotencyKey, Guid InstrumentId, Guid BankAccountId, string Date, string? SlipNumber = null);
+
 public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note);
 
 public sealed record InstrumentView(
@@ -76,7 +79,8 @@ public sealed record InstrumentView(
     decimal? RateToRial = null,
     Guid? ReceiptId = null,
     bool IsPostDated = false,
-    ReceivedInstrumentDetails? Details = null)
+    ReceivedInstrumentDetails? Details = null,
+    Guid? CollectionAccountId = null)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -100,7 +104,8 @@ public sealed record InstrumentView(
         i.Amount.RateToRial,
         i.ReceiptId,
         i.IsPostDated,
-        i.Direction == InstrumentDirection.Received ? i.Details : null);
+        i.Direction == InstrumentDirection.Received ? i.Details : null,
+        i.CollectionAccountId);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -114,7 +119,8 @@ public sealed class InstrumentUseCases(
     IFiscalPeriodPolicy fiscalPeriods,
     IBankBalanceQuery bankBalances,
     IPaymentApprovalQuery paymentApprovals,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IBankAccountLookup bankAccountLookup)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -279,6 +285,34 @@ public sealed class InstrumentUseCases(
         cancellationToken);
 
     /// <summary>Reads run in a unit of work too: the PostgreSQL adapters need its connection (found by the adapter integration tests).</summary>
+    /// <summary>
+    /// Deposits a received cheque at one of our bank accounts for collection (owner's report no. 4, item 9). The account is checked
+    /// with accounts-svc and marked in use; the deposit may be before the due date (rule N2 only stops clearing early).
+    /// </summary>
+    public Task<Result<Guid>> DepositForCollectionAsync(DepositChequeCommand command, CancellationToken cancellationToken) =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
+        {
+            var instrument = await instruments.GetAsync(command.InstrumentId, ct).ConfigureAwait(false);
+            if (instrument is null)
+            {
+                return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
+            }
+
+            var date = FiscalDate.ParseJalali(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            var account = await bankAccountLookup.GetAsync(command.BankAccountId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Instrument.CollectionAccountNotFound", "The bank account is not one of the company's bank accounts.");
+            instrument.DepositForCollection(new CollectionAccount(account.Id, account.AccountNumber, account.CurrencyCode, account.IsActive), date, currentUser.UserId, command.SlipNumber);
+            await bankAccountLookup.MarkInUseAsync(account.Id, ct).ConfigureAwait(false);
+            await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(instrument.Id);
+        }, id => id.ToString(), Guid.Parse, cancellationToken);
+
+    /// <summary>Received cheques in a state, by due date: in the cash desk (to deposit) or at the bank (to record collected or bounced).</summary>
+    public Task<IReadOnlyList<InstrumentView>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync<IReadOnlyList<InstrumentView>>(async ct =>
+            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(InstrumentView.From).ToList(), cancellationToken);
+
     public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>
         {

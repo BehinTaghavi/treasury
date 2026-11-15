@@ -219,3 +219,33 @@ public sealed class ReceivedInstrumentDetailsTests
         Assert.NotEqual(CounterpartyRef.ForDetail("200015", "الف").Id, CounterpartyRef.ForDetail("200016", "الف").Id);
     }
 }
+
+/// <summary>Owner's report no. 4, item 9: a cheque goes from the cash desk to one of our bank accounts for collection.</summary>
+public sealed class DepositForCollectionTests
+{
+    private static readonly CollectionAccount Mellat = new(Guid.NewGuid(), "0202-3572", "IRR", true);
+
+    [Fact]
+    public void The_cheque_is_at_the_bank_account_with_its_slip_number()
+    {
+        var cheque = ReceivedCheque();
+        cheque.DepositForCollection(Mellat, D("1405/08/05"), User, " 4455 ");
+        Assert.Equal((InstrumentState.DepositedForCollection, (Guid?)Mellat.Id, "0202-3572"), (cheque.State, cheque.CollectionAccountId, cheque.Destination));
+        Assert.Equal("4455", cheque.History[^1].Reference);
+        Assert.Contains(InstrumentAction.RecordCleared, cheque.AllowedActions());
+    }
+
+    [Fact]
+    public void Only_at_a_switched_on_account_in_the_cheque_currency()
+    {
+        Assert.Equal("Instrument.CollectionAccountInactive", Assert.Throws<DomainException>(() =>
+            ReceivedCheque().DepositForCollection(Mellat with { IsActive = false }, D("1405/08/05"), User)).Code);
+        Assert.Equal("Instrument.CollectionAccountCurrency", Assert.Throws<DomainException>(() =>
+            ReceivedCheque().DepositForCollection(Mellat with { CurrencyCode = "USD" }, D("1405/08/05"), User)).Code);
+    }
+
+    [Fact]
+    public void A_guarantee_cheque_is_not_deposited() =>
+        Assert.Equal("Instrument.KindNotAllowedForAction", Assert.Throws<DomainException>(() =>
+            ReceivedCheque(InstrumentKind.GuaranteeCheque, due: null).DepositForCollection(Mellat, D("1405/08/05"), User)).Code);
+}

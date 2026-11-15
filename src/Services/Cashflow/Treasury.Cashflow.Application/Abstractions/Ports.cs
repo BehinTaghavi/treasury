@@ -19,6 +19,9 @@ public interface IInstrumentRepository
     /// <summary>Saves changes and pending events. Throws <see cref="ConcurrencyConflictException"/> if someone else saved first.</summary>
     Task SaveAsync(Instrument instrument, CancellationToken cancellationToken);
 
+    /// <summary>Received instruments in a state (e.g. in the cash desk, at the bank), by due date.</summary>
+    Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken);
+
     /// <summary>The cheques and notes received on one receipt, in the order they were entered.</summary>
     Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken);
 }
@@ -105,7 +108,7 @@ public interface IChequeFormatRepository
 
 /// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
 /// <param name="HasCheques">The kind of account has cheque books: current Qard-al-hasan only (owner's report no. 4, item 1).</param>
-public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true);
+public sealed record BankAccountFact(Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true, string CurrencyCode = "IRR");
 
 /// <summary>Answered by accounts-svc. Failure to reach it: DomainException "Accounts.Unavailable".</summary>
 public interface IBankAccountLookup

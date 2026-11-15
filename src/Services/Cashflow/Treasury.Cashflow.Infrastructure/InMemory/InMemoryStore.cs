@@ -203,6 +203,18 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            IReadOnlyList<Instrument> list = db.Instruments.Values
+                .Where(s => s.Direction == InstrumentDirection.Received && s.State == state)
+                .OrderBy(s => s.DueDate ?? DateOnly.MaxValue).ThenBy(s => s.Number, StringComparer.Ordinal)
+                .Select(s => s.ToDomain()).ToList();
+            return Task.FromResult(list);
+        }
+    }
+
     public Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken)
     {
         lock (db.Gate)

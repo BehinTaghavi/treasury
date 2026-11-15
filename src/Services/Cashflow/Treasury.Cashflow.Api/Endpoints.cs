@@ -14,6 +14,8 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 
 public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference);
 
+public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
+
 public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool PartlyUsed = false, int? SerialDigits = null);
 
 public sealed record ChequeBookCorrection(string Serial, long FirstSheet, long LastSheet, long Version, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool? PartlyUsed = null, int? SerialDigits = null);
@@ -54,6 +56,14 @@ public static class Endpoints
             ToHttp(await useCases.ReceiveAsync(
                 new ReceiveInstrumentCommand(Key(http), r.Kind, r.Number, r.BankName, r.Amount, r.ReceivedOn, r.DueDate, r.DrawerId, r.DrawerName, r.Purpose), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/instruments/{id}"));
+
+        // Report no. 4, item 9: received cheques by state, and depositing one at a company bank account for collection.
+        api.MapGet("/instruments/received", async (InstrumentState state, InstrumentUseCases useCases, CancellationToken ct) =>
+            Results.Ok(await useCases.ListReceivedAsync(state, ct).ConfigureAwait(false)));
+
+        api.MapPost("/instruments/{id:guid}/deposit", async (Guid id, DepositRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.DepositForCollectionAsync(new DepositChequeCommand(Key(http), id, r.BankAccountId, r.Date, r.SlipNumber), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/instruments/{id}"));
 
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(

@@ -15,6 +15,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     private readonly InstrumentUseCases _useCases;
     private readonly ChequeBookUseCases _books;
     private readonly Guid _account = Guid.NewGuid();
+    private readonly FakeBankAccounts _bankAccounts = new();
 
     public InstrumentUseCaseTests()
     {
@@ -26,8 +27,27 @@ public sealed class InstrumentUseCaseTests : IDisposable
             _policies,
             _policies,
             _policies,
-            new FixedUser("clerk-1"));
+            new FixedUser("clerk-1"),
+            _bankAccounts);
         _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), new FakeBankAccounts(), new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
+    }
+
+    [Fact]
+    public async Task A_cheque_in_the_cash_desk_is_deposited_at_a_company_account_report_4_item_9()
+    {
+        var id = (await _useCases.ReceiveAsync(Receive(Guid.NewGuid().ToString(), "770001"), CancellationToken.None)).Value;
+        Assert.Contains(await _useCases.ListReceivedAsync(InstrumentState.InCashDesk, CancellationToken.None), i => i.Id == id);
+        Assert.Equal("Instrument.CollectionAccountNotFound",
+            (await _useCases.DepositForCollectionAsync(new(Guid.NewGuid().ToString(), id, FakeBankAccounts.Unknown, "1405/08/05"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.CollectionAccountInactive",
+            (await _useCases.DepositForCollectionAsync(new(Guid.NewGuid().ToString(), id, FakeBankAccounts.Closed, "1405/08/05"), CancellationToken.None)).ErrorCode);
+        var bank = Guid.NewGuid();
+        Assert.True((await _useCases.DepositForCollectionAsync(new(Guid.NewGuid().ToString(), id, bank, "1405/08/05", "SLIP-1"), CancellationToken.None)).IsSuccess);
+        var v = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("DepositedForCollection", (Guid?)bank), (v.State, v.CollectionAccountId));
+        Assert.Contains(bank, _bankAccounts.InUse);
+        Assert.DoesNotContain(await _useCases.ListReceivedAsync(InstrumentState.InCashDesk, CancellationToken.None), i => i.Id == id);
+        Assert.Contains(await _useCases.ListReceivedAsync(InstrumentState.DepositedForCollection, CancellationToken.None), i => i.Id == id);
     }
 
     public void Dispose() => _db.Dispose();

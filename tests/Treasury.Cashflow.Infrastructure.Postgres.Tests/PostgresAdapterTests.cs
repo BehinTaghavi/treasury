@@ -41,7 +41,8 @@ public sealed class PostgresAdapterTests : IDisposable
             _policies,
             _policies,
             _policies,
-            new FixedUser("clerk-1"));
+            new FixedUser("clerk-1"),
+            new AnyBankAccount());
         _books = new ChequeBookUseCases(_unitOfWork, new PostgresChequeBookRepository(), new AnyBankAccount(), new PostgresIdempotencyStore(_dataSource), new PostgresChequeFormatRepository());
     }
 

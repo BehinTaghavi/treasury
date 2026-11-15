@@ -7,6 +7,7 @@ import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
 import ReceiptForm from './ReceiptForm.vue'
 import ReceiptList from './ReceiptList.vue'
+import Collection from './Collection.vue'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -18,6 +19,8 @@ const tabs = [
   { id: 'Cash', title: ['دریافت نقدی', 'Cash'] },
   { id: 'BankDeposit', title: ['واریز به حساب / کارتخوان', 'Bank deposit / POS'] },
   { id: 'list', title: ['فهرست دریافت‌ها', 'Receipts list'] },
+  // Owner's report no. 4, item 9: the next step of a received cheque.
+  { id: 'collection', title: ['واگذاری و وصول چک', 'Deposit and collection'] },
 ] as const
 type Tab = (typeof tabs)[number]['id']
 const tab = ref<Tab>('Instruments')
@@ -38,8 +41,9 @@ const hints: Record<string, [string, string]> = {
         {{ fa ? x.title[0] : x.title[1] }}
       </button>
     </nav>
-    <p v-if="tab !== 'list'" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
-    <ReceiptList v-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
+    <p v-if="tab !== 'list' && tab !== 'collection'" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
+    <Collection v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+    <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
     <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" />
   </section>
 </template>

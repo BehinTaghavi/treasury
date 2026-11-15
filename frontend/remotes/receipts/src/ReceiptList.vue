@@ -47,7 +47,8 @@ const instrumentKinds: Record<string, [string, string]> = {
   PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
 }
 const stateNames: Record<string, [string, string]> = {
-  InCashDesk: ['نزد صندوق', 'In cash desk'], DepositedForCollection: ['واگذار جهت وصول', 'Sent for collection'], Cleared: ['وصول شده', 'Collected'],
+  // Owner's report no. 4, item 9: «در جریان وصول نزد صندوق» → «در جریان وصول نزد بانک».
+  InCashDesk: ['در جریان وصول نزد صندوق', 'In the cash desk'], DepositedForCollection: ['در جریان وصول نزد بانک', 'At the bank for collection'], Cleared: ['وصول شده', 'Collected'],
   Bounced: ['برگشت شده', 'Bounced'], ReturnedToIssuer: ['عودت شده', 'Returned'], Endorsed: ['واگذار به سایرین', 'Endorsed'],
 }
 const actionNames: Record<string, [string, string]> = {
@@ -230,7 +231,7 @@ onMounted(async () => { await L.load(); await load() })
                 <td class="num">{{ money(i.amountInRial) }}</td>
                 <td>{{ name(stateNames, i.state) }}</td>
                 <td>
-                  <button v-for="a in i.allowedActions" :key="a" type="button" class="tr-link"
+                  <button v-for="a in i.allowedActions.filter(x => x !== 'DepositForCollection')" :key="a" type="button" class="tr-link"
                           @click="pending = { id: i.id, action: a, date: todayJalali(), destination: '', note: '' }">{{ name(actionNames, a) }}</button>
                 </td>
               </tr>

@@ -31,6 +31,9 @@ public sealed record CounterpartyRef(Guid Id, string DisplayName, string? Detail
     }
 }
 
+/// <summary>One of our bank accounts as accounts-svc describes it when a cheque is deposited there for collection.</summary>
+public sealed record CollectionAccount(Guid Id, string Title, string CurrencyCode, bool IsActive);
+
 /// <summary>One step in the instrument's life. Replaces the old fixed columns D1–D5 / G1–G5 with a full history.</summary>
 public sealed record InstrumentHistoryEntry(
     InstrumentAction Action,
@@ -116,6 +119,9 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>Collection account (received cheques sent to a bank) or endorsee (received cheques given to others).</summary>
     public string? Destination { get; private set; }
+
+    /// <summary>Received cheques deposited for collection: the company bank account they were deposited at (report no. 4, item 9).</summary>
+    public Guid? CollectionAccountId { get; private set; }
 
     public InstrumentState State { get; private set; }
 
@@ -219,6 +225,24 @@ public sealed class Instrument : AggregateRoot<Guid>
         return instrument;
     }
 
+    /// <summary>
+    /// The cheque leaves the cash desk («در جریان وصول نزد صندوق») for one of our bank accounts («در جریان وصول نزد بانک»), owner's
+    /// report no. 4, item 9; old form D_Check_Vag_m (account and deposit slip «شماره فیش واگذاری»). The account must be switched on and
+    /// in the cheque's currency.
+    /// </summary>
+    public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
+    {
+        ArgumentNullException.ThrowIfNull(account);
+        Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
+        Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
+            "The cheque is deposited at an account in its own currency.");
+        Apply(InstrumentAction.DepositForCollection, date, userId, string.IsNullOrWhiteSpace(slipNumber) ? null : slipNumber.Trim(), null, () =>
+        {
+            Destination = account.Title.Trim();
+            CollectionAccountId = account.Id;
+        });
+    }
+
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
@@ -307,7 +331,8 @@ public sealed class Instrument : AggregateRoot<Guid>
         IEnumerable<InstrumentHistoryEntry> history,
         long version,
         Guid? receiptId = null,
-        ReceivedInstrumentDetails? details = null)
+        ReceivedInstrumentDetails? details = null,
+        Guid? collectionAccountId = null)
     {
         var historyList = history.ToList();
         var instrument = new Instrument(id, direction, kind, amount, issueDate, dueDate, counterparty, purpose, bankName)
@@ -322,6 +347,7 @@ public sealed class Instrument : AggregateRoot<Guid>
             IsMatured = historyList.Any(h => h.Action == InstrumentAction.RecordMatured),
             ReceiptId = receiptId,
             Details = details ?? ReceivedInstrumentDetails.None,
+            CollectionAccountId = collectionAccountId,
         };
         instrument._history.AddRange(historyList);
         instrument.SetLoadedVersion(version);
