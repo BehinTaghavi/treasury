@@ -34,3 +34,4 @@ Update this file when a task finishes (what is done, what is next). Months count
 | 2026-11-10 | Basic information step 1: `reference-svc` (currencies, country/province/city, bank names with default lists), Basic Information micro-frontend; next: bank accounts (waits for the owner's ledger-account Excel) |
 | 2026-11-10 | Owner's review of the receipts screen: main menu reordered, rule N2 (no clearing before the due date); basic information planned first |
 | 2026-11-10 | Test server on the owner's Windows PC (double-click scripts, guide); fixed: the system could not restart after a stop |
+| 2026-11-15 | Reviewer's guide in Farsi (`docs/reviewer-guide.fa.md`): build and run any version (`main` or a pull request) with only Git and Docker; every command run from a fresh clone on Linux |

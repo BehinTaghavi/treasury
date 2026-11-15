@@ -49,5 +49,5 @@ Offline mode exists because some workspaces cannot reach NuGet: a small shim (`t
 - `tools/migration` — old data → new schema, with reconciliation reports.
 - `frontend/shell`, `frontend/remotes/*`, `frontend/packages/ui-kit` — UI.
 - `deploy` — Docker Compose for one client's server (compact profile).
-- `docs` — `plan.md` (phases, what is done/next), `decisions.md`, `assessment.md` (+ `.fa.md`), architecture, ADRs, domain notes, open questions.
+- `docs` — `plan.md` (phases, what is done/next), `decisions.md`, `assessment.md` (+ `.fa.md`), architecture, ADRs, domain notes, open questions. Two hand-run guides follow `deploy/` and must be updated in the same pull request when it changes (new service, new `.env` variable, new port or screen): `test-server-windows.md` (owner, double-click) and `reviewer-guide.fa.md` (reviewer, Farsi, Git + Docker only).
 - `legacy` — old Access program (VBA, queries), MVC source, recovered stored procedures, schema, user manuals; passwords masked.
