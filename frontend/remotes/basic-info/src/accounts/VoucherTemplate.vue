@@ -38,6 +38,10 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['طرف حساب انتظامی', 'Guarantee counterpart'],
     use: ['بستانکار هنگام دریافت چک تضمینی', 'Credited when a guarantee cheque is received'],
   },
+  BadDebts: {
+    title: ['مطالبات سوخت شده', 'Bad debts written off'],
+    use: ['بدهکار هنگام ابطال چک دریافتی به دستور مدیریت؛ تفصیل: پرداخت کننده', "Debited when a received cheque is cancelled by management's order; detail: the payer"],
+  },
 }
 
 const rows = ref<Row[]>([])

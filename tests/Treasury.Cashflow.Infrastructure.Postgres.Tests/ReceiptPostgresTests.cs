@@ -118,6 +118,37 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Null((await vouchers.GetTemplateAsync(CancellationToken.None)).Single(a => a.Account == "ChequesInCashDesk").Code);
     }
 
+    [Fact]
+    public async Task Steps_of_item_14_keep_their_details_and_a_replacement_names_the_old_cheque()
+    {
+        var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new BankAccounts());
+        var number = Guid.NewGuid().ToString("N")[..8];
+        var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
+            [new(InstrumentKind.OrdinaryCheque, number, "1405/09/01", new MoneyInput(9_000_000), Bank, SayadId: "1234567890123456")]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var cheque = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments![0].Id;
+        var account = Guid.NewGuid();
+        Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque, account, "1405/08/25", "F-1"), CancellationToken.None)).IsSuccess);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28"), CancellationToken.None)).IsSuccess);
+        var view = (await useCases.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("ReturnedFromBank", (Guid?)account, (Guid?)account), (view.State, view.History[1].Details!.AccountId, view.History[2].Details!.AccountId));
+
+        var replace = await _receipts.ReplaceAsync(new(Key(), cheque, Header() with { Date = "1405/08/29" },
+            [new(InstrumentKind.OrdinaryCheque, "N" + number, "1405/10/01", new MoneyInput(9_500_000), Bank, SayadId: "6543210987654321")]), CancellationToken.None);
+        Assert.True(replace.IsSuccess, replace.ErrorCode);
+        var receipt = (await _receipts.GetAsync(replace.Value, CancellationToken.None))!;
+        Assert.Equal((Guid?)cheque, receipt.ReplacedInstrumentId);
+        view = (await useCases.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("Replaced", (Guid?)replace.Value), (view.State, view.History[^1].Details!.ReceiptId));
+
+        var fresh = receipt.Instruments![0].Id;
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), fresh, InstrumentAction.Cancel, "1405/08/30", Note: "سوخت", Reference: "م-1", DocumentDate: "1405/08/29"),
+            CancellationToken.None)).IsSuccess);
+        view = (await useCases.GetAsync(fresh, CancellationToken.None))!;
+        Assert.Equal(("Cancelled", "م-1", "1405/08/29"), (view.State, view.History[^1].Reference, view.History[^1].Details!.DocumentDate));
+    }
+
     private sealed class EuroBank : IBankAccountLookup
     {
         public static readonly Guid Id = Guid.NewGuid();

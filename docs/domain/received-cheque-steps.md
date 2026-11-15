@@ -1,4 +1,4 @@
-# Received cheques after receipt: steps, confirmation and vouchers (proposal)
+# Received cheques after receipt: steps, confirmation and vouchers
 
 > Farsi version: [received-cheque-steps.fa.md](received-cheque-steps.fa.md). Keep both in step when either changes.
 
@@ -10,8 +10,11 @@ number and date, (f) cancellation in any state by management's order, done by th
 company's debts, (h) return of an endorsed cheque. The old program had one form per step (manual: «ثبت وصول / برگشت / عودت
 چک‌های واگذاری», «خرج چک‌های دریافتی», «عودت چک نزد صندوق», «ابطال»).
 
-Status: **proposal, waiting for the owner's answers to Q30–Q33 and Q35** (Q34 answered) (`open-questions.md`). Steps (a) and (b) and the bounce without its
-notice number are already built.
+Status: **built** (15 Nov 2026) with the owner's answers to Q30–Q35 (`open-questions.md`): cancellation by the treasurer with
+management's order number and date (Q30); replacement cheques may differ in amount and number (Q31); endorsement to any تفصیل with the
+Sayad tracking number (Q32); a cheque back from the bank can be deposited again or get its bounce notice (Q33); «اسناد واخواست شده»
+(Q34); one voucher per cheque (Q35). Open: whether an endorsement must pay an approved payment request (Q36). Not built yet: undoing an
+unconfirmed step.
 
 ## 1. Mechanism
 
@@ -22,11 +25,9 @@ notice number are already built.
    A step can only follow the allowed order (table below); its date is not before the previous step (rule N1).
 3. **Confirming:** each step makes its **voucher**, shown as a draft under the step. The treasurer checks it (for "collected":
    against the bank statement) and presses **«تایید سند»**. The confirmed voucher is kept unchanged and later sent to the
-   accounting system (Phase F). An unconfirmed step can be undone («برگشت از آخرین عملیات») by the treasurer; a confirmed one only
-   by a new step.
-4. **Cancellation** (f) needs management's approval: the treasurer records **«درخواست ابطال»** with the reason; a manager presses
-   **«تایید ابطال»**; only then the cheque becomes «ابطال شده» and its voucher is made (Q30). Until login and roles exist anyone can
-   approve; then only the roles the owner names.
+   accounting system (Phase F).
+4. **Cancellation** (f): the treasurer cancels the cheque and types the **number and date of management's order** and the reason
+   (answer to Q30); the order cannot be dated after the cancellation.
 5. **A cheque card («کارت چک»):** opening a cheque shows its whole history, its latest state and every voucher with its state.
 
 ## 2. States and allowed steps
@@ -54,17 +55,18 @@ of the company bank account.
 | (c) returned to the company | date, bank's note | «اسناد نزد صندوق» · payer | «چک‌های در جریان وصول» · bank | owner's table «عودت چک واگذاری توسط بانک» |
 | (e) bounced | **bounce notice no. and date** (required), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
 | (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» · payer | Q31 |
-| (f) cancelled | management's approval, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
-| (g) endorsed | endorsee (ذینفع), payment purpose group and purpose, optional payment request, Sayad transfer tracking no. | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
+| (f) cancelled | management's order no. and date, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
+| (g) endorsed | receiver (any تفصیل), payment purpose group and purpose, Sayad transfer tracking no. (required) | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
 
-One voucher per step and cheque today; one voucher per slip or per operation if the owner prefers (Q35).
+One voucher per step and cheque (answer to Q35), also when several cheques are deposited on one slip.
 
 ## 4. What changes in the code (for the reviewer)
 
-- `InstrumentLifecycle`: new states `ReturnedFromBank`, `Replaced`, `Cancelled` for received cheques; new actions
-  `ReturnFromBank`, `Replace`, `RequestCancel`/`ApproveCancel`, `RecordEndorsementReturned`; the migration copy
-  (`legacy_mapping.py`) and `instrument-lifecycle.md` follow.
+- `InstrumentLifecycle`: new states `ReturnedFromBank`, `Replaced` and `Cancelled` for received cheques; new actions
+  `ReturnFromBank`, `Replace`, `RecordEndorsementReturned`, and `Cancel` for received cheques (`Instrument.CancelReceived`); the
+  migration copy (`legacy_mapping.py`) and `instrument-lifecycle.md` follow. `Bounced` and `Endorsed` are no longer final.
+- Schema 031: `instrument_event.details` (jsonb), `receipt.replaced_instrument_id`, the new states and the fixed account `BadDebts`.
 - The history entry keeps the bank account of each deposit (a cheque can be deposited again at another account), so every step's
   voucher keeps its own bank.
 - Replacement saves the old cheque and the new cheque(s) with a cheque receipt in one transaction (as receipts already do, ADR 0002

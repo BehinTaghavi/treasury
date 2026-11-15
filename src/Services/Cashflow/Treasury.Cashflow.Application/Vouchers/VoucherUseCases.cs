@@ -156,12 +156,22 @@ public sealed class VoucherUseCases(
             side = new LedgerSide(fact?.LedgerAccountCode, fact?.DetailCode);
         }
 
+        Replacement? replacement = null;
+        if (receipt.ReplacedInstrumentId is { } oldId && await instruments.GetAsync(oldId, ct).ConfigureAwait(false) is { } old)
+        {
+            var step = old.History.LastOrDefault(h => h.Action == InstrumentAction.Replace && h.Details?.ReceiptId == receipt.Id);
+            replacement = new Replacement(old, step?.From ?? InstrumentState.InCashDesk);
+        }
+
         var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
         var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return ReceiptVouchers.ForReceipt(receipt, lines, side, group?.LedgerAccountCode, template);
+        return ReceiptVouchers.ForReceipt(receipt, lines, side, group?.LedgerAccountCode, template, replacement);
     }
 
-    /// <summary>Null for steps without a voucher here (the receipt step is in the receipt's voucher).</summary>
+    /// <summary>
+    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher). Each step uses the bank account it
+    /// recorded (a cheque returned from one bank may be deposited at another); steps recorded before item 14 use the cheque's last account.
+    /// </summary>
     private async Task<Voucher?> ComputeStepAsync(Instrument cheque, int step, CancellationToken ct)
     {
         if (cheque.Direction != InstrumentDirection.Received || step < 1 || step > cheque.History.Count)
@@ -170,21 +180,32 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is not (InstrumentAction.DepositForCollection or InstrumentAction.RecordCleared or InstrumentAction.RecordBounced))
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.ReturnToIssuer)
         {
             return null;
         }
 
-        var bank = cheque.CollectionAccountId is { } id && await bankAccounts.GetAsync(id, ct).ConfigureAwait(false) is { } fact
-            ? new LedgerSide(fact.LedgerAccountCode, fact.Detail1Code)
-            : new LedgerSide(null, null);
-        var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return entry.Action switch
+        var bank = new LedgerSide(null, null);
+        if ((entry.Details?.AccountId ?? cheque.CollectionAccountId) is { } id && await bankAccounts.GetAsync(id, ct).ConfigureAwait(false) is { } fact)
         {
-            InstrumentAction.DepositForCollection => ReceiptVouchers.ForDeposit(cheque, bank, entry.Date, template),
-            InstrumentAction.RecordCleared => ReceiptVouchers.ForCleared(cheque, bank, entry.Date, template),
-            _ => ReceiptVouchers.ForBounced(cheque, bank, entry.Date, template),
+            bank = new LedgerSide(fact.LedgerAccountCode, fact.Detail1Code);
+        }
+
+        LedgerSide? endorsement = null;
+        var endorsed = entry.Action switch
+        {
+            InstrumentAction.Endorse => entry,
+            InstrumentAction.RecordEndorsementReturned => cheque.History.Take(step - 1).LastOrDefault(h => h.Action == InstrumentAction.Endorse),
+            _ => null,
         };
+        if (endorsed?.Details is { PurposeGroupId: { } groupId } d)
+        {
+            var group = await reference.PurposeGroupAsync(groupId, ct).ConfigureAwait(false);
+            endorsement = new LedgerSide(group?.LedgerAccountCode, d.PartyDetailCode);
+        }
+
+        var template = await templates.GetAsync(ct).ConfigureAwait(false);
+        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template);
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

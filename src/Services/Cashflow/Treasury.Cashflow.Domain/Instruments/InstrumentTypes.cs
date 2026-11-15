@@ -32,7 +32,9 @@ public enum InstrumentState
     Cleared,                 // [13] وصول شده
     Bounced,                 // [14] برگشت شده
     ReturnedToIssuer,        // [15] عودت شده
-    Endorsed,                // [16] واگذار به سایرین
+    Endorsed,                // [16] واگذار به سایرین (خرج شده)
+    ReturnedFromBank,        // عودت شده از بانک: back in the cash desk, not collected (owner's item 14 (c))
+    Replaced,                // تعویض شده: replaced by new cheques of the same payer (owner's item 14 (d))
 
     // Issued side
     BeingIssued,             // [20] در جریان صدور
@@ -59,6 +61,9 @@ public enum InstrumentAction
     RecordMatured,
     RecordPaidByBank,
     RecordBouncedAtBank,
+    ReturnFromBank,
+    Replace,
+    RecordEndorsementReturned,
 }
 
 public static class InstrumentKindRules

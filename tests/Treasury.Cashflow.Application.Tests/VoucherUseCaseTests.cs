@@ -155,6 +155,85 @@ public sealed class VoucherUseCaseTests : IDisposable
         Assert.Equal("Instrument.NotFound", (await _vouchers.ConfirmChequeVoucherAsync(Key(), Guid.NewGuid(), 2, CancellationToken.None)).ErrorCode);
     }
 
+    private async Task<Guid> ChequeOf(Guid receiptId) => (await _receipts.GetAsync(receiptId, CancellationToken.None))!.Instruments![0].Id;
+
+    [Fact]
+    public async Task A_cheque_returned_by_the_bank_is_replaced_by_two_cheques_on_a_receipt_of_its_own_item_14()
+    {
+        await SetTemplate();
+        var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28", Note: "امضا ناقص"), CancellationToken.None)).IsSuccess);
+
+        ReceivedInstrumentInput Line(string number, decimal amount) =>
+            new(InstrumentKind.OrdinaryCheque, number, "1405/10/15", new MoneyInput(amount), FakeReceiptReference.Melli, SayadId: "6543210987654321");
+        var header = new ReceiptHeaderInput("1405/08/29", "200015", FakeReceiptReference.SalesGroup, "تعویض چک 445566");
+        var preview = await _receipts.PreviewReplacementAsync(new("preview", cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None);
+        Assert.True(preview.IsSuccess, preview.ErrorCode);
+        Assert.Equal(("تعویض چک", 4), (preview.Value!.Operation, preview.Value.Lines.Count));
+
+        var other = new ReceiptHeaderInput("1405/08/29", "200016", FakeReceiptReference.SalesGroup, "تعویض");
+        Assert.Equal("Receipt.ReplacementPayerDiffers", (await _receipts.ReplaceAsync(new(Key(), cheque, other, [Line("903", 1)]), CancellationToken.None)).ErrorCode);
+
+        var r = await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var receipt = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(((Guid?)cheque, 2, 2), (receipt.ReplacedInstrumentId, receipt.Instruments!.Count, receipt.Number));
+        Assert.Equal("Replaced", (await _instruments.GetAsync(cheque, CancellationToken.None))!.State);
+
+        var v = (await _vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal([(true, "1201"), (true, "1201"), (false, "1201"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.True(v.IsComplete);
+        Assert.Equal([2, 3], (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None)).Select(x => x.Step));
+        Assert.Equal("Instrument.InvalidTransition", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task An_endorsement_pays_any_tafsil_with_a_payment_group_and_the_Sayad_tracking_number_Q32()
+    {
+        await SetTemplate();
+        var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.Equal("Instrument.ActionNotSupportedHere",
+            (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.Endorse, "1405/08/24", "پیمانکار"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.EndorsementGroupNotForPayments", (await _receipts.EndorseAsync(
+            new(Key(), cheque, "1405/08/24", "300001", FakeReceiptReference.SalesGroup, "خرید", "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.EndorseeRequired", (await _receipts.EndorseAsync(
+            new(Key(), cheque, "1405/08/24", "999999", FakeReceiptReference.PaymentGroup, "خرید", "SY-1"), CancellationToken.None)).ErrorCode);
+
+        // «300001» is staff: not a payer of receipts, but any تفصیل may receive an endorsed cheque.
+        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", "300001", FakeReceiptReference.PaymentGroup, "خرید مواد", "SY-1"), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
+        Assert.Equal([(true, "2101", "300001"), (false, "1201", "200015")], steps.Single().Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordEndorsementReturned, "1405/10/02", Reference: "BN-9"), CancellationToken.None)).IsSuccess);
+        steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
+        Assert.Equal([(true, "1203", "200015"), (false, "2101", "300001")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+    }
+
+    [Fact]
+    public async Task A_bounce_needs_its_notice_and_a_cancellation_managements_order_Q30()
+    {
+        await SetTemplate();
+        var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Instrument.BounceNoticeRequired",
+            (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordBounced, "1405/10/02", Note: "کسری"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordBounced, "1405/10/02", Note: "کسری", Reference: "BN-1"), CancellationToken.None)).IsSuccess);
+
+        Assert.Equal("Instrument.CancelOrderRequired",
+            (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.Cancel, "1405/10/20", Note: "سوخت"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _instruments.ChangeStateAsync(
+            new(Key(), cheque, InstrumentAction.Cancel, "1405/10/20", Note: "سوخت", Reference: "م-12", DocumentDate: "1405/10/18"), CancellationToken.None)).IsSuccess);
+        var view = (await _instruments.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("Cancelled", "1405/10/18"), (view.State, view.History[^1].Details!.DocumentDate));
+
+        var cancel = (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None))[^1];
+        Assert.Equal(("BadDebts", "1203"), (cancel.Lines[0].Missing, cancel.Lines[1].AccountCode));
+        Assert.True((await _vouchers.SetTemplateAccountAsync(Key(), FixedAccount.BadDebts, "8101", CancellationToken.None)).IsSuccess);
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 4, CancellationToken.None)).IsSuccess);
+    }
+
     private sealed class LedgerBank : IBankAccountLookup
     {
         public static readonly Guid Id = Guid.NewGuid();

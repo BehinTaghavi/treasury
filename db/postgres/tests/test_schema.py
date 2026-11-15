@@ -645,3 +645,24 @@ def test_a_voucher_is_confirmed_once_per_receipt_or_cheque_step_and_read_only_in
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
             for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+
+
+def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_and_steps_keep_details(db):
+    # 031_cashflow_cheque_steps.sql (owner's item 14, answers to Q30-Q35 of 15 Nov 2026).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405)
+        for state in ("ReturnedFromBank", "Replaced", "Cancelled"):
+            c.execute("UPDATE cashflow.instrument SET state = %s WHERE id = %s", (state, iid))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.instrument SET state = 'Lost' WHERE id = %s", (iid,))
+        c.execute("""INSERT INTO cashflow.instrument_event (fiscal_year, instrument_year, instrument_id, seq, action, from_state, to_state, event_date, user_id,
+                         reference, note, details)
+                     VALUES (1405, 1405, %s, 99, 'Cancel', 'InCashDesk', 'Cancelled', '2026-11-15', 'treasurer', 'M-12', 'bad debt',
+                             '{"documentDate": "2026-11-14"}')""", (iid,))
+        assert c.execute("SELECT details->>'documentDate' FROM cashflow.instrument_event WHERE instrument_id = %s AND seq = 99", (iid,)).fetchone()[0] == "2026-11-14"
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('BadDebts', '8101') ON CONFLICT DO NOTHING")
+        assert c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = 'cashflow' AND table_name = 'receipt' "
+                         "AND column_name = 'replaced_instrument_id'").fetchone() is not None
+        c.rollback()

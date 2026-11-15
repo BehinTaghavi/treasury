@@ -41,12 +41,13 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     {
         "200015" => new PayerFact("200015", "شرکت نمونه بازرگانی", true),
         "200099" => new PayerFact("200099", "مشتری قدیمی", false),
+        "200016" => new PayerFact("200016", "مشتری دیگر", true),
         "300001" => new PayerFact("300001", "کارمند", true, MayPay: false),
         _ => null,
     });
 
     public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Check(
-        id == SalesGroup ? new PurposeGroupFact(id, "وجوه حاصل فروش", true, true, "4101") : id == PaymentGroup ? new PurposeGroupFact(id, "خرید مواد", false, true) : null);
+        id == SalesGroup ? new PurposeGroupFact(id, "وجوه حاصل فروش", true, true, "4101") : id == PaymentGroup ? new PurposeGroupFact(id, "خرید مواد", false, true, "2101") : null);
 
     public Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         Check(id == Mellat ? "بانک ملت" : id == Melli ? "بانک ملی" : null);
@@ -54,7 +55,7 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     /// <summary>The chart: 1201, 1202, 1203, 9101, 9201 take entries; 12 has a lower level; 1299 is inactive.</summary>
     public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Check(code switch
     {
-        "1201" or "1202" or "1203" or "9101" or "9201" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "حساب " + code, true, true),
+        "1201" or "1202" or "1203" or "9101" or "9201" or "8101" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "حساب " + code, true, true),
         "12" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "کل", false, true),
         "1299" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "قدیمی", true, false),
         _ => null,

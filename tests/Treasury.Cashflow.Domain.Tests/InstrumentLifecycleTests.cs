@@ -36,7 +36,7 @@ public sealed class ReceivedInstrumentTests
     {
         var cheque = ReceivedCheque();
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
-        cheque.RecordBounced(D("1405/09/02"), User, "کسری موجودی");
+        cheque.RecordBounced(D("1405/09/02"), User, "کسری موجودی", "B-1");
         Assert.Equal(InstrumentState.Bounced, cheque.State);
         Assert.Equal("کسری موجودی", cheque.History[^1].Note);
     }
@@ -82,7 +82,7 @@ public sealed class ReceivedInstrumentTests
         Assert.Equal(InstrumentState.ReturnedToIssuer, returned.State);
 
         var endorsed = ReceivedCheque();
-        endorsed.Endorse("شرکت پیمانکار ب", D("1405/08/02"), User);
+        endorsed.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1"), D("1405/08/02"), User);
         Assert.Equal(InstrumentState.Endorsed, endorsed.State);
         Assert.Equal("شرکت پیمانکار ب", endorsed.Destination);
 
@@ -92,10 +92,10 @@ public sealed class ReceivedInstrumentTests
     }
 
     [Fact]
-    public void A_guarantee_note_cannot_be_endorsed_but_can_be_returned()
+    public void A_guarantee_note_cannot_be_endorsed_or_replaced_but_can_be_returned_or_cancelled()
     {
         var note = ReceivedCheque(InstrumentKind.GuaranteeNote, due: null);
-        Assert.Equal([InstrumentAction.ReturnToIssuer], note.AllowedActions());
+        Assert.Equal([InstrumentAction.ReturnToIssuer, InstrumentAction.Cancel], note.AllowedActions());
     }
 
     [Fact]
@@ -132,8 +132,8 @@ public sealed class ReceivedInstrumentTests
         // Answer to Q11 (CEO, 10 Nov 2026): rule N2 applies to bounces too.
         var cheque = ReceivedCheque(due: "1405/09/01");
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
-        Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => cheque.RecordBounced(D("1405/08/30"), User, "کسری موجودی")).Code);
-        cheque.RecordBounced(D("1405/09/01"), User, "کسری موجودی");
+        Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => cheque.RecordBounced(D("1405/08/30"), User, "کسری موجودی", "B-1")).Code);
+        cheque.RecordBounced(D("1405/09/01"), User, "کسری موجودی", "B-1");
         Assert.Equal(InstrumentState.Bounced, cheque.State);
     }
 
@@ -283,13 +283,19 @@ public sealed class LifecycleTableTests
     }
 
     [Fact]
-    public void Received_and_issued_states_never_mix()
+    public void Received_and_issued_states_never_mix_except_cancelled()
     {
-        InstrumentState[] received = [InstrumentState.InCashDesk, InstrumentState.DepositedForCollection, InstrumentState.Cleared, InstrumentState.Bounced, InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed];
+        InstrumentState[] received = [InstrumentState.InCashDesk, InstrumentState.DepositedForCollection, InstrumentState.Cleared, InstrumentState.Bounced,
+            InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed, InstrumentState.ReturnedFromBank, InstrumentState.Replaced];
+
+        // «ابطال شده» ends both lives: an issued cheque before delivery, a received one by management's order (owner's item 14 (f)).
         foreach (var t in InstrumentLifecycle.All)
         {
             Assert.Equal(t.Direction == InstrumentDirection.Received, received.Contains(t.From));
-            Assert.Equal(t.Direction == InstrumentDirection.Received, received.Contains(t.To));
+            if (t.To != InstrumentState.Cancelled)
+            {
+                Assert.Equal(t.Direction == InstrumentDirection.Received, received.Contains(t.To));
+            }
         }
     }
 }

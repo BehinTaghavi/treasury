@@ -12,7 +12,13 @@ namespace Treasury.Cashflow.Api;
 
 public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string BankName, MoneyInput Amount, string ReceivedOn, string? DueDate, Guid DrawerId, string DrawerName, string Purpose);
 
-public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference);
+/// <param name="Reference">Bounce notice no., management's order no. (cancellation) or bank reference.</param>
+/// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order.</param>
+public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null);
+
+public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
+
+public sealed record EndorseRequest(string Date, string ReceiverDetailCode, Guid PurposeGroupId, string Purpose, string SayadTracking, string? Note);
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
 
@@ -69,8 +75,20 @@ public static class Endpoints
 
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(
-                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference), ct).ConfigureAwait(false),
+                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
+
+        // Owner's item 14: replacement (a cheque receipt of the new cheques) and endorsement of a received cheque.
+        api.MapPost("/instruments/{id:guid}/replace", async (Guid id, ReplaceRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.ReplaceAsync(new ReplaceChequeCommand(Key(http), id, r.Header, r.Instruments), ct).ConfigureAwait(false),
+                receiptId => $"/api/cashflow/receipts/{receiptId}"));
+
+        api.MapPost("/instruments/{id:guid}/replace/voucher-preview", async (Guid id, ReplaceRequest r, ReceiptUseCases useCases, CancellationToken ct) =>
+            Preview(await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false)));
+
+        api.MapPost("/instruments/{id:guid}/endorse", async (Guid id, EndorseRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.ReceiverDetailCode, r.PurposeGroupId, r.Purpose, r.SayadTracking, r.Note), ct)
+                .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         // Receipts (owner, 14 Nov 2026): cash, money paid into a bank account, cheques and notes.
         api.MapGet("/receipts", async (int year, ReceiptKind? kind, ReceiptUseCases useCases, CancellationToken ct) =>

@@ -35,7 +35,8 @@ public sealed record ChangeInstrumentStateCommand(
     string Date,
     string? Destination = null,
     string? Note = null,
-    string? Reference = null);
+    string? Reference = null,
+    string? DocumentDate = null);
 
 
 public sealed record IssueChequeCommand(
@@ -55,7 +56,15 @@ public sealed record IssueChequeCommand(
 /// <param name="SlipNumber">Deposit slip number («شماره فیش واگذاری»).</param>
 public sealed record DepositChequeCommand(string IdempotencyKey, Guid InstrumentId, Guid BankAccountId, string Date, string? SlipNumber = null);
 
-public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note);
+public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note, StepDetailsView? Details = null);
+
+/// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
+public sealed record StepDetailsView(
+    Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId)
+{
+    public static StepDetailsView? From(StepDetails? d) => d is null ? null
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId);
+}
 
 public sealed record InstrumentView(
     Guid Id,
@@ -80,7 +89,8 @@ public sealed record InstrumentView(
     Guid? ReceiptId = null,
     bool IsPostDated = false,
     ReceivedInstrumentDetails? Details = null,
-    Guid? CollectionAccountId = null)
+    Guid? CollectionAccountId = null,
+    string? CounterpartyDetailCode = null)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -99,13 +109,15 @@ public sealed record InstrumentView(
         i.State.ToString(),
         i.OriginFiscalYear,
         i.AllowedActions().Select(a => a.ToString()).ToList(),
-        i.History.Select(h => new InstrumentHistoryView(h.Action.ToString(), h.From?.ToString(), h.To.ToString(), h.Date.ToJalaliString(), h.UserId, h.Reference, h.Note)).ToList(),
+        i.History.Select(h => new InstrumentHistoryView(h.Action.ToString(), h.From?.ToString(), h.To.ToString(), h.Date.ToJalaliString(), h.UserId, h.Reference, h.Note,
+            StepDetailsView.From(h.Details))).ToList(),
         i.Version,
         i.Amount.RateToRial,
         i.ReceiptId,
         i.IsPostDated,
         i.Direction == InstrumentDirection.Received ? i.Details : null,
-        i.CollectionAccountId);
+        i.CollectionAccountId,
+        i.Counterparty.DetailCode);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -181,11 +193,19 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);
                     break;
-                case InstrumentAction.Endorse:
-                    instrument.Endorse(command.Destination ?? string.Empty, date, user, command.Note);
+                case InstrumentAction.ReturnFromBank:
+                    instrument.ReturnFromBank(date, user, command.Note);
+                    break;
+                case InstrumentAction.RecordEndorsementReturned:
+                    instrument.RecordEndorsementReturned(date, user, command.Reference, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
+                    break;
+                case InstrumentAction.Cancel when instrument.Direction == InstrumentDirection.Received:
+                    // Owner's item 14 (f), answer to Q30: the treasurer types the number and date of management's order.
+                    instrument.CancelReceived(date, user, command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate),
+                        command.Note);
                     break;
                 case InstrumentAction.Cancel:
                     instrument.Cancel(date, user, command.Note ?? string.Empty);
@@ -202,6 +222,8 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.Receive:
                 case InstrumentAction.PrepareIssue:
                 case InstrumentAction.Issue:
+                case InstrumentAction.Endorse:
+                case InstrumentAction.Replace:
                 default:
                     return Result<Guid>.Fail("Instrument.ActionNotSupportedHere", $"Use the dedicated command for '{command.Action}'.");
             }

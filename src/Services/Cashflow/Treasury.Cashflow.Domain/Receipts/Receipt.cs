@@ -146,6 +146,9 @@ public sealed class Receipt : AggregateRoot<Guid>
 
     public ReceiptState State { get; private set; }
 
+    /// <summary>A cheque receipt that replaces a cheque of the same payer (تعویض, owner's item 14 (d)): that cheque's id.</summary>
+    public Guid? ReplacedInstrumentId { get; private init; }
+
     public FiscalDate? CancelledOn { get; private set; }
 
     public string? CancelReason { get; private set; }
@@ -175,10 +178,19 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// Cheques and notes from one payer on one receipt (old Access form D_Check; manual: «ثبت چک بعدی»). The instruments are created
     /// in the same command and name this receipt; they must have been received from the same payer on the same day.
     /// </summary>
-    public static Receipt RecordInstruments(Guid id, int number, ReceiptHeader header, IReadOnlyList<Instrument> instruments, string userId)
+    public static Receipt RecordInstruments(Guid id, int number, ReceiptHeader header, IReadOnlyList<Instrument> instruments, string userId,
+        Instrument? replaces = null)
     {
         ArgumentNullException.ThrowIfNull(instruments);
         Validate(header, number, userId);
+        if (replaces is not null)
+        {
+            // Owner's item 14 (d), answer to Q31: the new cheques may differ in amount and number; they come from the same payer.
+            Require(replaces.Direction == InstrumentDirection.Received && replaces.Counterparty.DetailCode == header.Payer.DetailCode,
+                "Receipt.ReplacementPayerDiffers", "The new cheques must come from the payer of the cheque they replace.");
+            Require(instruments.All(i => i.Kind.IsCollectable()), "Receipt.ReplacementKind", "A cheque is replaced by ordinary or bank cheques.");
+        }
+
         Require(instruments.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
         foreach (var i in instruments.Where(i => i.Kind.IsCheque() && i.Details.SayadId is null))
         {
@@ -186,7 +198,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             throw new DomainException("Receipt.SayadIdRequired", $"Enter the Sayad ID of cheque {i.Number}.");
         }
 
-        var receipt = new Receipt(id, ReceiptKind.Instruments, number, header, userId);
+        var receipt = new Receipt(id, ReceiptKind.Instruments, number, header, userId) { ReplacedInstrumentId = replaces?.Id };
         foreach (var i in instruments)
         {
             Require(i.Direction == InstrumentDirection.Received && i.ReceiptId == id && i.IssueDate == header.Date && i.Counterparty.Id == receipt.Payer.Id,
@@ -220,7 +232,8 @@ public sealed class Receipt : AggregateRoot<Guid>
         Guid id, ReceiptKind kind, int number, FiscalDate date, CounterpartyRef payer, Guid purposeGroupId, string purposeGroupName, string purpose,
         string? reference1, string? reference2, Guid? departmentId, bool salesProceeds, string? note, string recordedBy,
         ReceiptAccountKind? accountKind, Guid? accountId, DepositMethod? method, string? trackingNumber, Money? amount,
-        IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version)
+        IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version,
+        Guid? replacedInstrumentId = null)
     {
         ArgumentNullException.ThrowIfNull(payer);
         var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true, true),
@@ -236,6 +249,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             State = state,
             CancelledOn = cancelledOn,
             CancelReason = cancelReason,
+            ReplacedInstrumentId = replacedInstrumentId,
         };
         r._instrumentIds.AddRange(instrumentIds);
         r.SetLoadedVersion(version);

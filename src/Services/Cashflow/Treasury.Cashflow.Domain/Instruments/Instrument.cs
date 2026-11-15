@@ -35,6 +35,8 @@ public sealed record CounterpartyRef(Guid Id, string DisplayName, string? Detail
 public sealed record CollectionAccount(Guid Id, string Title, string CurrencyCode, bool IsActive);
 
 /// <summary>One step in the instrument's life. Replaces the old fixed columns D1–D5 / G1–G5 with a full history.</summary>
+/// <param name="Reference">Deposit slip, bounce notice, management's order or bank reference, depending on the step.</param>
+/// <param name="Details">What else the step recorded (bank account, receiver, order date…); null for older steps.</param>
 public sealed record InstrumentHistoryEntry(
     InstrumentAction Action,
     InstrumentState? From,
@@ -42,7 +44,31 @@ public sealed record InstrumentHistoryEntry(
     FiscalDate Date,
     string UserId,
     string? Reference,
-    string? Note);
+    string? Note,
+    StepDetails? Details = null);
+
+/// <summary>
+/// What a step of a received cheque records besides its date, reference and note (owner's item 14, 15 Nov 2026), so that each step's
+/// voucher keeps its own accounts even when the cheque moves on.
+/// </summary>
+/// <param name="AccountId">Deposit, collected, bounced, returned from the bank: the company bank account of that deposit.</param>
+/// <param name="PartyDetailCode">Endorsement: the receiver's تفصیل (any تفصیل, answer to Q32).</param>
+/// <param name="DocumentDate">Cancellation: the date of management's order (answer to Q30).</param>
+/// <param name="PurposeGroupId">Endorsement: the payment purpose group (its account is debited).</param>
+/// <param name="SayadTracking">Endorsement: tracking number of the transfer in the Sayad system (answer to Q32).</param>
+/// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
+public sealed record StepDetails(
+    Guid? AccountId = null,
+    string? PartyDetailCode = null,
+    string? PartyName = null,
+    FiscalDate? DocumentDate = null,
+    Guid? PurposeGroupId = null,
+    string? Purpose = null,
+    string? SayadTracking = null,
+    Guid? ReceiptId = null);
+
+/// <summary>An endorsement (خرج چک): the receiver (any تفصیل), what it pays for and the Sayad transfer (owner, answers to Q32).</summary>
+public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -240,7 +266,7 @@ public sealed class Instrument : AggregateRoot<Guid>
         {
             Destination = account.Title.Trim();
             CollectionAccountId = account.Id;
-        });
+        }, details: new StepDetails(AccountId: account.Id));
     }
 
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
@@ -255,21 +281,88 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// </summary>
     public void RecordCleared(FiscalDate date, string userId, string? reference = null) =>
         Apply(InstrumentAction.RecordCleared, date, userId, reference, null,
-            validate: () => RequireNotBeforeDueDate(date, "Instrument.ClearedBeforeDueDate", "Clearing"));
+            validate: () => RequireNotBeforeDueDate(date, "Instrument.ClearedBeforeDueDate", "Clearing"),
+            details: new StepDetails(AccountId: CollectionAccountId));
 
-    /// <summary>The bank returned the cheque. Rule N2 also applies (CEO, 10 Nov 2026, answer to Q11): not before the due date.</summary>
-    public void RecordBounced(FiscalDate date, string userId, string? reason, string? reference = null) =>
-        Apply(InstrumentAction.RecordBounced, date, userId, reference, reason,
-            validate: () => RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce"));
+    /// <summary>
+    /// The bounce («برگشت»): at the company's request the bank issued its bounce notice; its number and date are recorded (owner's item 14
+    /// (e)). From the bank, or after the bank returned the cheque (answer to Q33). Rule N2 also applies (answer to Q11): not before the due
+    /// date. The step's date is the notice's date.
+    /// </summary>
+    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber)
+    {
+        var fromBank = State == InstrumentState.DepositedForCollection;
+        Apply(InstrumentAction.RecordBounced, date, userId, Clean(noticeNumber), reason,
+            validate: () =>
+            {
+                RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
+                Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
+            },
+            details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
+    }
+
+    /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
+    public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>
+        Apply(InstrumentAction.ReturnFromBank, date, userId, null, note, details: new StepDetails(AccountId: CollectionAccountId));
 
     public void ReturnToIssuer(FiscalDate date, string userId, string? note = null) =>
         Apply(InstrumentAction.ReturnToIssuer, date, userId, null, note);
 
-    public void Endorse(string endorsee, FiscalDate date, string userId, string? note = null)
+    /// <summary>
+    /// Endorsement («خرج چک», owner's item 14 (g), kept by the owner): the cheque pays a debt of the company. The receiver is any تفصیل
+    /// and the Sayad transfer's tracking number is recorded (answers to Q32).
+    /// </summary>
+    public void Endorse(Endorsement endorsement, FiscalDate date, string userId, string? note = null)
     {
-        Require(!string.IsNullOrWhiteSpace(endorsee), "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
-        Apply(InstrumentAction.Endorse, date, userId, null, note, () => Destination = endorsee.Trim());
+        ArgumentNullException.ThrowIfNull(endorsement);
+        Require(!string.IsNullOrWhiteSpace(endorsement.ReceiverDetailCode) && !string.IsNullOrWhiteSpace(endorsement.ReceiverName),
+            "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
+        Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
+        Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
+        Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
+            details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim()));
     }
+
+    /// <summary>
+    /// The receiver of an endorsed cheque brings it back bounced, with the bank's bounce notice (owner's item 14 (h)). The cheque becomes
+    /// «برگشت شده» again in the company's hands; rule N2 applies.
+    /// </summary>
+    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null) =>
+        Apply(InstrumentAction.RecordEndorsementReturned, date, userId, Clean(noticeNumber), reason,
+            validate: () =>
+            {
+                RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
+                Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
+            },
+            changeDetails: () => Destination = null);
+
+    /// <summary>
+    /// Replacement («تعویض», owner's item 14 (d)): the payer gives new cheques for this one; they may differ in amount and number (answer
+    /// to Q31) and come on their own cheque receipt.
+    /// </summary>
+    public void Replace(Guid replacementReceiptId, FiscalDate date, string userId)
+    {
+        Require(replacementReceiptId != Guid.Empty, "Instrument.ReplacementRequired", "The replacement receipt is required.");
+        Apply(InstrumentAction.Replace, date, userId, null, null, details: new StepDetails(ReceiptId: replacementReceiptId));
+    }
+
+    /// <summary>
+    /// Cancellation of a received cheque («ابطال», owner's item 14 (f)): in the cash desk, back from the bank or bounced. The treasurer
+    /// cancels it and types the number and date of management's order (answer to Q30), with the reason.
+    /// </summary>
+    public void CancelReceived(FiscalDate date, string userId, string? orderNumber, FiscalDate? orderDate, string? reason)
+    {
+        Require(Direction == InstrumentDirection.Received, "Instrument.InvalidTransition", "Only a received cheque is cancelled this way.");
+        Require(!string.IsNullOrWhiteSpace(orderNumber) && orderDate is not null, "Instrument.CancelOrderRequired",
+            "Enter the number and date of management's order to cancel.");
+        Require(orderDate is null || orderDate <= date, "Instrument.CancelOrderAfterCancel", "Management's order cannot be dated after the cancellation.");
+        Require(!string.IsNullOrWhiteSpace(reason), "Instrument.CancelReasonRequired", "A reason is required to cancel.");
+        Apply(InstrumentAction.Cancel, date, userId, orderNumber!.Trim(), reason!.Trim(), details: new StepDetails(DocumentDate: orderDate));
+    }
+
+    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 
     /// <summary>Gives the instrument the sheet number reserved from <paramref name="chequeBookId"/> (old Stcode 21).</summary>
     public void Issue(Guid chequeBookId, string sheetNumber, FiscalDate date, string userId)
@@ -287,6 +380,8 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     public void Cancel(FiscalDate date, string userId, string reason)
     {
+        // A received cheque is cancelled with management's order (CancelReceived).
+        Require(Direction == InstrumentDirection.Issued, "Instrument.CancelOrderRequired", "Enter the number and date of management's order to cancel.");
         Require(!string.IsNullOrWhiteSpace(reason), "Instrument.CancelReasonRequired", "A reason is required to cancel.");
         Apply(InstrumentAction.Cancel, date, userId, null, reason);
     }
@@ -355,7 +450,8 @@ public sealed class Instrument : AggregateRoot<Guid>
     }
 
     /// <param name="validate">Extra rule of this action, checked after the transition and date rules, before anything changes.</param>
-    private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null)
+    private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null,
+        StepDetails? details = null)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         var transition = InstrumentLifecycle.Find(Direction, State, action)
@@ -380,13 +476,14 @@ public sealed class Instrument : AggregateRoot<Guid>
         var from = State;
         changeDetails?.Invoke();
         State = transition.To;
-        Record(action, from, transition.To, date, userId, reference, note);
+        Record(action, from, transition.To, date, userId, reference, note, details);
     }
 
-    private void Record(InstrumentAction action, InstrumentState? from, InstrumentState to, FiscalDate date, string userId, string? reference, string? note)
+    private void Record(InstrumentAction action, InstrumentState? from, InstrumentState to, FiscalDate date, string userId, string? reference, string? note,
+        StepDetails? details = null)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
-        _history.Add(new InstrumentHistoryEntry(action, from, to, date, userId, reference, note));
+        _history.Add(new InstrumentHistoryEntry(action, from, to, date, userId, reference, note, details));
         Raise(new InstrumentStateChanged(Id, Direction, Kind, action, from, to, date, Amount, Counterparty.Id, Number, Destination, userId));
     }
 

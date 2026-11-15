@@ -12,3 +12,8 @@ service (section 5.1). Only new aggregates are created; none that already exists
 The alternative (save the receipt, then create the instruments from its event) would show a receipt without its cheques for a
 while and needs a compensating step when a cheque is refused, which is the MVC failure this ADR removes. Any later change to an
 instrument stays its own command.
+
+Amendment (15 Nov 2026, replacement of a received cheque, owner's item 14 (d)): the cheque receipt of the new cheques, the new
+instruments and the replaced cheque («تعویض شده») are saved in one transaction (`ReceiptUseCases.ReplaceAsync`). The replaced cheque is
+an existing aggregate, saved with its version check, so a concurrent step on it makes the whole replacement fail and nothing is left
+half-done; doing it in two commands would leave new cheques with the old one still «نزد صندوق».

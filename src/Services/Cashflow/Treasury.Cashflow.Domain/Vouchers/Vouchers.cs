@@ -24,7 +24,13 @@ public enum FixedAccount
 
     /// <summary>«طرف حساب انتظامی»: the other side of guarantee cheques.</summary>
     GuaranteeCounterpart,
+
+    /// <summary>«مطالبات سوخت شده»: debited when a received cheque is cancelled (owner's table «ابطال چک دریافتنی نزد صندوق»).</summary>
+    BadDebts,
 }
+
+/// <summary>A cheque receipt that replaces a cheque: the old cheque and where it was when replaced (owner's item 14 (d)).</summary>
+public sealed record Replacement(Instrument Old, InstrumentState From);
 
 /// <summary>What reference-svc says about a ledger account (copy of the accounting system's chart).</summary>
 public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive);
@@ -101,13 +107,38 @@ public static class ReceiptVouchers
     /// انتظامی» (payer on both sides).
     /// </summary>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
-    public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template)
+    /// <param name="replacement">A replacement (تعویض): Dr «اسناد نزد صندوق» for each new cheque / Cr the old cheque where it was («اسناد نزد
+    /// صندوق» or, if bounced, «اسناد واخواست شده»); a difference in amount (answer to Q31) goes to the purpose group, with the payer.</param>
+    public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
+        Replacement? replacement = null)
     {
         ArgumentNullException.ThrowIfNull(receipt);
         ArgumentNullException.ThrowIfNull(template);
         var payer = receipt.Payer.DetailCode;
         var lines = new List<VoucherLine>();
         var title = $"{receipt.Purpose} – {receipt.Payer.DisplayName}";
+        if (replacement is not null)
+        {
+            var old = replacement.Old;
+            foreach (var i in instruments)
+            {
+                var (foreign, currency) = Foreign(i);
+                lines.Add(Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, i.Amount.ToRial(),
+                    $"چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – تعویض چک {old.Number} – {receipt.Payer.DisplayName}", foreign, currency));
+            }
+
+            var (oldForeign, oldCurrency) = Foreign(old);
+            lines.Add(Fixed(false, template, replacement.From == InstrumentState.Bounced ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk,
+                payer, old.Amount.ToRial(), Text(old, "تعویض"), oldForeign, oldCurrency));
+            var difference = instruments.Sum(i => i.Amount.ToRial()) - old.Amount.ToRial();
+            if (difference != 0)
+            {
+                lines.Add(new VoucherLine(difference < 0, purposeGroupAccount, payer, Math.Abs(difference), $"{title} – تفاوت مبلغ تعویض چک {old.Number}"));
+            }
+
+            return new Voucher($"تعویض چک – رسید {receipt.Number}", receipt.Date, lines);
+        }
+
         if (receipt.Kind == ReceiptKind.Instruments)
         {
             foreach (var i in instruments)
@@ -154,6 +185,62 @@ public static class ReceiptVouchers
         Pair("برگشت چک توسط بانک", cheque, date,
             Fixed(true, template, FixedAccount.ProtestedCheques, cheque.Counterparty.DetailCode, cheque.Amount.ToRial(), Text(cheque, "برگشت")),
             Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "برگشت")));
+
+    /// <summary>
+    /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
+    /// steps without a voucher here: receiving and replacing (on their receipt), returning to the payer.
+    /// </summary>
+    /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
+    /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
+    public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template)
+    {
+        ArgumentNullException.ThrowIfNull(cheque);
+        ArgumentNullException.ThrowIfNull(bank);
+        if (cheque.Direction != InstrumentDirection.Received || step < 1 || step > cheque.History.Count)
+        {
+            return null;
+        }
+
+        var e = cheque.History[step - 1];
+        var payer = cheque.Counterparty.DetailCode;
+        var amount = cheque.Amount.ToRial();
+        switch (e.Action)
+        {
+            case InstrumentAction.DepositForCollection:
+                return ForDeposit(cheque, bank, e.Date, template);
+            case InstrumentAction.RecordCleared:
+                return ForCleared(cheque, bank, e.Date, template);
+            case InstrumentAction.RecordBounced when e.From == InstrumentState.ReturnedFromBank:
+                return Pair("برگشت چک (پس از عودت از بانک)", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت – اعلامیه {e.Reference}")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"برگشت – اعلامیه {e.Reference}")));
+            case InstrumentAction.RecordBounced:
+                return ForBounced(cheque, bank, e.Date, template) is { } b ? b with { Lines = [.. b.Lines.Select(l => l with { Description = $"{l.Description} – اعلامیه {e.Reference}" })] } : null;
+            case InstrumentAction.ReturnFromBank:
+                return Pair("عودت چک واگذاری توسط بانک", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, "عودت از بانک")),
+                    Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, amount, Text(cheque, "عودت از بانک")));
+            case InstrumentAction.Cancel:
+                var text = Text(cheque, $"ابطال – دستور {e.Reference} مورخ {e.Details?.DocumentDate?.ToJalaliString()}");
+                return cheque.Kind.IsGuarantee()
+                    ? Pair("ابطال چک انتظامی دریافتی", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, text),
+                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, text))
+                    : Pair("ابطال چک دریافتنی", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
+                        Fixed(false, template, e.From == InstrumentState.Bounced ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk, payer, amount, text));
+            case InstrumentAction.Endorse:
+                return Pair("خرج چک", cheque, e.Date,
+                    new VoucherLine(true, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"خرج به {e.Details?.PartyName} – {e.Details?.Purpose}")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"خرج به {e.Details?.PartyName}")));
+            case InstrumentAction.RecordEndorsementReturned:
+                return Pair("برگشت چک خرج شده", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – اعلامیه {e.Reference}")),
+                    new VoucherLine(false, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"برگشت خرج – اعلامیه {e.Reference}")));
+            default:
+                return null;
+        }
+    }
 
     private static Voucher Pair(string operation, Instrument cheque, FiscalDate date, VoucherLine debit, VoucherLine credit)
     {

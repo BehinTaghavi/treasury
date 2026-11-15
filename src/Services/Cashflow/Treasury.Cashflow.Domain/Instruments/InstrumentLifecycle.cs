@@ -26,6 +26,20 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "D_Check_Od_m: 11 -> 15"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "D_Check_Kh_m: 11 -> 16, Checktype 0/2 only"),
 
+        // Received: the owner's item 14 (15 Nov 2026, answers Q30–Q35; docs/domain/received-cheque-steps.md). New-version manual
+        // «ثبت وصول / برگشت / عودت چک‌های واگذاری» (return to the cash desk), «تعویض چک‌ها», «ابطال»; owner's voucher table.
+        new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.ReturnFromBank, InstrumentState.ReturnedFromBank, AnyKind, "Owner item 14 (c); manual: عودت به صندوق"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner item 14, answer Q33: deposited again"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "Owner item 14, answer Q33: bounce notice after the return"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Manual: عودت شده از نزد بانک → عودت"),
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d); manual: تعویض چک‌های نزد صندوق"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d): replacement of a returned cheque"),
+        new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d)"),
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f), answer Q30; manual: ابطال چک‌های نزد صندوق"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f)"),
+        new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f)"),
+        new(InstrumentDirection.Received, InstrumentState.Endorsed, InstrumentAction.RecordEndorsementReturned, InstrumentState.Bounced, AnyKind, "Owner item 14 (h); voucher table: عودت چک‌های خرج شده (پس از برگشت)"),
+
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),
         new(InstrumentDirection.Issued, InstrumentState.Issued, InstrumentAction.Deliver, InstrumentState.Delivered, AnyKind, "Check_deliv_m: 21 -> 22"),
@@ -52,6 +66,6 @@ public static class InstrumentLifecycle
            .ToList();
 
     public static bool IsFinal(InstrumentState state) =>
-        state is InstrumentState.Cleared or InstrumentState.Bounced or InstrumentState.ReturnedToIssuer
-              or InstrumentState.Endorsed or InstrumentState.Cancelled or InstrumentState.PaidByBank or InstrumentState.BouncedAtBank;
+        state is InstrumentState.Cleared or InstrumentState.ReturnedToIssuer or InstrumentState.Replaced
+              or InstrumentState.Cancelled or InstrumentState.PaidByBank or InstrumentState.BouncedAtBank;
 }

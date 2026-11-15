@@ -101,6 +101,8 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
 
 public sealed class PostgresInstrumentRepository : IInstrumentRepository
 {
+    private static readonly System.Text.Json.JsonSerializerOptions StepJson = new(System.Text.Json.JsonSerializerDefaults.Web);
+
     private const string Columns =
         "origin_fiscal_year, id, direction, kind, number, bank_name, bank_account_id, cheque_book_id, payment_id, amount, currency, rate_to_rial, " +
         "issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, version, receipt_id, counterparty_detail_code, details, " +
@@ -154,7 +156,7 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
 
         var history = new List<HistorySnapshot>();
         await using (var cmd = tx.Command(
-            "SELECT action, from_state, to_state, event_date, user_id, reference, note FROM cashflow.instrument_event WHERE instrument_id = @id ORDER BY seq"))
+            "SELECT action, from_state, to_state, event_date, user_id, reference, note, details FROM cashflow.instrument_event WHERE instrument_id = @id ORDER BY seq"))
         {
             cmd.Parameters.AddWithValue("id", id);
             await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -167,7 +169,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
                     r.GetFieldValue<DateOnly>(3),
                     r.GetString(4),
                     r.IsDBNull(5) ? null : r.GetString(5),
-                    r.IsDBNull(6) ? null : r.GetString(6)));
+                    r.IsDBNull(6) ? null : r.GetString(6),
+                    r.IsDBNull(7) ? null : System.Text.Json.JsonSerializer.Deserialize<StepDetailsSnapshot>(r.GetString(7), StepJson)));
             }
         }
 
@@ -248,8 +251,8 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
             var h = s.History[i];
             // The step belongs to the fiscal year in which it happens (doc 7.4).
             await using var cmd = tx.Command(
-                "INSERT INTO cashflow.instrument_event (fiscal_year, instrument_year, instrument_id, seq, action, from_state, to_state, event_date, user_id, reference, note) " +
-                "VALUES (cashflow.fiscal_year_of(@date), @iyear, @iid, @seq, @action, @from, @to, @date, @user, @ref, @note)");
+                "INSERT INTO cashflow.instrument_event (fiscal_year, instrument_year, instrument_id, seq, action, from_state, to_state, event_date, user_id, reference, note, details) " +
+                "VALUES (cashflow.fiscal_year_of(@date), @iyear, @iid, @seq, @action, @from, @to, @date, @user, @ref, @note, @details)");
             cmd.Parameters.AddWithValue("date", h.Date);
             cmd.Parameters.AddWithValue("iyear", s.OriginFiscalYear);
             cmd.Parameters.AddWithValue("iid", s.Id);
@@ -260,6 +263,10 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
             cmd.Parameters.AddWithValue("user", h.UserId);
             cmd.Parameters.AddWithValue("ref", (object?)h.Reference ?? DBNull.Value);
             cmd.Parameters.AddWithValue("note", (object?)h.Note ?? DBNull.Value);
+            cmd.Parameters.Add(new NpgsqlParameter("details", NpgsqlTypes.NpgsqlDbType.Jsonb)
+            {
+                Value = h.Details is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(h.Details, StepJson),
+            });
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
     }

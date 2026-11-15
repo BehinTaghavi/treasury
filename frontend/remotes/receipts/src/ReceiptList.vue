@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
- * Receipts of a fiscal year, newest first, with a search box. Opening a receipt shows its cheques and notes with their state and
- * the steps the server allows next (send for collection, collected, bounced, return, endorse). A cash or bank receipt typed by
+ * Receipts of a fiscal year, newest first, with a search box. Opening a receipt shows its cheques and notes with their latest state;
+ * their next steps are recorded in «عملیات چک‌های دریافتی» (owner's item 14). A cash or bank receipt typed by
  * mistake is cancelled with a reason; a cheque is returned to the payer instead.
  * The receipt's voucher and the vouchers of each cheque's later steps (deposit, collected, bounced) are shown with «تایید سند»
  * (owner's report no. 4, item 8: one voucher per receipt or operation, the treasurer confirms).
@@ -22,7 +22,7 @@ interface Receipt {
   purposeGroupName: string; purpose: string; reference1: string | null; reference2: string | null; departmentId: string | null; salesProceeds: boolean; note: string | null
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null; currency: string | null
   rateToRial: number | null; totalRial: number; instrumentCount: number; state: string; cancelledOn: string | null; cancelReason: string | null
-  recordedBy: string; version: number; instruments: Instrument[] | null
+  recordedBy: string; version: number; instruments: Instrument[] | null; replacedInstrumentId: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
@@ -52,11 +52,8 @@ const instrumentKinds: Record<string, [string, string]> = {
 const stateNames: Record<string, [string, string]> = {
   // Owner's report no. 4, item 9: «در جریان وصول نزد صندوق» → «در جریان وصول نزد بانک».
   InCashDesk: ['در جریان وصول نزد صندوق', 'In the cash desk'], DepositedForCollection: ['در جریان وصول نزد بانک', 'At the bank for collection'], Cleared: ['وصول شده', 'Collected'],
-  Bounced: ['برگشت شده', 'Bounced'], ReturnedToIssuer: ['عودت شده', 'Returned'], Endorsed: ['واگذار به سایرین', 'Endorsed'],
-}
-const actionNames: Record<string, [string, string]> = {
-  DepositForCollection: ['واگذاری جهت وصول', 'Send for collection'], RecordCleared: ['ثبت وصول', 'Record collected'],
-  RecordBounced: ['ثبت برگشت', 'Record bounced'], ReturnToIssuer: ['عودت', 'Return to payer'], Endorse: ['خرج (واگذاری به سایرین)', 'Endorse'],
+  Bounced: ['برگشت شده', 'Bounced'], ReturnedToIssuer: ['عودت به پرداخت‌کننده', 'Returned to the payer'], Endorsed: ['خرج شده', 'Endorsed'],
+  ReturnedFromBank: ['عودت شده از بانک', 'Back from the bank'], Replaced: ['تعویض شده', 'Replaced'], Cancelled: ['ابطال شده', 'Cancelled'],
 }
 const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
 
@@ -142,21 +139,6 @@ async function confirmCancel() {
   await Promise.all([open(r0.id), load()])
 }
 
-// ---- next step of a cheque or note ----
-interface Pending { id: string; action: string; date: string; destination: string; note: string }
-const pending = ref<Pending | null>(null)
-const needsDestination = new Set(['DepositForCollection', 'Endorse'])
-async function confirmAction() {
-  const p = pending.value
-  if (!p || !selected.value) return
-  const date = normaliseJalali(p.date)
-  if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
-  const r = await api.post<string>(`/api/cashflow/instruments/${p.id}/actions/${p.action}`, { date, destination: p.destination || null, note: p.note || null })
-  if (!r.ok) return show('error', translate(r.code, props.locale))
-  pending.value = null
-  show('ok', t('عملیات ثبت شد.', 'Done.'))
-  await open(selected.value.id)
-}
 
 defineExpose({ load })
 watch([year, kind], () => { selected.value = null; void load() })
@@ -208,7 +190,8 @@ onMounted(async () => { await L.load(); await load() })
     </div>
 
     <section v-if="selected" style="margin-top: 1.25rem">
-      <h3>{{ t(`رسید ${name(kindNames, selected.kind)} شمارهٔ ${num(selected.number)}`, `${name(kindNames, selected.kind)} receipt no. ${selected.number}`) }}</h3>
+      <h3>{{ t(`رسید ${name(kindNames, selected.kind)} شمارهٔ ${num(selected.number)}`, `${name(kindNames, selected.kind)} receipt no. ${selected.number}`) }}
+        <span v-if="selected.replacedInstrumentId" class="tr-tag later">{{ t('تعویض چک', 'Replacement') }}</span></h3>
       <p class="small">
         {{ t('تاریخ', 'Date') }}: <span class="num">{{ selected.date }}</span> ·
         {{ t('پرداخت کننده', 'Payer') }}: {{ selected.payerName }} ({{ selected.payerDetailCode }}) ·
@@ -235,16 +218,8 @@ onMounted(async () => { await L.load(); await load() })
       </div>
 
       <template v-if="selected.instruments?.length">
-        <div v-if="pending" class="tr-buttons" style="margin: .75rem 0; padding: .75rem; background: #f5f7fa; border-radius: 8px">
-          <strong>{{ name(actionNames, pending.action) }}</strong>
-          <label>{{ t('تاریخ', 'Date') }} <input v-model="pending.date" dir="ltr" /></label>
-          <label v-if="needsDestination.has(pending.action)">{{ pending.action === 'Endorse' ? t('گیرنده', 'Endorsee') : t('حساب واگذاری', 'Collection account') }}
-            <input v-model="pending.destination" />
-          </label>
-          <label v-if="pending.action === 'RecordBounced' || pending.action === 'ReturnToIssuer'">{{ t('علت / توضیح', 'Reason') }} <input v-model="pending.note" /></label>
-          <button type="button" @click="confirmAction">{{ t('تایید', 'Confirm') }}</button>
-          <button type="button" class="tr-secondary" @click="pending = null">{{ t('انصراف', 'Back') }}</button>
-        </div>
+        <p class="muted small">{{ t('مراحل بعدی هر چک (واگذاری، وصول، عودت، برگشت، تعویض، ابطال، خرج) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شوند.',
+          'The next steps of each cheque are recorded on the «Received cheque steps» tab.') }}</p>
         <div class="tr-scroll">
           <table class="tr-table">
             <thead>
@@ -269,8 +244,6 @@ onMounted(async () => { await L.load(); await load() })
                 <td class="num">{{ money(i.amountInRial) }}</td>
                 <td>{{ name(stateNames, i.state) }}</td>
                 <td>
-                  <button v-for="a in i.allowedActions.filter(x => x !== 'DepositForCollection')" :key="a" type="button" class="tr-link"
-                          @click="pending = { id: i.id, action: a, date: todayJalali(), destination: '', note: '' }">{{ name(actionNames, a) }}</button>
                   <button type="button" class="tr-link" @click="toggleSteps(i.id)">{{ steps[i.id] ? t('بستن اسناد مراحل', 'Hide step vouchers') : t('اسناد مراحل چک', 'Step vouchers') }}</button>
                 </td>
               </tr>

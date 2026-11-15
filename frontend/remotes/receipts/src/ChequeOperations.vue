@@ -1,0 +1,349 @@
+<script setup lang="ts">
+/**
+ * «عملیات چک‌های دریافتی» (owner's item 14, 15 Nov 2026; answers Q30–Q35; docs/domain/received-cheque-steps.md). One tab per place of
+ * the cheque, like the old program's forms: in the cash desk, at the bank, back from the bank or bounced, endorsed. Each step is recorded
+ * here, the cheque's latest state changes at once, and the step's voucher is shown for the treasurer's «تایید سند». Opening a cheque shows
+ * its card: the whole history and every voucher.
+ * Steps: deposit at the bank (several cheques on one slip), collected, returned to the company, bounced (bank's notice no. and date),
+ * replaced by new cheques (a cheque receipt of its own), cancelled by management's order (its no. and date), endorsed to any تفصیل (with
+ * the Sayad transfer's tracking no.), endorsement returned, returned to the payer.
+ */
+import { computed, onMounted, reactive, ref } from 'vue'
+import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
+import { useLookups, type Detail } from './lookups'
+import ReceiptForm from './ReceiptForm.vue'
+import VoucherTable, { type Voucher } from './VoucherTable.vue'
+
+interface Step { action: string; from: string | null; to: string; date: string; userId: string; reference: string | null; note: string | null
+  details: { accountId: string | null; partyName: string | null; documentDate: string | null; purpose: string | null; sayadTracking: string | null; receiptId: string | null } | null }
+interface Cheque {
+  id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
+  dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
+  allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
+  details: { branchName: string | null; sayadId: string | null } | null
+}
+type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
+
+const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
+const api = createApi({ baseUrl: props.apiBase, token: props.token })
+const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
+const fa = computed(() => props.locale === 'fa')
+const money = (n: number) => formatAmount(n, props.locale)
+const L = useLookups(api)
+
+const tabs: { id: Tab; title: [string, string]; states: string[] }[] = [
+  { id: 'desk', title: ['نزد صندوق', 'In the cash desk'], states: ['InCashDesk'] },
+  { id: 'bank', title: ['نزد بانک (در جریان وصول)', 'At the bank'], states: ['DepositedForCollection'] },
+  { id: 'back', title: ['عودت‌شده از بانک و برگشتی', 'Back from the bank and bounced'], states: ['ReturnedFromBank', 'Bounced'] },
+  { id: 'endorsed', title: ['خرج‌شده', 'Endorsed'], states: ['Endorsed'] },
+]
+const stateNames: Record<string, [string, string]> = {
+  InCashDesk: ['نزد صندوق', 'In the cash desk'], DepositedForCollection: ['در جریان وصول نزد بانک', 'At the bank'], Cleared: ['وصول شده', 'Collected'],
+  Bounced: ['برگشت شده', 'Bounced'], ReturnedFromBank: ['عودت شده از بانک', 'Back from the bank'], ReturnedToIssuer: ['عودت به پرداخت‌کننده', 'Returned to the payer'],
+  Endorsed: ['خرج شده', 'Endorsed'], Replaced: ['تعویض شده', 'Replaced'], Cancelled: ['ابطال شده', 'Cancelled'],
+}
+const actionNames: Record<string, [string, string]> = {
+  Receive: ['دریافت', 'Received'], DepositForCollection: ['واگذاری به بانک', 'Deposit at the bank'], RecordCleared: ['وصول', 'Collected'],
+  ReturnFromBank: ['عودت به شرکت', 'Returned by the bank'], RecordBounced: ['برگشت', 'Bounced'], Replace: ['تعویض', 'Replace'],
+  Cancel: ['ابطال', 'Cancel'], Endorse: ['خرج چک', 'Endorse'], RecordEndorsementReturned: ['برگشت خرج', 'Endorsement returned'],
+  ReturnToIssuer: ['عودت به پرداخت‌کننده', 'Return to the payer'],
+}
+const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
+
+const tab = ref<Tab>('desk')
+const lists = reactive<Record<string, Cheque[]>>({})
+const search = ref('')
+const dueUntil = ref('')
+const busy = ref(false)
+const message = ref<{ kind: 'error' | 'ok' | 'warning'; text: string } | null>(null)
+const show = (kind: 'error' | 'ok' | 'warning', text: string) => { message.value = { kind, text } }
+
+const current = computed(() => tabs.find(x => x.id === tab.value)!)
+const shown = computed(() => {
+  const until = normaliseJalali(dueUntil.value)
+  const key = searchKey(search.value)
+  return current.value.states.flatMap(s => lists[s] ?? []).filter(c =>
+    (!until || (c.dueDate ?? '') <= until) && (!key || searchKey(`${c.number} ${c.counterparty} ${c.bankName ?? ''} ${c.destination ?? ''}`).includes(key)))
+})
+const count = (x: (typeof tabs)[number]) => x.states.reduce((n, s) => n + (lists[s]?.length ?? 0), 0)
+const accountName = (id: string | null | undefined) => { const a = L.bankAccounts.value.find(x => x.id === id); return a ? L.accountTitle(a) : '' }
+
+async function load() {
+  const states = tabs.flatMap(x => x.states)
+  const results = await Promise.all(states.map(s => api.get<Cheque[]>(`/api/cashflow/instruments/received?state=${s}`)))
+  states.forEach((s, i) => { const r = results[i]!; if (r.ok) lists[s] = r.value })
+  for (const k of Object.keys(chosen)) if (!tickable.value.some(c => c.id === k)) delete chosen[k]
+}
+
+// ---- deposit at the bank: ticked cheques of the cash desk, or back from the bank (answer to Q33), on one slip ----
+const chosen = reactive<Record<string, boolean>>({})
+const deposit = reactive({ date: todayJalali(), accountId: '', slip: '' })
+const tickable = computed(() => shown.value.filter(c => c.allowedActions.includes('DepositForCollection')))
+const selected = computed(() => tickable.value.filter(c => chosen[c.id]))
+const selectedCurrency = computed(() => selected.value[0]?.currency ?? 'IRR')
+const selectedTotal = computed(() => selected.value.reduce((s, c) => s + c.amount, 0))
+const accountChoices = computed<Choice[]>(() => L.bankAccounts.value
+  .filter(a => a.isActive && a.currencyCode === selectedCurrency.value)
+  .map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
+function toggleAll(on: boolean) { for (const c of tickable.value) chosen[c.id] = on }
+
+async function depositSelected() {
+  message.value = null
+  const date = normaliseJalali(deposit.date)
+  if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
+  if (!selected.value.length) return show('error', t('ابتدا چک‌ها را انتخاب کنید.', 'Tick the cheques first.'))
+  if (new Set(selected.value.map(c => c.currency)).size > 1) return show('error', t('چک‌های یک ارز را با هم واگذار کنید.', 'Deposit cheques of one currency together.'))
+  if (!deposit.accountId) return show('error', translate('Instrument.CollectionAccountRequired', props.locale))
+  busy.value = true
+  const failed: string[] = []
+  let done = 0
+  for (const c of selected.value) {
+    const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/deposit`, { bankAccountId: deposit.accountId, date, slipNumber: deposit.slip || null })
+    if (r.ok) done++
+    else failed.push(`${c.number}: ${translate(r.code, props.locale)}`)
+  }
+  busy.value = false
+  await load()
+  const ok = t(`${done.toLocaleString('fa-IR')} چک به بانک واگذار شد. سند هر چک در کارت آن چک (کلیک روی ردیف) تایید می‌شود.`,
+    `${done} cheque(s) deposited. Each cheque's voucher is confirmed on its card (click the row).`)
+  if (failed.length) show(done ? 'warning' : 'error', `${done ? ok + ' ' : ''}${t('واگذار نشد', 'Not deposited')} – ${failed.join('؛ ')}`)
+  else { show('ok', ok); deposit.slip = '' }
+}
+
+// ---- one step on one cheque ----
+interface Pending {
+  cheque: Cheque; action: string; date: string; reference: string; documentDate: string; note: string
+  receiver: string; groupId: string; purpose: string; sayad: string
+}
+const pending = ref<Pending | null>(null)
+const receivers = ref<Detail[]>([])
+const receiverChoices = computed<Choice[]>(() => receivers.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
+const paymentGroups = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Payment' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+function onReceiverSearch(text: string) {
+  clearTimeout(searchTimer)
+  // Any تفصیل may receive an endorsed cheque (answer to Q32).
+  searchTimer = setTimeout(async () => { receivers.value = await L.searchDetails(text, pending.value?.receiver) }, 250)
+}
+const replacing = ref<Cheque | null>(null)
+
+async function start(c: Cheque, action: string) {
+  message.value = null
+  if (action === 'Replace') { replacing.value = c; pending.value = null; return }
+  replacing.value = null
+  pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', receiver: '', groupId: '', purpose: '', sayad: '' }
+  if (action === 'Endorse') receivers.value = await L.searchDetails('', undefined)
+}
+
+async function confirmStep() {
+  const p = pending.value
+  if (!p || busy.value) return
+  const date = normaliseJalali(p.date)
+  if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
+  busy.value = true
+  const r = p.action === 'Endorse'
+    ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
+        { date, receiverDetailCode: p.receiver, purposeGroupId: p.groupId || '00000000-0000-0000-0000-000000000000', purpose: p.purpose, sayadTracking: p.sayad, note: p.note || null })
+    : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
+        { date, note: p.note || null, reference: p.reference || null, documentDate: p.action === 'Cancel' ? normaliseJalali(p.documentDate) ?? p.documentDate : null })
+  busy.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  pending.value = null
+  show('ok', t(`«${name(actionNames, p.action)}» چک ${p.cheque.number} ثبت شد. سند آن را در کارت چک تایید کنید.`, `"${name(actionNames, p.action)}" recorded for cheque ${p.cheque.number}. Confirm its voucher on the cheque card.`))
+  await load()
+  await openCard(p.cheque.id)
+}
+
+async function replaced() {
+  const c = replacing.value
+  replacing.value = null
+  show('ok', t(`چک ${c?.number} تعویض شد؛ چک‌های جدید نزد صندوق‌اند. سند تعویض در فهرست دریافت‌ها (رسید جدید) تایید می‌شود.`,
+    `Cheque ${c?.number} replaced; the new cheques are in the cash desk. Confirm the replacement voucher on the new receipt in the receipts list.`))
+  await load()
+}
+
+// ---- the cheque card: history and vouchers ----
+const card = ref<Cheque | null>(null)
+const vouchers = ref<Voucher[]>([])
+const confirming = ref(false)
+async function openCard(id: string) {
+  const [c, v] = await Promise.all([api.get<Cheque>(`/api/cashflow/instruments/${id}`), api.get<Voucher[]>(`/api/cashflow/instruments/${id}/vouchers`)])
+  if (c.ok) card.value = c.value
+  vouchers.value = v.ok ? v.value : []
+}
+async function confirmVoucher(step: number) {
+  if (!card.value || confirming.value) return
+  confirming.value = true
+  const r = await api.post<string>(`/api/cashflow/instruments/${card.value.id}/vouchers/${step}/confirm`, {})
+  confirming.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  show('ok', t('سند تایید شد.', 'Voucher confirmed.'))
+  await openCard(card.value.id)
+}
+function stepText(s: Step) {
+  const d = s.details
+  const parts = [s.reference && (s.action === 'RecordBounced' || s.action === 'RecordEndorsementReturned' ? t(`اعلامیه ${s.reference}`, `notice ${s.reference}`)
+    : s.action === 'Cancel' ? t(`دستور ${s.reference} مورخ ${d?.documentDate ?? ''}`, `order ${s.reference} of ${d?.documentDate ?? ''}`)
+    : s.action === 'Endorse' ? t(`پیگیری صیاد ${s.reference}`, `Sayad ${s.reference}`) : s.reference),
+  d?.accountId && accountName(d.accountId), d?.partyName, d?.purpose, s.note]
+  return parts.filter(Boolean).join(' · ')
+}
+
+/** Steps offered on each row; deposit is done with the tick boxes. */
+const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection')
+
+onMounted(async () => { await L.load(); await load() })
+</script>
+
+<template>
+  <div>
+    <nav class="tr-subtabs" role="tablist">
+      <button v-for="x in tabs" :key="x.id" type="button" role="tab" :aria-selected="tab === x.id" :class="{ active: tab === x.id }"
+              @click="tab = x.id; pending = null; replacing = null">
+        {{ fa ? x.title[0] : x.title[1] }} <span class="muted small">({{ count(x).toLocaleString(fa ? 'fa-IR' : 'en-US') }})</span>
+      </button>
+    </nav>
+    <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
+
+    <div class="tr-buttons">
+      <label style="width: 10rem">{{ t('سررسید تا', 'Due until') }} <input v-model="dueUntil" placeholder="1405/09/30" dir="ltr" /></label>
+      <label style="flex: 1; min-width: 14rem">{{ t('جستجو (شماره، پرداخت کننده، بانک، گیرنده)', 'Search (number, payer, bank, receiver)') }} <input v-model="search" /></label>
+    </div>
+
+    <!-- one step on one cheque -->
+    <fieldset v-if="pending" class="tr-step">
+      <legend>{{ name(actionNames, pending.action) }} – {{ t('چک', 'cheque') }} {{ pending.cheque.number }} ({{ money(pending.cheque.amount) }})</legend>
+      <label class="req">{{ pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned' ? t('تاریخ اعلامیهٔ برگشت', 'Date of the bounce notice')
+        : pending.action === 'Cancel' ? t('تاریخ ابطال', 'Date of cancellation') : t('تاریخ', 'Date') }}
+        <input v-model="pending.date" dir="ltr" /></label>
+      <template v-if="pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned'">
+        <label class="req">{{ t('شمارهٔ اعلامیهٔ برگشت', 'Bounce notice no.') }} <input v-model="pending.reference" dir="ltr" /></label>
+        <label class="wide">{{ t('علت برگشت', 'Reason') }} <input v-model="pending.note" /></label>
+      </template>
+      <template v-else-if="pending.action === 'Cancel'">
+        <label class="req">{{ t('شمارهٔ دستور مدیریت', "Management's order no.") }} <input v-model="pending.reference" /></label>
+        <label class="req">{{ t('تاریخ دستور مدیریت', "Date of the order") }} <input v-model="pending.documentDate" dir="ltr" /></label>
+        <label class="wide req">{{ t('علت ابطال', 'Reason') }} <input v-model="pending.note" /></label>
+      </template>
+      <template v-else-if="pending.action === 'Endorse'">
+        <label class="wide">{{ t('گیرندهٔ چک (هر حساب تفصیلی)', 'Receiver (any detail account)') }}
+          <SearchSelect v-model="pending.receiver" :options="receiverChoices" remote required :aria-label="t('گیرندهٔ چک', 'Receiver')"
+                        :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onReceiverSearch" />
+        </label>
+        <label>{{ t('گروه بابت پرداخت', 'Payment purpose group') }}
+          <SearchSelect v-model="pending.groupId" :options="paymentGroups" required :aria-label="t('گروه بابت پرداخت', 'Payment purpose group')"
+                        :none-text="t('گروه بابت پرداختی تعریف نشده است', 'No payment purpose group')" />
+        </label>
+        <label class="wide req">{{ t('بابت', 'Purpose') }} <input v-model="pending.purpose" /></label>
+        <label class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
+        <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
+      </template>
+      <template v-else>
+        <label v-if="pending.action === 'RecordCleared'">{{ t('شمارهٔ مرجع (صورتحساب بانک)', 'Reference (bank statement)') }} <input v-model="pending.reference" dir="ltr" /></label>
+        <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
+      </template>
+      <div class="tr-buttons wide">
+        <button type="button" :disabled="busy" @click="confirmStep">{{ t('ثبت', 'Record') }}</button>
+        <button type="button" class="tr-secondary" @click="pending = null">{{ t('انصراف', 'Back') }}</button>
+      </div>
+    </fieldset>
+
+    <!-- replacement: a cheque receipt of the new cheques (answer to Q31: they may differ in amount and number) -->
+    <section v-if="replacing" class="tr-step">
+      <div class="tr-buttons">
+        <strong>{{ t(`تعویض چک ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`, `Replace cheque ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`) }}</strong>
+        <button type="button" class="tr-secondary" @click="replacing = null">{{ t('انصراف', 'Back') }}</button>
+      </div>
+      <ReceiptForm :key="replacing.id" kind="Instruments" :replaces="{ id: replacing.id, number: replacing.number ?? '', amount: replacing.amountInRial, payerCode: replacing.counterpartyDetailCode ?? '' }"
+                   :api-base="apiBase" :locale="locale" :token="token" @saved="replaced" />
+    </section>
+
+    <div class="tr-scroll">
+      <table class="tr-table">
+        <thead>
+          <tr>
+            <th v-if="tab === 'desk' || tab === 'back'">
+              <input type="checkbox" :checked="tickable.length > 0 && selected.length === tickable.length" :aria-label="t('همه', 'All')"
+                     @change="toggleAll(($event.target as HTMLInputElement).checked)" />
+            </th>
+            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
+            <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('وضعیت', 'State') }}</th><th>{{ t('عملیات', 'Steps') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in shown" :key="c.id" :class="['clickable', { selected: card?.id === c.id || chosen[c.id] }]" @click="openCard(c.id)">
+            <td v-if="tab === 'desk' || tab === 'back'" @click.stop>
+              <input v-if="c.allowedActions.includes('DepositForCollection')" v-model="chosen[c.id]" type="checkbox" :aria-label="c.number ?? ''" />
+            </td>
+            <td class="num">{{ c.dueDate }}</td>
+            <td class="num">{{ c.number }}</td>
+            <td>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
+            <td>{{ c.counterparty }}</td>
+            <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
+            <td>{{ name(stateNames, c.state) }}
+              <div v-if="c.state === 'DepositedForCollection'" class="muted small">{{ accountName(c.collectionAccountId) || c.destination }}</div>
+              <div v-else-if="c.state === 'Endorsed'" class="muted small">{{ c.destination }}</div>
+            </td>
+            <td class="tr-actions" @click.stop>
+              <button v-for="a in rowActions(c)" :key="a" type="button" :class="['tr-link', { danger: a === 'Cancel' || a === 'RecordBounced' }]" @click="start(c, a)">
+                {{ name(actionNames, a) }}</button>
+            </td>
+          </tr>
+          <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('چکی در این بخش نیست.', 'No cheque here.') }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <fieldset v-if="(tab === 'desk' || tab === 'back') && tickable.length" style="margin-top: .75rem">
+      <legend>{{ t('واگذاری چک‌های تیک‌خورده به بانک جهت وصول', 'Deposit the ticked cheques for collection') }}</legend>
+      <label class="req">{{ t('تاریخ واگذاری', 'Date') }} <input v-model="deposit.date" dir="ltr" /></label>
+      <label class="wide">{{ t('حساب بانکی شرکت', 'Company bank account') }}
+        <SearchSelect v-model="deposit.accountId" :options="accountChoices" required :aria-label="t('حساب بانکی شرکت', 'Company bank account')"
+                      :none-text="t('حساب بانکی فعالی با ارز این چک‌ها نیست', 'No active account in this currency')" />
+      </label>
+      <label>{{ t('شماره فیش واگذاری', 'Deposit slip no.') }} <input v-model="deposit.slip" dir="ltr" /></label>
+      <div class="tr-buttons wide">
+        <strong>{{ t(`${selected.length.toLocaleString('fa-IR')} چک`, `${selected.length} cheques`) }} – <span class="num">{{ money(selectedTotal) }}</span> {{ selectedCurrency === 'IRR' ? t('ریال', 'Rial') : selectedCurrency }}</strong>
+        <button type="button" :disabled="busy || !selected.length" @click="depositSelected">{{ t('واگذاری به بانک', 'Deposit at the bank') }}</button>
+      </div>
+    </fieldset>
+
+    <!-- the cheque card -->
+    <section v-if="card" class="tr-card">
+      <div class="tr-buttons">
+        <h3 style="margin: 0">{{ t(`کارت چک ${card.number}`, `Cheque ${card.number}`) }}</h3>
+        <span class="tr-tag">{{ name(stateNames, card.state) }}</span>
+        <span class="muted small">{{ card.bankName }} · {{ card.counterparty }} · {{ t('سررسید', 'due') }} {{ card.dueDate }} · {{ money(card.amount) }} {{ card.currency }}</span>
+        <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
+      </div>
+      <table class="tr-table">
+        <thead><tr><th>#</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('مرحله', 'Step') }}</th><th>{{ t('وضعیت پس از آن', 'State after') }}</th><th>{{ t('جزئیات', 'Details') }}</th><th>{{ t('کاربر', 'User') }}</th></tr></thead>
+        <tbody>
+          <tr v-for="(s, i) in card.history" :key="i">
+            <td class="num">{{ (i + 1).toLocaleString(fa ? 'fa-IR' : 'en-US') }}</td>
+            <td class="num">{{ s.date }}</td>
+            <td>{{ name(actionNames, s.action) }}</td>
+            <td>{{ name(stateNames, s.to) }}</td>
+            <td class="small">{{ stepText(s) }}</td>
+            <td class="small muted">{{ s.userId }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="!vouchers.length" class="muted small">{{ t('سند دریافت این چک در فهرست دریافت‌ها (رسید آن) است؛ مراحل بعدی هنوز ثبت نشده‌اند.',
+        "This cheque's receipt voucher is on its receipt in the receipts list; no later step yet.") }}</p>
+      <VoucherTable v-for="v in vouchers" :key="v.step" :voucher="v" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming"
+                    @confirm="confirmVoucher(v.step)" />
+    </section>
+  </div>
+</template>
+
+<style scoped src="./receipts.css"></style>
+<style scoped>
+.tr-actions { white-space: nowrap; }
+.tr-subtabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .75rem; }
+.tr-subtabs button { background: #fff; color: #1f2933; border: 1px solid #cbd2d9; border-radius: 999px; padding: .35rem .85rem; }
+.tr-subtabs button.active { background: #e8effc; color: #1d4ed8; border-color: #93b4f5; font-weight: 600; }
+.tr-step { margin: .75rem 0; background: #f8fafc; }
+.tr-card { margin-top: 1.25rem; padding: .75rem; border: 1px solid #d9e2ec; border-radius: 8px; }
+</style>

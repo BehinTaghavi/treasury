@@ -6,6 +6,8 @@
  * Ctrl+Enter saves. Errors are shown from the API's codes, translated.
  * The voucher the receipt will produce is shown at the bottom while the form is filled (owner's report no. 4, item 8); the treasurer
  * confirms it from the receipts list after saving.
+ * With `replaces` the form is the replacement of a received cheque (owner's item 14 (d)): the payer is the old cheque's, the new cheques
+ * may differ in amount and number (answer to Q31), and the receipt is saved with the old cheque marked «تعویض شده».
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -22,7 +24,10 @@ interface Line {
   g1Name: string; g1Code: string; g2Name: string; g2Code: string
 }
 
-const props = withDefaults(defineProps<{ kind: Kind; apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
+const props = withDefaults(defineProps<{
+  kind: Kind; apiBase?: string; locale?: Locale; token?: () => string | undefined
+  replaces?: { id: string; number: string; amount: number; payerCode: string }
+}>(), { apiBase: '', locale: 'fa', token: undefined, replaces: undefined })
 const emit = defineEmits<{ saved: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
@@ -50,7 +55,8 @@ const methodChoices = computed<Choice[]>(() => methods
 const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 
 // ---- header (every kind) ----
-const header = reactive({ date: todayJalali(), payer: '', groupId: '', purpose: '', ref1: '', ref2: '', departmentId: '', salesProceeds: false, note: '' })
+const header = reactive({ date: todayJalali(), payer: props.replaces?.payerCode ?? '', groupId: '', purpose: props.replaces ? `تعویض چک ${props.replaces.number}` : '',
+  ref1: '', ref2: '', departmentId: '', salesProceeds: false, note: '' })
 const payers = ref<Detail[]>([])
 /** Owner, 14 Nov 2026 (answer to Q22): payers are customers and persons or companies. */
 const PayerRoles = 'Customer,PersonOrCompany'
@@ -97,7 +103,7 @@ const lines = ref<Line[]>([blankLine()])
 const bankChoices = computed<Choice[]>(() => L.banks.value.filter(b => b.isActive !== false).map(b => ({ value: b.id, label: b.name })))
 const currencyChoices = computed<Choice[]>(() => L.currencies.value.filter(c => c.code).map(c => ({ value: c.code!, label: c.name, hint: c.code! })))
 const cityChoices = computed<Choice[]>(() => L.cities.value.map(c => ({ value: c.name, label: c.name })))
-const kindChoices = computed<Choice[]>(() => lineKinds.map(k => ({ value: k.value, label: fa.value ? k.fa : k.en })))
+const kindChoices = computed<Choice[]>(() => lineKinds.filter(k => !props.replaces || !isGuarantee(k.value)).map(k => ({ value: k.value, label: fa.value ? k.fa : k.en })))
 
 /** «ثبت چک بعدی»: the next line starts as a copy of the last one (same bank, account, due date…), with the next cheque number. */
 function nextLine() {
@@ -171,7 +177,8 @@ function request(): { path: string; body: Record<string, unknown> } | { error: s
       if (l.currency !== 'IRR' && parseAmount(l.rate) === null) return { error: 'Money.InvalidRate' }
       if (isCheque(l.kind) && !l.sayadId.trim()) return { error: 'Receipt.SayadIdRequired' }
     }
-    return { path: '/api/cashflow/receipts/instruments', body: { header: headerBody(), instruments: lines.value.map(lineBody) } }
+    const path = props.replaces ? `/api/cashflow/instruments/${props.replaces.id}/replace` : '/api/cashflow/receipts/instruments'
+    return { path, body: { header: headerBody(), instruments: lines.value.map(lineBody) } }
   }
   if (!money1.accountId) return { error: 'Receipt.AccountNotFound' }
   const amount = parseAmount(money1.amount)
@@ -231,7 +238,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await L.load(); payers.value = await L.searchDetails('', undefined, PayerRoles) })
+onMounted(async () => { await L.load(); payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles) })
 </script>
 
 <template>
@@ -240,7 +247,7 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
       <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
       <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" /></label>
       <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
-        <SearchSelect v-model="header.payer" :options="payerChoices" remote required :aria-label="t('پرداخت کننده', 'Payer')"
+        <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="!!replaces" :aria-label="t('پرداخت کننده', 'Payer')"
                       :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
       </label>
       <label>{{ t('گروه بابت', 'Purpose group') }}
@@ -327,6 +334,8 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
 
     <div class="tr-buttons">
       <strong>{{ t('جمع (ریال):', 'Total (Rial):') }} <span class="num">{{ money(total) }}</span></strong>
+      <span v-if="replaces" class="muted">{{ t(`چک قبلی: ${money(replaces.amount)} – تفاوت: ${money(total - replaces.amount)}`,
+        `Old cheque: ${money(replaces.amount)} – difference: ${money(total - replaces.amount)}`) }}</span>
       <button type="submit" :disabled="saving">{{ t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>

@@ -18,7 +18,16 @@
 | ۱۳ — وصول شده | Cleared | RecordCleared (ثبت وصول) | DepositedForCollection | D_Check_vos_m | همه |
 | ۱۴ — برگشت شده | Bounced | RecordBounced (ثبت برگشت) | DepositedForCollection | D_Check_vos_m، Checkbacked | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer (عودت به صادرکننده) | InCashDesk | D_Check_Od_m | همه |
-| ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده لازم است) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
+| — عودت شده از بانک | ReturnedFromBank | ReturnFromBank (عودت به شرکت) | DepositedForCollection | بند ۱۴ (ج) | همه |
+| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (واگذاری مجدد) | ReturnedFromBank | بند ۱۴، Q33 | چک عادی، چک بانکی |
+| ۱۴ — برگشت شده | Bounced | RecordBounced (شمارهٔ اعلامیهٔ برگشت الزامی؛ تاریخ مرحله تاریخ اعلامیه است) | DepositedForCollection، ReturnedFromBank | بند ۱۴ (ه)، Q33 | همه |
+| ۱۴ — برگشت شده | Bounced | RecordEndorsementReturned (برگشت خرج، با شمارهٔ اعلامیه) | Endorsed | بند ۱۴ (ح) | همه |
+| ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | دستورالعمل | همه |
+| — تعویض شده | Replaced | Replace (با رسید دریافت چک‌های جدید از همان پرداخت‌کننده) | InCashDesk، ReturnedFromBank، Bounced | بند ۱۴ (د)، Q31 | غیر تضمینی |
+| — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، ReturnedFromBank، Bounced | بند ۱۴ (و)، Q30 | همه |
+| ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
+
+بند ۱۴ مدیرعامل (۲۴ آبان ۱۴۰۵) و پاسخ‌های Q30 تا Q35: `docs/domain/received-cheque-steps.fa.md`. «برگشت شده» و «خرج شده» دیگر پایانی نیستند.
 
 ## صادره (در سیستم قدیم Dp = 2)
 
