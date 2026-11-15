@@ -1,31 +1,46 @@
-# Accounting vouchers for receipts and payments
 
-> Farsi version: [posting-rules.fa.md](posting-rules.fa.md). Keep both in step when either changes.
 
-Source: the owner's instruction **182-99 (22/07/1399) «راهنمای سند حسابداری پرداخت‌ها و دریافت‌ها در خزانه‌داری»**, sent 10 Nov 2026.
-These rules are for Phase F (`posting-svc`); they are written down now because Basic Information already stores what they need.
+## Treasury voucher template (owner's table «شابلون اسناد خزانه داری», resent 15 Nov 2026)
 
-## Account structure (owner, 10 Nov 2026)
-- **Fixed part**, four levels that depend on each other: گروه → کل → معین → معین در معین. Each level's code starts with its parent's code; the length of each level is a company setting (Iran Nazho Co.: 1 / 2 / 4 / 6 digits).
-- **Floating part**: تفصیل, a unique code of its own length (Iran Nazho Co.: 6 digits), with a type (بانکها، اشخاص و شرکت‌ها، مشتریان، کارکنان، مراکز هزینه، سفارشات، قراردادها…).
-- Entries go only on an account without a lower level (a معین without معین در معین, or a معین در معین). Old program: «حساب داراي سطح معين در معين است».
-- A معین / معین در معین lists the تفصیل types it allows in the first and, optionally, the second position, possibly several per position. A تفصیل of a type not listed is refused; when types are listed, the تفصیل is required. The new-generation ERP defines this on the account; for older ERPs (Iran Nazho Co.) it is set in Treasury → Basic Information → Chart of accounts.
+The owner's spreadsheet lists, for every receipt, payment and operation, the account debited and credited and the type of
+تفصیل on each side. Its account-number columns are empty: they are filled in per company. «گروه بابت» means the purpose group's
+معین; «بانک مربوطه» the bank account's تفصیل; «ذینفع» the payer on a receipt and the payee on a payment; «صندوقدار» and «تنخواه دار»
+the holders. The table, as sent (the Farsi copy of this file has the same table):
 
-## The rule
-The **purpose group (گروه بابت)** chosen by the user is the key: each purpose group points to one معین / معین در معین. With it, the voucher is built automatically.
+| نوع | عملیات | بدهکار | تفصیل بدهکار | بستانکار | تفصیل بستانکار |
+|---|---|---|---|---|---|
+| دریافت | دریافت چک عادی - روز | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | گروه بابت | ذینفع |
+| دریافت | دریافت چک عادی - مدت دار | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | گروه بابت | ذینفع |
+| دریافت | دریافت چک انتظامی | چک انتظامی به نفع شرکت | ذینفع | طرف حساب انتظامی | ذینفع |
+| دریافت | دریافت سفته عادی - روز / مدت دار | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | گروه بابت | ذینفع |
+| دریافت | دریافت سفته انتظامی | سفته انتظامی به نفع شرکت | ذینفع | طرف حساب انتظامی | ذینفع |
+| دریافت | دریافت نقدی / واریزی | صندوق | ذینفع | گروه بابت | ذینفع |
+| پرداخت | دریافت تنخواه گردان (ترمیم) | تنخواه گردان | ذینفع | بانک | بانک مربوطه |
+| پرداخت | پرداخت چک نقدی | گروه بابت | ذینفع | بانک / اسناد پرداختنی | بانک مربوطه |
+| پرداخت | پرداخت چک نقدی - حساب پشتیبان | (۱) بانک دریافت کننده از حساب پشتیبان، (۲) ذینفع دریافت کننده چک | بانک مربوطه | (۱) بانک پشتیبان، (۲) بانک صادر کننده چک | بانک مربوطه |
+| پرداخت | پرداخت چک مدت دار | گروه بابت | ذینفع | اسناد پرداختنی | ذینفع؛ تفصیل دوم: بانک مربوطه |
+| پرداخت | پرداخت سفته عادی | گروه بابت | ذینفع | اسناد پرداختنی | ذینفع |
+| پرداخت | پرداخت چک انتظامی | طرف حساب انتظامی | ذینفع | چک انتظامی به عهده شرکت | ذینفع |
+| پرداخت | پرداخت سفته انتظامی | طرف حساب انتظامی | ذینفع | سفته انتظامی به عهده شرکت | ذینفع |
+| پرداخت | برداشت از حساب بانکی | هزینه و کارمزد بانکی / تسهیلات پرداختنی | ذینفع | بانک / نقد و بانک | بانک مربوطه |
+| پرداخت | پرداخت نقدی | گروه بابت | ذینفع | صندوق | صندوقدار |
+| پرداخت | پرداخت تنخواه گردان | گروه بابت | مرکز | تنخواه گردان | تنخواه دار |
+| عملیات | واگذاری چک به بانک | چک های در جریان وصول | بانک مربوطه | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | واگذاری سفته به بانک | سفته های در جریان وصول | بانک مربوطه | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | اعلام وصول چک / سفته واگذاری توسط بانک | بانک / نقد و بانک | بانک مربوطه | چک (سفته) های در جریان وصول | بانک مربوطه |
+| عملیات | برگشت چک واگذاری توسط بانک | اسناد درخواست شده | ذینفع | چک های در جریان وصول | بانک مربوطه |
+| عملیات | عودت چک واگذاری توسط بانک | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | چک های در جریان وصول | بانک مربوطه |
+| عملیات | عودت چک‌های نزد صندوق | بدهکاران یا ... | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | ابطال چک دریافتنی نزد صندوق | مطالبات سوخت شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | ابطال چک / سفته انتظامی دریافتی نزد صندوق | طرف حساب انتظامی | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
+| عملیات | تبدیل چک / سفته انتظامی دریافتی به عادی | (۱) اسناد نزد صندوق / اسناد دریافتنی، (۲) طرف حساب انتظامی | ذینفع | (۱) درآمد حاصل از تضمین استفاده شده، (۲) چک انتظامی به نفع شرکت | ذینفع |
+| عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
+| عملیات | عودت چک پرداختنی صادره نزد ذینفع و ابطال آن | اسناد پرداختنی | ذینفع | بستانکاران یا ... | ذینفع |
+| عملیات | عودت چک‌های خرج شده توسط ما به دیگران (پس از برگشت) | اسناد واخواست شده | ذینفع | بستانکاران یا ... | ذینفع |
 
-| | Debit (بدهکار) | Credit (بستانکار) |
-|---|---|---|
-| **Payment** | معین of the purpose group + **payee's** تفصیل | معین «موجودی بانک» + **the bank account's** تفصیل |
-| Payment by post-dated cheque | same | معین «اسناد پرداختنی» + **payee's** تفصیل |
-| **Receipt** | معین «موجودی بانک» + **the bank account's** تفصیل | معین of the purpose group + **payer's** تفصیل |
-| Receipt of a post-dated cheque | معین «اسناد دریافتنی» or «اسناد نزد صندوق» + **payer's** تفصیل | same |
-
-Examples from the instruction: payment purpose groups «خرید مواد اولیه» and «هزینه حمل» → حساب‌های پرداختنی تجاری; «پیش پرداخت خرید» → پیش پرداخت خرید کالا. Receipt purpose group «وجوه حاصل فروش» → کنترل فروش.
-
-## Setup order (from the instruction)
-Payments: 1) bank accounts (their معین already exists in the accounting system), 2) cheque books per bank account, 3) payment purpose groups. Receipts: 1) receipt purpose groups.
-
-## Still to settle with the owner before Phase F
-- Which معین is used for each instrument state (in the cash desk, deposited for collection, bounced, cleared): the bank account form already has «معین واگذاری» and «معین برگشتی» (manual section 5).
-- Voucher per operation or per day; numbering; how vouchers reach the accounting system.
+Plan (owner's report no. 4, item 8): a Basic Information page «شابلون اسناد خزانه داری» holds the company's account codes for the
+fixed accounts of this table (e.g. اسناد نزد صندوق، چک های در جریان وصول، چک انتظامی به نفع شرکت، طرف حساب انتظامی); the purpose
+group, bank account, cash desk and petty cash supply their own accounts. Each receipt and cheque step then shows its voucher lines at
+the bottom of its form; a confirmed voucher is sent to the accounting system once it is connected. Open points are in the reply to
+report no. 4 (debit account of money paid straight into a bank, one collection account or each bank's «معین واگذاری», voucher per
+operation or per day).
