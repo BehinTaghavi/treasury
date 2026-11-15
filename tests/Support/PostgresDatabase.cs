@@ -1,15 +1,17 @@
 using Npgsql;
-using Treasury.Cashflow.Infrastructure.Postgres.Tests;
+using Treasury.Tests.Support;
 using Xunit;
 
 [assembly: AssemblyFixture(typeof(PostgresDatabase))]
 
-namespace Treasury.Cashflow.Infrastructure.Postgres.Tests;
+namespace Treasury.Tests.Support;
+
+// Shared by the PostgreSQL adapter test projects of every service (linked into each; see their .csproj).
 
 /// <summary>
 /// One fresh test database for the whole test run, built from the real schema scripts in db/postgres
 /// the same way db/postgres/apply.sh does it: roles as administrator, every object as treasury_owner.
-/// The adapters then log in as the cashflow_svc role, so missing grants fail the tests too.
+/// The adapters then act as their service's role (<see cref="ServiceAs"/>), so missing grants fail the tests too.
 /// </summary>
 public sealed class PostgresDatabase : IAsyncLifetime
 {
@@ -19,7 +21,10 @@ public sealed class PostgresDatabase : IAsyncLifetime
     private readonly string _name = $"treasury_adapter_test_{Environment.ProcessId}";
 
     /// <summary>Connection string of the cashflow service (role cashflow_svc) to the test database.</summary>
-    public string Service { get; private set; } = string.Empty;
+    public string Service => ServiceAs("cashflow_svc");
+
+    /// <summary>Connection string that acts as <paramref name="role"/> (e.g. reference_svc) on the test database.</summary>
+    public string ServiceAs(string role) => new NpgsqlConnectionStringBuilder(Admin) { Options = $"-c role={role}" }.ConnectionString;
 
     /// <summary>Administrator connection to the test database, for checks the service role may not make.</summary>
     public string Admin { get; private set; } = string.Empty;
@@ -48,12 +53,13 @@ public sealed class PostgresDatabase : IAsyncLifetime
             return;
         }
 
-        await using (var server = new NpgsqlConnection(With(_admin, "postgres")))
-        {
-            await server.OpenAsync();
-            await Exec(server, $"DROP DATABASE IF EXISTS \"{_name}\" WITH (FORCE)");
-            await Exec(server, $"CREATE DATABASE \"{_name}\"");
-        }
+        // Test projects run in parallel and share the server's roles (000_roles.sql): one setup at a time.
+        // The lock lives in the "postgres" database, which every fixture connects to, and ends with this connection.
+        await using var server = new NpgsqlConnection(With(_admin, "postgres"));
+        await server.OpenAsync();
+        await Exec(server, "SELECT pg_advisory_lock(73170001)");
+        await Exec(server, $"DROP DATABASE IF EXISTS \"{_name}\" WITH (FORCE)");
+        await Exec(server, $"CREATE DATABASE \"{_name}\"");
 
         Admin = With(_admin, _name);
         var scripts = Directory.GetFiles(Path.Combine(RepositoryRoot(), "db", "postgres"), "0??_*.sql").Order(StringComparer.Ordinal).ToList();
@@ -82,8 +88,6 @@ public sealed class PostgresDatabase : IAsyncLifetime
             await Exec(admin, "SELECT cashflow.open_fiscal_year(1405, '2026-03-21', '2027-03-20')");
         }
 
-        // Log in as the administrator but act as cashflow_svc (in production the service logs in as that role itself).
-        Service = new NpgsqlConnectionStringBuilder(Admin) { Options = "-c role=cashflow_svc" }.ConnectionString;
     }
 
     public async ValueTask DisposeAsync()

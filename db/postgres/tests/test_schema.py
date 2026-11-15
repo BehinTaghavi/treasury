@@ -162,3 +162,32 @@ def test_the_scripts_can_run_again_after_years_were_opened_by_an_administrator(d
         owners = {r[0] for r in c.execute(
             "SELECT pg_get_userbyid(relowner) FROM pg_class WHERE relnamespace = 'cashflow'::regnamespace AND relname LIKE 'instrument%fy14%'")}
     assert owners == {"treasury_owner"}
+
+
+def test_a_name_is_unique_per_list_and_parent_and_a_currency_code_once(db):
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        country, a, b = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        add = "INSERT INTO reference.catalogue_item (id, kind, parent_id, name, name_key, code) VALUES (%s, %s, %s, %s, %s, %s)"
+        c.execute(add, (country, "Country", None, "ایران", "ایران", None))
+        c.execute(add, (a, "Province", country, "فارس", "فارس", None))
+        c.execute(add, (b, "Province", country, "اصفهان", "اصفهان", None))
+        c.execute(add, (uuid.uuid4(), "City", a, "نیک‌آباد", "نیکآباد", None))
+        c.execute(add, (uuid.uuid4(), "City", b, "نیک‌آباد", "نیکآباد", None))  # same name, other province: allowed
+        c.execute(add, (uuid.uuid4(), "Currency", None, "دلار", "دلار", "USD"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "Country", None, "ايران", "ایران", None))  # same key, no parent
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "Currency", None, "دلار آمریکا", "دلارآمریکا", "USD"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "City", None, "کرج", "کرج", None))  # a city needs its province
+
+
+def test_the_reference_service_role_cannot_read_the_cashflow_schema(db):
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("SELECT count(*) FROM cashflow.instrument")

@@ -69,6 +69,7 @@ jobs:
           {
             echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
             echo "CASHFLOW_DB_PASSWORD=$(openssl rand -hex 16)"
+            echo "REFERENCE_DB_PASSWORD=$(openssl rand -hex 16)"
             echo "KEYCLOAK_ADMIN_PASSWORD=$(openssl rand -hex 16)"
             echo "GATEWAY_PORT=8080"
           } > deploy/.env

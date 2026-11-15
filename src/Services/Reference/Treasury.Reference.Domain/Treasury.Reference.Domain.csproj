@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Domain layer of reference-svc (Organization & Reference Data): lists used by every other service. No frameworks. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Domain</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\BuildingBlocks\Treasury.BuildingBlocks.Domain\Treasury.BuildingBlocks.Domain.csproj" />
+  </ItemGroup>
+</Project>

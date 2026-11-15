@@ -26,6 +26,7 @@ services:
       PGUSER: postgres
       PGPASSWORD: ${POSTGRES_PASSWORD}
       CASHFLOW_DB_PASSWORD: ${CASHFLOW_DB_PASSWORD:?set in .env}
+      REFERENCE_DB_PASSWORD: ${REFERENCE_DB_PASSWORD:?set in .env}
       FISCAL_YEARS: ${FISCAL_YEARS:-1404:2025-03-21:2026-03-20 1405:2026-03-21:2027-03-20}
     volumes:
       - ../db/postgres:/db:ro
@@ -35,6 +36,7 @@ services:
         set -e
         bash /db/apply.sh treasury
         psql -v ON_ERROR_STOP=1 -d treasury -c "ALTER ROLE cashflow_svc PASSWORD '$${CASHFLOW_DB_PASSWORD}'"
+        psql -v ON_ERROR_STOP=1 -d treasury -c "ALTER ROLE reference_svc PASSWORD '$${REFERENCE_DB_PASSWORD}'"
         for fy in $${FISCAL_YEARS}; do
           IFS=: read y s e <<< "$$fy"
           psql -v ON_ERROR_STOP=1 -d treasury -c "SELECT cashflow.open_fiscal_year($$y, '$$s', '$$e')"
@@ -65,6 +67,24 @@ services:
       Development__OpenFiscalYears__0: "1404"
       Development__OpenFiscalYears__1: "1405"
 
+  # Basic Information lists (reference-svc). Same login rules as cashflow-api.
+  reference-api:
+    build:
+      context: ..
+      dockerfile: src/Services/Reference/Treasury.Reference.Api/Dockerfile
+    depends_on:
+      db-init: { condition: service_completed_successfully }
+    environment:
+      ConnectionStrings__Treasury: "Host=postgres;Database=treasury;Username=reference_svc;Password=${REFERENCE_DB_PASSWORD}"
+      ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Development}
+      Keycloak__Authority: ${KEYCLOAK_AUTHORITY:-}
+      Keycloak__Audience: treasury
+
+  remote-basic-info:
+    build:
+      context: ../frontend
+      args: { APP: remotes/basic-info, REMOTE_BASE_URL: /remotes/basic-info/ }
+
   remote-receipts:
     build:
       context: ../frontend
@@ -79,7 +99,7 @@ services:
 
   gateway:
     image: nginx:1.29-alpine
-    depends_on: [shell, remote-receipts, cashflow-api, keycloak]
+    depends_on: [shell, remote-receipts, remote-basic-info, cashflow-api, reference-api, keycloak]
     ports:
       # Only this computer can open the system unless GATEWAY_ADDRESS=0.0.0.0 is set (there is no login yet).
       - "${GATEWAY_ADDRESS:-127.0.0.1}:${GATEWAY_PORT:-8080}:80"

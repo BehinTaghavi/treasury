@@ -6,8 +6,10 @@
 ## Run the system locally (no database, no login)
 ```bash
 dotnet run --project src/Services/Cashflow/Treasury.Cashflow.Api          # http://localhost:5081, in-memory, Development
+dotnet run --project src/Services/Reference/Treasury.Reference.Api        # http://localhost:5082, Basic Information lists
 cd frontend && pnpm install
 pnpm --filter @treasury/remote-receipts build && pnpm --filter @treasury/remote-receipts preview   # http://localhost:5174
+pnpm --filter @treasury/remote-basic-info build && pnpm --filter @treasury/remote-basic-info preview # http://localhost:5175
 pnpm --filter @treasury/shell dev                                          # http://localhost:3000 → "دریافت‌ها"
 ```
 Development-only endpoints simulate other services: `POST /dev/payments/{id}/approve`, `POST /dev/bank-accounts/{id}/balance/{rial}`, `POST /dev/fiscal-years/{year}/open`, `GET /dev/outbox`.

@@ -18,6 +18,15 @@ location="$(curl -s -o /dev/null -w '%{redirect_url}' "$base/receipts")"
 [[ "$location" == "$base/receipts/" ]] || fail "/receipts redirects to '$location' instead of '$base/receipts/'"
 [[ "$(status "$base/remotes/receipts/mf-manifest.json")" == 200 ]] || fail "receipts micro-frontend manifest missing"
 [[ "$(status "$base/remotes/receipts/remoteEntry.js")" == 200 ]] || fail "receipts micro-frontend entry missing"
+[[ "$(status "$base/remotes/basic-info/mf-manifest.json")" == 200 ]] || fail "basic information micro-frontend manifest missing"
+
+# Basic Information (reference-svc -> PostgreSQL as reference_svc): the default lists are there on a new database.
+for _ in $(seq 1 60); do
+  [[ "$(status "$base/api/reference/banks")" == 200 ]] && break
+  sleep 2
+done
+curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank names list (reference-svc) is missing or empty"
+curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
 
 # Keycloak must advertise the address users actually use (host and port), or logins and token checks fail.
 for _ in $(seq 1 60); do
@@ -37,4 +46,4 @@ curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheq
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 
-echo "OK: shell, receipts micro-frontend, Keycloak and the cashflow API with PostgreSQL work at $base"
+echo "OK: shell, receipts and basic information micro-frontends, Keycloak, and the cashflow and reference APIs with PostgreSQL work at $base"
