@@ -26,6 +26,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 ## Done log
 | Date | What |
 |---|---|
+| 2026-11-15 | Reviewer's guide in Farsi (`docs/reviewer-guide.fa.md`): the code and its patterns explained, a pull-request review checklist, and a classified learning path for the technologies used |
 | 2026-11-09 | Repository loaded: Phase 0 code, design document (EN/FA), decisions log, plan, masked legacy source |
 | 2026-11-09 | Phase 0 first package delivered |
 | 2026-11-10 | Phase A tasks 1–4: first build with NuGet (0 warnings), 81 .NET tests incl. 14 PostgreSQL adapter tests, Docker Compose runs end to end, CI green with a `compose` job; environment setup script |
