@@ -1,0 +1,194 @@
+using Treasury.Accounts.Application.Abstractions;
+using Treasury.Accounts.Domain.BankAccounts;
+using Treasury.BuildingBlocks.Domain;
+
+namespace Treasury.Accounts.Application.BankAccounts;
+
+/// <summary>The bank account form as sent by the screen. Dates are Jalali text, converted at this edge (CLAUDE.md rule 5).</summary>
+public sealed record BankAccountForm(
+    string AccountNumber,
+    Guid BankId,
+    string? BranchName,
+    string? BranchCode,
+    Guid? CityId,
+    string? OpeningDate,
+    bool IsForeignCurrency,
+    string? CurrencyCode,
+    string LedgerAccountCode,
+    string? Detail1Code,
+    string? Detail2Code,
+    string? CollectionAccountCode,
+    string? BouncedAccountCode,
+    bool HasCollectionPriority,
+    bool IsFacility);
+
+public sealed record RegisterBankAccountCommand(string IdempotencyKey, BankAccountForm Form, Guid? MainAccountId = null);
+
+public sealed record ChangeBankAccountCommand(string IdempotencyKey, Guid Id, BankAccountForm Form, long ExpectedVersion);
+
+public sealed record SetBankAccountActiveCommand(string IdempotencyKey, Guid Id, bool Active, long ExpectedVersion);
+
+public sealed record BankAccountView(
+    Guid Id, string AccountNumber, Guid BankId, string? BranchName, string? BranchCode, Guid? CityId, string? OpeningDate,
+    string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode, string? Detail1Code, string? Detail2Code,
+    string? CollectionAccountCode, string? BouncedAccountCode, bool HasCollectionPriority, bool IsFacility, bool IsActive, long Version)
+{
+    public static BankAccountView From(BankAccount a) => new(
+        a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.BranchName, a.Data.BranchCode, a.Data.CityId, a.Data.OpeningDate?.ToJalaliString(),
+        a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode, a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code,
+        a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.HasCollectionPriority, a.Data.IsFacility, a.IsActive, a.Version);
+}
+
+/// <summary>Use cases of the company's bank accounts (manual section 5). Each write is one command in one transaction.</summary>
+public sealed class BankAccountUseCases(IUnitOfWork unitOfWork, IBankAccountRepository accounts, IReferenceLookup reference, IIdempotencyStore idempotency)
+{
+    private readonly CommandRunner _runner = new(unitOfWork, idempotency);
+
+    public Task<Result<Guid>> RegisterAsync(RegisterBankAccountCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var (data, ledger) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
+            BankAccount? main = null;
+            var mainHasBackup = false;
+            if (command.MainAccountId is { } mainId)
+            {
+                main = await accounts.GetAsync(mainId, ct).ConfigureAwait(false);
+                if (main is null)
+                {
+                    return Result<Guid>.Fail("BankAccount.MainAccountNotFound", $"Main account {mainId} was not found.");
+                }
+
+                mainHasBackup = await accounts.HasBackupAsync(mainId, null, ct).ConfigureAwait(false);
+            }
+
+            var account = BankAccount.Register(Guid.NewGuid(), data, ledger, main, mainHasBackup);
+            if (await accounts.NumberTakenAsync(account.NumberKey, null, ct).ConfigureAwait(false))
+            {
+                return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined."); // "شماره حساب تكراري است"
+            }
+
+            await accounts.AddAsync(account, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(account.Id);
+        }, cancellationToken);
+
+    public Task<Result<Guid>> ChangeAsync(ChangeBankAccountCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var account = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
+            var (data, ledger) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
+            account.Change(data, ledger);
+            if (await accounts.NumberTakenAsync(account.NumberKey, account.Id, ct).ConfigureAwait(false))
+            {
+                return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined.");
+            }
+
+            await accounts.SaveAsync(account, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(account.Id);
+        }, cancellationToken);
+
+    public Task<Result<Guid>> SetActiveAsync(SetBankAccountActiveCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var account = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
+            if (command.Active)
+            {
+                account.Activate();
+            }
+            else
+            {
+                account.Deactivate();
+            }
+
+            await accounts.SaveAsync(account, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(account.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// Manual: accounts with "اولویت واگذاری" come first in the bank lists so they are easier to choose; then by number.
+    /// Inactive accounts only when asked (the Basic Information screen shows them, the receipt and payment forms do not).
+    /// </summary>
+    public Task<IReadOnlyList<BankAccountView>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync<IReadOnlyList<BankAccountView>>(async ct =>
+            (await accounts.ListAsync(includeInactive, ct).ConfigureAwait(false))
+                .OrderByDescending(a => a.Data.HasCollectionPriority)
+                .ThenBy(a => a.NumberKey, StringComparer.Ordinal)
+                .Select(BankAccountView.From)
+                .ToList(),
+            cancellationToken);
+
+    private async Task<BankAccount> LoadAsync(Guid id, long expectedVersion, CancellationToken ct)
+    {
+        var account = await accounts.GetAsync(id, ct).ConfigureAwait(false)
+            ?? throw new DomainException("BankAccount.NotFound", $"Bank account {id} was not found.");
+        return account.Version == expectedVersion
+            ? account
+            : throw new ConcurrencyConflictException($"Bank account {id} was changed by someone else.");
+    }
+
+    /// <summary>Checks the form against reference-svc (bank, city, currency, ledger accounts and تفصیل) and builds the domain data.</summary>
+    private async Task<(BankAccountData Data, LedgerFacts Ledger)> PrepareAsync(BankAccountForm form, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(form);
+        var bank = await reference.BankAsync(form.BankId, ct).ConfigureAwait(false);
+        Require(form.BankId == Guid.Empty || bank is not null, "BankAccount.BankNotFound", "The bank is not in the bank list.");
+        Require(bank is null || bank.IsActive, "BankAccount.BankInactive", "The bank is inactive in the bank list.");
+        if (form.CityId is { } cityId)
+        {
+            var city = await reference.CityAsync(cityId, ct).ConfigureAwait(false);
+            Require(city is not null, "BankAccount.CityNotFound", "The city is not in the list.");
+        }
+
+        // Form_Bankacc: the Rial unless "ارزی" is ticked; then the currency is chosen from the list.
+        var currencyCode = form.IsForeignCurrency ? (form.CurrencyCode ?? string.Empty).Trim().ToUpperInvariant() : BankAccount.Rial;
+        Require(!form.IsForeignCurrency || currencyCode != BankAccount.Rial, "BankAccount.ForeignCurrencyRequired", "Choose the foreign currency of the account.");
+        if (form.IsForeignCurrency)
+        {
+            var currency = await reference.CurrencyAsync(currencyCode, ct).ConfigureAwait(false);
+            Require(currency is { IsActive: true }, "BankAccount.CurrencyNotFound", "The currency is not an active currency of the list.");
+        }
+
+        var accountsByCode = new Dictionary<string, LedgerAccountFact>();
+        foreach (var code in new[] { form.LedgerAccountCode, form.CollectionAccountCode, form.BouncedAccountCode }.Select(Trim).OfType<string>().Distinct())
+        {
+            if (await reference.LedgerAccountAsync(code, ct).ConfigureAwait(false) is { } fact)
+            {
+                accountsByCode[code] = fact;
+            }
+        }
+
+        var detailsByCode = new Dictionary<string, DetailFact>();
+        foreach (var code in new[] { form.Detail1Code, form.Detail2Code }.Select(Trim).OfType<string>().Distinct())
+        {
+            if (await reference.DetailAsync(code, ct).ConfigureAwait(false) is { } fact)
+            {
+                detailsByCode[code] = fact;
+            }
+        }
+
+        var data = new BankAccountData(
+            form.AccountNumber,
+            form.BankId,
+            form.BranchName,
+            form.BranchCode,
+            form.CityId,
+            string.IsNullOrWhiteSpace(form.OpeningDate) ? null : FiscalDate.ParseJalali(form.OpeningDate),
+            currencyCode,
+            new BankLedger(form.LedgerAccountCode, form.Detail1Code, form.Detail2Code, form.CollectionAccountCode, form.BouncedAccountCode),
+            form.HasCollectionPriority,
+            form.IsFacility);
+        return (data, new LedgerFacts(accountsByCode, detailsByCode));
+    }
+
+    private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>
+        _runner.RunAsync(key, work, id => id.ToString(), Guid.Parse, ct);
+
+    private static string? Trim(string? s) => string.IsNullOrWhiteSpace(s) ? null : PersianText.Clean(s);
+
+    private static void Require(bool condition, string code, string message)
+    {
+        if (!condition)
+        {
+            throw new DomainException(code, message);
+        }
+    }
+}

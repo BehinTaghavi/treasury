@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Application layer of reference-svc: use cases and ports. Depends only on the domain. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Reference.Domain\Treasury.Reference.Domain.csproj" />
+  </ItemGroup>
+</Project>

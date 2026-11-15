@@ -41,4 +41,26 @@ describe('api client', () => {
     const api = createApi({ fetchImpl: (async () => { throw new TypeError('offline') }) as unknown as typeof fetch })
     expect(await api.get('/api/x')).toEqual({ ok: false, code: 'Network.Error', status: 0 })
   })
+
+  it('sends an idempotency key on updates too', async () => {
+    let seen: RequestInit | undefined
+    const fetchImpl = async (_: string, init: RequestInit) => { seen = init; return new Response(JSON.stringify({ value: 'x' }), { status: 201 }) }
+    const api = createApi({ fetchImpl: fetchImpl as unknown as typeof fetch })
+    const r = await api.put('/api/reference/banks/1', { name: 'ملت', version: 1 })
+    expect(r.ok).toBe(true)
+    expect(seen?.method).toBe('PUT')
+    expect((seen?.headers as Record<string, string>)['Idempotency-Key']).toBeTruthy()
+  })
+
+  it('uploads a file as form data with an idempotency key and no JSON content type', async () => {
+    let seen: RequestInit | undefined
+    const fetchImpl = async (_: string, init: RequestInit) => { seen = init; return new Response(JSON.stringify({ value: { added: 3 } }), { status: 200 }) }
+    const api = createApi({ fetchImpl: fetchImpl as unknown as typeof fetch })
+    const r = await api.upload<{ added: number }>('/api/reference/ledger/chart/import?preview=true', new Blob(['x']), 'chart.xls')
+    expect(r.ok && r.value.added).toBe(3)
+    const h = seen?.headers as Record<string, string>
+    expect(seen?.body).toBeInstanceOf(FormData)
+    expect(h['Idempotency-Key']).toBeTruthy()
+    expect(h['Content-Type']).toBeUndefined()
+  })
 })

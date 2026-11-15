@@ -4,6 +4,13 @@
     <Project Path="src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Treasury.BuildingBlocks.Domain.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Accounts/">
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Api/Treasury.Accounts.Api.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Application/Treasury.Accounts.Application.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Domain/Treasury.Accounts.Domain.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Infrastructure.Postgres/Treasury.Accounts.Infrastructure.Postgres.csproj" />
+    <Project Path="src/Services/Accounts/Treasury.Accounts.Infrastructure/Treasury.Accounts.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Cashflow/">
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Api/Treasury.Cashflow.Api.csproj" />
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Application/Treasury.Cashflow.Application.csproj" />
@@ -11,11 +18,26 @@
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/Treasury.Cashflow.Infrastructure.Postgres.csproj" />
     <Project Path="src/Services/Cashflow/Treasury.Cashflow.Infrastructure/Treasury.Cashflow.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Reference/">
+    <Project Path="src/Services/Reference/Treasury.Reference.Api/Treasury.Reference.Api.csproj" />
+    <Project Path="src/Services/Reference/Treasury.Reference.Application/Treasury.Reference.Application.csproj" />
+    <Project Path="src/Services/Reference/Treasury.Reference.Domain/Treasury.Reference.Domain.csproj" />
+    <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure.Excel/Treasury.Reference.Infrastructure.Excel.csproj" />
+    <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure.Postgres/Treasury.Reference.Infrastructure.Postgres.csproj" />
+    <Project Path="src/Services/Reference/Treasury.Reference.Infrastructure/Treasury.Reference.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Treasury.Accounts.Application.Tests/Treasury.Accounts.Application.Tests.csproj" />
+    <Project Path="tests/Treasury.Accounts.Domain.Tests/Treasury.Accounts.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.Accounts.Infrastructure.Postgres.Tests/Treasury.Accounts.Infrastructure.Postgres.Tests.csproj" />
     <Project Path="tests/Treasury.ArchitectureTests/Treasury.ArchitectureTests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Application.Tests/Treasury.Cashflow.Application.Tests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Domain.Tests/Treasury.Cashflow.Domain.Tests.csproj" />
     <Project Path="tests/Treasury.Cashflow.Infrastructure.Postgres.Tests/Treasury.Cashflow.Infrastructure.Postgres.Tests.csproj" />
+    <Project Path="tests/Treasury.Reference.Application.Tests/Treasury.Reference.Application.Tests.csproj" />
+    <Project Path="tests/Treasury.Reference.Domain.Tests/Treasury.Reference.Domain.Tests.csproj" />
+    <Project Path="tests/Treasury.Reference.Infrastructure.Excel.Tests/Treasury.Reference.Infrastructure.Excel.Tests.csproj" />
+    <Project Path="tests/Treasury.Reference.Infrastructure.Postgres.Tests/Treasury.Reference.Infrastructure.Postgres.Tests.csproj" />
     <Project Path="tests/Treasury.TestShim/Treasury.TestShim.csproj" />
   </Folder>
 </Solution>

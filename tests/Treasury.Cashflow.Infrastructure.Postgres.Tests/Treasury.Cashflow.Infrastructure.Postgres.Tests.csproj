@@ -5,5 +5,6 @@
        Without it the tests are skipped locally and fail on CI. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\Services\Cashflow\Treasury.Cashflow.Infrastructure.Postgres\Treasury.Cashflow.Infrastructure.Postgres.csproj" />
+    <Compile Include="..\Support\PostgresDatabase.cs" Link="PostgresDatabase.cs" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- PostgreSQL 17 adapters of reference-svc (Npgsql). Needs NuGet; skipped in offline builds (-p:Offline=true). Schema: db/postgres. -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Reference.Infrastructure.Postgres</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Reference.Infrastructure\Treasury.Reference.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

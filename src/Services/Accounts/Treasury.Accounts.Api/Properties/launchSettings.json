@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "accounts": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:5083",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

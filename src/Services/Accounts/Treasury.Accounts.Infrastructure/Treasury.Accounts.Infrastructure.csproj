@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Adapters with no external packages: in-memory store, outbox messages, HTTP client of reference-svc.
+       The PostgreSQL adapters are in Treasury.Accounts.Infrastructure.Postgres (needs NuGet: Npgsql). -->
+  <PropertyGroup>
+    <RootNamespace>Treasury.Accounts.Infrastructure</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Treasury.Accounts.Application\Treasury.Accounts.Application.csproj" />
+  </ItemGroup>
+</Project>

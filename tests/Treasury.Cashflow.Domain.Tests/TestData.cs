@@ -1,3 +1,4 @@
+using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
 
