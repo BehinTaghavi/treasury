@@ -13,7 +13,7 @@ company's debts, (h) return of an endorsed cheque. The old program had one form 
 Status: **built** (15 Nov 2026) with the owner's answers to Q30–Q35 (`open-questions.md`): cancellation by the treasurer with
 management's order number and date (Q30); replacement cheques may differ in amount and number (Q31); endorsement to any تفصیل with the
 Sayad tracking number (Q32); a cheque back from the bank can be deposited again or get its bounce notice (Q33); «اسناد واخواست شده»
-(Q34); one voucher per cheque (Q35). Open: whether an endorsement must pay an approved payment request (Q36). Not built yet: undoing an
+(Q34); one voucher per cheque (Q35). An endorsement pays an approved payment request (Q36): the request's beneficiary receives the cheque; a returned endorsed cheque takes the payment back. Not built yet: undoing an
 unconfirmed step.
 
 ## 1. Mechanism
@@ -56,7 +56,7 @@ of the company bank account.
 | (e) bounced | **bounce notice no. and date** (required), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
 | (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» · payer | Q31 |
 | (f) cancelled | management's order no. and date, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
-| (g) endorsed | receiver (any تفصیل), payment purpose group and purpose, Sayad transfer tracking no. (required) | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
+| (g) endorsed | an approved payment request (its beneficiary, payment purpose group and purpose), Sayad transfer tracking no. (required) | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
 
 One voucher per step and cheque (answer to Q35), also when several cheques are deposited on one slip.

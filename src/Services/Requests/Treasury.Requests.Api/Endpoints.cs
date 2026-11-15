@@ -10,6 +10,11 @@ public sealed record EditRequest(PaymentRequestInput Input, long Version);
 
 public sealed record ChangeRequest(long Version, string? Reason = null);
 
+/// <summary>A payment against an approved request, sent by cashflow-svc when a received cheque is endorsed (answer to Q36).</summary>
+public sealed record PaymentInput(string Key, string Kind, Guid? InstrumentId, string? Reference, decimal Amount, string Currency, string Date);
+
+public sealed record ReversePaymentInput(string Key);
+
 public static class Endpoints
 {
     public static void MapPaymentRequestEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
@@ -54,6 +59,13 @@ public static class Endpoints
 
         api.MapPost("/{id:guid}/{change:regex(^(approve|withdraw-approval|cancel)$)}", async (Guid id, string change, ChangeRequest r, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
             ToHttp(await u.ChangeAsync(new(Key(http), id, change, r.Version, r.Reason), ct).ConfigureAwait(false)));
+
+        // Payments against approved requests (answer to Q36): an endorsed cheque pays the request; a returned one takes the payment back.
+        api.MapPost("/{id:guid}/payments", async (Guid id, PaymentInput p, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RecordPaymentAsync(new(Key(http), id, p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, p.Currency, p.Date), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/payments/reverse", async (Guid id, ReversePaymentInput p, HttpRequest http, PaymentRequestUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ReversePaymentAsync(Key(http), id, p.Key, ct).ConfigureAwait(false)));
     }
 
     private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();

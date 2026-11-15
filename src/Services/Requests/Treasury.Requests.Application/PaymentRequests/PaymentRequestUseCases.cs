@@ -35,20 +35,27 @@ public sealed record EditPaymentRequestCommand(string IdempotencyKey, Guid Id, P
 /// <param name="Change">"approve", "withdraw-approval" or "cancel" (with <paramref name="Reason"/>).</param>
 public sealed record ChangePaymentRequestCommand(string IdempotencyKey, Guid Id, string Change, long ExpectedVersion, string? Reason = null);
 
+/// <summary>A payment recorded by treasury against an approved request (answer to Q36: an endorsed cheque).</summary>
+public sealed record RecordRequestPaymentCommand(
+    string IdempotencyKey, Guid Id, string PaymentKey, string Kind, Guid? InstrumentId, string? Reference, decimal Amount, string Currency, string Date);
+
+public sealed record RequestPaymentView(string Key, string Kind, Guid? InstrumentId, string? Reference, decimal Amount, string Date, string UserId);
+
 public sealed record PaymentRequestView(
     Guid Id, int FiscalYear, int Number, string Date, Guid RequesterId, string RequesterName, Guid? RequesterDepartmentId, string? CostCenterCode,
     Guid BeneficiaryId, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string PurposeGroupName, string Purpose,
     string? Reference1, string? Reference2, decimal Amount, string Currency, string Method, int Priority, string? TransferAccount, string? CardNumber,
     string? PayFromKind, Guid? PayFromId, string? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
     string State, string RecordedBy, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, long Version,
-    IReadOnlyList<RequestAttachment>? Files = null)
+    IReadOnlyList<RequestAttachment>? Files = null, decimal PaidAmount = 0, IReadOnlyList<RequestPaymentView>? Payments = null)
 {
     public static PaymentRequestView From(PaymentRequest r) => new(
         r.Id, r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.RequesterId, r.RequesterName, r.RequesterDepartmentId, r.CostCenterCode,
         r.BeneficiaryId, r.BeneficiaryDetailCode, r.BeneficiaryName, r.PurposeGroupId, r.PurposeGroupName, r.Purpose, r.Reference1, r.Reference2,
         r.Amount, r.Currency, r.Method.ToString(), r.Priority, r.TransferAccount, r.CardNumber, r.PayFromKind?.ToString(), r.PayFromId,
         r.DueDate?.ToJalaliString(), r.DepartmentId, r.HasMainBeneficiaries, r.Attachments, r.Note, r.State.ToString(), r.RecordedBy, r.ApprovedBy,
-        r.ApprovedAt, r.CancelReason, r.Version, r.Files);
+        r.ApprovedAt, r.CancelReason, r.Version, r.Files, r.PaidAmount,
+        r.Payments.Select(p => new RequestPaymentView(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, p.Date.ToJalaliString(), p.UserId)).ToList());
 }
 
 /// <summary>
@@ -109,6 +116,33 @@ public sealed class PaymentRequestUseCases(
                     return Result<Guid>.Fail("Request.UnknownChange", $"Unknown change '{command.Change}'.");
             }
 
+            await requests.SaveAsync(request, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(request.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// Records a payment against an approved request (called by cashflow-svc when a received cheque is endorsed, answer to Q36). The request is
+    /// paid when its payments reach its amount. Repeating the same payment key changes nothing.
+    /// </summary>
+    public Task<Result<Guid>> RecordPaymentAsync(RecordRequestPaymentCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var request = await requests.GetAsync(command.Id, ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.NotFound", "The payment request was not found.");
+            request.RecordPayment(
+                new RequestPayment(command.PaymentKey, command.Kind, command.InstrumentId, command.Reference, command.Amount, FiscalDate.ParseJalali(command.Date), currentUser.UserId),
+                command.Currency);
+            await requests.SaveAsync(request, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(request.Id);
+        }, cancellationToken);
+
+    /// <summary>Takes a payment back (the endorsed cheque came back bounced): the request is to be paid again.</summary>
+    public Task<Result<Guid>> ReversePaymentAsync(string idempotencyKey, Guid id, string paymentKey, CancellationToken cancellationToken) =>
+        Run(idempotencyKey, async ct =>
+        {
+            var request = await requests.GetAsync(id, ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.NotFound", "The payment request was not found.");
+            request.ReversePayment(paymentKey, currentUser.UserId);
             await requests.SaveAsync(request, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(request.Id);
         }, cancellationToken);

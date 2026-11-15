@@ -51,7 +51,7 @@ public sealed record PayerFact(string DetailCode, string Name, bool IsActive, bo
 
 /// <summary>What every receipt says, whatever its kind (new-version manual, form «دریافت چک و اسناد دریافتنی»).</summary>
 /// <param name="Reference1">Value of the purpose group's first reference (عطف), e.g. an invoice or contract number.</param>
-/// <param name="DepartmentId">بخش: the department that received it (optional).</param>
+/// <param name="DepartmentId">واحد سازمانی دریافت کننده: the department that received it (optional).</param>
 /// <param name="SalesProceeds">«وجوه حاصل فروش»: links the receipt to the sales system.</param>
 public sealed record ReceiptHeader(
     FiscalDate Date,

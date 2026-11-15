@@ -51,9 +51,11 @@ public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string
 /// <summary>Replacement of a received cheque (تعویض, owner's item 14 (d)): a cheque receipt of the new cheques, from the same payer.</summary>
 public sealed record ReplaceChequeCommand(string IdempotencyKey, Guid InstrumentId, ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
-/// <summary>Endorsement of a received cheque (خرج چک, owner's item 14 (g); answers to Q32).</summary>
-public sealed record EndorseChequeCommand(
-    string IdempotencyKey, Guid InstrumentId, string Date, string ReceiverDetailCode, Guid PurposeGroupId, string Purpose, string SayadTracking, string? Note = null);
+/// <summary>Endorsement of a received cheque (خرج چک, owner's item 14 (g)): it pays an approved payment request (answer to Q36).</summary>
+public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null);
+
+/// <summary>The receiver brings an endorsed cheque back bounced (owner's item 14 (h)), with the bank's bounce notice.</summary>
+public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null);
 
 public sealed record ReceiptView(
     Guid Id,
@@ -113,7 +115,8 @@ public sealed class ReceiptUseCases(
     IIdempotencyStore idempotency,
     ICurrentUser currentUser,
     IVoucherTemplateRepository templates,
-    IConfirmedVoucherRepository vouchers)
+    IConfirmedVoucherRepository vouchers,
+    IPaymentRequestLookup paymentRequests)
 {
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -205,8 +208,10 @@ public sealed class ReceiptUseCases(
         }, cancellationToken);
 
     /// <summary>
-    /// Endorsement («خرج چک», owner's item 14 (g)): the cheque pays a debt of the company. The receiver is any تفصیل; the purpose group is a
-    /// payment group, whose account is debited; the Sayad transfer's tracking number is required (answers to Q32).
+    /// Endorsement («خرج چک», owner's item 14 (g)): the cheque pays an approved payment request (answer to Q36). The request's beneficiary
+    /// receives it and its payment purpose group (debited on the voucher) and purpose are taken; the cheque may pay the request in full or
+    /// in part, never more than remains; the Sayad transfer's tracking number is required (answer to Q32). The payment is recorded on the
+    /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice.
     /// </summary>
     public Task<Result<Guid>> EndorseAsync(EndorseChequeCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -214,27 +219,62 @@ public sealed class ReceiptUseCases(
             var cheque = await ReceivedChequeAsync(command.InstrumentId, ct).ConfigureAwait(false);
             var date = FiscalDate.ParseJalali(command.Date);
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
-            var receiver = string.IsNullOrWhiteSpace(command.ReceiverDetailCode) ? null
-                : await reference.PayerAsync(command.ReceiverDetailCode.Trim(), ct).ConfigureAwait(false);
-            if (receiver is null)
+            if (command.PaymentRequestId == Guid.Empty)
             {
-                throw new DomainException("Instrument.EndorseeRequired", "Choose the receiver's تفصیل.");
+                throw new DomainException("Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
             }
 
-            if (!receiver.IsActive)
+            var request = await paymentRequests.GetAsync(command.PaymentRequestId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Instrument.PaymentRequestRequired", "The payment request was not found.");
+            if (request.State != "Approved")
             {
-                throw new DomainException("Instrument.EndorseeInactive", "The receiver's تفصیل is inactive.");
+                throw new DomainException("Instrument.PaymentRequestNotApproved", $"Payment request {request.Number} is not approved for payment.");
             }
 
-            var group = await reference.PurposeGroupAsync(command.PurposeGroupId, ct).ConfigureAwait(false)
-                ?? throw new DomainException("Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
-            if (group.IsForReceipts || !group.IsActive)
+            if (!string.Equals(request.Currency, cheque.Amount.Currency, StringComparison.OrdinalIgnoreCase))
             {
-                throw new DomainException("Instrument.EndorsementGroupNotForPayments", "Choose an active payment purpose group.");
+                throw new DomainException("Instrument.PaymentRequestCurrency", "The cheque and the payment request are in different currencies.");
             }
 
-            cheque.Endorse(new Endorsement(receiver.DetailCode, receiver.Name, group.Id, command.Purpose, command.SayadTracking), date, currentUser.UserId, command.Note);
-            await reference.MarkInUseAsync("purpose-groups", group.Id, ct).ConfigureAwait(false);
+            if (cheque.Amount.Amount > request.Amount - request.PaidAmount)
+            {
+                throw new DomainException("Instrument.PaymentRequestOverpaid", "The cheque is more than what remains to be paid on the request.");
+            }
+
+            var group = await reference.PurposeGroupAsync(request.PurposeGroupId, ct).ConfigureAwait(false);
+            if (group is null || group.IsForReceipts || !group.IsActive)
+            {
+                throw new DomainException("Instrument.EndorsementGroupNotForPayments", "The request's purpose group is not an active payment group.");
+            }
+
+            cheque.Endorse(new Endorsement(request.BeneficiaryDetailCode, request.BeneficiaryName, request.PurposeGroupId, request.Purpose, command.SayadTracking, request.Id),
+                date, currentUser.UserId, command.Note);
+            var key = cheque.EndorsementPaymentKey(cheque.History.Count);
+            await paymentRequests.RecordPaymentAsync(request.Id,
+                new RequestPaymentInput(key, cheque.Id, $"چک {cheque.Number} {cheque.BankName}".Trim(), cheque.Amount.Amount, cheque.Amount.Currency, date.ToJalaliString()), ct)
+                .ConfigureAwait(false);
+            await instruments.SaveAsync(cheque, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(cheque.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// The receiver brings the endorsed cheque back bounced («برگشت خرج», owner's item 14 (h)): the cheque is «برگشت شده» again and the
+    /// payment it made on the request is taken back, so the request is to be paid again.
+    /// </summary>
+    public Task<Result<Guid>> EndorsementReturnedAsync(EndorsementReturnedCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var cheque = await ReceivedChequeAsync(command.InstrumentId, ct).ConfigureAwait(false);
+            var date = FiscalDate.ParseJalali(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            var step = cheque.History.Count;
+            var endorsement = cheque.History[^1];
+            cheque.RecordEndorsementReturned(date, currentUser.UserId, command.NoticeNumber, command.Reason);
+            if (endorsement.Action == InstrumentAction.Endorse && endorsement.Details?.PaymentRequestId is { } requestId)
+            {
+                await paymentRequests.ReversePaymentAsync(requestId, cheque.EndorsementPaymentKey(step), ct).ConfigureAwait(false);
+            }
+
             await instruments.SaveAsync(cheque, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(cheque.Id);
         }, cancellationToken);

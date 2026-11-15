@@ -26,7 +26,7 @@ public sealed class ReceiptPostgresTests : IDisposable
         _receipts = new ReceiptUseCases(
             new PostgresUnitOfWork(_dataSource), new PostgresReceiptRepository(), new PostgresInstrumentRepository(), new Accounts(), new BankAccounts(),
             new Reference(), new DevelopmentPolicies().OpenYear(1405), new PostgresIdempotencyStore(_dataSource), new User(),
-            new PostgresVoucherTemplateRepository(), new PostgresConfirmedVoucherRepository());
+            new PostgresVoucherTemplateRepository(), new PostgresConfirmedVoucherRepository(), new NoRequests());
     }
 
     public void Dispose() => _dataSource.Dispose();
@@ -188,6 +188,15 @@ public sealed class ReceiptPostgresTests : IDisposable
             Task.FromResult<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?>(new(code, "حساب " + code, true, true));
 
         public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class NoRequests : IPaymentRequestLookup
+    {
+        public Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PaymentRequestFact?>(null);
+
+        public Task RecordPaymentAsync(Guid requestId, RequestPaymentInput payment, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task ReversePaymentAsync(Guid requestId, string paymentKey, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class User : ICurrentUser

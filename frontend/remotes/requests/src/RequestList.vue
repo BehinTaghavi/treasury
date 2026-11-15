@@ -16,6 +16,7 @@ interface Request {
   cardNumber: string | null; payFromKind: string | null; payFromId: string | null; dueDate: string | null; hasMainBeneficiaries: boolean
   attachments: number; note: string | null; state: string; recordedBy: string; approvedBy: string | null; cancelReason: string | null; version: number
   files: RequestFile[] | null
+  paidAmount: number; payments: { key: string; kind: string; reference: string | null; amount: number; date: string; userId: string }[] | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number; approved?: boolean }>(),
@@ -130,13 +131,14 @@ onMounted(async () => { await L.load(); await load() })
             <td>{{ r.beneficiaryName }} <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
             <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span> <span v-if="r.files?.length" class="tr-tag" :title="t('تصاویر ضمائم', 'Scans')">📎 {{ num(r.files.length) }}</span></td>
             <td>{{ methodName(r.method) }}</td>
-            <td class="num">{{ money(r.amount) }} <span v-if="r.currency !== 'IRR'">{{ r.currency }}</span></td>
+            <td class="num">{{ money(r.amount) }} <span v-if="r.currency !== 'IRR'">{{ r.currency }}</span>
+              <div v-if="r.paidAmount && r.state !== 'Paid'" class="muted small">{{ t(`پرداخت‌شده ${money(r.paidAmount)} – مانده ${money(r.amount - r.paidAmount)}`, `paid ${money(r.paidAmount)} – left ${money(r.amount - r.paidAmount)}`) }}</div></td>
             <td class="num">{{ num(r.priority) }}</td>
             <td><span :class="['tr-tag', r.state === 'Approved' ? 'current' : r.state === 'Cancelled' ? 'cancelled' : '']">{{ stateName(r.state) }}</span></td>
             <td class="tr-actions" @click.stop>
               <button v-if="r.state === 'Registered'" type="button" class="tr-link" @click="emit('edit', r.id)">{{ t('اصلاح', 'Correct') }}</button>
               <button v-if="r.state === 'Registered'" type="button" class="tr-link" @click="change(r, 'approve')">{{ t('تایید', 'Approve') }}</button>
-              <button v-if="r.state === 'Approved'" type="button" class="tr-link" @click="change(r, 'withdraw-approval')">{{ t('برداشتن تایید', 'Withdraw approval') }}</button>
+              <button v-if="r.state === 'Approved' && !r.paidAmount" type="button" class="tr-link" @click="change(r, 'withdraw-approval')">{{ t('برداشتن تایید', 'Withdraw approval') }}</button>
             </td>
           </tr>
           <tr v-if="!shown.length"><td colspan="10" class="muted">{{ approved ? t('درخواست تایید شده‌ای برای پرداخت نیست.', 'No approved request to pay.') : t('درخواستی ثبت نشده است.', 'No requests.') }}</td></tr>
@@ -167,8 +169,19 @@ onMounted(async () => { await L.load(); await load() })
           <span class="muted">({{ sizeText(f.size, fa) }})</span>
         </template>
       </p>
+      <!-- Payments against the request (answer to Q36): endorsed received cheques. -->
+      <div v-if="selected.payments?.length" class="small">
+        <strong>{{ t('پرداخت‌ها', 'Payments') }}</strong>
+        <ul>
+          <li v-for="p in selected.payments" :key="p.key">
+            <span class="num">{{ p.date }}</span> – {{ p.kind === 'EndorsedCheque' ? t('خرج چک دریافتی', 'Endorsed received cheque') : p.kind }} {{ p.reference }} –
+            <span class="num">{{ money(p.amount) }}</span> <span class="muted">({{ p.userId }})</span>
+          </li>
+        </ul>
+        <span>{{ t(`جمع پرداخت ${money(selected.paidAmount)} – مانده ${money(selected.amount - selected.paidAmount)}`, `Paid ${money(selected.paidAmount)} – left ${money(selected.amount - selected.paidAmount)}`) }}</span>
+      </div>
       <p v-if="selected.cancelReason" class="tr-msg error">{{ t('علت ابطال', 'Reason') }}: {{ selected.cancelReason }}</p>
-      <div v-if="selected.state === 'Registered' || selected.state === 'Approved'" class="tr-buttons">
+      <div v-if="(selected.state === 'Registered' || selected.state === 'Approved') && !selected.paidAmount" class="tr-buttons">
         <button v-if="!cancel.open" type="button" class="tr-secondary" @click="cancel.open = true">{{ t('ابطال درخواست', 'Cancel request') }}</button>
         <template v-else>
           <label style="flex: 1">{{ t('علت ابطال', 'Reason') }} <input v-model="cancel.reason" /></label>

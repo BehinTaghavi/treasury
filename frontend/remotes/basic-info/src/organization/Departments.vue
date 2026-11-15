@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Departments (بخش‌ها / واحدهای سازمانی), new-version manual item 12: number, title and the cost centres (تفصیل marked as cost
+ * Departments (واحدهای سازمانی / واحدهای سازمانی), new-version manual item 12: number, title and the cost centres (تفصیل marked as cost
  * centres in the accounting system) the department consists of. A cost centre belongs to one department only.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
@@ -78,16 +78,16 @@ async function save() {
     : await api.post<string>(base, body)
   busy.value = false
   if (!r.ok) return fail(r.code)
-  message.value = { kind: 'ok', text: t(`بخش «${form.name.trim()}» ثبت شد.`, `Department "${form.name.trim()}" saved.`) }
+  message.value = { kind: 'ok', text: t(`واحد سازمانی «${form.name.trim()}» ثبت شد.`, `Department "${form.name.trim()}" saved.`) }
   showForm.value = false
   await load()
 }
 
 async function change(d: Department, what: 'activate' | 'deactivate' | 'delete') {
-  if (what === 'delete' && !window.confirm(t(`بخش «${d.name}» حذف شود؟`, `Delete department "${d.name}"?`))) return
+  if (what === 'delete' && !window.confirm(t(`واحد سازمانی «${d.name}» حذف شود؟`, `Delete department "${d.name}"?`))) return
   const r = await api.post<string>(`${base}/${d.id}/${what}`, { version: d.version })
   if (!r.ok) return fail(r.code)
-  message.value = { kind: 'ok', text: what === 'delete' ? t('بخش حذف شد.', 'Department deleted.') : what === 'activate' ? t('فعال شد.', 'Switched on.') : t('غیرفعال شد.', 'Switched off.') }
+  message.value = { kind: 'ok', text: what === 'delete' ? t('واحد سازمانی حذف شد.', 'Department deleted.') : what === 'activate' ? t('فعال شد.', 'Switched on.') : t('غیرفعال شد.', 'Switched off.') }
   await load()
 }
 
@@ -96,16 +96,16 @@ onMounted(load)
 
 <template>
   <div>
-    <h3>{{ t('بخش‌ها (واحدهای سازمانی)', 'Departments') }}</h3>
+    <h3>{{ t('واحدهای سازمانی', 'Departments') }}</h3>
     <p v-if="!centers.length" class="muted">{{ t('مراکز هزینه از «حساب‌های تفصیل» (تفصیل‌های علامت‌خورده به عنوان مرکز هزینه) خوانده می‌شوند؛ ابتدا آن‌ها را وارد کنید.', 'Cost centres come from the detail accounts marked as cost centres; import them first.') }}</p>
-    <button type="button" class="tr-new" @click="startNew">{{ t('بخش جدید', 'New department') }}</button>
+    <button type="button" class="tr-new" @click="startNew">{{ t('واحد سازمانی جدید', 'New department') }}</button>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
     <form v-if="showForm" class="tr-form" @submit.prevent="save">
       <fieldset>
-        <legend>{{ editing ? t('ویرایش بخش', 'Edit department') : t('بخش جدید', 'New department') }}</legend>
-        <label class="req"><span>{{ t('شماره بخش', 'Number') }} <span class="star">*</span></span><input v-model="form.number" dir="ltr" inputmode="numeric" /></label>
-        <label class="req wide"><span>{{ t('عنوان بخش (واحد سازمانی)', 'Title') }} <span class="star">*</span></span><input v-model="form.name" maxlength="100" autocomplete="off" /></label>
+        <legend>{{ editing ? t('ویرایش واحد سازمانی', 'Edit department') : t('واحد سازمانی جدید', 'New department') }}</legend>
+        <label class="req"><span>{{ t('شماره واحد سازمانی', 'Number') }} <span class="star">*</span></span><input v-model="form.number" dir="ltr" inputmode="numeric" /></label>
+        <label class="req wide"><span>{{ t('عنوان واحد سازمانی', 'Title') }} <span class="star">*</span></span><input v-model="form.name" maxlength="100" autocomplete="off" /></label>
         <div class="wide">
           <label>{{ t('افزودن مرکز هزینه', 'Add a cost centre') }}
             <SearchSelect :model-value="toAdd" :options="centerChoices" :aria-label="t('مرکز هزینه', 'Cost centre')" :none-text="t('مرکز هزینه‌ای پیدا نشد', 'No cost centre found')"
@@ -114,7 +114,7 @@ onMounted(load)
           <ul class="tr-chips">
             <li v-for="c in form.costCenterCodes" :key="c">
               <span dir="ltr">{{ c }}</span> {{ centerName(c) }}
-              <small v-if="owner(c)" class="tr-warn">{{ t(`(در بخش «${owner(c)!.name}»)`, `(in "${owner(c)!.name}")`) }}</small>
+              <small v-if="owner(c)" class="tr-warn">{{ t(`(در واحد سازمانی «${owner(c)!.name}»)`, `(in "${owner(c)!.name}")`) }}</small>
               <button type="button" :aria-label="t('حذف', 'Remove')" @click="form.costCenterCodes = form.costCenterCodes.filter(x => x !== c)">×</button>
             </li>
             <li v-if="!form.costCenterCodes.length" class="muted">{{ t('مرکز هزینه‌ای انتخاب نشده است.', 'No cost centre chosen.') }}</li>
@@ -133,7 +133,7 @@ onMounted(load)
         <button type="button" class="tr-secondary" :disabled="!search" @click="search = ''">{{ t('نمایش همه', 'Show all') }}</button>
       </div>
       <table class="tr-table">
-        <thead><tr><th>{{ t('شماره', 'No.') }}</th><th>{{ t('عنوان بخش', 'Title') }}</th><th>{{ t('مراکز هزینه', 'Cost centres') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
+        <thead><tr><th>{{ t('شماره', 'No.') }}</th><th>{{ t('عنوان واحد سازمانی', 'Title') }}</th><th>{{ t('مراکز هزینه', 'Cost centres') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
         <tbody>
           <tr v-for="d in shown" :key="d.id" :class="{ inactive: !d.isActive }">
             <td>{{ num(d.number) }}</td>
@@ -149,7 +149,7 @@ onMounted(load)
         </tbody>
       </table>
     </template>
-    <p v-else-if="!showForm" class="muted">{{ t('هنوز بخشی تعریف نشده است.', 'No department yet.') }}</p>
+    <p v-else-if="!showForm" class="muted">{{ t('هنوز واحد سازمانی تعریف نشده است.', 'No department yet.') }}</p>
   </div>
 </template>
 

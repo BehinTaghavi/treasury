@@ -18,6 +18,7 @@ public sealed class VoucherUseCaseTests : IDisposable
     private readonly InMemoryVoucherStore _store = new();
     private readonly FakeReceiptReference _reference = new();
     private readonly LedgerBank _bank = new();
+    private readonly FakePaymentRequests _requests = new();
     private readonly ReceiptUseCases _receipts;
     private readonly InstrumentUseCases _instruments;
     private readonly VoucherUseCases _vouchers;
@@ -27,7 +28,7 @@ public sealed class VoucherUseCaseTests : IDisposable
         var policies = new DevelopmentPolicies().OpenYear(1405);
         _receipts = new ReceiptUseCases(
             new InMemoryUnitOfWork(_db), new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), _bank, _reference,
-            policies, new InMemoryIdempotencyStore(_db), new Treasurer(), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store));
+            policies, new InMemoryIdempotencyStore(_db), new Treasurer(), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store), _requests);
         _instruments = new InstrumentUseCases(new InMemoryUnitOfWork(_db), new InMemoryInstrumentRepository(_db), new InMemoryChequeBookRepository(_db),
             new InMemoryIdempotencyStore(_db), policies, policies, policies, new Treasurer(), _bank);
         _vouchers = new VoucherUseCases(new InMemoryUnitOfWork(_db), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store),
@@ -189,24 +190,33 @@ public sealed class VoucherUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task An_endorsement_pays_any_tafsil_with_a_payment_group_and_the_Sayad_tracking_number_Q32()
+    public async Task An_endorsement_pays_an_approved_payment_request_and_its_return_takes_the_payment_back_Q36()
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
         Assert.Equal("Instrument.ActionNotSupportedHere",
             (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.Endorse, "1405/08/24", "پیمانکار"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Instrument.EndorsementGroupNotForPayments", (await _receipts.EndorseAsync(
-            new(Key(), cheque, "1405/08/24", "300001", FakeReceiptReference.SalesGroup, "خرید", "SY-1"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Instrument.EndorseeRequired", (await _receipts.EndorseAsync(
-            new(Key(), cheque, "1405/08/24", "999999", FakeReceiptReference.PaymentGroup, "خرید", "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.PaymentRequestRequired", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", Guid.Empty, "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.PaymentRequestNotApproved",
+            (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Registered, "SY-1"), CancellationToken.None)).ErrorCode);
+        _requests.Requests[FakePaymentRequests.Approved] = _requests.Requests[FakePaymentRequests.Approved] with { PaidAmount = 20_000_000 };
+        Assert.Equal("Instrument.PaymentRequestOverpaid",
+            (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None)).ErrorCode);
+        _requests.Requests[FakePaymentRequests.Approved] = _requests.Requests[FakePaymentRequests.Approved] with { PaidAmount = 15_000_000 };
 
-        // «300001» is staff: not a payer of receipts, but any تفصیل may receive an endorsed cheque.
-        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", "300001", FakeReceiptReference.PaymentGroup, "خرید مواد", "SY-1"), CancellationToken.None);
+        // The request's beneficiary receives the cheque; its payment group's account is debited.
+        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.Equal(("Paid", 25_000_000m), (_requests.Requests[FakePaymentRequests.Approved].State, _requests.Requests[FakePaymentRequests.Approved].PaidAmount));
+        var view = (await _instruments.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("پیمانکار الف", (Guid?)FakePaymentRequests.Approved), (view.Destination, view.History[^1].Details!.PaymentRequestId));
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([(true, "2101", "300001"), (false, "1201", "200015")], steps.Single().Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
 
-        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordEndorsementReturned, "1405/10/02", Reference: "BN-9"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Instrument.ActionNotSupportedHere",
+            (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordEndorsementReturned, "1405/10/02", Reference: "BN-9"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _receipts.EndorsementReturnedAsync(new(Key(), cheque, "1405/10/02", "BN-9"), CancellationToken.None)).IsSuccess);
+        Assert.Equal(("Approved", 15_000_000m), (_requests.Requests[FakePaymentRequests.Approved].State, _requests.Requests[FakePaymentRequests.Approved].PaidAmount));
         steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([(true, "1203", "200015"), (false, "2101", "300001")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
     }

@@ -666,3 +666,11 @@ def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_a
         assert c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = 'cashflow' AND table_name = 'receipt' "
                          "AND column_name = 'replaced_instrument_id'").fetchone() is not None
         c.rollback()
+
+
+def test_a_payment_request_keeps_its_payments(db):
+    # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
+    with psycopg.connect(db) as c:
+        row = c.execute("""SELECT column_default, is_nullable FROM information_schema.columns
+                           WHERE table_schema = 'requests' AND table_name = 'payment_request' AND column_name = 'payments'""").fetchone()
+        assert row is not None and row[1] == "NO" and "[]" in row[0]

@@ -198,7 +198,7 @@ onMounted(async () => { await L.load(); await load() })
         {{ selected.purposeGroupName }}: {{ selected.purpose }}
         <template v-if="selected.reference1"> · {{ selected.reference1 }}</template>
         <template v-if="selected.reference2"> · {{ selected.reference2 }}</template>
-        <template v-if="selected.departmentId"> · {{ t('بخش دریافت کننده', 'Receiving department') }}: {{ L.departments.value.find(d => d.id === selected!.departmentId)?.name }}</template>
+        <template v-if="selected.departmentId"> · {{ t('واحد سازمانی دریافت کننده', 'Receiving department') }}: {{ L.departments.value.find(d => d.id === selected!.departmentId)?.name }}</template>
         <template v-if="selected.salesProceeds"> · {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</template>
         <template v-if="selected.trackingNumber"> · {{ t('پیگیری', 'Tracking') }}: {{ selected.trackingNumber }}</template>
         <template v-if="selected.rateToRial"> · {{ t('نرخ', 'Rate') }}: {{ money(selected.rateToRial) }}</template>

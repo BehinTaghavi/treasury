@@ -163,3 +163,22 @@ public interface ICurrentUser
 {
     string UserId { get; }
 }
+
+/// <summary>What requests-svc says about a payment request (answer to Q36: an endorsed cheque pays an approved request).</summary>
+public sealed record PaymentRequestFact(
+    Guid Id, int Number, string State, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string Purpose, decimal Amount,
+    string Currency, decimal PaidAmount);
+
+/// <summary>A payment made by a received cheque on a request; <see cref="Key"/> makes a repeated call harmless.</summary>
+public sealed record RequestPaymentInput(string Key, Guid InstrumentId, string Reference, decimal Amount, string Currency, string Date);
+
+/// <summary>Payment requests in requests-svc, over its API (ADR 0001).</summary>
+public interface IPaymentRequestLookup
+{
+    Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Records the payment on the request; a refusal comes back as the request's own error code.</summary>
+    Task RecordPaymentAsync(Guid requestId, RequestPaymentInput payment, CancellationToken cancellationToken);
+
+    Task ReversePaymentAsync(Guid requestId, string paymentKey, CancellationToken cancellationToken);
+}

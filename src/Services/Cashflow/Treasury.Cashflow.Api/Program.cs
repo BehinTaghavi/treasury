@@ -103,6 +103,13 @@ builder.Services.AddHttpClient<IReceiptReferenceLookup, Treasury.Cashflow.Infras
     c.Timeout = TimeSpan.FromSeconds(10);
 });
 
+var requestsUrl = builder.Configuration["Services:Requests"] ?? throw new InvalidOperationException("Services:Requests (requests-svc address) is not configured.");
+builder.Services.AddHttpClient<IPaymentRequestLookup, Treasury.Cashflow.Infrastructure.HttpPaymentRequestLookup>(c =>
+{
+    c.BaseAddress = new Uri(requestsUrl.EndsWith('/') ? requestsUrl : requestsUrl + "/");
+    c.Timeout = TimeSpan.FromSeconds(10);
+});
+
 var app = builder.Build();
 
 app.UseExceptionHandler();

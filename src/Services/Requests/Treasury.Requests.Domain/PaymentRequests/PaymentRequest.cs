@@ -23,6 +23,14 @@ public enum PaymentMethod
 /// <param name="ContentType">application/pdf, image/jpeg or image/png, read from the file itself.</param>
 public sealed record RequestAttachment(Guid Id, string FileName, string ContentType, int Size, string UploadedBy, DateTimeOffset UploadedAt);
 
+/// <summary>
+/// A payment made against an approved request (owner, answer to Q36 of 15 Nov 2026: an endorsed received cheque «خرج چک» pays an approved
+/// payment request). Payment screens of Phase E add the other kinds.
+/// </summary>
+/// <param name="Key">Identifies the payment (e.g. "endorse:{cheque}:{step}"), so a repeated call never pays twice.</param>
+/// <param name="Reference">What paid it, as shown to users (e.g. «چک 445566 بانک ملت»).</param>
+public sealed record RequestPayment(string Key, string Kind, Guid? InstrumentId, string? Reference, decimal Amount, FiscalDate Date, string UserId);
+
 /// <summary>Registered by the requester, approved for payment, paid by treasury (Phase E), or cancelled.</summary>
 public enum PaymentRequestState
 {
@@ -92,6 +100,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public const int MaxAttachmentFiles = 20;
 
     private readonly List<RequestAttachment> _files = [];
+    private readonly List<RequestPayment> _payments = [];
 
     private PaymentRequest(Guid id, int number, int fiscalYear, string recordedBy)
         : base(id)
@@ -156,7 +165,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
 
     public FiscalDate? DueDate { get; private set; }
 
-    /// <summary>«بخش»: groups payments by the company's organisational units.</summary>
+    /// <summary>«واحد سازمانی» (manual: «بخش»): groups payments by the company's organisational units.</summary>
     public Guid? DepartmentId { get; private set; }
 
     public bool HasMainBeneficiaries { get; private set; }
@@ -175,6 +184,13 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
 
     /// <summary>Scans attached to the request; the number of paper documents is <see cref="Attachments"/>.</summary>
     public IReadOnlyList<RequestAttachment> Files => _files;
+
+    /// <summary>Payments made against the request (an endorsed cheque, answer to Q36); the request is paid when they reach its amount.</summary>
+    public IReadOnlyList<RequestPayment> Payments => _payments;
+
+    public decimal PaidAmount => _payments.Sum(p => p.Amount);
+
+    public decimal RemainingAmount => Amount - PaidAmount;
 
     public static PaymentRequest Register(Guid id, int number, PaymentRequestForm form, string userId)
     {
@@ -236,10 +252,53 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Raise(new PaymentRequestApproved(Id, Number, FiscalYear, Amount, Currency, Method, Priority, userId));
     }
 
+    /// <summary>
+    /// Records a payment against the approved request (answer to Q36). Several payments may share one request (Q29) up to its amount; when
+    /// they reach it the request is «پرداخت شده». A payment already recorded under the same key is not recorded again.
+    /// </summary>
+    public void RecordPayment(RequestPayment payment, string currency)
+    {
+        ArgumentNullException.ThrowIfNull(payment);
+        Require(!string.IsNullOrWhiteSpace(payment.Key), "PaymentRequest.PaymentKeyRequired", "The payment needs its key.");
+        if (_payments.Any(p => p.Key == payment.Key))
+        {
+            return;
+        }
+
+        Require(State == PaymentRequestState.Approved, "PaymentRequest.NotApproved", "Only an approved request is paid.");
+        Require(string.Equals((currency ?? string.Empty).Trim(), Currency, StringComparison.OrdinalIgnoreCase), "PaymentRequest.PaymentCurrency",
+            "The payment must be in the request's currency.");
+        Require(payment.Amount > 0, "PaymentRequest.PaymentAmountInvalid", "The payment amount must be positive.");
+        Require(payment.Amount <= RemainingAmount, "PaymentRequest.Overpaid", "The payment is more than what remains to be paid on the request.");
+        _payments.Add(payment);
+        if (RemainingAmount == 0)
+        {
+            State = PaymentRequestState.Paid;
+        }
+
+        Raise(new PaymentRequestPaymentRecorded(Id, payment.Key, payment.Kind, payment.InstrumentId, payment.Amount, payment.Date, State == PaymentRequestState.Paid, payment.UserId));
+    }
+
+    /// <summary>A payment came back (an endorsed cheque returned bounced, owner's item 14 (h)): the request is to be paid again.</summary>
+    public void ReversePayment(string key, string userId)
+    {
+        var i = _payments.FindIndex(p => p.Key == key);
+        Require(i >= 0, "PaymentRequest.PaymentNotFound", "The payment was not found on the request.");
+        var payment = _payments[i];
+        _payments.RemoveAt(i);
+        if (State == PaymentRequestState.Paid)
+        {
+            State = PaymentRequestState.Approved;
+        }
+
+        Raise(new PaymentRequestPaymentReversed(Id, key, payment.Amount, userId));
+    }
+
     /// <summary>The approval is taken back (the checkbox unticked) while nothing has been paid.</summary>
     public void WithdrawApproval(string userId)
     {
         Require(State == PaymentRequestState.Approved, "PaymentRequest.NotApproved", "The request is not approved.");
+        Require(_payments.Count == 0, "PaymentRequest.HasPayments", "Part of the request is paid; its approval cannot be taken back.");
         (State, ApprovedBy, ApprovedAt) = (PaymentRequestState.Registered, null, null);
         Raise(new PaymentRequestApprovalWithdrawn(Id, userId));
     }
@@ -249,6 +308,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     {
         Require(State is PaymentRequestState.Registered or PaymentRequestState.Approved, "PaymentRequest.CannotCancel",
             "A paid or cancelled request cannot be cancelled.");
+        Require(_payments.Count == 0, "PaymentRequest.HasPayments", "Part of the request is paid; it cannot be cancelled.");
         Require(!string.IsNullOrWhiteSpace(reason), "PaymentRequest.CancelReasonRequired", "Give the reason for cancelling.");
         (State, CancelReason) = (PaymentRequestState.Cancelled, reason.Trim());
         Raise(new PaymentRequestCancelled(Id, CancelReason, userId));
@@ -269,6 +329,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             State = d.State, ApprovedBy = d.ApprovedBy, ApprovedAt = d.ApprovedAt, CancelReason = d.CancelReason,
         };
         r._files.AddRange(files ?? []);
+        r._payments.AddRange(d.Payments ?? []);
         r.SetLoadedVersion(version);
         return r;
     }
@@ -276,7 +337,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public PaymentRequestSnapshotData Data() => new(
         Date, RequesterId, RequesterName, RequesterDepartmentId, CostCenterCode, BeneficiaryId, BeneficiaryDetailCode, BeneficiaryName,
         PurposeGroupId, PurposeGroupName, Purpose, Reference1, Reference2, Amount, Currency, Method, Priority, TransferAccount, CardNumber,
-        PayFromKind, PayFromId, DueDate, DepartmentId, HasMainBeneficiaries, Attachments, Note, State, ApprovedBy, ApprovedAt, CancelReason);
+        PayFromKind, PayFromId, DueDate, DepartmentId, HasMainBeneficiaries, Attachments, Note, State, ApprovedBy, ApprovedAt, CancelReason, [.. _payments]);
 
     private void Apply(PaymentRequestForm f)
     {
@@ -404,7 +465,7 @@ public sealed record PaymentRequestSnapshotData(
     string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1,
     string? Reference2, decimal Amount, string Currency, PaymentMethod Method, int Priority, string? TransferAccount, string? CardNumber,
     PayFromKind? PayFromKind, Guid? PayFromId, FiscalDate? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
-    PaymentRequestState State, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason);
+    PaymentRequestState State, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, IReadOnlyList<RequestPayment>? Payments = null);
 
 public sealed record PaymentRequestRegistered(
     Guid PaymentRequestId, int Number, int FiscalYear, string BeneficiaryDetailCode, decimal Amount, string Currency, PaymentMethod Method, string UserId) : DomainEvent;
@@ -421,3 +482,8 @@ public sealed record PaymentRequestFileAttached(Guid PaymentRequestId, Guid File
 public sealed record PaymentRequestFileRemoved(Guid PaymentRequestId, Guid FileId, string UserId) : DomainEvent;
 
 public sealed record PaymentRequestCancelled(Guid PaymentRequestId, string Reason, string UserId) : DomainEvent;
+
+public sealed record PaymentRequestPaymentRecorded(
+    Guid PaymentRequestId, string Key, string Kind, Guid? InstrumentId, decimal Amount, FiscalDate Date, bool FullyPaid, string UserId) : DomainEvent;
+
+public sealed record PaymentRequestPaymentReversed(Guid PaymentRequestId, string Key, decimal Amount, string UserId) : DomainEvent;

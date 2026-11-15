@@ -60,10 +60,11 @@ public sealed record InstrumentHistoryView(string Action, string? From, string T
 
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
-    Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId)
+    Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
+    Guid? PaymentRequestId = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
 }
 
 public sealed record InstrumentView(
@@ -196,9 +197,6 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.ReturnFromBank:
                     instrument.ReturnFromBank(date, user, command.Note);
                     break;
-                case InstrumentAction.RecordEndorsementReturned:
-                    instrument.RecordEndorsementReturned(date, user, command.Reference, command.Note);
-                    break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
                     break;
@@ -224,6 +222,7 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.Issue:
                 case InstrumentAction.Endorse:
                 case InstrumentAction.Replace:
+                case InstrumentAction.RecordEndorsementReturned:
                 default:
                     return Result<Guid>.Fail("Instrument.ActionNotSupportedHere", $"Use the dedicated command for '{command.Action}'.");
             }

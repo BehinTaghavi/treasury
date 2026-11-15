@@ -15,6 +15,7 @@ namespace Treasury.Cashflow.Domain.Tests;
 public sealed class ChequeStepTests
 {
     private static readonly Guid BankA = Guid.NewGuid();
+    private static readonly Guid Request = Guid.NewGuid();
     private static readonly LedgerSide SideA = new("1102", "600001");
     private static readonly LedgerSide SideB = new("1109", "600009");
 
@@ -122,19 +123,23 @@ public sealed class ChequeStepTests
     }
 
     [Fact]
-    public void Endorsement_needs_receiver_group_purpose_and_Sayad_tracking_g_Q32()
+    public void Endorsement_pays_an_approved_request_and_needs_receiver_group_purpose_and_Sayad_tracking_g_Q32_Q36()
     {
         var group = Guid.NewGuid();
         Assert.Equal("Instrument.SayadTrackingRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید", " "), D("1405/08/02"), User)).Code);
+            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید", " ", Request), D("1405/08/02"), User)).Code);
         Assert.Equal("Instrument.EndorseeRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("", "", group, "خرید", "SY"), D("1405/08/02"), User)).Code);
+            Cheque().Endorse(new Endorsement("", "", group, "خرید", "SY", Request), D("1405/08/02"), User)).Code);
+        Assert.Equal("Instrument.PaymentRequestRequired", Assert.Throws<DomainException>(() =>
+            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید", "SY", Guid.Empty), D("1405/08/02"), User)).Code);
         Assert.Equal("Instrument.EndorsementGroupRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", Guid.Empty, "خرید", "SY"), D("1405/08/02"), User)).Code);
+            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", Guid.Empty, "خرید", "SY", Request), D("1405/08/02"), User)).Code);
 
         var c = Cheque();
-        c.Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید مواد", "SY-99"), D("1405/08/02"), User);
-        Assert.Equal((InstrumentState.Endorsed, "پیمانکار ب", "SY-99"), (c.State, c.Destination, c.History[^1].Details!.SayadTracking));
+        c.Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید مواد", "SY-99", Request), D("1405/08/02"), User);
+        Assert.Equal((InstrumentState.Endorsed, "پیمانکار ب", "SY-99", (Guid?)Request), (c.State, c.Destination, c.History[^1].Details!.SayadTracking, c.History[^1].Details!.PaymentRequestId));
+        Assert.Equal($"endorse:{c.Id}:2", c.EndorsementPaymentKey(2));
+        Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.EndorsementPaymentKey(1)).Code);
         var endorsementSide = new LedgerSide("2101", "300200");
         Assert.Equal([(true, "2101", "300200"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 2, SideA, endorsementSide, Template())));
         Assert.Equal([InstrumentAction.RecordEndorsementReturned], c.AllowedActions());
@@ -144,7 +149,7 @@ public sealed class ChequeStepTests
     public void An_endorsed_cheque_comes_back_bounced_h()
     {
         var c = Cheque();
-        c.Endorse(new Endorsement("300200", "پیمانکار ب", Guid.NewGuid(), "خرید", "SY-1"), D("1405/08/02"), User);
+        c.Endorse(new Endorsement("300200", "پیمانکار ب", Guid.NewGuid(), "خرید", "SY-1", Request), D("1405/08/02"), User);
         Assert.Equal("Instrument.BounceNoticeRequired", Assert.Throws<DomainException>(() => c.RecordEndorsementReturned(D("1405/09/05"), User, null)).Code);
         Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => c.RecordEndorsementReturned(D("1405/08/20"), User, "BN-5")).Code);
         c.RecordEndorsementReturned(D("1405/09/05"), User, "BN-5");

@@ -57,6 +57,7 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="PurposeGroupId">Endorsement: the payment purpose group (its account is debited).</param>
 /// <param name="SayadTracking">Endorsement: tracking number of the transfer in the Sayad system (answer to Q32).</param>
 /// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
+/// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -65,10 +66,14 @@ public sealed record StepDetails(
     Guid? PurposeGroupId = null,
     string? Purpose = null,
     string? SayadTracking = null,
-    Guid? ReceiptId = null);
+    Guid? ReceiptId = null,
+    Guid? PaymentRequestId = null);
 
-/// <summary>An endorsement (خرج چک): the receiver (any تفصیل), what it pays for and the Sayad transfer (owner, answers to Q32).</summary>
-public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking);
+/// <summary>
+/// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
+/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32).
+/// </summary>
+public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -320,9 +325,18 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
         Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
         Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        Require(endorsement.PaymentRequestId != Guid.Empty, "Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
         Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
-                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim()));
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim(),
+                PaymentRequestId: endorsement.PaymentRequestId));
+    }
+
+    /// <summary>The key of the payment an endorsement made on its request: the cheque and the endorsement's step (answer to Q36).</summary>
+    public string EndorsementPaymentKey(int step)
+    {
+        Require(step >= 1 && step <= _history.Count && _history[step - 1].Action == InstrumentAction.Endorse, "Instrument.InvalidTransition", "That step is not an endorsement.");
+        return $"endorse:{Id}:{step}";
     }
 
     /// <summary>

@@ -234,9 +234,9 @@ onMounted(async () => {
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="form.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="form.ref2" /></label>
-      <!-- Owner's report no. 4, item 11: titled «بخش درخواست کننده». -->
-      <label v-if="departmentChoices.length">{{ t('بخش درخواست کننده', 'Requesting department') }}
-        <SearchSelect v-model="form.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('بخش درخواست کننده', 'Requesting department')" />
+      <!-- Owner's report no. 4, item 11: titled «واحد سازمانی درخواست کننده». -->
+      <label v-if="departmentChoices.length">{{ t('واحد سازمانی درخواست کننده', 'Requesting department') }}
+        <SearchSelect v-model="form.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('واحد سازمانی درخواست کننده', 'Requesting department')" />
       </label>
     </fieldset>
 

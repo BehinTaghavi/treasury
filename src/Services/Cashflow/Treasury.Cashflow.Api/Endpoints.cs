@@ -18,7 +18,9 @@ public sealed record ActionRequest(string Date, string? Destination, string? Not
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
-public sealed record EndorseRequest(string Date, string ReceiverDetailCode, Guid PurposeGroupId, string Purpose, string SayadTracking, string? Note);
+public sealed record EndorseRequest(string Date, Guid PaymentRequestId, string SayadTracking, string? Note);
+
+public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason);
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
 
@@ -87,7 +89,11 @@ public static class Endpoints
             Preview(await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false)));
 
         api.MapPost("/instruments/{id:guid}/endorse", async (Guid id, EndorseRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.ReceiverDetailCode, r.PurposeGroupId, r.Purpose, r.SayadTracking, r.Note), ct)
+            ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.PaymentRequestId, r.SayadTracking, r.Note), ct)
+                .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
+
+        api.MapPost("/instruments/{id:guid}/endorsement-returned", async (Guid id, EndorsementReturnedRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason), ct)
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         // Receipts (owner, 14 Nov 2026): cash, money paid into a bank account, cheques and notes.

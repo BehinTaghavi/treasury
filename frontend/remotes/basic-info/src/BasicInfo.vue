@@ -56,7 +56,7 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'cash-desks', title: ['صندوق‌ها', 'Cash desks'] },
   { id: 'petty-cash', title: ['تنخواه گردان‌ها', 'Petty cash'] },
   // Opening balances are an item of the main menu (owner, 14 Nov 2026), exposed as ./OpeningBalances.
-  { id: 'departments', title: ['بخش‌ها (واحد سازمانی)', 'Departments'] },
+  { id: 'departments', title: ['واحدهای سازمانی', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
   { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
   // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.
@@ -71,7 +71,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
   <section class="tr-basic" :dir="fa ? 'rtl' : 'ltr'">
     <h2>{{ t('اطلاعات پایه', 'Basic information') }}</h2>
     <div class="tr-layout">
-      <nav class="tr-sections" :aria-label="t('بخش‌های اطلاعات پایه', 'Basic information sections')">
+      <nav class="tr-sections" :aria-label="t('فهرست اطلاعات پایه', 'Basic information sections')">
         <button
           v-for="s in sections"
           :key="s.id"

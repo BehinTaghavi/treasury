@@ -175,4 +175,38 @@ public sealed class PaymentRequestTests
 
         Assert.Equal("PaymentRequest.TooManyAttachments", Code(() => r.AttachFile(Guid.NewGuid(), "x.pdf", Pdf, User, DateTimeOffset.UnixEpoch)));
     }
+
+    private static RequestPayment Pay(string key, decimal amount) => new(key, "EndorsedCheque", Guid.NewGuid(), "چک 445566", amount, D("1405/08/25"), "treasurer");
+
+    [Fact]
+    public void Endorsed_cheques_pay_an_approved_request_in_part_or_in_full_Q36()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(amount: 25_000_000), User);
+        Assert.Equal("PaymentRequest.NotApproved", Code(() => r.RecordPayment(Pay("a", 10_000_000), "IRR")));
+        r.Approve("manager", DateTimeOffset.UnixEpoch);
+        Assert.Equal("PaymentRequest.PaymentCurrency", Code(() => r.RecordPayment(Pay("a", 10_000_000), "USD")));
+        Assert.Equal("PaymentRequest.Overpaid", Code(() => r.RecordPayment(Pay("a", 30_000_000), "IRR")));
+        r.RecordPayment(Pay("a", 10_000_000), "IRR");
+        r.RecordPayment(Pay("a", 10_000_000), "IRR"); // the same payment again changes nothing
+        Assert.Equal((PaymentRequestState.Approved, 10_000_000m, 15_000_000m), (r.State, r.PaidAmount, r.RemainingAmount));
+        Assert.Equal("PaymentRequest.HasPayments", Code(() => r.WithdrawApproval("manager")));
+        Assert.Equal("PaymentRequest.HasPayments", Code(() => r.Cancel("منتفی", "manager")));
+        r.RecordPayment(Pay("b", 15_000_000), "IRR");
+        Assert.Equal((PaymentRequestState.Paid, 0m), (r.State, r.RemainingAmount));
+        Assert.Equal("PaymentRequest.NotApproved", Code(() => r.RecordPayment(Pay("c", 1), "IRR")));
+    }
+
+    [Fact]
+    public void A_returned_endorsed_cheque_takes_its_payment_back_and_the_request_is_to_be_paid_again()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(amount: 25_000_000), User);
+        r.Approve("manager", DateTimeOffset.UnixEpoch);
+        r.RecordPayment(Pay("a", 25_000_000), "IRR");
+        Assert.Equal(PaymentRequestState.Paid, r.State);
+        Assert.Equal("PaymentRequest.PaymentNotFound", Code(() => r.ReversePayment("x", "treasurer")));
+        r.ReversePayment("a", "treasurer");
+        Assert.Equal((PaymentRequestState.Approved, 0m), (r.State, r.PaidAmount));
+        var copy = PaymentRequest.Restore(r.Id, r.Number, r.FiscalYear, r.RecordedBy, r.Data(), 3);
+        Assert.Empty(copy.Payments);
+    }
 }

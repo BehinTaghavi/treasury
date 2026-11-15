@@ -147,8 +147,8 @@ onMounted(load)
                         :none-text="t('تفصیلی از نوع کارکنان پیدا نشد', 'No staff detail account found')" @search="onStaffSearch" />
           <small v-if="editing && !editing.personDetailCode" class="muted">{{ t(`نام قبلی: ${editing.fullName}؛ تفصیل او را انتخاب کنید.`, `Earlier name: ${editing.fullName}; choose the detail account.`) }}</small>
         </label>
-        <label>{{ t('بخش (واحد سازمانی)', 'Department') }}
-          <SearchSelect :model-value="form.departmentId" :options="departmentChoices" :empty-label="t('ندارد', 'None')" :aria-label="t('بخش', 'Department')" @update:model-value="onDepartment" />
+        <label>{{ t('واحد سازمانی', 'Department') }}
+          <SearchSelect :model-value="form.departmentId" :options="departmentChoices" :empty-label="t('ندارد', 'None')" :aria-label="t('واحد سازمانی', 'Department')" @update:model-value="onDepartment" />
         </label>
         <label class="req"><span>{{ t('مرکز هزینه', 'Cost centre') }} <span class="star">*</span></span>
           <SearchSelect v-model="form.costCenterCode" :options="centerChoices" required :aria-label="t('مرکز هزینه', 'Cost centre')" :none-text="t('مرکز هزینه‌ای پیدا نشد', 'No cost centre found')" />
@@ -162,12 +162,12 @@ onMounted(load)
 
     <template v-if="requesters.length">
       <div class="tr-search">
-        <label>{{ t('بخش', 'Department') }}<SearchSelect v-model="departmentFilter" :options="filterChoices" :empty-label="t('همه', 'All')" :aria-label="t('بخش', 'Department')" /></label>
+        <label>{{ t('واحد سازمانی', 'Department') }}<SearchSelect v-model="departmentFilter" :options="filterChoices" :empty-label="t('همه', 'All')" :aria-label="t('واحد سازمانی', 'Department')" /></label>
         <label>{{ t('جستجو', 'Search') }}<input v-model="search" type="search" autocomplete="off" /></label>
         <button type="button" class="tr-secondary" :disabled="!search && !departmentFilter" @click="search = ''; departmentFilter = ''">{{ t('نمایش همه', 'Show all') }}</button>
       </div>
       <table class="tr-table">
-        <thead><tr><th>{{ t('شماره', 'No.') }}</th><th>{{ t('نام و نام خانوادگی', 'Name') }}</th><th>{{ t('بخش', 'Department') }}</th><th>{{ t('مرکز هزینه', 'Cost centre') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
+        <thead><tr><th>{{ t('شماره', 'No.') }}</th><th>{{ t('نام و نام خانوادگی', 'Name') }}</th><th>{{ t('واحد سازمانی', 'Department') }}</th><th>{{ t('مرکز هزینه', 'Cost centre') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th /></tr></thead>
         <tbody>
           <tr v-for="r in shown" :key="r.id" :class="{ inactive: !r.isActive }">
             <td>{{ num(r.number) }}</td>

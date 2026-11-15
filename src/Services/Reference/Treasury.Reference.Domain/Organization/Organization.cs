@@ -41,7 +41,7 @@ internal static class Rules
 }
 
 /// <summary>
-/// A department (بخش / واحد سازمانی) of the company that requests money, new-version manual item 12: a number, a title and the
+/// A department (واحد سازمانی; the manual says «بخش») of the company that requests money, new-version manual item 12: a number, a title and the
 /// cost centres (مراکز هزینه, تفصیل marked as cost centres in the accounting system) it consists of.
 /// </summary>
 public sealed class Department : AggregateRoot<Guid>

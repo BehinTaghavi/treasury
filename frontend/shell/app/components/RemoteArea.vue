@@ -13,7 +13,7 @@ const Area = defineAsyncComponent({
     return mod.default
   },
   loadingComponent: { render: () => h('p', { class: 'muted' }, t('در حال بارگذاری…', 'Loading…')) },
-  errorComponent: { render: () => h('p', { class: 'error' }, t('این بخش در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.', 'This area is not available right now. Please try again later.')) },
+  errorComponent: { render: () => h('p', { class: 'error' }, t('این صفحه در دسترس نیست. لطفاً بعداً دوباره تلاش کنید.', 'This area is not available right now. Please try again later.')) },
   timeout: 15000,
 })
 </script>

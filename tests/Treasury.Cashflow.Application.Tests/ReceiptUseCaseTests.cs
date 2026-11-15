@@ -71,6 +71,45 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     private Task<T?> Check<T>(T? value) => Down ? throw new DomainException("Reference.Unavailable", "down") : Task.FromResult(value);
 }
 
+/// <summary>requests-svc stand-in (answer to Q36): approved requests that endorsed cheques pay, with the same rules as the real one.</summary>
+public sealed class FakePaymentRequests : IPaymentRequestLookup
+{
+    public static readonly Guid Approved = Guid.NewGuid();
+    public static readonly Guid Registered = Guid.NewGuid();
+
+    public Dictionary<Guid, PaymentRequestFact> Requests { get; } = new()
+    {
+        [Approved] = new(Approved, 7, "Approved", "300001", "پیمانکار الف", FakeReceiptReference.PaymentGroup, "خرید مواد", 25_000_000, "IRR", 0),
+        [Registered] = new(Registered, 8, "Registered", "300001", "پیمانکار الف", FakeReceiptReference.PaymentGroup, "خرید", 1_000_000, "IRR", 0),
+    };
+
+    public Dictionary<string, (Guid Request, decimal Amount)> Payments { get; } = [];
+
+    public Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Requests.GetValueOrDefault(id));
+
+    public Task RecordPaymentAsync(Guid requestId, RequestPaymentInput payment, CancellationToken cancellationToken)
+    {
+        if (!Payments.ContainsKey(payment.Key))
+        {
+            var r = Requests[requestId];
+            var paid = r.PaidAmount + payment.Amount;
+            Requests[requestId] = r with { PaidAmount = paid, State = paid == r.Amount ? "Paid" : r.State };
+            Payments[payment.Key] = (requestId, payment.Amount);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task ReversePaymentAsync(Guid requestId, string paymentKey, CancellationToken cancellationToken)
+    {
+        var (id, amount) = Payments[paymentKey];
+        Payments.Remove(paymentKey);
+        var r = Requests[id];
+        Requests[id] = r with { PaidAmount = r.PaidAmount - amount, State = "Approved" };
+        return Task.CompletedTask;
+    }
+}
+
 /// <summary>Receipts (owner, 14 Nov 2026): cash, bank deposits (slip, transfer, POS, card-to-card), cheques and notes.</summary>
 public sealed class ReceiptUseCaseTests : IDisposable
 {
@@ -86,7 +125,7 @@ public sealed class ReceiptUseCaseTests : IDisposable
         _receipts = new ReceiptUseCases(
             uow, new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), _bankAccounts, _reference,
             new DevelopmentPolicies().OpenYear(1405), new InMemoryIdempotencyStore(_db), new User(),
-            new InMemoryVoucherTemplateRepository(_vouchers), new InMemoryConfirmedVoucherRepository(_vouchers));
+            new InMemoryVoucherTemplateRepository(_vouchers), new InMemoryConfirmedVoucherRepository(_vouchers), new FakePaymentRequests());
     }
 
     public void Dispose() => _db.Dispose();

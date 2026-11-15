@@ -222,7 +222,7 @@ onMounted(async () => {
     </form>
 
     <p v-if="noParentForTop" class="tr-msg error" role="status">
-      {{ t(`برای «${byId(tops, top)?.name}» هنوز ${label(spec.parent.label)}ی تعریف نشده است. اگر در فهرست کشور دو «ایران» هست، آن را انتخاب کنید که کنارش «۳۱ استان» نوشته شده؛ وگرنه ابتدا در بخش «استان / ایالت» آن را تعریف کنید.`,
+      {{ t(`برای «${byId(tops, top)?.name}» هنوز ${label(spec.parent.label)}ی تعریف نشده است. اگر در فهرست کشور دو «ایران» هست، آن را انتخاب کنید که کنارش «۳۱ استان» نوشته شده؛ وگرنه ابتدا در صفحهٔ «استان / ایالت» آن را تعریف کنید.`,
                `"${byId(tops, top)?.name}" has no ${label(spec.parent.label).toLowerCase()} yet. If the country list shows two "Iran", choose the one marked "31 provinces"; otherwise define the ${label(spec.parent.label).toLowerCase()} first.`) }}
     </p>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>

@@ -5,13 +5,14 @@
  * here, the cheque's latest state changes at once, and the step's voucher is shown for the treasurer's «تایید سند». Opening a cheque shows
  * its card: the whole history and every voucher.
  * Steps: deposit at the bank (several cheques on one slip), collected, returned to the company, bounced (bank's notice no. and date),
- * replaced by new cheques (a cheque receipt of its own), cancelled by management's order (its no. and date), endorsed to any تفصیل (with
- * the Sayad transfer's tracking no.), endorsement returned, returned to the payer.
+ * replaced by new cheques (a cheque receipt of its own), cancelled by management's order (its no. and date), endorsed to pay an approved
+ * payment request (answer to Q36; its beneficiary receives the cheque; with the Sayad transfer's tracking no.), endorsement returned (the
+ * request's payment is taken back), returned to the payer.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
-import { useLookups, type Detail } from './lookups'
+import { useLookups } from './lookups'
 import ReceiptForm from './ReceiptForm.vue'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
@@ -113,18 +114,27 @@ async function depositSelected() {
 
 // ---- one step on one cheque ----
 interface Pending {
-  cheque: Cheque; action: string; date: string; reference: string; documentDate: string; note: string
-  receiver: string; groupId: string; purpose: string; sayad: string
+  cheque: Cheque; action: string; date: string; reference: string; documentDate: string; note: string; requestId: string; sayad: string
+}
+/** An approved payment request (requests-svc) an endorsed cheque can pay (answer to Q36). */
+interface PayRequest {
+  id: string; fiscalYear: number; number: number; beneficiaryName: string; beneficiaryDetailCode: string; purposeGroupName: string; purpose: string
+  amount: number; currency: string; paidAmount: number; method: string; priority: number
 }
 const pending = ref<Pending | null>(null)
-const receivers = ref<Detail[]>([])
-const receiverChoices = computed<Choice[]>(() => receivers.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
-const paymentGroups = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Payment' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
-let searchTimer: ReturnType<typeof setTimeout> | undefined
-function onReceiverSearch(text: string) {
-  clearTimeout(searchTimer)
-  // Any تفصیل may receive an endorsed cheque (answer to Q32).
-  searchTimer = setTimeout(async () => { receivers.value = await L.searchDetails(text, pending.value?.receiver) }, 250)
+const approved = ref<PayRequest[]>([])
+/** Requests in the cheque's currency with at least the cheque's amount left to pay. */
+const requestChoices = computed<Choice[]>(() => {
+  const c = pending.value?.cheque
+  if (!c) return []
+  return approved.value.filter(r => r.currency === c.currency && r.amount - r.paidAmount >= c.amount)
+    .map(r => ({ value: r.id, label: `${r.beneficiaryName} – ${r.purpose}`, hint: t(`درخواست ${r.number} – مانده ${money(r.amount - r.paidAmount)}`, `request ${r.number} – left ${money(r.amount - r.paidAmount)}`) }))
+})
+const chosenRequest = computed(() => approved.value.find(r => r.id === pending.value?.requestId))
+async function loadApproved() {
+  const y = Number(todayJalali().slice(0, 4))
+  const results = await Promise.all([y - 1, y].map(year => api.get<PayRequest[]>(`/api/requests/payment-requests?year=${year}&state=Approved`)))
+  approved.value = results.flatMap(r => (r.ok ? r.value : []))
 }
 const replacing = ref<Cheque | null>(null)
 
@@ -132,8 +142,8 @@ async function start(c: Cheque, action: string) {
   message.value = null
   if (action === 'Replace') { replacing.value = c; pending.value = null; return }
   replacing.value = null
-  pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', receiver: '', groupId: '', purpose: '', sayad: '' }
-  if (action === 'Endorse') receivers.value = await L.searchDetails('', undefined)
+  pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', requestId: '', sayad: '' }
+  if (action === 'Endorse') await loadApproved()
 }
 
 async function confirmStep() {
@@ -144,7 +154,9 @@ async function confirmStep() {
   busy.value = true
   const r = p.action === 'Endorse'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
-        { date, receiverDetailCode: p.receiver, purposeGroupId: p.groupId || '00000000-0000-0000-0000-000000000000', purpose: p.purpose, sayadTracking: p.sayad, note: p.note || null })
+        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: p.sayad, note: p.note || null })
+    : p.action === 'RecordEndorsementReturned'
+    ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null })
     : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
         { date, note: p.note || null, reference: p.reference || null, documentDate: p.action === 'Cancel' ? normaliseJalali(p.documentDate) ?? p.documentDate : null })
   busy.value = false
@@ -227,15 +239,16 @@ onMounted(async () => { await L.load(); await load() })
         <label class="wide req">{{ t('علت ابطال', 'Reason') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else-if="pending.action === 'Endorse'">
-        <label class="wide">{{ t('گیرندهٔ چک (هر حساب تفصیلی)', 'Receiver (any detail account)') }}
-          <SearchSelect v-model="pending.receiver" :options="receiverChoices" remote required :aria-label="t('گیرندهٔ چک', 'Receiver')"
-                        :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onReceiverSearch" />
+        <label class="wide">{{ t('درخواست وجه تاییدشده', 'Approved payment request') }}
+          <SearchSelect v-model="pending.requestId" :options="requestChoices" required :aria-label="t('درخواست وجه تاییدشده', 'Approved payment request')"
+                        :none-text="t('درخواست وجه تاییدشده‌ای با این ارز و مانده‌ای به اندازهٔ این چک نیست', 'No approved request in this currency with enough left to pay')" />
         </label>
-        <label>{{ t('گروه بابت پرداخت', 'Payment purpose group') }}
-          <SearchSelect v-model="pending.groupId" :options="paymentGroups" required :aria-label="t('گروه بابت پرداخت', 'Payment purpose group')"
-                        :none-text="t('گروه بابت پرداختی تعریف نشده است', 'No payment purpose group')" />
-        </label>
-        <label class="wide req">{{ t('بابت', 'Purpose') }} <input v-model="pending.purpose" /></label>
+        <p v-if="chosenRequest" class="wide small">
+          {{ t('گیرنده', 'Receiver') }}: <strong>{{ chosenRequest.beneficiaryName }}</strong> ({{ chosenRequest.beneficiaryDetailCode }}) ·
+          {{ chosenRequest.purposeGroupName }}: {{ chosenRequest.purpose }} ·
+          {{ t('مبلغ درخواست', 'Request') }} {{ money(chosenRequest.amount) }} · {{ t('پرداخت‌شده', 'paid') }} {{ money(chosenRequest.paidAmount) }} ·
+          {{ t('پس از این چک مانده', 'left after this cheque') }} {{ money(chosenRequest.amount - chosenRequest.paidAmount - pending.cheque.amount) }}
+        </p>
         <label class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>
@@ -290,7 +303,7 @@ onMounted(async () => { await L.load(); await load() })
                 {{ name(actionNames, a) }}</button>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('چکی در این بخش نیست.', 'No cheque here.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('چکی در این زبانه نیست.', 'No cheque here.') }}</td></tr>
         </tbody>
       </table>
     </div>

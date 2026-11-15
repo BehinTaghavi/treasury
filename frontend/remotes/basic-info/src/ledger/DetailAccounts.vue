@@ -77,7 +77,7 @@ onMounted(loadAll)
       :api-base="apiBase" :locale="locale" :token="token"
       @imported="loadAll"
     />
-    <p v-else class="muted">{{ t('ابتدا در بخش «کدینگ حساب‌ها» طول کدها را تعیین کنید.', 'Set the code lengths in the chart of accounts first.') }}</p>
+    <p v-else class="muted">{{ t('ابتدا در صفحهٔ «کدینگ حساب‌ها» طول کدها را تعیین کنید.', 'Set the code lengths in the chart of accounts first.') }}</p>
 
     <div class="tr-filters">
       <label>{{ t('جستجو (کد یا نام)', 'Search (code or name)') }}<input v-model="search" autocomplete="off" /></label>

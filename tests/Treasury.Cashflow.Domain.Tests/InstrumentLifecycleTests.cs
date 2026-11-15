@@ -82,7 +82,7 @@ public sealed class ReceivedInstrumentTests
         Assert.Equal(InstrumentState.ReturnedToIssuer, returned.State);
 
         var endorsed = ReceivedCheque();
-        endorsed.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1"), D("1405/08/02"), User);
+        endorsed.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1", Guid.NewGuid()), D("1405/08/02"), User);
         Assert.Equal(InstrumentState.Endorsed, endorsed.State);
         Assert.Equal("شرکت پیمانکار ب", endorsed.Destination);
 

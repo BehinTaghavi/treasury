@@ -54,6 +54,24 @@ public sealed class PaymentRequestPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task Payments_of_endorsed_cheques_are_kept_with_the_request_Q36()
+    {
+        var id = (await _requests.RegisterAsync(new(Key(), Input(PaymentMethod.CurrentCheque) with { Currency = "IRR", Amount = 9_000_000 }), CancellationToken.None)).Value;
+        Assert.True((await _requests.ChangeAsync(new(Key(), id, "approve", 1), CancellationToken.None)).IsSuccess);
+        var cheque = Guid.NewGuid();
+        Assert.True((await _requests.RecordPaymentAsync(new(Key(), id, "endorse:x:2", "EndorsedCheque", cheque, "چک 1", 4_000_000, "IRR", "1405/08/25"), CancellationToken.None)).IsSuccess);
+        var v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("Approved", 4_000_000m, "1405/08/25", (Guid?)cheque), (v.State, v.PaidAmount, v.Payments![0].Date, v.Payments[0].InstrumentId));
+        Assert.Equal("PaymentRequest.Overpaid",
+            (await _requests.RecordPaymentAsync(new(Key(), id, "endorse:y:2", "EndorsedCheque", null, "چک 2", 6_000_000, "IRR", "1405/08/25"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _requests.RecordPaymentAsync(new(Key(), id, "endorse:y:2", "EndorsedCheque", null, "چک 2", 5_000_000, "IRR", "1405/08/26"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Paid", (await _requests.GetAsync(id, CancellationToken.None))!.State);
+        Assert.True((await _requests.ReversePaymentAsync(Key(), id, "endorse:x:2", CancellationToken.None)).IsSuccess);
+        v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("Approved", 5_000_000m), (v.State, v.PaidAmount));
+    }
+
+    [Fact]
     public async Task A_scan_is_stored_with_its_request_and_removed_with_it()
     {
         var id = (await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None)).Value;
