@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Domain;
 using System.Collections.Concurrent;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;

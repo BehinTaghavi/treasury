@@ -1,4 +1,3 @@
-using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Application.BankAccounts;
 using Treasury.Accounts.Domain.BankAccounts;
 using Treasury.Accounts.Infrastructure.InMemory;

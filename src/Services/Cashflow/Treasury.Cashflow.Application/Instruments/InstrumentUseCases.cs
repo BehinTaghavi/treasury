@@ -1,4 +1,5 @@
 using System.Globalization;
+using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Domain.ChequeBooks;
@@ -108,10 +109,12 @@ public sealed class InstrumentUseCases(
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser)
 {
+    private readonly CommandRunner _runner = new(unitOfWork, idempotency);
+
     public const string PossibleDuplicateWarning = "Instrument.PossibleDuplicate";
 
     public Task<Result<Guid>> ReceiveAsync(ReceiveInstrumentCommand command, CancellationToken cancellationToken) =>
-        RunAsync(command.IdempotencyKey, async ct =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
         {
             var receivedOn = FiscalDate.ParseJalali(command.ReceivedOn);
             await EnsureOpenAsync(receivedOn, ct).ConfigureAwait(false);
@@ -139,7 +142,7 @@ public sealed class InstrumentUseCases(
         }, id => id.ToString(), Guid.Parse, cancellationToken);
 
     public Task<Result<Guid>> ChangeStateAsync(ChangeInstrumentStateCommand command, CancellationToken cancellationToken) =>
-        RunAsync(command.IdempotencyKey, async ct =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
         {
             var instrument = await instruments.GetAsync(command.InstrumentId, ct).ConfigureAwait(false);
             if (instrument is null)
@@ -195,7 +198,7 @@ public sealed class InstrumentUseCases(
         }, id => id.ToString(), Guid.Parse, cancellationToken);
 
     public Task<Result<Guid>> RegisterChequeBookAsync(RegisterChequeBookCommand command, CancellationToken cancellationToken) =>
-        RunAsync(command.IdempotencyKey, async ct =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
         {
             var book = ChequeBook.Register(Guid.NewGuid(), command.BankAccountId, command.Serial, command.FirstSheet, command.LastSheet);
             await chequeBooks.AddAsync(book, ct).ConfigureAwait(false);
@@ -207,7 +210,7 @@ public sealed class InstrumentUseCases(
     /// reserves the sheet (R5) and records the instrument — all in one transaction, with the cheque book locked.
     /// </summary>
     public Task<Result<IssuedChequeView>> IssueChequeAsync(IssueChequeCommand command, CancellationToken cancellationToken) =>
-        RunAsync(command.IdempotencyKey, async ct =>
+        _runner.RunAsync(command.IdempotencyKey, async ct =>
         {
             if (!await paymentApprovals.IsApprovedAsync(command.PaymentId, ct).ConfigureAwait(false))
             {
@@ -293,57 +296,4 @@ public sealed class InstrumentUseCases(
 
     private static FiscalDate? ParseOptionalDate(string? text) =>
         string.IsNullOrWhiteSpace(text) ? null : FiscalDate.ParseJalali(text);
-
-    /// <summary>Idempotency + one transaction + translation of rule violations into results.</summary>
-    private async Task<Result<T>> RunAsync<T>(
-        string idempotencyKey,
-        Func<CancellationToken, Task<Result<T>>> work,
-        Func<T, string> serialize,
-        Func<string, T> deserialize,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            return Result<T>.Fail("Request.IdempotencyKeyRequired", "An idempotency key is required for every write.");
-        }
-
-        var previous = await idempotency.GetResultAsync(idempotencyKey, cancellationToken).ConfigureAwait(false);
-        if (previous is not null)
-        {
-            return Result<T>.Ok(deserialize(previous));
-        }
-
-        try
-        {
-            return await unitOfWork.ExecuteAsync(async ct =>
-            {
-                var result = await work(ct).ConfigureAwait(false);
-                if (!result.IsSuccess)
-                {
-                    // Abort the transaction: nothing of a failed command is saved.
-                    throw new CommandFailedException<T>(result);
-                }
-
-                await idempotency.SaveResultAsync(idempotencyKey, serialize(result.Value!), ct).ConfigureAwait(false);
-                return result;
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (CommandFailedException<T> failed)
-        {
-            return failed.Result;
-        }
-        catch (DomainException ex)
-        {
-            return Result<T>.From(ex);
-        }
-        catch (ConcurrencyConflictException ex)
-        {
-            return Result<T>.Fail("Concurrency.Conflict", ex.Message);
-        }
-    }
-
-    private sealed class CommandFailedException<T>(Result<T> result) : Exception(result.ErrorMessage)
-    {
-        public Result<T> Result { get; } = result;
-    }
 }

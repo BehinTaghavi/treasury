@@ -4,6 +4,7 @@ using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Application.BankAccounts;
 using Treasury.Accounts.Infrastructure;
 using Treasury.Accounts.Infrastructure.InMemory;
+using Treasury.BuildingBlocks.Application;
 
 var builder = WebApplication.CreateBuilder(args);
 

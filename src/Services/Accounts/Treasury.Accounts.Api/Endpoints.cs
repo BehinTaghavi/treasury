@@ -1,5 +1,5 @@
-using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Application.BankAccounts;
+using Treasury.BuildingBlocks.Application;
 
 namespace Treasury.Accounts.Api;
 

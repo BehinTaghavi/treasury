@@ -1,4 +1,5 @@
 using Npgsql;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Domain.Catalogue;
 using Treasury.Tests.Support;
@@ -26,7 +27,7 @@ public sealed class CataloguePostgresTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private Task<Treasury.Reference.Application.Abstractions.Result<Guid>> Add(CatalogueKind kind, string name, Guid? parent = null, string? code = null) =>
+    private Task<Result<Guid>> Add(CatalogueKind kind, string name, Guid? parent = null, string? code = null) =>
         _useCases.AddAsync(new AddCatalogueItemCommand(Key(), kind, name, parent, code), CancellationToken.None);
 
     [Fact]

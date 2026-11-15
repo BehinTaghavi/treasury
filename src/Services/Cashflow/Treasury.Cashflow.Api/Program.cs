@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Treasury.BuildingBlocks.Application;
 using Treasury.Cashflow.Api;
 using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.Instruments;

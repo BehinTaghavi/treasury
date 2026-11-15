@@ -81,6 +81,23 @@ public sealed class LayerTests
         }
     }
 
+    /// <summary>The shared application block (results, unit of work, idempotency, command runner) knows no service and no framework.</summary>
+    [Fact]
+    public void Shared_application_block_depends_only_on_the_shared_domain_block()
+    {
+        var refs = References(Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "Treasury.BuildingBlocks.Application.dll")));
+        var unexpected = refs.Where(r => r != "Treasury.BuildingBlocks.Domain" && r != "System" && !r.StartsWith("System.", StringComparison.Ordinal)).ToList();
+        Assert.True(unexpected.Count == 0, $"Treasury.BuildingBlocks.Application references {string.Join(", ", unexpected)}");
+    }
+
+    [Theory]
+    [InlineData("Cashflow")]
+    [InlineData("Reference")]
+    [InlineData("Accounts")]
+    public void Each_service_uses_the_shared_application_block(string service) =>
+        Assert.Contains("Treasury.BuildingBlocks.Application",
+            References(Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, $"Treasury.{service}.Application.dll"))));
+
     [Fact]
     public void Domain_types_expose_no_public_setters()
     {
