@@ -32,23 +32,41 @@ public sealed class CompanyUseCaseTests : IDisposable
     [Fact]
     public async Task The_name_is_entered_once_and_corrected_afterwards()
     {
-        var first = await _useCases.SaveNameAsync(Key(), " شرکت  ایران ناژو ", 0, CancellationToken.None);
+        var first = await _useCases.SaveAsync(Key(), new(" شرکت  ایران ناژو "), 0, CancellationToken.None);
         Assert.True(first.IsSuccess, first.ErrorCode);
         Assert.Equal(new CompanyView("شرکت ایران ناژو", false, 1), await Company());
 
-        var corrected = await _useCases.SaveNameAsync(Key(), "شرکت ایران ناژو (سهامی خاص)", 1, CancellationToken.None);
+        var corrected = await _useCases.SaveAsync(Key(), new("شرکت ایران ناژو (سهامی خاص)"), 1, CancellationToken.None);
         Assert.Equal(first.Value, corrected.Value); // still the one profile of the database
         Assert.Equal(new CompanyView("شرکت ایران ناژو (سهامی خاص)", false, 2), await Company());
 
-        Assert.Equal("Company.NameRequired", (await _useCases.SaveNameAsync(Key(), " ", 2, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Company.NameRequired", (await _useCases.SaveAsync(Key(), new(" "), 2, CancellationToken.None)).ErrorCode);
         Assert.Equal(2, _db.OutboxMessages.Count(m => m.Type == "CompanyProfileChanged"));
+    }
+
+    [Fact]
+    public async Task The_official_details_are_saved_with_the_name_and_survive_a_new_logo_owner_answer_Q38()
+    {
+        var form = new CompanyForm("شرکت نمونه", "۱۰۱۰۱۰۱۰۱۰۳", "411111111111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir");
+        Assert.True((await _useCases.SaveAsync(Key(), form, 0, CancellationToken.None)).IsSuccess);
+        var saved = new CompanyView("شرکت نمونه", false, 1, "10101010103", "411111111111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir");
+        Assert.Equal(saved, await Company());
+
+        Assert.True((await _useCases.AttachLogoAsync(Key(), Png, 1, CancellationToken.None)).IsSuccess);
+        Assert.Equal(saved with { HasLogo = true, Version = 2 }, await Company());
+
+        // A detail that is wrong refuses the whole form; an emptied detail is removed.
+        Assert.Equal("Company.EmailInvalid", (await _useCases.SaveAsync(Key(), form with { Name = "دیگر", Email = "info" }, 2, CancellationToken.None)).ErrorCode);
+        Assert.Equal(saved with { HasLogo = true, Version = 2 }, await Company());
+        Assert.True((await _useCases.SaveAsync(Key(), form with { Website = " ", Email = null }, 2, CancellationToken.None)).IsSuccess);
+        Assert.Equal(saved with { HasLogo = true, Version = 3, Website = null, Email = null }, await Company());
     }
 
     [Fact]
     public async Task A_change_made_on_an_old_copy_of_the_form_is_refused()
     {
-        await _useCases.SaveNameAsync(Key(), "شرکت نمونه", 0, CancellationToken.None);
-        Assert.Equal("Concurrency.Conflict", (await _useCases.SaveNameAsync(Key(), "دیگر", 0, CancellationToken.None)).ErrorCode);
+        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
+        Assert.Equal("Concurrency.Conflict", (await _useCases.SaveAsync(Key(), new("دیگر"), 0, CancellationToken.None)).ErrorCode);
         Assert.Equal("Concurrency.Conflict", (await _useCases.AttachLogoAsync(Key(), Png, 5, CancellationToken.None)).ErrorCode);
         Assert.Equal("شرکت نمونه", (await Company()).Name);
     }
@@ -57,18 +75,18 @@ public sealed class CompanyUseCaseTests : IDisposable
     public async Task The_same_request_sent_twice_is_saved_once()
     {
         var key = Key();
-        var first = await _useCases.SaveNameAsync(key, "شرکت نمونه", 0, CancellationToken.None);
-        var again = await _useCases.SaveNameAsync(key, "شرکت نمونه", 0, CancellationToken.None);
+        var first = await _useCases.SaveAsync(key, new("شرکت نمونه"), 0, CancellationToken.None);
+        var again = await _useCases.SaveAsync(key, new("شرکت نمونه"), 0, CancellationToken.None);
         Assert.Equal(first.Value, again.Value);
         Assert.Equal(1, (await Company()).Version);
-        Assert.Equal("Request.IdempotencyKeyRequired", (await _useCases.SaveNameAsync(" ", "شرکت نمونه", 1, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Request.IdempotencyKeyRequired", (await _useCases.SaveAsync(" ", new("شرکت نمونه"), 1, CancellationToken.None)).ErrorCode);
     }
 
     [Fact]
     public async Task The_logo_follows_the_name_is_replaced_and_survives_a_name_correction()
     {
         Assert.Equal("Company.NameRequired", (await _useCases.AttachLogoAsync(Key(), Png, 0, CancellationToken.None)).ErrorCode);
-        await _useCases.SaveNameAsync(Key(), "شرکت نمونه", 0, CancellationToken.None);
+        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
 
         Assert.Equal("Company.LogoInvalid", (await _useCases.AttachLogoAsync(Key(), [1, 2, 3], 1, CancellationToken.None)).ErrorCode);
         Assert.Null(await _useCases.GetLogoAsync(CancellationToken.None));
@@ -79,7 +97,7 @@ public sealed class CompanyUseCaseTests : IDisposable
         Assert.Equal("image/png", logo!.Value.ContentType);
         Assert.Equal(Png, logo.Value.Data);
 
-        Assert.True((await _useCases.SaveNameAsync(Key(), "شرکت نمونه نو", 2, CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.SaveAsync(Key(), new("شرکت نمونه نو"), 2, CancellationToken.None)).IsSuccess);
         Assert.Equal(Png, (await _useCases.GetLogoAsync(CancellationToken.None))!.Value.Data);
 
         Assert.True((await _useCases.AttachLogoAsync(Key(), Jpeg, 3, CancellationToken.None)).IsSuccess);
@@ -92,7 +110,7 @@ public sealed class CompanyUseCaseTests : IDisposable
     public async Task The_logo_can_be_removed()
     {
         Assert.Equal("Company.NoLogo", (await _useCases.RemoveLogoAsync(Key(), 0, CancellationToken.None)).ErrorCode);
-        await _useCases.SaveNameAsync(Key(), "شرکت نمونه", 0, CancellationToken.None);
+        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
         Assert.Equal("Company.NoLogo", (await _useCases.RemoveLogoAsync(Key(), 1, CancellationToken.None)).ErrorCode);
         await _useCases.AttachLogoAsync(Key(), Png, 1, CancellationToken.None);
 

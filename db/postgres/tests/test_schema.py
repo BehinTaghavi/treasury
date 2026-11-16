@@ -699,6 +699,18 @@ def test_one_company_profile_with_a_small_logo(db):
         with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
                 c.execute("UPDATE reference.company_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        # 034_reference_company_details.sql (owner's answer to Q38): optional official details, each with its shape.
+        c.execute(
+            "UPDATE reference.company SET national_id = '10101010103', economic_code = '411111111111', registration_number = '12345', "
+            "address = 'تهران', postal_code = '1234567890', phone = '+98-21-88880000', website = 'www.example.ir', email = 'info@example.ir'")
+        for column, bad in (("national_id", "1234567890"), ("economic_code", "4111"), ("registration_number", "12/3"), ("address", "x" * 301),
+                            ("postal_code", "12345"), ("phone", "abc"), ("website", ""), ("email", "info")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE reference.company SET {column} = %s", (bad,))
+        c.execute(
+            "UPDATE reference.company SET national_id = NULL, economic_code = NULL, registration_number = NULL, address = NULL, "
+            "postal_code = NULL, phone = NULL, website = NULL, email = NULL")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             with c.transaction():
                 c.execute("DELETE FROM reference.company")  # the profile is corrected, never deleted

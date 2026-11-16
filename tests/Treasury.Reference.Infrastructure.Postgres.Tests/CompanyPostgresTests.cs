@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Treasury.Reference.Infrastructure.Postgres.Tests;
 
-/// <summary>«اطلاعات شرکت» through the real PostgreSQL adapter, acting as the reference_svc role (033_reference_company.sql).</summary>
+/// <summary>«اطلاعات شرکت» through the real PostgreSQL adapter, acting as the reference_svc role (033_reference_company.sql, 034).</summary>
 public sealed class CompanyPostgresTests : IDisposable
 {
     private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
@@ -35,10 +35,10 @@ public sealed class CompanyPostgresTests : IDisposable
         Assert.Equal(CompanyView.NotEntered, await _useCases.GetAsync(ct));
         Assert.Null(await _useCases.GetLogoAsync(ct));
 
-        var first = await _useCases.SaveNameAsync(Key(), "شرکت نمونه", 0, ct);
+        var first = await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, ct);
         Assert.True(first.IsSuccess, first.ErrorCode);
         Assert.Equal(new CompanyView("شرکت نمونه", false, 1), await _useCases.GetAsync(ct));
-        Assert.Equal("Concurrency.Conflict", (await _useCases.SaveNameAsync(Key(), "دیگر", 0, ct)).ErrorCode);
+        Assert.Equal("Concurrency.Conflict", (await _useCases.SaveAsync(Key(), new("دیگر"), 0, ct)).ErrorCode);
 
         // A second first entry that slipped past the check is stopped by the table itself.
         await using (var raw = _dataSource.CreateCommand("INSERT INTO reference.company (id, name) VALUES (gen_random_uuid(), 'دوم')"))
@@ -51,12 +51,18 @@ public sealed class CompanyPostgresTests : IDisposable
         Assert.Equal("image/png", logo!.Value.ContentType);
         Assert.Equal(Png, logo.Value.Data);
 
-        Assert.True((await _useCases.SaveNameAsync(Key(), "شرکت نمونه (سهامی خاص)", 2, ct)).IsSuccess);
+        // The official details (Q38) are saved with the name and read back; the logo stays.
+        var form = new CompanyForm("شرکت نمونه (سهامی خاص)", "۱۰۱۰۱۰۱۰۱۰۳", "4111-1111-1111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir");
+        Assert.True((await _useCases.SaveAsync(Key(), form, 2, ct)).IsSuccess);
+        Assert.Equal(
+            new CompanyView("شرکت نمونه (سهامی خاص)", true, 3, "10101010103", "411111111111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir"),
+            await _useCases.GetAsync(ct));
+        Assert.Equal("Company.PostalCodeInvalid", (await _useCases.SaveAsync(Key(), form with { PostalCode = "123" }, 3, ct)).ErrorCode);
         Assert.True((await _useCases.AttachLogoAsync(Key(), Jpeg, 3, ct)).IsSuccess);
         logo = await _useCases.GetLogoAsync(ct);
         Assert.Equal("image/jpeg", logo!.Value.ContentType);
         Assert.Equal(Jpeg, logo.Value.Data);
-        Assert.Equal(new CompanyView("شرکت نمونه (سهامی خاص)", true, 4), await _useCases.GetAsync(ct));
+        Assert.Equal(("شرکت نمونه (سهامی خاص)", true, 4L, "10101010103"), await _useCases.GetAsync(ct) is var v ? (v.Name, v.HasLogo, v.Version, v.NationalId) : default);
         Assert.Equal("Concurrency.Conflict", (await _useCases.RemoveLogoAsync(Key(), 3, ct)).ErrorCode);
 
         Assert.True((await _useCases.RemoveLogoAsync(Key(), 4, ct)).IsSuccess);

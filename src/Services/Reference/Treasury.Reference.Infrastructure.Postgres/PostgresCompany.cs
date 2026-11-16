@@ -6,17 +6,23 @@ using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Infrastructure.Postgres;
 
-// Written against db/postgres/033_reference_company.sql.
+// Written against db/postgres/033_reference_company.sql and 034_reference_company_details.sql.
 
 public sealed class PostgresCompanyRepository : ICompanyRepository
 {
+    private const string Details = "national_id, economic_code, registration_number, address, postal_code, phone, website, email";
+
     public async Task<CompanyProfile?> GetAsync(CancellationToken cancellationToken)
     {
-        await using var cmd = PostgresUnitOfWork.Current.Command("SELECT id, name, logo_type, version FROM reference.company");
+        await using var cmd = PostgresUnitOfWork.Current.Command($"SELECT id, name, logo_type, version, {Details} FROM reference.company");
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
-        return await r.ReadAsync(cancellationToken).ConfigureAwait(false)
-            ? CompanyProfile.Restore(r.GetGuid(0), r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2), r.GetInt64(3))
-            : null;
+        if (!await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        string? S(int i) => r.IsDBNull(i) ? null : r.GetString(i);
+        return CompanyProfile.Restore(r.GetGuid(0), r.GetString(1), S(2), r.GetInt64(3), new CompanyDetails(S(4), S(5), S(6), S(7), S(8), S(9), S(10), S(11)));
     }
 
     public async Task AddAsync(CompanyProfile company, CancellationToken cancellationToken)
@@ -24,7 +30,9 @@ public sealed class PostgresCompanyRepository : ICompanyRepository
         ArgumentNullException.ThrowIfNull(company);
         var tx = PostgresUnitOfWork.Current;
         // The table holds one row (company_single): a second first entry at the same moment changes nothing and is a conflict.
-        await using (var cmd = tx.Command("INSERT INTO reference.company (id, name, logo_type) VALUES (@id, @name, @logo) ON CONFLICT DO NOTHING"))
+        await using (var cmd = tx.Command(
+            $"INSERT INTO reference.company (id, name, logo_type, {Details}) " +
+            "VALUES (@id, @name, @logo, @national_id, @economic_code, @registration_number, @address, @postal_code, @phone, @website, @email) ON CONFLICT DO NOTHING"))
         {
             Parameters(cmd, company);
             if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
@@ -42,7 +50,9 @@ public sealed class PostgresCompanyRepository : ICompanyRepository
         ArgumentNullException.ThrowIfNull(company);
         var tx = PostgresUnitOfWork.Current;
         await using (var cmd = tx.Command(
-            "UPDATE reference.company SET name = @name, logo_type = @logo, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
+            "UPDATE reference.company SET name = @name, logo_type = @logo, national_id = @national_id, economic_code = @economic_code, " +
+            "registration_number = @registration_number, address = @address, postal_code = @postal_code, phone = @phone, website = @website, email = @email, " +
+            "version = version + 1, updated_at = now() WHERE id = @id AND version = @expected"))
         {
             Parameters(cmd, company);
             cmd.Parameters.AddWithValue("expected", company.Version);
@@ -83,6 +93,16 @@ public sealed class PostgresCompanyRepository : ICompanyRepository
     {
         cmd.Parameters.AddWithValue("id", c.Id);
         cmd.Parameters.AddWithValue("name", c.Name);
-        cmd.Parameters.Add(new NpgsqlParameter("logo", NpgsqlDbType.Text) { Value = (object?)c.LogoType ?? DBNull.Value });
+        Text("logo", c.LogoType);
+        Text("national_id", c.Details.NationalId);
+        Text("economic_code", c.Details.EconomicCode);
+        Text("registration_number", c.Details.RegistrationNumber);
+        Text("address", c.Details.Address);
+        Text("postal_code", c.Details.PostalCode);
+        Text("phone", c.Details.Phone);
+        Text("website", c.Details.Website);
+        Text("email", c.Details.Email);
+
+        void Text(string name, string? value) => cmd.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Text) { Value = (object?)value ?? DBNull.Value });
     }
 }

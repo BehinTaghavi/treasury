@@ -33,7 +33,7 @@ The MVC version is not repaired. The system is rebuilt, and each part runs besid
 
 By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the latest one, #8, was green before it was merged.
 
-**In review (16 Nov 2026) — company information:** a new Basic Information page «اطلاعات شرکت» keeps the company's name and its scanned logo, and the shell shows both at the top of every screen (`reference-svc`, schema 033).
+**In review (16 Nov 2026) — company information:** a new Basic Information page «اطلاعات شرکت» keeps the company's name and its scanned logo, and the shell shows both at the top of every screen; the page also keeps the company's official details (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone, website, e-mail) for the top of printed forms (`reference-svc`, schemas 033 and 034).
 
 | Pull request | Subject | What it added |
 |---|---|---|
@@ -55,11 +55,11 @@ Phase A is almost finished. Basic Information (Phase B) is built and waits for r
 | Part | What is built | Tests |
 |---|---|---|
 | `cashflow-svc` | Lifecycle of received and issued cheques and notes with rule N2; cheque types with their scans and cheque books (series, serial, Sayad ID); receipts (cash, bank deposit, cheques and notes); the steps of a received cheque after receipt; treasury vouchers | Domain, use-case and PostgreSQL tests |
-| `reference-svc` | Currencies, country/province/city (Iran's cities pre-filled), bank names; code lengths, chart of accounts and تفصیل with Excel import, allowed تفصیل types; references (عطف), purpose groups and purposes; organisational units, requesters of funds, beneficiaries; the company's name and logo («اطلاعات شرکت») | Domain, use-case, Excel-reader and PostgreSQL tests |
+| `reference-svc` | Currencies, country/province/city (Iran's cities pre-filled), bank names; code lengths, chart of accounts and تفصیل with Excel import, allowed تفصیل types; references (عطف), purpose groups and purposes; organisational units, requesters of funds, beneficiaries; the company's name, logo and official details («اطلاعات شرکت») | Domain, use-case, Excel-reader and PostgreSQL tests |
 | `accounts-svc` | The company's bank accounts with their kinds and bank cards, cash desks, petty cash, opening balances | Domain, use-case and PostgreSQL tests |
 | `requests-svc` | Payment requests: request, approval, cancellation, the list approved for payment, scanned attachments, payment by an endorsed cheque | Domain, use-case and PostgreSQL tests |
 | Architecture rules | Layers depend inward only; no service references another service's code | Architecture tests |
-| Database | One schema per service (scripts 000 to 033), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
+| Database | One schema per service (scripts 000 to 034), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
 | Migration tool | Old cheques moved to the new schema with a reconciliation report; Jalali dates checked day by day against .NET for 1380–1420 | Migration tests |
 | User interface | Nuxt 4 shell (the company's name and logo at the top of every screen) and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
 | Deployment | Docker Compose for one client's server, and the Windows test server | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |
@@ -77,7 +77,7 @@ The full plan and phases A–G are in `docs/plan.md`.
 - **Payment requests (Phase C):** the owner's answers to Q25–Q29, then paying approved requests (Phase E).
 - **Payments and cheque printing (Phase E):** the proposal in `docs/domain/cheque-printing.md` waits for the owner's answers to Q12–Q18.
 - **Later phases:** accounting vouchers sent to the general ledger (F), reports and the full pilot (G).
-- **Open business questions:** Q1–Q10, Q25–Q29 and Q37–Q38 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
+- **Open business questions:** Q1–Q10 and Q25–Q29 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
 
 ## Repository layout
 

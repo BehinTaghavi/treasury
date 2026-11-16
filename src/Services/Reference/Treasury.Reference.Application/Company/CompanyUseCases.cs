@@ -4,18 +4,31 @@ using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Application.Company;
 
+/// <summary>The form of «اطلاعات شرکت»: the name (required) and the official details of Q38 (each optional).</summary>
+public sealed record CompanyForm(
+    string? Name, string? NationalId = null, string? EconomicCode = null, string? RegistrationNumber = null, string? Address = null,
+    string? PostalCode = null, string? Phone = null, string? Website = null, string? Email = null)
+{
+    public CompanyDetails Details => new(NationalId, EconomicCode, RegistrationNumber, Address, PostalCode, Phone, Website, Email);
+}
+
 /// <param name="Name">Empty until the company name is entered.</param>
 /// <param name="Version">0 until the company name is entered; sent back with every change.</param>
-public sealed record CompanyView(string Name, bool HasLogo, long Version)
+public sealed record CompanyView(
+    string Name, bool HasLogo, long Version, string? NationalId = null, string? EconomicCode = null, string? RegistrationNumber = null,
+    string? Address = null, string? PostalCode = null, string? Phone = null, string? Website = null, string? Email = null)
 {
     public static readonly CompanyView NotEntered = new(string.Empty, false, 0);
 
-    public static CompanyView From(CompanyProfile c) => new(c.Name, c.HasLogo, c.Version);
+    public static CompanyView From(CompanyProfile c) =>
+        new(c.Name, c.HasLogo, c.Version, c.Details.NationalId, c.Details.EconomicCode, c.Details.RegistrationNumber, c.Details.Address,
+            c.Details.PostalCode, c.Details.Phone, c.Details.Website, c.Details.Email);
 }
 
 /// <summary>
 /// «اطلاعات شرکت» (owner, 16 Nov 2026): the company's name and logo, entered in Basic Information and shown at the top of every
-/// screen. Each write is one command in one transaction on the one profile of the database.
+/// screen, and its official details for printed forms (Q37, Q38). Each write is one command in one transaction on the one profile
+/// of the database.
 /// </summary>
 public sealed class CompanyUseCases(IUnitOfWork unitOfWork, ICompanyRepository companies, IIdempotencyStore idempotency)
 {
@@ -24,14 +37,15 @@ public sealed class CompanyUseCases(IUnitOfWork unitOfWork, ICompanyRepository c
     public Task<CompanyView> GetAsync(CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct => await companies.GetAsync(ct).ConfigureAwait(false) is { } c ? CompanyView.From(c) : CompanyView.NotEntered, cancellationToken);
 
-    /// <summary>Enters the company name for the first time (<paramref name="expectedVersion"/> 0) or corrects it.</summary>
-    public Task<Result<Guid>> SaveNameAsync(string key, string? name, long expectedVersion, CancellationToken cancellationToken) =>
+    /// <summary>Enters the company's name and details for the first time (<paramref name="expectedVersion"/> 0) or corrects them.</summary>
+    public Task<Result<Guid>> SaveAsync(string key, CompanyForm form, long expectedVersion, CancellationToken cancellationToken) =>
         RunAsync(key, async ct =>
         {
+            ArgumentNullException.ThrowIfNull(form);
             var company = await companies.GetAsync(ct).ConfigureAwait(false);
             if (company is null)
             {
-                company = CompanyProfile.Register(Guid.NewGuid(), name);
+                company = CompanyProfile.Register(Guid.NewGuid(), form.Name, form.Details);
                 if (expectedVersion != 0)
                 {
                     throw new ConcurrencyConflictException("The company profile was changed by someone else.");
@@ -42,7 +56,7 @@ public sealed class CompanyUseCases(IUnitOfWork unitOfWork, ICompanyRepository c
             }
 
             Check(company, expectedVersion);
-            company.Rename(name);
+            company.Edit(form.Name, form.Details);
             await companies.SaveAsync(company, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(company.Id);
         }, cancellationToken);

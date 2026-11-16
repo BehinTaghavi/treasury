@@ -4,9 +4,9 @@ using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Api;
 
-public sealed record CompanyNameRequest(string? Name, long Version);
+public sealed record CompanyEditRequest(CompanyForm Form, long Version);
 
-/// <summary>«اطلاعات شرکت» (owner, 16 Nov 2026): the company's name and logo under /api/reference/company.</summary>
+/// <summary>«اطلاعات شرکت» (owner, 16 Nov 2026): the company's name, official details and logo under /api/reference/company.</summary>
 public static class CompanyEndpoints
 {
     public static void MapCompanyEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
@@ -19,8 +19,8 @@ public static class CompanyEndpoints
 
         api.MapGet(string.Empty, async (CompanyUseCases u, CancellationToken ct) => Results.Ok(await u.GetAsync(ct).ConfigureAwait(false)));
 
-        api.MapPut(string.Empty, async (CompanyNameRequest r, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
-            ToHttp(await u.SaveNameAsync(Key(http), r.Name, r.Version, ct).ConfigureAwait(false)));
+        api.MapPut(string.Empty, async (CompanyEditRequest r, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SaveAsync(Key(http), r.Form, r.Version, ct).ConfigureAwait(false)));
 
         // The logo: multipart form with "file" and "version"; at most 1 MB (checked again by the domain).
         api.MapPost("/logo", async (IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] long version, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>

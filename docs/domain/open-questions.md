@@ -57,9 +57,9 @@ Proposal: `received-cheque-steps.md`.
 
 ## Company information (owner, 16 Nov 2026)
 
-Built: Basic Information → «اطلاعات شرکت» keeps the company's name and logo; both are shown at the top of every screen.
+Built: Basic Information → «اطلاعات شرکت» keeps the company's name, logo and official details; the name and logo are shown at the top of every screen.
 
 | # | Question | Proposed behaviour | Why |
 |---|---|---|---|
-| Q37 | Should **printed forms and reports** (receipt, payment request, cheque delivery, reports) also carry the company's **name and logo** at the top when they are built? | Yes: every printed form starts with the logo and the name from «اطلاعات شرکت». | "At the top of all forms" may mean the screens, the printouts, or both; the screens are done. |
-| Q38 | Which **other company details** belong on «اطلاعات شرکت» (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone)? | Only name and logo for now; the others are added when a printed form needs them. | They are needed on official printouts, not on the screens. |
+| Q37 | Should **printed forms and reports** (receipt, payment request, cheque delivery, reports) also carry the company's **name and logo** at the top when they are built? | **Answered 16 Nov 2026: yes.** Every printed form and report starts with the logo and the name from «اطلاعات شرکت»; built with each printed form (Phases E and G). | "At the top of all forms" may mean the screens, the printouts, or both; the screens are done. |
+| Q38 | Which **other company details** belong on «اطلاعات شرکت» (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone)? | **Answered 16 Nov 2026: add شناسه ملی, کد اقتصادی, شماره ثبت, نشانی, کد پستی, تلفن, آدرس سایت and ایمیل.** Built: all optional, each checked when filled in (شناسه ملی 11 digits with check digit, کد اقتصادی 11 or 12 digits, کد پستی 10 digits). | They are needed on official printouts, not on the screens. |

@@ -4,7 +4,7 @@ using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Infrastructure.InMemory;
 
-public sealed record CompanySnapshot(Guid Id, string Name, string? LogoType, byte[]? Logo, long Version);
+public sealed record CompanySnapshot(Guid Id, string Name, string? LogoType, byte[]? Logo, long Version, CompanyDetails Details);
 
 /// <summary>In-memory company profile (local runs, tests): one row, same version checks and outbox as the database.</summary>
 public sealed class InMemoryCompanyRepository(InMemoryReferenceDatabase db) : ICompanyRepository
@@ -12,7 +12,7 @@ public sealed class InMemoryCompanyRepository(InMemoryReferenceDatabase db) : IC
     private const string Table = "company";
 
     public Task<CompanyProfile?> GetAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(Stored() is { } s ? CompanyProfile.Restore(s.Id, s.Name, s.LogoType, s.Version) : null);
+        Task.FromResult(Stored() is { } s ? CompanyProfile.Restore(s.Id, s.Name, s.LogoType, s.Version, s.Details) : null);
 
     public Task AddAsync(CompanyProfile company, CancellationToken cancellationToken)
     {
@@ -62,7 +62,7 @@ public sealed class InMemoryCompanyRepository(InMemoryReferenceDatabase db) : IC
             tables[Table] = rows;
         }
 
-        rows[company.Id] = new CompanySnapshot(company.Id, company.Name, company.LogoType, logo, newVersion);
+        rows[company.Id] = new CompanySnapshot(company.Id, company.Name, company.LogoType, logo, newVersion, company.Details);
         InMemoryUnitOfWork.Pending.Outbox.AddRange(company.PendingEvents.Select(OutboxMessage.From));
         company.MarkSaved(newVersion);
         return Task.CompletedTask;
