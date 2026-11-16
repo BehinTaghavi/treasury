@@ -266,7 +266,8 @@ onMounted(async () => { await L.load(); await load() })
 
       <template v-if="selected.instruments?.length">
         <p class="muted small">{{ selected.kind === 'Notes'
-          ? t('عودت یا ابطال هر سفته در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شود.', 'Returning or cancelling a note is recorded on the «Received cheque steps» tab.')
+          ? t('مراحل بعدی هر سفته (واگذاری به بانک، وصول، واخواست، استرداد، خرج، ابطال) در زبانهٔ «عملیات سفته‌های دریافتی» ثبت می‌شوند.',
+            'The next steps of each note (to the bank, collected, protested, handed back, endorsed, cancelled) are recorded on the «Received note steps» tab.')
           : t('مراحل بعدی هر چک (واگذاری، وصول، عودت، برگشت، تعویض، ابطال، خرج) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شوند.',
             'The next steps of each cheque are recorded on the «Received cheque steps» tab.') }}</p>
         <div class="tr-scroll">

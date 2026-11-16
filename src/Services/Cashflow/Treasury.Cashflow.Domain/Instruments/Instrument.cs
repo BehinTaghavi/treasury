@@ -71,7 +71,8 @@ public sealed record StepDetails(
 
 /// <summary>
 /// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
-/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32).
+/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32). An endorsed promissory
+/// note («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026) has no Sayad transfer.
 /// </summary>
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
 
@@ -331,11 +332,13 @@ public sealed class Instrument : AggregateRoot<Guid>
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
         Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        // Only cheques are transferred in the Sayad system; a note is endorsed on its back.
+        var sayad = Kind.IsCheque() ? Clean(endorsement.SayadTracking) : null;
+        Require(!Kind.IsCheque() || sayad is not null, "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
         Require(endorsement.PaymentRequestId != Guid.Empty, "Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
-        Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
+        Apply(InstrumentAction.Endorse, date, userId, sayad, note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
-                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim(),
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: sayad,
                 PaymentRequestId: endorsement.PaymentRequestId));
     }
 

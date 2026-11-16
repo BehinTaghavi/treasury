@@ -24,6 +24,8 @@ const tabs = [
   { id: 'list', title: ['فهرست دریافت‌ها', 'Receipts list'] },
   // Owner's report no. 4, item 9, and item 14: every step of a received cheque after receipt.
   { id: 'collection', title: ['عملیات چک‌های دریافتی', 'Received cheque steps'] },
+  // Owner, 16 Nov 2026: the steps of a note after receipt (to the bank, collected, handed back, endorsed…).
+  { id: 'noteSteps', title: ['عملیات سفته‌های دریافتی', 'Received note steps'] },
 ] as const
 type Tab = (typeof tabs)[number]['id']
 const tab = ref<Tab>('Instruments')
@@ -46,8 +48,9 @@ const hints: Record<string, [string, string]> = {
         {{ fa ? x.title[0] : x.title[1] }}
       </button>
     </nav>
-    <p v-if="tab !== 'list' && tab !== 'collection'" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
+    <p v-if="hints[tab]" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
     <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+    <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" />
     <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
     <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" />

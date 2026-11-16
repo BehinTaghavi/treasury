@@ -46,6 +46,10 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
     use: ['بدهکار هنگام دریافت سفتهٔ تضمینی یا امانی؛ بستانکار آن «طرف حساب انتظامی» است', 'Debited when a guarantee or trust note is received; credited to the guarantee counterpart'],
   },
+  NotesInCollection: {
+    title: ['سفته‌های در جریان وصول', 'Notes in collection'],
+    use: ['بدهکار هنگام واگذاری سفته به بانک، بستانکار هنگام وصول، واخواست یا عودت؛ تفصیل: تفصیل حساب بانکی', "Debited when a note goes to the bank, credited when collected, protested or returned; detail: the bank account's detail"],
+  },
 }
 
 const rows = ref<Row[]>([])

@@ -181,7 +181,10 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.ReturnToIssuer)
+        // Returning to the payer has no voucher yet (owner's table: «بدهکاران یا ...»), except a guarantee note, which leaves the
+        // off-balance accounts when it is handed back («استرداد»).
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace
+            || (entry.Action == InstrumentAction.ReturnToIssuer && cheque.Kind != InstrumentKind.GuaranteeNote))
         {
             return null;
         }

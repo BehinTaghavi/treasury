@@ -698,6 +698,11 @@ def test_a_note_receipt_has_its_own_numbers_names_its_notes_and_keeps_its_terms(
         c.execute("""INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'Notes', 1)
                      ON CONFLICT (fiscal_year, kind) DO UPDATE SET last_number = cashflow.receipt_number.last_number + 1""")
         c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeNotesForCompany', '9102') ON CONFLICT DO NOTHING")
+        # 035_cashflow_note_steps.sql (owner, 16 Nov 2026: steps of a note after receipt): «سفته های در جریان وصول».
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesInCollection', '1204') ON CONFLICT DO NOTHING")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesProtested', '1205')")
         c.rollback()
 
 

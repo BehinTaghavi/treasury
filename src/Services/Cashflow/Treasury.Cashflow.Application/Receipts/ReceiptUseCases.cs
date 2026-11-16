@@ -282,7 +282,8 @@ public sealed class ReceiptUseCases(
     /// Endorsement («خرج چک», owner's item 14 (g)): the cheque pays an approved payment request (answer to Q36). The request's beneficiary
     /// receives it and its payment purpose group (debited on the voucher) and purpose are taken; the cheque may pay the request in full or
     /// in part, never more than remains; the Sayad transfer's tracking number is required (answer to Q32). The payment is recorded on the
-    /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice.
+    /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice. An ordinary promissory note
+    /// is endorsed the same way («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026), without a Sayad transfer.
     /// </summary>
     public Task<Result<Guid>> EndorseAsync(EndorseChequeCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -322,7 +323,8 @@ public sealed class ReceiptUseCases(
                 date, currentUser.UserId, command.Note);
             var key = cheque.EndorsementPaymentKey(cheque.History.Count);
             await paymentRequests.RecordPaymentAsync(request.Id,
-                new RequestPaymentInput(key, cheque.Id, $"چک {cheque.Number} {cheque.BankName}".Trim(), cheque.Amount.Amount, cheque.Amount.Currency, date.ToJalaliString()), ct)
+                new RequestPaymentInput(key, cheque.Id, (cheque.Kind.IsNote() ? $"سفته {cheque.Number}" : $"چک {cheque.Number} {cheque.BankName}").Trim(), cheque.Amount.Amount,
+                    cheque.Amount.Currency, date.ToJalaliString()), ct)
                 .ConfigureAwait(false);
             await instruments.SaveAsync(cheque, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(cheque.Id);

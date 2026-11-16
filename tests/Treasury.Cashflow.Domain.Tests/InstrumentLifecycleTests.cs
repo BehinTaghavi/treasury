@@ -53,11 +53,12 @@ public sealed class ReceivedInstrumentTests
 
     [Theory]
     [InlineData(InstrumentKind.GuaranteeCheque)]
-    [InlineData(InstrumentKind.PromissoryNote)]
+    [InlineData(InstrumentKind.GuaranteeNote)]
     [InlineData(InstrumentKind.Instalment)]
-    public void Only_ordinary_and_bank_cheques_can_be_sent_for_collection(InstrumentKind kind)
+    public void Only_ordinary_and_bank_cheques_and_ordinary_notes_can_be_sent_for_collection(InstrumentKind kind)
     {
-        var item = ReceivedCheque(kind, due: kind == InstrumentKind.GuaranteeCheque ? null : "1405/09/01");
+        // Old rule R3 (Checktype 0/2 only); ordinary promissory notes were added by the owner on 16 Nov 2026 (NoteStepTests).
+        var item = ReceivedCheque(kind, due: kind.IsGuarantee() ? null : "1405/09/01");
         Assert.DoesNotContain(InstrumentAction.DepositForCollection, item.AllowedActions());
         var ex = Assert.Throws<DomainException>(() => item.DepositForCollection("حساب", D("1405/08/05"), User));
         Assert.Equal("Instrument.KindNotAllowedForAction", ex.Code);
