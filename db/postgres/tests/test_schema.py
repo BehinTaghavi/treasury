@@ -674,3 +674,38 @@ def test_a_payment_request_keeps_its_payments(db):
         row = c.execute("""SELECT column_default, is_nullable FROM information_schema.columns
                            WHERE table_schema = 'requests' AND table_name = 'payment_request' AND column_name = 'payments'""").fetchone()
         assert row is not None and row[1] == "NO" and "[]" in row[0]
+
+
+def test_one_company_profile_with_a_small_logo(db):
+    # 033_reference_company.sql (owner, 16 Nov 2026): one row per database; the logo is a PNG/JPEG of at most 1 MB.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        company = uuid.uuid4()
+        c.execute("DELETE FROM reference.company_logo")
+        if c.execute("SELECT count(*) FROM reference.company").fetchone()[0] == 0:
+            c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت آزمایشی')", (company,))
+        company = c.execute("SELECT id FROM reference.company").fetchone()[0]
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت دوم')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET name = ''")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET logo_type = 'application/pdf'")
+        c.execute("UPDATE reference.company SET logo_type = 'image/png'")
+        c.execute("INSERT INTO reference.company_logo (company_id, data) VALUES (%s, %s)", (company, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM reference.company")  # the profile is corrected, never deleted
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("UPDATE reference.company SET logo_type = NULL")
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("SELECT name FROM reference.company")
+

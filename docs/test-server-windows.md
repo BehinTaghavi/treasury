@@ -59,6 +59,8 @@ Only the **Receipts** screen (دریافت‌ها) works so far. Suggested check
 4. Enter a cheque with the **same bank and number** twice: you should get a duplicate warning, and it is still saved (open question Q1).
 5. Type an impossible date like `1405/13/40`: you should get a clear error and nothing is saved.
 
+6. **Company name and logo:** open **اطلاعات پایه** → **اطلاعات شرکت**, type the company's name, choose the scanned logo file (PNG or JPEG, at most 1 MB) and press **ثبت**. The name and logo then appear at the top of every screen.
+
 Anything that behaves differently from how your company works, or from the old program, is exactly what Claude needs to hear.
 Write it down in plain words (Farsi is fine), with a screenshot if you can.
 

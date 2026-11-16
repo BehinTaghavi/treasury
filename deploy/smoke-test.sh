@@ -28,6 +28,8 @@ for _ in $(seq 1 60); do
 done
 curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank names list (reference-svc) is missing or empty"
 curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
+# «اطلاعات شرکت»: the company's name and logo for the top bar of every screen (schema 033).
+curl -sf "$base/api/reference/company" | grep -q '"version"' || fail "company information (reference-svc) is not served"
 
 # Bank accounts (accounts-svc -> PostgreSQL as accounts_svc).
 for _ in $(seq 1 60); do

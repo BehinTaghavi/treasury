@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createApi, formatAmount, hasTranslation, normaliseJalali, parseAmount, translate } from './index'
+import { createApi, formatAmount, hasTranslation, logoFileProblem, normaliseJalali, parseAmount, translate } from './index'
 
 describe('formatting', () => {
   it('accepts Persian digits and separators in amounts', () => {
@@ -67,5 +67,19 @@ describe('api client', () => {
     expect(seen?.body).toBeInstanceOf(FormData)
     expect(h['Idempotency-Key']).toBeTruthy()
     expect(h['Content-Type']).toBeUndefined()
+  })
+})
+
+describe('company logo', () => {
+  // Owner, 16 Nov 2026: the logo scanned by the user is a PNG or JPEG picture; the domain allows at most 1 MB (CompanyProfile).
+  it('accepts a PNG or JPEG picture of at most 1 MB', () => {
+    expect(logoFileProblem({ size: 20_000, type: 'image/png' })).toBeNull()
+    expect(logoFileProblem({ size: 1024 * 1024, type: 'image/jpeg' })).toBeNull()
+  })
+  it('names the problem of any other file with an error code that has a text', () => {
+    expect(logoFileProblem({ size: 20_000, type: 'application/pdf' })).toBe('Company.LogoInvalid')
+    expect(logoFileProblem({ size: 0, type: 'image/png' })).toBe('Company.LogoInvalid')
+    expect(logoFileProblem({ size: 1024 * 1024 + 1, type: 'image/png' })).toBe('Company.LogoTooLarge')
+    expect(hasTranslation('Company.LogoInvalid') && hasTranslation('Company.LogoTooLarge')).toBe(true)
   })
 })

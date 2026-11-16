@@ -54,3 +54,12 @@ Proposal: `received-cheque-steps.md`.
 | Q34 | Your table says «اسناد **درخ**واست شده» for a bounce and «اسناد **واخ**واست شده» for a returned endorsed cheque. Is it **one account** (واخواست = protested)? | **Answered 15 Nov 2026: one account, «اسناد واخواست شده»** (the table's «درخواست شده» was a typing error; corrected everywhere). | Probably a typing difference. |
 | Q35 | When several cheques are deposited together on **one slip** (or collected on one statement date), is it **one voucher** for the slip or one per cheque? | **Answered 15 Nov 2026: one voucher per cheque.** | Your answer "one voucher for each operation" can mean either. |
 | Q36 | **Endorsement and payment requests:** must every endorsement («خرج چک») pay an **approved payment request** (the request then becomes paid), or is the request optional? (Your answer repeated the question.) | **Answered 15 Nov 2026: yes, every endorsement pays an approved payment request** (in full or in part; the request is paid when its payments reach its amount; a returned endorsed cheque takes its payment back). | Decides whether the endorsement screen must choose an approved request. |
+
+## Company information (owner, 16 Nov 2026)
+
+Built: Basic Information → «اطلاعات شرکت» keeps the company's name and logo; both are shown at the top of every screen.
+
+| # | Question | Proposed behaviour | Why |
+|---|---|---|---|
+| Q37 | Should **printed forms and reports** (receipt, payment request, cheque delivery, reports) also carry the company's **name and logo** at the top when they are built? | Yes: every printed form starts with the logo and the name from «اطلاعات شرکت». | "At the top of all forms" may mean the screens, the printouts, or both; the screens are done. |
+| Q38 | Which **other company details** belong on «اطلاعات شرکت» (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone)? | Only name and logo for now; the others are added when a printed form needs them. | They are needed on official printouts, not on the screens. |
