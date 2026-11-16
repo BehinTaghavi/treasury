@@ -8,12 +8,14 @@ namespace Treasury.Cashflow.Domain.Receipts;
 /// The kinds of receipt (new-version manual, «دریافت ها شامل»): cash into a cash desk, money paid into one of our bank accounts
 /// (deposit slip, transfer, POS, card-to-card), and cheques and promissory notes, current or post-dated, guarantee or not. Each
 /// kind has its own serial number per fiscal year, as in the old program (Subs.Scode 17 «دريافت نقدي», 16 «واريز به حساب», D_Check).
+/// Promissory notes have a receipt of their own (owner's report no. 4, item 13, and his form «فرم دریافت سفته» of 16 Nov 2026).
 /// </summary>
 public enum ReceiptKind
 {
     Cash,
     BankDeposit,
     Instruments,
+    Notes,
 }
 
 /// <summary>How money reached the bank account (old D_variz «نوع واريز»; manual: «ثبت دریافتهای از محل عابر بانک – POS – (کارت به کارت)»).</summary>
@@ -141,6 +143,9 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// <summary>Cheques and notes received on this receipt.</summary>
     public IReadOnlyList<Guid> InstrumentIds => _instrumentIds;
 
+    /// <summary>A receipt of promissory notes: why and how they were received (owner's form «فرم دریافت سفته»); null for the other kinds.</summary>
+    public NoteReceiptTerms? NoteTerms { get; private init; }
+
     /// <summary>Rial total: the amount, or the sum of the cheques and notes (foreign currency at its rate).</summary>
     public decimal TotalRial { get; private set; }
 
@@ -212,12 +217,49 @@ public sealed class Receipt : AggregateRoot<Guid>
     }
 
     /// <summary>
+    /// Promissory notes of one issuer on one receipt (owner's form «فرم دریافت سفته», 16 Nov 2026; report no. 4, item 13). Every note
+    /// becomes an instrument in the cash desk: a guarantee note when the notes are held as security or in trust, otherwise an ordinary
+    /// note. With «معین» every note has its due date; with «عندالمطالبه» none has (it can be collected whenever its holder wishes).
+    /// Every note must have passed the checks of article 308 (owner's answer to Q40). The receipt records the handing over of the
+    /// notes only; it is not a receipt of money. The authorised signatories who sign it are chosen by the signature rule of the note
+    /// receipt (Basic Information, owner's answers to Q41 and Q45–Q47).
+    /// </summary>
+    /// <param name="rule">The signature rule of the note receipt; null when none is set (no authorised signature needed).</param>
+    /// <param name="signerIds">The signatories chosen on the form.</param>
+    public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId,
+        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(terms);
+        ArgumentNullException.ThrowIfNull(notes);
+        Validate(header, number, userId);
+        var checkedTerms = terms.Validated() with { Signers = (rule ?? SignatureRuleFact.None).Choose(signerIds) };
+        Require(notes.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
+        var onDemand = checkedTerms.Maturity == NoteMaturity.OnDemand;
+        var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
+        foreach (var n in notes)
+        {
+            Require(n.Kind == checkedTerms.InstrumentKind && n.Details.OnDemand == onDemand, "Receipt.NoteKindMismatch",
+                "Every note on the receipt follows the receipt's reason and kind of due date.");
+            Require(onDemand || n.DueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+            Require(n.Details.Checks?.IsComplete(onDemand) == true, "Receipt.NoteChecksIncomplete",
+                $"Note {n.Number} is received only when every item of article 308 is checked on it.");
+            Require(n.Direction == InstrumentDirection.Received && n.ReceiptId == id && n.IssueDate == header.Date && n.Counterparty.Id == receipt.Payer.Id,
+                "Receipt.InstrumentMismatch", "Every cheque and note must be received from this payer on this receipt's date.");
+        }
+
+        receipt._instrumentIds.AddRange(notes.Select(n => n.Id));
+        receipt.TotalRial = notes.Sum(n => n.Amount.ToRial());
+        receipt.Raise(receipt.Recorded());
+        return receipt;
+    }
+
+    /// <summary>
     /// Cancels (ابطال) a cash or bank receipt entered by mistake. Cheques and notes are not cancelled with their receipt: each one is
     /// returned to the payer (عودت) through its own steps, which keeps its history.
     /// </summary>
     public void Cancel(FiscalDate date, string reason, string userId)
     {
-        Require(Kind != ReceiptKind.Instruments, "Receipt.CancelInstruments", "Return each cheque or note to the payer instead of cancelling the receipt.");
+        Require(Kind is not (ReceiptKind.Instruments or ReceiptKind.Notes), "Receipt.CancelInstruments", "Return each cheque or note to the payer instead of cancelling the receipt.");
         Require(State == ReceiptState.Recorded, "Receipt.AlreadyCancelled", "The receipt is already cancelled.");
         Require(!string.IsNullOrWhiteSpace(reason), "Receipt.CancelReasonRequired", "Give the reason for cancelling.");
         Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
@@ -233,7 +275,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         string? reference1, string? reference2, Guid? departmentId, bool salesProceeds, string? note, string recordedBy,
         ReceiptAccountKind? accountKind, Guid? accountId, DepositMethod? method, string? trackingNumber, Money? amount,
         IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version,
-        Guid? replacedInstrumentId = null)
+        Guid? replacedInstrumentId = null, NoteReceiptTerms? noteTerms = null)
     {
         ArgumentNullException.ThrowIfNull(payer);
         var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true, true),
@@ -250,6 +292,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             CancelledOn = cancelledOn,
             CancelReason = cancelReason,
             ReplacedInstrumentId = replacedInstrumentId,
+            NoteTerms = noteTerms,
         };
         r._instrumentIds.AddRange(instrumentIds);
         r.SetLoadedVersion(version);

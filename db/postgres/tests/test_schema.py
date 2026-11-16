@@ -674,3 +674,68 @@ def test_a_payment_request_keeps_its_payments(db):
         row = c.execute("""SELECT column_default, is_nullable FROM information_schema.columns
                            WHERE table_schema = 'requests' AND table_name = 'payment_request' AND column_name = 'payments'""").fetchone()
         assert row is not None and row[1] == "NO" and "[]" in row[0]
+
+
+def test_a_note_receipt_has_its_own_numbers_names_its_notes_and_keeps_its_terms(db):
+    # 033_cashflow_note_receipts.sql (owner's report no. 4, item 13, and his form «فرم دریافت سفته» of 16 Nov 2026).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code,
+                 purpose_group_id, purpose_group_name, purpose, recorded_by, instrument_ids, total_rial, state, note_terms)
+             VALUES (1405, %s, %s, %s, '2026-11-16', %s, 'الف', '200015', %s, 'تضمین', 'تضمین قرارداد', 'test', %s, 1000, 'Recorded', %s)"""
+    terms = '{"reason": "Guarantee", "form": "Paper", "maturity": "OnDemand"}'
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        rid = uuid.uuid4()
+        c.execute(add, (rid, "Notes", 1, uuid.uuid4(), uuid.uuid4(), [uuid.uuid4()], terms))
+        assert c.execute("SELECT note_terms->>'maturity' FROM cashflow.receipt WHERE id = %s", (rid,)).fetchone()[0] == "OnDemand"
+        for kind, number, notes, note_terms in (
+                ("Notes", 2, [], terms),                        # a note receipt names its notes
+                ("Notes", 2, [uuid.uuid4()], None),             # and always has its terms
+                ("Instruments", 90, [uuid.uuid4()], terms),     # which no other kind has
+                ("Bills", 1, [uuid.uuid4()], None)):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), kind, number, uuid.uuid4(), uuid.uuid4(), notes, note_terms))
+        c.execute("""INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'Notes', 1)
+                     ON CONFLICT (fiscal_year, kind) DO UPDATE SET last_number = cashflow.receipt_number.last_number + 1""")
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeNotesForCompany', '9102') ON CONFLICT DO NOTHING")
+        # 035_cashflow_note_steps.sql (owner, 16 Nov 2026: steps of a note after receipt): «سفته های در جریان وصول».
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesInCollection', '1204') ON CONFLICT DO NOTHING")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesProtested', '1205')")
+        c.rollback()
+
+
+def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(db):
+    # 034_reference_signatories.sql (owner, 16 Nov 2026: authorised signatories in Basic Information and a rule per kind of document).
+    add = """INSERT INTO reference.signatory (id, full_name, name_key, position, national_code, mobile) VALUES (%s, %s, %s, 'مدیر عامل', %s, %s)"""
+    rule = "INSERT INTO reference.signature_rule (document, id, required_count, compulsory, optional) VALUES (%s, %s, %s, %s, %s)"
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        ceo, cfo = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (ceo, "علی رضایی", "علیرضایی", "0123456789", "09121234567"))
+        c.execute(add, (cfo, "بهرام کریمی", "بهرامکریمی", None, None))
+        for row, error in (
+                ((uuid.uuid4(), "علی رضایی", "علیرضایی", None, None), psycopg.errors.UniqueViolation),       # the same name
+                ((uuid.uuid4(), "دیگری", "دیگری", "0123456789", None), psycopg.errors.UniqueViolation),       # the same national code
+                ((uuid.uuid4(), "دیگری", "دیگری", "12345", None), psycopg.errors.CheckViolation),
+                ((uuid.uuid4(), "دیگری", "دیگری", None, "02188990011"), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, row)
+        c.execute(rule, ("NoteReceipt", uuid.uuid4(), 2, [ceo], [cfo]))
+        for row, error in (
+                (("NoteReceipt", uuid.uuid4(), 1, [ceo], []), psycopg.errors.UniqueViolation),                # one rule per kind of document
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo, cfo], []), psycopg.errors.CheckViolation),           # fewer than the compulsory ones
+                (("IssuedCheque", uuid.uuid4(), 3, [ceo], [cfo]), psycopg.errors.CheckViolation),             # more than those named
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo], [ceo]), psycopg.errors.CheckViolation),             # compulsory and optional
+                (("Invoice", uuid.uuid4(), 0, [], []), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(rule, row)
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not read reference-svc's tables
+            with c.transaction():
+                c.execute("SELECT 1 FROM reference.signatory")
+        c.rollback()
+

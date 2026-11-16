@@ -146,7 +146,8 @@ public sealed class VoucherUseCases(
 
     private async Task<Voucher> ComputeReceiptAsync(Receipt receipt, CancellationToken ct)
     {
-        IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
+        IReadOnlyList<Instrument> lines = receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes
+            ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
         LedgerSide? side = null;
         if (receipt.AccountId is { } accountId)
         {
@@ -180,9 +181,19 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.ReturnToIssuer)
+        // Returning a cheque to its payer has no voucher yet (owner's table: «بدهکاران یا ...»). A note handed back («استرداد») has
+        // one (owner, 16 Nov 2026): a guarantee note leaves the off-balance accounts, an ordinary note debits what its receipt credited.
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace
+            || (entry.Action == InstrumentAction.ReturnToIssuer && !cheque.Kind.IsNote()))
         {
             return null;
+        }
+
+        string? receiptGroupAccount = null;
+        if (entry.Action == InstrumentAction.ReturnToIssuer && cheque.Kind == InstrumentKind.PromissoryNote && cheque.ReceiptId is { } receiptId
+            && await receipts.GetAsync(receiptId, ct).ConfigureAwait(false) is { } receipt)
+        {
+            receiptGroupAccount = (await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false))?.LedgerAccountCode;
         }
 
         var bank = new LedgerSide(null, null);
@@ -205,7 +216,7 @@ public sealed class VoucherUseCases(
         }
 
         var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template);
+        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template, receiptGroupAccount);
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

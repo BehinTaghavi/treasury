@@ -72,6 +72,14 @@ public static class InstrumentKindRules
     public static bool IsCollectable(this InstrumentKind kind) =>
         kind is InstrumentKind.OrdinaryCheque or InstrumentKind.BankCheque;
 
+    /// <summary>
+    /// Sent to a bank for collection or endorsed to others: ordinary and bank cheques (old rule R3) and, by the owner's decision of
+    /// 16 Nov 2026 («مراحل سفته پس از دریافت: واگذاری به بانک، وصول، استرداد، خرج سفته»), ordinary promissory notes. Guarantee
+    /// cheques and notes are held, not collected.
+    /// </summary>
+    public static bool IsNegotiable(this InstrumentKind kind) =>
+        kind.IsCollectable() || kind == InstrumentKind.PromissoryNote;
+
     /// <summary>Guarantee items are held as security; they have no due date of their own.</summary>
     public static bool IsGuarantee(this InstrumentKind kind) =>
         kind is InstrumentKind.GuaranteeCheque or InstrumentKind.GuaranteeNote;

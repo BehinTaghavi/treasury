@@ -8,6 +8,9 @@
  * replaced by new cheques (a cheque receipt of its own), cancelled by management's order (its no. and date), endorsed to pay an approved
  * payment request (answer to Q36; its beneficiary receives the cheque; with the Sayad transfer's tracking no.), endorsement returned (the
  * request's payment is taken back), returned to the payer.
+ * With `notes` the same screen is «عملیات سفته‌های دریافتی» (owner, 16 Nov 2026: واگذاری به بانک، وصول، استرداد، خرج سفته – ظهرنویسی
+ * و انتقال به غیر): it lists promissory notes instead of cheques, a note the bank does not pay is protested («واخواست»), returning it to
+ * the obligor is «استرداد», and an endorsement has no Sayad transfer. Guarantee and trust notes are only handed back or cancelled.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -22,14 +25,22 @@ interface Cheque {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
-  details: { branchName: string | null; sayadId: string | null } | null
+  details: { branchName: string | null; sayadId: string | null; onDemand?: boolean } | null
 }
 type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
 
-const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
+const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; notes?: boolean }>(),
+  { apiBase: '', locale: 'fa', token: undefined, notes: false })
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
-const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
+/** The words of the cheque screen in the notes screen: سفته for چک, واخواست‌نامه for the bounce notice, متعهد for the payer. */
+const noteWords: [string, string][] = props.locale === 'fa'
+  ? [['چکی ', 'سفته‌ای '], ['چک', 'سفته'], ['اعلامیهٔ برگشت', 'واخواست‌نامه'], ['اعلامیه', 'واخواست‌نامه'], ['علت برگشت', 'علت واخواست'],
+      ['پرداخت کننده', 'متعهد'], ['پرداخت‌کننده', 'متعهد']]
+  : [['cheques', 'notes'], ['Cheque', 'Note'], ['cheque', 'note'], ['bounce notice', 'protest'], ['Bounce notice', 'Protest'], ['Payer', 'Obligor'], ['payer', 'obligor']]
+const words = (text: string) => (props.notes ? noteWords.reduce((s, [a, b]) => s.replaceAll(a, b), text) : text)
+const t = (f: string, e: string) => words(props.locale === 'fa' ? f : e)
+const isNote = (kind: string) => kind.endsWith('Note')
 const money = (n: number) => formatAmount(n, props.locale)
 const L = useLookups(api)
 
@@ -50,7 +61,12 @@ const actionNames: Record<string, [string, string]> = {
   Cancel: ['ابطال', 'Cancel'], Endorse: ['خرج چک', 'Endorse'], RecordEndorsementReturned: ['برگشت خرج', 'Endorsement returned'],
   ReturnToIssuer: ['عودت به پرداخت‌کننده', 'Return to the payer'],
 }
-const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
+if (props.notes) {
+  tabs[2]!.title = ['عودت‌شده از بانک و واخواستی', 'Back from the bank and protested']
+  Object.assign(stateNames, { Bounced: ['واخواست شده', 'Protested'], ReturnedToIssuer: ['مسترد شده به متعهد', 'Handed back to the obligor'] })
+  Object.assign(actionNames, { RecordBounced: ['واخواست', 'Protest'], ReturnToIssuer: ['استرداد به متعهد', 'Hand back to the obligor'] })
+}
+const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? words(fa.value ? m[k][0] : m[k][1]) : k ?? '')
 
 const tab = ref<Tab>('desk')
 const lists = reactive<Record<string, Cheque[]>>({})
@@ -73,7 +89,8 @@ const accountName = (id: string | null | undefined) => { const a = L.bankAccount
 async function load() {
   const states = tabs.flatMap(x => x.states)
   const results = await Promise.all(states.map(s => api.get<Cheque[]>(`/api/cashflow/instruments/received?state=${s}`)))
-  states.forEach((s, i) => { const r = results[i]!; if (r.ok) lists[s] = r.value })
+  // Cheques on the cheque screen, promissory notes on the notes screen.
+  states.forEach((s, i) => { const r = results[i]!; if (r.ok) lists[s] = r.value.filter(c => isNote(c.kind) === props.notes) })
   for (const k of Object.keys(chosen)) if (!tickable.value.some(c => c.id === k)) delete chosen[k]
 }
 
@@ -154,7 +171,7 @@ async function confirmStep() {
   busy.value = true
   const r = p.action === 'Endorse'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
-        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: p.sayad, note: p.note || null })
+        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: props.notes ? '' : p.sayad, note: p.note || null })
     : p.action === 'RecordEndorsementReturned'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null })
     : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
@@ -202,8 +219,8 @@ function stepText(s: Step) {
   return parts.filter(Boolean).join(' · ')
 }
 
-/** Steps offered on each row; deposit is done with the tick boxes. */
-const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection')
+/** Steps offered on each row; deposit is done with the tick boxes. A note is not replaced here (replacement is a cheque receipt). */
+const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && !(props.notes && a === 'Replace'))
 
 onMounted(async () => { await L.load(); await load() })
 </script>
@@ -249,7 +266,7 @@ onMounted(async () => { await L.load(); await load() })
           {{ t('مبلغ درخواست', 'Request') }} {{ money(chosenRequest.amount) }} · {{ t('پرداخت‌شده', 'paid') }} {{ money(chosenRequest.paidAmount) }} ·
           {{ t('پس از این چک مانده', 'left after this cheque') }} {{ money(chosenRequest.amount - chosenRequest.paidAmount - pending.cheque.amount) }}
         </p>
-        <label class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
+        <label v-if="!notes" class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else>
@@ -280,7 +297,7 @@ onMounted(async () => { await L.load(); await load() })
               <input type="checkbox" :checked="tickable.length > 0 && selected.length === tickable.length" :aria-label="t('همه', 'All')"
                      @change="toggleAll(($event.target as HTMLInputElement).checked)" />
             </th>
-            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
+            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ notes ? t('نوع', 'Kind') : t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
             <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('وضعیت', 'State') }}</th><th>{{ t('عملیات', 'Steps') }}</th>
           </tr>
         </thead>
@@ -289,9 +306,10 @@ onMounted(async () => { await L.load(); await load() })
             <td v-if="tab === 'desk' || tab === 'back'" @click.stop>
               <input v-if="c.allowedActions.includes('DepositForCollection')" v-model="chosen[c.id]" type="checkbox" :aria-label="c.number ?? ''" />
             </td>
-            <td class="num">{{ c.dueDate }}</td>
+            <td class="num">{{ c.dueDate ?? (c.details?.onDemand ? t('عندالمطالبه', 'On demand') : '') }}</td>
             <td class="num">{{ c.number }}</td>
-            <td>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
+            <td v-if="notes">{{ c.kind === 'GuaranteeNote' ? t('تضمینی / امانی', 'Guarantee / trust') : t('عادی', 'Ordinary') }}</td>
+            <td v-else>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
             <td>{{ c.counterparty }}</td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ name(stateNames, c.state) }}
@@ -327,7 +345,7 @@ onMounted(async () => { await L.load(); await load() })
       <div class="tr-buttons">
         <h3 style="margin: 0">{{ t(`کارت چک ${card.number}`, `Cheque ${card.number}`) }}</h3>
         <span class="tr-tag">{{ name(stateNames, card.state) }}</span>
-        <span class="muted small">{{ card.bankName }} · {{ card.counterparty }} · {{ t('سررسید', 'due') }} {{ card.dueDate }} · {{ money(card.amount) }} {{ card.currency }}</span>
+        <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}</span>
         <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
       </div>
       <table class="tr-table">

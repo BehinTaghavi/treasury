@@ -14,20 +14,22 @@
 | کد قدیم | وضعیت جدید | گام | از وضعیت | فرم قدیم | انواع |
 |---|---|---|---|---|---|
 | ۱۱ — نزد صندوق | InCashDesk | Receive (دریافت) | — | D_Check | همه |
-| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (حساب وصول لازم است) | InCashDesk | D_Check_Vag_m | چک عادی، چک بانکی |
+| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (حساب وصول لازم است) | InCashDesk | D_Check_Vag_m | چک عادی، چک بانکی؛ سفتهٔ عادی (مدیرعامل، ۲۵ آبان ۱۴۰۵) |
 | ۱۳ — وصول شده | Cleared | RecordCleared (ثبت وصول) | DepositedForCollection | D_Check_vos_m | همه |
 | ۱۴ — برگشت شده | Bounced | RecordBounced (ثبت برگشت) | DepositedForCollection | D_Check_vos_m، Checkbacked | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer (عودت به صادرکننده) | InCashDesk | D_Check_Od_m | همه |
 | — عودت شده از بانک | ReturnedFromBank | ReturnFromBank (عودت به شرکت) | DepositedForCollection | بند ۱۴ (ج) | همه |
-| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (واگذاری مجدد) | ReturnedFromBank | بند ۱۴، Q33 | چک عادی، چک بانکی |
+| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (واگذاری مجدد) | ReturnedFromBank | بند ۱۴، Q33 | چک عادی، چک بانکی؛ سفتهٔ عادی (مدیرعامل، ۲۵ آبان ۱۴۰۵) |
 | ۱۴ — برگشت شده | Bounced | RecordBounced (شمارهٔ اعلامیهٔ برگشت الزامی؛ تاریخ مرحله تاریخ اعلامیه است) | DepositedForCollection، ReturnedFromBank | بند ۱۴ (ه)، Q33 | همه |
 | ۱۴ — برگشت شده | Bounced | RecordEndorsementReturned (برگشت خرج، با شمارهٔ اعلامیه) | Endorsed | بند ۱۴ (ح) | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | دستورالعمل | همه |
 | — تعویض شده | Replaced | Replace (با رسید دریافت چک‌های جدید از همان پرداخت‌کننده) | InCashDesk، ReturnedFromBank، Bounced | بند ۱۴ (د)، Q31 | غیر تضمینی |
 | — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، ReturnedFromBank، Bounced | بند ۱۴ (و)، Q30 | همه |
-| ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
+| ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی؛ سفتهٔ عادی (مدیرعامل، ۲۵ آبان ۱۴۰۵) |
 
 بند ۱۴ مدیرعامل (۲۴ آبان ۱۴۰۵) و پاسخ‌های Q30 تا Q35: `docs/domain/received-cheque-steps.fa.md`. «برگشت شده» و «خرج شده» دیگر پایانی نیستند.
+
+**سفته (مدیرعامل، ۲۵ آبان ۱۴۰۵: «مراحل سفته پس از دریافت شامل واگذاری به بانک، وصول، استرداد، خرج سفته (ظهرنویسی و انتقال به غیر) و …»).** سفتهٔ دریافتی همان وضعیت‌ها و گام‌های چک دریافتی را دارد؛ ردیفی به جدول اضافه نشده و فقط انواع تغییر کرده است: سفتهٔ **عادی** (`PromissoryNote`) اکنون به بانک واگذار و خرج می‌شود (قاعدهٔ قدیمی R3 فقط چک عادی و بانکی را اجازه می‌داد). سفتهٔ **تضمینی یا امانی** (`GuaranteeNote`) فقط مسترد (ReturnToIssuer) یا ابطال می‌شود. برای سفته، برگشت همان «واخواست» است (با شمارهٔ واخواست‌نامه)، عودت به پرداخت‌کننده «استرداد به متعهد» است و خرج سفته انتقال صیادی ندارد. سفتهٔ عندالمطالبه سررسید ندارد و قاعدهٔ N2 مانع وصول آن نیست. صفحه: «عملیات سفته‌های دریافتی». با پاسخ‌های مدیرعامل به Q49 تا Q52 تأیید شد؛ تبدیل سفتهٔ انتظامی به عادی و تعویض سفته لازم نیست.
 
 ## صادره (در سیستم قدیم Dp = 2)
 

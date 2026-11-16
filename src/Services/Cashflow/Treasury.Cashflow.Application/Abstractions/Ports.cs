@@ -83,6 +83,9 @@ public interface IReceiptReferenceLookup
     /// <summary>A ledger account of the chart (copy of the accounting system); null when unknown.</summary>
     Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
+    /// <summary>The signature rule of a kind of document ("NoteReceipt"…) with its signatories; null when reference-svc knows none.</summary>
+    Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken);
+
     /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }
