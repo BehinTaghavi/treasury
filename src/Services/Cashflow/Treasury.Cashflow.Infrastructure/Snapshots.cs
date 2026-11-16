@@ -78,15 +78,15 @@ public sealed record ReceiptSnapshot(
 public sealed record NoteTermsSnapshot(
     NoteReason Reason, NoteForm Form, NoteMaturity Maturity, string? IssuerNationalCode = null, string? IssuerPhone = null, string? CommitmentSubject = null,
     string? ReturnTerms = null, string? CustodyPlace = null, bool OriginalReceived = false, DateOnly? OriginalReceivedOn = null, string? Discrepancy = null,
-    NoteAttachments? Attachments = null, string? DeliveredBy = null, string? ApprovedBy = null)
+    NoteAttachments? Attachments = null, string? DeliveredBy = null, IReadOnlyList<ReceiptSigner>? Signers = null)
 {
     public static NoteTermsSnapshot? From(NoteReceiptTerms? t) => t is null ? null
         : new(t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
-            t.OriginalReceivedOn?.Value, t.Discrepancy, t.Attachments, t.DeliveredBy, t.ApprovedBy);
+            t.OriginalReceivedOn?.Value, t.Discrepancy, t.Attachments, t.DeliveredBy, t.Signers);
 
     public NoteReceiptTerms ToDomain() => new(
         Reason, Form, Maturity, IssuerNationalCode, IssuerPhone, CommitmentSubject, ReturnTerms, CustodyPlace, OriginalReceived,
-        OriginalReceivedOn is { } d ? new FiscalDate(d) : null, Discrepancy, Attachments, DeliveredBy, ApprovedBy);
+        OriginalReceivedOn is { } d ? new FiscalDate(d) : null, Discrepancy, Attachments, DeliveredBy, Signers);
 }
 
 public sealed record HistorySnapshot(

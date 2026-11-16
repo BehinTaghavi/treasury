@@ -41,7 +41,7 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
     {
         await _receipts.RecordCashAsync(new(Key(), Header(), FakeReceiptAccounts.Desk, 1_000), CancellationToken.None);
         var terms = Terms() with { IssuerNationalCode = "0123456789", CustodyPlace = "صندوق شرکت", OriginalReceived = true, OriginalReceivedOn = "1405/08/26",
-            Attachments = new NoteAttachments(NoteImage: true), DeliveredBy = "علی رضایی", ApprovedBy = "مدیر مالی" };
+            Attachments = new NoteAttachments(NoteImage: true), DeliveredBy = "علی رضایی" };
 
         var first = await _receipts.RecordNotesAsync(new(Key(), Header(), terms, [Note("123456"), Note("123457", "1405/12/25", 250_000_000)]), CancellationToken.None);
         var second = await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("200")]), CancellationToken.None);
@@ -50,9 +50,10 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
         var v = (await _receipts.GetAsync(first.Value, CancellationToken.None))!;
         Assert.Equal(("Notes", 1, 2, 750_000_000m), (v.Kind, v.Number, v.InstrumentCount, v.TotalRial));
         Assert.Equal(2, (await _receipts.GetAsync(second.Value, CancellationToken.None))!.Number);
-        Assert.Equal(("Debt", "Paper", "Fixed", "0123456789", "صندوق شرکت", true, "1405/08/26", "علی رضایی", "مدیر مالی"),
+        Assert.Equal(("Debt", "Paper", "Fixed", "0123456789", "صندوق شرکت", true, "1405/08/26", "علی رضایی"),
             (v.NoteTerms!.Reason, v.NoteTerms.Form, v.NoteTerms.Maturity, v.NoteTerms.IssuerNationalCode, v.NoteTerms.CustodyPlace, v.NoteTerms.OriginalReceived,
-                v.NoteTerms.OriginalReceivedOn, v.NoteTerms.DeliveredBy, v.NoteTerms.ApprovedBy));
+                v.NoteTerms.OriginalReceivedOn, v.NoteTerms.DeliveredBy));
+        Assert.Empty(v.NoteTerms.Signers); // no signature rule set in Basic Information: no authorised signature needed
         Assert.True(v.NoteTerms.Attachments.NoteImage);
         var note = v.Instruments!.Single(i => i.Number == "123456");
         Assert.Equal(("PromissoryNote", "InCashDesk", "1405/08/25", "1405/08/20", "1405/11/30", 500_000_000m, true),
@@ -114,6 +115,28 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
         Assert.Equal("Receipt.NoteChecksIncomplete", (await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("2"), unchecked1]), CancellationToken.None)).ErrorCode);
         Assert.Equal("Receipt.NoteChecksIncomplete", (await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("1") with { Checks = null }]), CancellationToken.None)).ErrorCode);
         Assert.Empty(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_authorised_signatories_follow_the_signature_rule_of_the_note_receipt_owner_answers_Q41_Q46()
+    {
+        var ceo = new SignerFact(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
+        var cfo = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
+        var board = new SignerFact(Guid.NewGuid(), "سارا احمدی", "عضو هیئت مدیره");
+        _reference.NoteReceiptRule = new SignatureRuleFact(2, [ceo], [cfo, board]);
+        async Task<Treasury.BuildingBlocks.Application.Result<Guid>> Save(params Guid[] signers) =>
+            await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note(Guid.NewGuid().ToString("N")[..6])], SignerIds: signers), CancellationToken.None);
+
+        Assert.Equal("Receipt.CompulsorySignerMissing", (await Save(cfo.Id, board.Id)).ErrorCode);
+        Assert.Equal("Receipt.SignersTooFew", (await Save(ceo.Id)).ErrorCode);
+        Assert.Equal("Receipt.SignerNotAuthorised", (await Save(ceo.Id, Guid.NewGuid())).ErrorCode);
+        Assert.Equal("Receipt.CompulsorySignerMissing", (await Save()).ErrorCode);
+
+        var saved = await Save(board.Id, ceo.Id);
+        Assert.True(saved.IsSuccess, saved.ErrorCode);
+        var signers = (await _receipts.GetAsync(saved.Value, CancellationToken.None))!.NoteTerms!.Signers;
+        Assert.Equal([("علی رضایی", "مدیر عامل"), ("سارا احمدی", "عضو هیئت مدیره")], signers.Select(s => (s.Name, s.Position!)));
+        Assert.True((await Save(ceo.Id, cfo.Id, board.Id)).IsSuccess); // more may sign than the rule needs
     }
 
     [Fact]

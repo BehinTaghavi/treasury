@@ -158,7 +158,7 @@ public sealed class NoteReceiptTests
     {
         var id = Guid.NewGuid();
         var full = new NoteReceiptTerms(NoteReason.Guarantee, NoteForm.Electronic, NoteMaturity.Fixed, "0123456789", " 0912 ", " حسن انجام قرارداد ۴۵ ", "پس از تأیید واحد فنی",
-            "صندوق شرکت", true, D("1405/08/26"), " ", new NoteAttachments(NoteImage: true, Contract: true), "علی رضایی", "مدیر مالی");
+            "صندوق شرکت", true, D("1405/08/26"), " ", new NoteAttachments(NoteImage: true, Contract: true), "علی رضایی");
         var t = Receipt.RecordNotes(id, 1, Header(), full, [Note(id, full)], User).NoteTerms!;
         Assert.Equal(("حسن انجام قرارداد ۴۵", "پس از تأیید واحد فنی", "0912", D("1405/08/26")), (t.CommitmentSubject, t.ReturnTerms, t.IssuerPhone, t.OriginalReceivedOn));
         Assert.Null(t.Discrepancy);
@@ -181,6 +181,28 @@ public sealed class NoteReceiptTests
         Assert.Equal("Receipt.IssuerNationalCodeInvalid", Code(Terms() with { IssuerNationalCode = "0123456788" }));
         Assert.Equal("Receipt.OriginalDateRequired", Code(Terms() with { OriginalReceived = true }));
         Assert.Equal("Receipt.NoteTextTooLong", Code(Terms() with { CustodyPlace = new string('ن', 501) }));
+    }
+
+    [Fact]
+    public void The_chosen_signatories_meet_the_signature_rule_owner_answers_Q41_Q45_Q46()
+    {
+        var ceo = new SignerFact(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
+        var cfo = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
+        var board = new SignerFact(Guid.NewGuid(), "سارا احمدی", null);
+        var rule = new SignatureRuleFact(2, [ceo], [cfo, board]);
+        var id = Guid.NewGuid();
+        Receipt Save(SignatureRuleFact? r, params Guid[] signers) => Receipt.RecordNotes(id, 1, Header(), Terms(), [Note(id, Terms())], User, r, signers);
+
+        // In the rule's order, with the name and position of the day.
+        Assert.Equal([new ReceiptSigner(ceo.Id, "علی رضایی", "مدیر عامل"), new ReceiptSigner(board.Id, "سارا احمدی", null)], Save(rule, board.Id, ceo.Id, ceo.Id).NoteTerms!.Signers!);
+        Assert.Equal(3, Save(rule, ceo.Id, cfo.Id, board.Id).NoteTerms!.Signers!.Count);
+        Assert.Equal("Receipt.CompulsorySignerMissing", Assert.Throws<DomainException>(() => Save(rule, cfo.Id, board.Id)).Code);
+        Assert.Equal("Receipt.SignersTooFew", Assert.Throws<DomainException>(() => Save(rule, ceo.Id)).Code);
+        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(rule, ceo.Id, cfo.Id, Guid.NewGuid())).Code);
+
+        // No rule set in Basic Information: nobody signs as an authorised signatory.
+        Assert.Empty(Save(null).NoteTerms!.Signers!);
+        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(null, ceo.Id)).Code);
     }
 
     [Fact]

@@ -82,6 +82,17 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
     public async Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Entry>(http, $"api/reference/banks/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.Name;
 
+    private sealed record RuleSignatory(Guid Id, string FullName, string? Position);
+
+    private sealed record Rule(int Required, RuleSignatory[]? Compulsory, RuleSignatory[]? Optional);
+
+    public async Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken)
+    {
+        static List<SignerFact> Facts(RuleSignatory[]? list) => (list ?? []).Select(s => new SignerFact(s.Id, s.FullName, s.Position)).ToList();
+        return await ServiceHttp.GetAsync<Rule>(http, $"api/reference/signature-rules/{Uri.EscapeDataString(document)}", "Reference.Unavailable", cancellationToken)
+            .ConfigureAwait(false) is { } r ? new SignatureRuleFact(r.Required, Facts(r.Compulsory), Facts(r.Optional)) : null;
+    }
+
     public async Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {
         var path = $"api/reference/{list}/{id}/in-use";

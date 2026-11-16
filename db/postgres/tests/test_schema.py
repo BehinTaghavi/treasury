@@ -700,3 +700,37 @@ def test_a_note_receipt_has_its_own_numbers_names_its_notes_and_keeps_its_terms(
         c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeNotesForCompany', '9102') ON CONFLICT DO NOTHING")
         c.rollback()
 
+
+def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(db):
+    # 034_reference_signatories.sql (owner, 16 Nov 2026: authorised signatories in Basic Information and a rule per kind of document).
+    add = """INSERT INTO reference.signatory (id, full_name, name_key, position, national_code, mobile) VALUES (%s, %s, %s, 'مدیر عامل', %s, %s)"""
+    rule = "INSERT INTO reference.signature_rule (document, id, required_count, compulsory, optional) VALUES (%s, %s, %s, %s, %s)"
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        ceo, cfo = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (ceo, "علی رضایی", "علیرضایی", "0123456789", "09121234567"))
+        c.execute(add, (cfo, "بهرام کریمی", "بهرامکریمی", None, None))
+        for row, error in (
+                ((uuid.uuid4(), "علی رضایی", "علیرضایی", None, None), psycopg.errors.UniqueViolation),       # the same name
+                ((uuid.uuid4(), "دیگری", "دیگری", "0123456789", None), psycopg.errors.UniqueViolation),       # the same national code
+                ((uuid.uuid4(), "دیگری", "دیگری", "12345", None), psycopg.errors.CheckViolation),
+                ((uuid.uuid4(), "دیگری", "دیگری", None, "02188990011"), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, row)
+        c.execute(rule, ("NoteReceipt", uuid.uuid4(), 2, [ceo], [cfo]))
+        for row, error in (
+                (("NoteReceipt", uuid.uuid4(), 1, [ceo], []), psycopg.errors.UniqueViolation),                # one rule per kind of document
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo, cfo], []), psycopg.errors.CheckViolation),           # fewer than the compulsory ones
+                (("IssuedCheque", uuid.uuid4(), 3, [ceo], [cfo]), psycopg.errors.CheckViolation),             # more than those named
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo], [ceo]), psycopg.errors.CheckViolation),             # compulsory and optional
+                (("Invoice", uuid.uuid4(), 0, [], []), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(rule, row)
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not read reference-svc's tables
+            with c.transaction():
+                c.execute("SELECT 1 FROM reference.signatory")
+        c.rollback()
+

@@ -50,7 +50,8 @@ public sealed record NoteAttachments(bool NoteImage = false, bool Contract = fal
 /// <param name="OriginalReceived">«وضعیت دریافت اصل سند»; when received, <paramref name="OriginalReceivedOn"/> is its date.</param>
 /// <param name="Discrepancy">«شرح نقص یا مغایرت احتمالی».</param>
 /// <param name="DeliveredBy">«تحویل‌دهنده»: who handed the notes over.</param>
-/// <param name="ApprovedBy">«تأییدکنندهٔ مجاز»: named on the printed receipt, where the three sign (open question Q41).</param>
+/// <param name="Signers">«تأییدکنندهٔ مجاز»: the authorised signatories chosen by the signature rule of the note receipt (owner's answers to
+/// Q41 and Q45–Q47); set by the receipt, printed with their positions on the receipt they sign.</param>
 public sealed record NoteReceiptTerms(
     NoteReason Reason,
     NoteForm Form,
@@ -65,7 +66,7 @@ public sealed record NoteReceiptTerms(
     string? Discrepancy = null,
     NoteAttachments? Attachments = null,
     string? DeliveredBy = null,
-    string? ApprovedBy = null)
+    IReadOnlyList<ReceiptSigner>? Signers = null)
 {
     public const int MaxTextLength = 500;
 
@@ -84,14 +85,14 @@ public sealed record NoteReceiptTerms(
         Require(code is null || IranianIds.IsValidPersonOrCompany(code), "Receipt.IssuerNationalCodeInvalid",
             "The issuer's national code (10 digits) or national ID (11 digits) is not valid.");
         Require(!OriginalReceived || OriginalReceivedOn is not null, "Receipt.OriginalDateRequired", "Enter the date the original note was received.");
-        string?[] texts = [IssuerPhone, CommitmentSubject, ReturnTerms, CustodyPlace, Discrepancy, DeliveredBy, ApprovedBy];
+        string?[] texts = [IssuerPhone, CommitmentSubject, ReturnTerms, CustodyPlace, Discrepancy, DeliveredBy];
         Require(texts.All(t => (t?.Trim().Length ?? 0) <= MaxTextLength), "Receipt.NoteTextTooLong", "One of the texts is too long.");
         return new NoteReceiptTerms(
             Reason, Form, Maturity, code, Clean(IssuerPhone),
             Reason == NoteReason.Guarantee ? Clean(CommitmentSubject) : null,
             Reason == NoteReason.Debt ? null : Clean(ReturnTerms),
             Clean(CustodyPlace), OriginalReceived, OriginalReceived ? OriginalReceivedOn : null, Clean(Discrepancy),
-            Attachments ?? new NoteAttachments(), Clean(DeliveredBy), Clean(ApprovedBy));
+            Attachments ?? new NoteAttachments(), Clean(DeliveredBy), Signers ?? []);
     }
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();

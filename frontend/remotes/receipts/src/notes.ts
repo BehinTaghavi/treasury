@@ -8,8 +8,10 @@ export interface NoteGuarantor { name: string; nationalCode: string | null; deta
 export interface NoteTerms {
   reason: string; form: string; maturity: string; issuerNationalCode: string | null; issuerPhone: string | null; commitmentSubject: string | null
   returnTerms: string | null; custodyPlace: string | null; originalReceived: boolean; originalReceivedOn: string | null; discrepancy: string | null
-  attachments: NoteAttachments; deliveredBy: string | null; approvedBy: string | null
+  attachments: NoteAttachments; deliveredBy: string | null; signers: NoteSigner[]
 }
+/** An authorised signatory chosen by the signature rule of the note receipt («دارندگان امضای مجاز», Basic Information). */
+export interface NoteSigner { id: string; name: string; position: string | null }
 export interface NoteLine {
   id: string; kind: string; number: string | null; amount: number; amountInRial: number; dueDate: string | null; noteIssueDate?: string | null; state: string
   details: { guarantors: NoteGuarantor[] | null; onDemand?: boolean; checks?: NoteChecks | null } | null

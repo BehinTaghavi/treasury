@@ -5,7 +5,9 @@
  * the persons (issuer and guarantors with their تفصیل), the notes, the supplementary information, and the checks of each note.
  * «عندالمطالبه» switches the due-date column off; «دریافت شد» asks for the date the original was received; «موضوع تعهد» is for a
  * guarantee only. Owner's answers of 16 Nov 2026: up to three guarantors for a note (Q39); every item of article 308 is ticked for
- * each note before the receipt is saved (Q40), except the payment date of a note payable on demand, which has none. The voucher the receipt will produce is shown at the bottom while the form is filled; Ctrl+Enter saves.
+ * each note before the receipt is saved (Q40), except the payment date of a note payable on demand, which has none. The authorised
+ * signatories who sign the receipt are chosen by the signature rule of «رسید دریافت سفته» in Basic Information (answers to Q41 and
+ * Q45–Q47): the compulsory ones are always on it, the others are ticked until the number the rule needs is reached. The voucher the receipt will produce is shown at the bottom while the form is filled; Ctrl+Enter saves.
  * After saving, the receipt can be printed for the three signatures.
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -15,6 +17,9 @@ import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
 import NoteReceiptPrint from './NoteReceiptPrint.vue'
 import { attachmentNames, checkNames, confirmationText, formNames, maturityNames, reasonNames, type NoteAttachments, type NoteChecks, type NoteReceipt } from './notes'
+
+interface RuleSignatory { id: string; fullName: string; position: string }
+interface SignatureRule { required: number; compulsory: RuleSignatory[]; optional: RuleSignatory[] }
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Line { key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
@@ -35,8 +40,18 @@ const header = reactive({ date: todayJalali(), issuer: '', groupId: '', purpose:
 const noAttachments = (): NoteAttachments => ({ noteImage: false, contract: false, representation: false, other: false })
 const terms = reactive({
   reason: 'Debt', form: 'Paper', maturity: 'Fixed', issuerNationalCode: '', issuerPhone: '', commitmentSubject: '', returnTerms: '', custodyPlace: '',
-  originalReceived: false, originalReceivedOn: '', discrepancy: '', attachments: noAttachments(), deliveredBy: '', approvedBy: '',
+  originalReceived: false, originalReceivedOn: '', discrepancy: '', attachments: noAttachments(), deliveredBy: '',
 })
+
+// ---- authorised signatories: the signature rule of the note receipt (Basic Information → دارندگان امضای مجاز) ----
+const rule = ref<SignatureRule>({ required: 0, compulsory: [], optional: [] })
+const optionalSigners = reactive<Record<string, boolean>>({})
+const signerIds = computed(() => [...rule.value.compulsory.map(s => s.id), ...rule.value.optional.filter(s => optionalSigners[s.id]).map(s => s.id)])
+const hasRule = computed(() => rule.value.required > 0 || rule.value.compulsory.length + rule.value.optional.length > 0)
+async function loadRule() {
+  const r = await api.get<SignatureRule>('/api/reference/signature-rules/NoteReceipt')
+  if (r.ok) rule.value = r.value
+}
 const issuers = ref<Detail[]>([])
 /** As on the other receipts (answer to Q22): customers and persons or companies. */
 const IssuerRoles = 'Customer,PersonOrCompany'
@@ -141,6 +156,7 @@ function request(): { body: Record<string, unknown> } | { error: string } {
   if (terms.originalReceived && !terms.originalReceivedOn.trim()) return { error: 'Receipt.OriginalDateRequired' }
   if (terms.originalReceived && !normaliseJalali(terms.originalReceivedOn)) return { error: 'FiscalDate.Invalid' }
   if (guarantors.value.some(g => !g.name.trim() && !g.detailCode)) return { error: 'Instrument.GuarantorNameRequired' }
+  if (signerIds.value.length < rule.value.required) return { error: 'Receipt.SignersTooFew' }
   return {
     body: {
       header: {
@@ -151,8 +167,9 @@ function request(): { body: Record<string, unknown> } | { error: string } {
         reason: terms.reason, form: terms.form, maturity: terms.maturity, issuerNationalCode: text(toLatinDigits(terms.issuerNationalCode)), issuerPhone: text(terms.issuerPhone),
         commitmentSubject: guarantee.value ? text(terms.commitmentSubject) : null, returnTerms: terms.reason === 'Debt' ? null : text(terms.returnTerms),
         custodyPlace: text(terms.custodyPlace), originalReceived: terms.originalReceived, originalReceivedOn: terms.originalReceived ? date(terms.originalReceivedOn) : null,
-        discrepancy: text(terms.discrepancy), attachments: terms.attachments, deliveredBy: text(terms.deliveredBy), approvedBy: text(terms.approvedBy),
+        discrepancy: text(terms.discrepancy), attachments: terms.attachments, deliveredBy: text(terms.deliveredBy),
       },
+      signerIds: signerIds.value,
       notes: lines.value.map(l => ({
         number: toLatinDigits(l.number.trim()), issueDate: date(l.issueDate), dueDate: onDemand.value ? null : date(l.dueDate), amount: parseAmount(l.amount) ?? 0,
         checks: { ...l.checks, paymentDate: !onDemand.value && l.checks.paymentDate },
@@ -169,7 +186,7 @@ const preview = ref<Voucher | null>(null)
 const previewHint = ref('')
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewRun = 0
-watch([header, terms, lines], () => {
+watch([header, terms, lines, optionalSigners], () => {
   clearTimeout(previewTimer)
   previewTimer = setTimeout(refreshPreview, 400)
 }, { deep: true })
@@ -197,7 +214,7 @@ async function save(thenPrint = false) {
     show('ok', t(`رسید سفتهٔ شمارهٔ ${got.ok ? num(got.value.number) : ''} ثبت شد.`, `Note receipt no. ${got.ok ? got.value.number : ''} saved.`))
     Object.assign(header, { purpose: '', ref1: '', ref2: '', note: '' })
     Object.assign(terms, { issuerNationalCode: '', issuerPhone: '', commitmentSubject: '', returnTerms: '', custodyPlace: '', originalReceived: false, originalReceivedOn: '',
-      discrepancy: '', attachments: noAttachments(), deliveredBy: '', approvedBy: '' })
+      discrepancy: '', attachments: noAttachments(), deliveredBy: '' })
     lines.value = [blankLine()]
     guarantors.value = []
     emit('saved', r.value)
@@ -218,7 +235,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await L.load(); issuers.value = await L.searchDetails('', undefined, IssuerRoles) })
+onMounted(async () => { await Promise.all([L.load(), loadRule()]); issuers.value = await L.searchDetails('', undefined, IssuerRoles) })
 </script>
 
 <template>
@@ -405,9 +422,18 @@ onMounted(async () => { await L.load(); issuers.value = await L.searchDetails(''
       <div class="tr-buttons" style="align-items: flex-end">
         <label style="flex: 1; min-width: 12rem">{{ t('تحویل‌دهنده', 'Handed over by') }} <input v-model="terms.deliveredBy" maxlength="500" :placeholder="t('نام تحویل‌دهندهٔ سفته', 'Name')" /></label>
         <label style="flex: 1; min-width: 12rem">{{ t('تحویل‌گیرندهٔ خزانه', 'Received by (treasury)') }} <span class="tr-box">{{ t('کاربر ثبت‌کننده', 'The user saving') }}</span></label>
-        <label style="flex: 1; min-width: 12rem">{{ t('تأییدکنندهٔ مجاز', 'Authorised approver') }} <input v-model="terms.approvedBy" maxlength="500" :placeholder="t('نام و سمت', 'Name and position')" /></label>
       </div>
-      <p class="muted small" style="margin: .4rem 0 0">{{ t('امضا و تاریخ هر سه نفر روی رسید چاپی می‌آید.', 'The three sign and date the printed receipt.') }}</p>
+      <div class="tr-group" style="margin-top: .6rem">
+        <span>{{ t('امضاکنندگان مجاز (تأییدکننده)', 'Authorised signatories') }}
+          <span v-if="hasRule" class="muted">{{ t(`– ${num(rule.required)} امضا لازم است؛ ${num(signerIds.length)} نفر انتخاب شده`, `– ${rule.required} needed; ${signerIds.length} chosen`) }}</span></span>
+        <div v-if="hasRule" class="tr-ticks">
+          <label v-for="s in rule.compulsory" :key="s.id"><input type="checkbox" checked disabled /> {{ s.fullName }} <span class="muted small">({{ s.position }} – {{ t('اجباری', 'compulsory') }})</span></label>
+          <label v-for="s in rule.optional" :key="s.id"><input v-model="optionalSigners[s.id]" type="checkbox" /> {{ s.fullName }} <span class="muted small">({{ s.position }})</span></label>
+        </div>
+        <span v-else class="muted small">{{ t('قاعدهٔ امضای «رسید دریافت سفته» در اطلاعات پایه ← «دارندگان امضای مجاز» تعیین نشده است؛ رسید بدون امضاکنندهٔ مجاز ثبت می‌شود.',
+          'No signature rule is set for the receipt of notes (Basic Information → Authorised signatories); the receipt is saved without authorised signatories.') }}</span>
+      </div>
+      <p class="muted small" style="margin: .4rem 0 0">{{ t('امضا و تاریخ همهٔ این افراد روی رسید چاپی می‌آید.', 'They all sign and date the printed receipt.') }}</p>
       <label style="margin-top: .6rem">{{ t('توضیحات', 'Remarks') }} <textarea v-model="header.note" rows="2" maxlength="500" /></label>
     </fieldset>
 

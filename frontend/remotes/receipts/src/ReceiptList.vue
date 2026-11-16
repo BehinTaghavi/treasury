@@ -246,7 +246,7 @@ onMounted(async () => { await L.load(); await load() })
         <p class="small">
           {{ t('پیوست‌ها', 'Attachments') }}: {{ attachmentNames.filter(([k]) => terms!.attachments[k]).map(([, f, e]) => t(f, e)).join('، ') || '—' }}
           <template v-if="terms.deliveredBy"> · {{ t('تحویل‌دهنده', 'Handed over by') }}: {{ terms.deliveredBy }}</template>
-          <template v-if="terms.approvedBy"> · {{ t('تأییدکنندهٔ مجاز', 'Approver') }}: {{ terms.approvedBy }}</template>
+          <template v-if="terms.signers?.length"> · {{ t('امضاکنندگان مجاز', 'Authorised signatories') }}: {{ terms.signers.map(s => s.position ? `${s.name} (${s.position})` : s.name).join('، ') }}</template>
         </p>
         <div class="tr-buttons">
           <button type="button" class="tr-secondary" @click="print">{{ t('چاپ رسید', 'Print receipt') }}</button>

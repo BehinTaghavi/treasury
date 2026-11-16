@@ -20,6 +20,8 @@ const money = (n: number) => formatAmount(n, props.locale)
 const pick = (m: Record<string, [string, string]>, k: string) => (m[k] ? (fa.value ? m[k][0] : m[k][1]) : k)
 const terms = computed(() => props.receipt.noteTerms)
 const notes = computed(() => props.receipt.instruments ?? [])
+/** The authorised signatories chosen by the signature rule; with none, one empty box is left for the approver. */
+const signers = computed(() => (terms.value?.signers?.length ? terms.value.signers : [{ id: '', name: '', position: null }]))
 /** Every guarantor once, with the notes it guarantees (all of them when it is on every note). */
 const guarantors = computed(() => {
   const found = new Map<string, { g: NoteGuarantor; notes: string[] }>()
@@ -132,12 +134,17 @@ const checked = (key: string) => notes.value.length > 0 && notes.value.every(n =
     <p class="confirm">{{ t(confirmationText[0], confirmationText[1]) }}</p>
 
     <table class="signatures">
-      <thead><tr><th>{{ t('تحویل‌دهنده', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرندهٔ خزانه', 'Received by (treasury)') }}</th><th>{{ t('تأییدکنندهٔ مجاز', 'Authorised approver') }}</th></tr></thead>
+      <thead>
+        <tr>
+          <th>{{ t('تحویل‌دهنده', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرندهٔ خزانه', 'Received by (treasury)') }}</th>
+          <th v-for="s in signers" :key="s.id">{{ t('تأییدکنندهٔ مجاز', 'Authorised signatory') }}<template v-if="s.position"> – {{ s.position }}</template></th>
+        </tr>
+      </thead>
       <tbody>
         <tr>
           <td><span>{{ t('نام:', 'Name:') }} {{ terms?.deliveredBy }}</span><span>{{ t('امضا:', 'Signature:') }}</span><span>{{ t('تاریخ:', 'Date:') }}</span></td>
           <td><span>{{ t('نام:', 'Name:') }} {{ receipt.recordedBy }}</span><span>{{ t('امضا:', 'Signature:') }}</span><span>{{ t('تاریخ:', 'Date:') }}</span></td>
-          <td><span>{{ t('نام:', 'Name:') }} {{ terms?.approvedBy }}</span><span>{{ t('امضا:', 'Signature:') }}</span><span>{{ t('تاریخ:', 'Date:') }}</span></td>
+          <td v-for="s in signers" :key="s.id"><span>{{ t('نام:', 'Name:') }} {{ s.name }}</span><span>{{ t('امضا:', 'Signature:') }}</span><span>{{ t('تاریخ:', 'Date:') }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -170,6 +177,6 @@ tr.sum td { background: #eef1f5; font-weight: 600; }
 .confirm { margin: 0; padding: 1.6mm 2mm; border: 1px solid #333; }
 .signatures td { height: 20mm; vertical-align: top; }
 .signatures td span { display: block; margin-top: 1.4mm; }
-.signatures th { width: 33.3%; }
+.signatures { table-layout: fixed; }
 .remarks { flex: 1; min-height: 12mm; border: 1px solid #333; padding: 1.6mm 2mm; }
 </style>

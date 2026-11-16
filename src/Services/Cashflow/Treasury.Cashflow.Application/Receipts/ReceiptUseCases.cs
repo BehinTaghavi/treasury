@@ -70,11 +70,12 @@ public sealed record NoteTermsInput(
     string? OriginalReceivedOn = null,
     string? Discrepancy = null,
     NoteAttachments? Attachments = null,
-    string? DeliveredBy = null,
-    string? ApprovedBy = null);
+    string? DeliveredBy = null);
 
+/// <param name="SignerIds">The authorised signatories chosen by the signature rule of the note receipt (Basic Information).</param>
 public sealed record RecordNoteReceiptCommand(
-    string IdempotencyKey, ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null);
+    string IdempotencyKey, ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null,
+    IReadOnlyList<Guid>? SignerIds = null);
 
 public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string Date, string Reason, long ExpectedVersion);
 
@@ -90,11 +91,12 @@ public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid Inst
 /// <summary>The receipt-level part of a note receipt as the screens and the printed receipt show it.</summary>
 public sealed record NoteTermsView(
     string Reason, string Form, string Maturity, string? IssuerNationalCode, string? IssuerPhone, string? CommitmentSubject, string? ReturnTerms,
-    string? CustodyPlace, bool OriginalReceived, string? OriginalReceivedOn, string? Discrepancy, NoteAttachments Attachments, string? DeliveredBy, string? ApprovedBy)
+    string? CustodyPlace, bool OriginalReceived, string? OriginalReceivedOn, string? Discrepancy, NoteAttachments Attachments, string? DeliveredBy,
+    IReadOnlyList<ReceiptSigner> Signers)
 {
     public static NoteTermsView? From(NoteReceiptTerms? t) => t is null ? null : new(
         t.Reason.ToString(), t.Form.ToString(), t.Maturity.ToString(), t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace,
-        t.OriginalReceived, t.OriginalReceivedOn?.ToJalaliString(), t.Discrepancy, t.Attachments ?? new NoteAttachments(), t.DeliveredBy, t.ApprovedBy);
+        t.OriginalReceived, t.OriginalReceivedOn?.ToJalaliString(), t.Discrepancy, t.Attachments ?? new NoteAttachments(), t.DeliveredBy, t.Signers ?? []);
 }
 
 public sealed record ReceiptView(
@@ -159,6 +161,9 @@ public sealed class ReceiptUseCases(
     IConfirmedVoucherRepository vouchers,
     IPaymentRequestLookup paymentRequests)
 {
+    /// <summary>The name reference-svc gives the note receipt among the documents with a signature rule.</summary>
+    public const string NoteReceiptDocument = "NoteReceipt";
+
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
 
@@ -483,7 +488,8 @@ public sealed class ReceiptUseCases(
         var t = command.Terms;
         var terms = new NoteReceiptTerms(
             t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
-            string.IsNullOrWhiteSpace(t.OriginalReceivedOn) ? null : FiscalDate.ParseJalali(t.OriginalReceivedOn), t.Discrepancy, t.Attachments, t.DeliveredBy, t.ApprovedBy);
+            string.IsNullOrWhiteSpace(t.OriginalReceivedOn) ? null : FiscalDate.ParseJalali(t.OriginalReceivedOn), t.Discrepancy, t.Attachments, t.DeliveredBy);
+        var rule = await reference.SignatureRuleAsync(NoteReceiptDocument, ct).ConfigureAwait(false);
 
         // Guarantors come from the تفصیل list or are typed; each guarantees one note («شماره سفته مرتبط») or all of them.
         var numbers = command.Notes.Select(n => n.Number?.Trim() ?? string.Empty).ToList();
@@ -535,7 +541,7 @@ public sealed class ReceiptUseCases(
         }
 
         var receiptNumber = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Notes, ct).ConfigureAwait(false);
-        return (Receipt.RecordNotes(receiptId, receiptNumber, header, terms, created, user), created);
+        return (Receipt.RecordNotes(receiptId, receiptNumber, header, terms, created, user, rule, command.SignerIds), created);
     }
 
     public Task<Result<Guid>> CancelAsync(CancelReceiptCommand command, CancellationToken cancellationToken) =>

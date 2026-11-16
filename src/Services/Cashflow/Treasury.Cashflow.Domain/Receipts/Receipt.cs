@@ -221,14 +221,18 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// becomes an instrument in the cash desk: a guarantee note when the notes are held as security or in trust, otherwise an ordinary
     /// note. With «معین» every note has its due date; with «عندالمطالبه» none has (it can be collected whenever its holder wishes).
     /// Every note must have passed the checks of article 308 (owner's answer to Q40). The receipt records the handing over of the
-    /// notes only; it is not a receipt of money.
+    /// notes only; it is not a receipt of money. The authorised signatories who sign it are chosen by the signature rule of the note
+    /// receipt (Basic Information, owner's answers to Q41 and Q45–Q47).
     /// </summary>
-    public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId)
+    /// <param name="rule">The signature rule of the note receipt; null when none is set (no authorised signature needed).</param>
+    /// <param name="signerIds">The signatories chosen on the form.</param>
+    public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId,
+        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
     {
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(notes);
         Validate(header, number, userId);
-        var checkedTerms = terms.Validated();
+        var checkedTerms = terms.Validated() with { Signers = (rule ?? SignatureRuleFact.None).Choose(signerIds) };
         Require(notes.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
         var onDemand = checkedTerms.Maturity == NoteMaturity.OnDemand;
         var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
