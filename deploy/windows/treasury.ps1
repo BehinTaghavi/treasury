@@ -185,6 +185,12 @@ function Start-Treasury {
     Test-Download
     Wait-ForDocker
     Initialize-Settings
+    $stamp = [IO.Path]::Combine($root, 'frontend', 'shell', 'public', 'version.txt')
+    if (Test-Path $stamp) {
+        $version = (Get-Content -Path $stamp -TotalCount 1).Trim()
+        if ($version -and -not $version.StartsWith('$Format')) { Say "Version in this folder: $version (shown at the top of the screen)" }
+    }
+    Say "Folder: $root"
     Say 'Building and starting the Treasury system. The first time this downloads about 2 GB and takes 10-20 minutes...'
     Invoke-Build
     Start-Containers
