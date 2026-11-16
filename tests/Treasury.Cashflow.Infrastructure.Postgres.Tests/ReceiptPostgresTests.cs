@@ -33,6 +33,8 @@ public sealed class ReceiptPostgresTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
+    private static readonly NoteChecks AllChecked = new(true, true, true, true, true);
+
     private static ReceiptHeaderInput Header() => new("1405/08/23", "200015", Group, "فروش محصولات", "ف-۱", null, null, true, "یادداشت");
 
     [Fact]
@@ -97,7 +99,7 @@ public sealed class ReceiptPostgresTests : IDisposable
         var terms = new NoteTermsInput(NoteReason.Guarantee, NoteForm.Electronic, NoteMaturity.Fixed, "0123456789", "021-88990011", "حسن انجام قرارداد ۴۵",
             "پس از تأیید واحد فنی", "صندوق شرکت", true, "1405/08/24", "ندارد", new NoteAttachments(NoteImage: true, Contract: true), "علی رضایی", "مدیر مالی");
         var r = await _receipts.RecordNotesAsync(new(Key(), Header(), terms,
-            [new(number, "1405/08/20", "1405/11/30", 500_000_000, new NoteChecks(Signature: true, PaymentDate: true)), new("B" + number, null, "1405/12/25", 250_000_000)],
+            [new(number, "1405/08/20", "1405/11/30", 500_000_000, AllChecked), new("B" + number, null, "1405/12/25", 250_000_000, AllChecked)],
             [new("رضا احمدی", "0123456789", "300045", "0912", number)]), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
 
@@ -118,7 +120,7 @@ public sealed class ReceiptPostgresTests : IDisposable
 
         // Its own series: the next note receipt gets the next number; a cheque receipt does not move it.
         var next = await _receipts.RecordNotesAsync(new(Key(), Header(), new NoteTermsInput(NoteReason.Debt, NoteForm.Paper, NoteMaturity.OnDemand),
-            [new("C" + number, null, null, 1_000_000)]), CancellationToken.None);
+            [new("C" + number, null, null, 1_000_000, AllChecked with { PaymentDate = false })]), CancellationToken.None);
         Assert.True(next.IsSuccess, next.ErrorCode);
         var nv = (await _receipts.GetAsync(next.Value, CancellationToken.None))!;
         Assert.Equal(v.Number + 1, nv.Number);

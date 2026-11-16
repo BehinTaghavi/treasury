@@ -4,7 +4,8 @@
  * own). Notes of one issuer are saved on one receipt, numbered in their own series. The form follows the owner's sheet: the receipt,
  * the persons (issuer and guarantors with their تفصیل), the notes, the supplementary information, and the checks of each note.
  * «عندالمطالبه» switches the due-date column off; «دریافت شد» asks for the date the original was received; «موضوع تعهد» is for a
- * guarantee only. The voucher the receipt will produce is shown at the bottom while the form is filled; Ctrl+Enter saves.
+ * guarantee only. Owner's answers of 16 Nov 2026: up to three guarantors for a note (Q39); every item of article 308 is ticked for
+ * each note before the receipt is saved (Q40), except the payment date of a note payable on demand, which has none. The voucher the receipt will produce is shown at the bottom while the form is filled; Ctrl+Enter saves.
  * After saving, the receipt can be printed for the three signatures.
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
@@ -59,6 +60,8 @@ watch(() => header.groupId, async id => {
   if (r.ok) purposes.value = r.value
 })
 const onDemand = computed(() => terms.maturity === 'OnDemand')
+/** A note payable on demand has no payment date written on it, so that item of article 308 is not asked. */
+const notAsked = (k: keyof NoteChecks) => k === 'paymentDate' && onDemand.value
 const guarantee = computed(() => terms.reason === 'Guarantee')
 
 // ---- guarantors and endorsers ----
@@ -94,6 +97,7 @@ function removeLine(i: number) {
   lines.value.splice(i, 1)
   if (!lines.value.length) lines.value.push(blankLine())
 }
+function tickAll(l: Line) { for (const [k] of checkNames) l.checks[k] = true }
 const total = computed(() => lines.value.reduce((s, l) => s + (parseAmount(l.amount) ?? 0), 0))
 const noteChoices = computed<Choice[]>(() => lines.value.map(l => toLatinDigits(l.number.trim())).filter(Boolean).map(n => ({ value: n, label: n })))
 const lineTitle = (l: Line, i: number) => t(`ردیف ${num(i + 1)}`, `Line ${i + 1}`) + (l.number.trim() ? ` – ${l.number.trim()}` : '')
@@ -133,6 +137,7 @@ function request(): { body: Record<string, unknown> } | { error: string } {
     if (!onDemand.value && !normaliseJalali(l.dueDate)) return { error: 'FiscalDate.Invalid' }
     if (parseAmount(l.amount) === null) return { error: 'Money.NotPositive' }
   }
+  if (lines.value.some(l => !checkNames.every(([k]) => l.checks[k] || notAsked(k)))) return { error: 'Receipt.NoteChecksIncomplete' }
   if (terms.originalReceived && !terms.originalReceivedOn.trim()) return { error: 'Receipt.OriginalDateRequired' }
   if (terms.originalReceived && !normaliseJalali(terms.originalReceivedOn)) return { error: 'FiscalDate.Invalid' }
   if (guarantors.value.some(g => !g.name.trim() && !g.detailCode)) return { error: 'Instrument.GuarantorNameRequired' }
@@ -149,7 +154,8 @@ function request(): { body: Record<string, unknown> } | { error: string } {
         discrepancy: text(terms.discrepancy), attachments: terms.attachments, deliveredBy: text(terms.deliveredBy), approvedBy: text(terms.approvedBy),
       },
       notes: lines.value.map(l => ({
-        number: toLatinDigits(l.number.trim()), issueDate: date(l.issueDate), dueDate: onDemand.value ? null : date(l.dueDate), amount: parseAmount(l.amount) ?? 0, checks: l.checks,
+        number: toLatinDigits(l.number.trim()), issueDate: date(l.issueDate), dueDate: onDemand.value ? null : date(l.dueDate), amount: parseAmount(l.amount) ?? 0,
+        checks: { ...l.checks, paymentDate: !onDemand.value && l.checks.paymentDate },
       })),
       guarantors: guarantors.value.map(g => ({
         name: text(g.name), nationalCode: text(toLatinDigits(g.nationalCode)), detailCode: g.detailCode || null, phone: text(g.phone), noteNumber: g.noteNumber || null,
@@ -291,8 +297,8 @@ onMounted(async () => { await L.load(); issuers.value = await L.searchDetails(''
       </div>
       <div class="tr-buttons" style="margin-top: .6rem">
         <button type="button" class="tr-secondary" @click="addGuarantor">{{ t('+ افزودن ضامن / ظهرنویس', '+ Guarantor / endorser') }}</button>
-        <span class="muted small">{{ t('هر سفته حداکثر دو ضامن دارد. ضامن از فهرست حساب‌های تفصیلی انتخاب یا نام او نوشته می‌شود.',
-          'A note has at most two guarantors, chosen from the detail accounts or typed.') }}</span>
+        <span class="muted small">{{ t('هر سفته حداکثر سه ضامن دارد. ضامن از فهرست حساب‌های تفصیلی انتخاب یا نام او نوشته می‌شود.',
+          'A note has at most three guarantors, chosen from the detail accounts or typed.') }}</span>
       </div>
     </fieldset>
 
@@ -378,14 +384,19 @@ onMounted(async () => { await L.load(); issuers.value = await L.searchDetails(''
     <fieldset class="tr-block">
       <legend>{{ t('کنترل و تأیید دریافت', 'Checks and confirmation') }}</legend>
       <p class="small" style="margin: 0 0 .4rem">{{ t('کنترل مشخصات روی هر سفته', 'Checked on each note') }}
-        <span class="muted">{{ t('(موارد مادهٔ ۳۰۸ قانون تجارت)', '(the items of article 308 of the Commercial Code)') }}</span></p>
+        <span class="muted">{{ t('(موارد مادهٔ ۳۰۸ قانون تجارت؛ تا همهٔ موارد هر سفته تیک نخورد رسید ثبت نمی‌شود)',
+          '(the items of article 308 of the Commercial Code; the receipt is saved only when every item of each note is ticked)') }}</span></p>
       <div class="tr-scroll">
         <table class="tr-table">
-          <thead><tr><th>{{ t('سفته', 'Note') }}</th><th v-for="[k, f, e] in checkNames" :key="k">{{ t(f, e) }}</th></tr></thead>
+          <thead><tr><th>{{ t('سفته', 'Note') }}</th><th v-for="[k, f, e] in checkNames" :key="k">{{ t(f, e) }}</th><th /></tr></thead>
           <tbody>
             <tr v-for="(l, i) in lines" :key="l.key">
               <td>{{ lineTitle(l, i) }}</td>
-              <td v-for="[k, f, e] in checkNames" :key="k"><input v-model="l.checks[k]" type="checkbox" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" /></td>
+              <td v-for="[k, f, e] in checkNames" :key="k">
+                <span v-if="notAsked(k)" class="muted small">{{ t('ندارد (عندالمطالبه)', 'none (on demand)') }}</span>
+                <input v-else v-model="l.checks[k]" type="checkbox" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" />
+              </td>
+              <td><button type="button" class="tr-link" @click="tickAll(l)">{{ t('همه کنترل شد', 'All checked') }}</button></td>
             </tr>
           </tbody>
         </table>

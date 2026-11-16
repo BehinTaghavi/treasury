@@ -186,7 +186,8 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// A cheque or note received on a receipt (رسید دریافت), with what is written on it. A cheque needs its bank (rule R1); a
-    /// promissory note has no bank and may name up to two guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»).
+    /// promissory note has no bank and may name up to three guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»; owner's
+    /// answer to Q39).
     /// </summary>
     public static Instrument Receive(
         Guid id,

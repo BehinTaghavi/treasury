@@ -193,10 +193,11 @@ public sealed class ReceivedInstrumentDetailsTests
     }
 
     [Fact]
-    public void A_note_has_at_most_two_guarantors_with_valid_national_codes()
+    public void A_note_has_at_most_three_guarantors_with_valid_national_codes_owner_answer_Q39()
     {
         Assert.Equal("Instrument.TooManyGuarantors", Assert.Throws<DomainException>(() =>
-            Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null)]))).Code);
+            Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null), new("د", null)]))).Code);
+        Assert.Equal(3, Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null)])).Details.GuarantorList.Count);
         Assert.Equal("Instrument.GuarantorNationalCodeInvalid", Assert.Throws<DomainException>(() =>
             Receive(InstrumentKind.GuaranteeNote, null, new(Guarantors: [new("الف", "0123456788")]))).Code);
         Assert.Equal("Instrument.GuarantorNameRequired", Assert.Throws<DomainException>(() =>

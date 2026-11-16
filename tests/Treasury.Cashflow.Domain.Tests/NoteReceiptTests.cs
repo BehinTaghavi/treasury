@@ -22,12 +22,14 @@ public sealed class NoteReceiptTests
     private static NoteReceiptTerms Terms(NoteReason reason = NoteReason.Debt, NoteMaturity maturity = NoteMaturity.Fixed) =>
         new(reason, NoteForm.Paper, maturity);
 
+    private static readonly NoteChecks AllChecked = new(true, true, true, true, true);
+
     private static Instrument Note(Guid receiptId, NoteReceiptTerms terms, string number = "123456", string? due = "1405/11/30", string? written = "1405/08/20",
         decimal amount = 500_000_000, string date = "1405/08/25", NoteChecks? checks = null, IReadOnlyList<NoteGuarantor>? guarantors = null) =>
         Instrument.Receive(Guid.NewGuid(), terms.InstrumentKind, number, null, Money.Rials(amount), D(date), due is null ? null : D(due),
             CounterpartyRef.ForDetail(Issuer.DetailCode, Issuer.Name), "بابت بدهی فاکتور ۱۲۳", User,
             new ReceivedInstrumentDetails(Guarantors: guarantors, WrittenOn: written is null ? null : D(written).Value,
-                OnDemand: terms.Maturity == NoteMaturity.OnDemand, Checks: checks),
+                OnDemand: terms.Maturity == NoteMaturity.OnDemand, Checks: checks ?? AllChecked),
             receiptId);
 
     [Fact]
@@ -35,7 +37,7 @@ public sealed class NoteReceiptTests
     {
         var id = Guid.NewGuid();
         var terms = Terms();
-        var a = Note(id, terms, "123456", checks: new NoteChecks(Signature: true, Date: true, AmountInWords: true, Payee: true, PaymentDate: true));
+        var a = Note(id, terms, "123456");
         var b = Note(id, terms, "123457", due: "1405/12/25", amount: 250_000_000);
 
         var r = Receipt.RecordNotes(id, 4, Header(), terms, [a, b], User);
@@ -64,7 +66,7 @@ public sealed class NoteReceiptTests
         Assert.Equal(kind, terms.InstrumentKind);
         var id = Guid.NewGuid();
         var wrong = Instrument.Receive(Guid.NewGuid(), kind == InstrumentKind.PromissoryNote ? InstrumentKind.GuaranteeNote : InstrumentKind.PromissoryNote, "9", null,
-            Money.Rials(1), D("1405/08/25"), D("1405/09/01"), CounterpartyRef.ForDetail(Issuer.DetailCode, Issuer.Name), "x", User, ReceivedInstrumentDetails.None, id);
+            Money.Rials(1), D("1405/08/25"), D("1405/09/01"), CounterpartyRef.ForDetail(Issuer.DetailCode, Issuer.Name), "x", User, new ReceivedInstrumentDetails(Checks: AllChecked), id);
         Assert.Equal("Receipt.NoteKindMismatch", Assert.Throws<DomainException>(() => Receipt.RecordNotes(id, 1, Header(), terms, [wrong], User)).Code);
     }
 
@@ -89,6 +91,30 @@ public sealed class NoteReceiptTests
 
         // «معین» and «عندالمطالبه» are chosen once for the receipt.
         Assert.Equal("Receipt.NoteKindMismatch", Assert.Throws<DomainException>(() => Receipt.RecordNotes(id, 1, Header(), Terms(), [note], User)).Code);
+    }
+
+    [Theory]
+    [InlineData(false, true, true, true, true)]
+    [InlineData(true, false, true, true, true)]
+    [InlineData(true, true, false, true, true)]
+    [InlineData(true, true, true, false, true)]
+    [InlineData(true, true, true, true, false)]
+    public void A_note_with_an_item_of_article_308_not_checked_is_not_received_owner_answer_Q40(bool signature, bool date, bool words, bool payee, bool paymentDate)
+    {
+        var id = Guid.NewGuid();
+        var note = Note(id, Terms(), checks: new NoteChecks(signature, date, words, payee, paymentDate));
+        Assert.Equal("Receipt.NoteChecksIncomplete", Assert.Throws<DomainException>(() => Receipt.RecordNotes(id, 1, Header(), Terms(), [note], User)).Code);
+    }
+
+    [Fact]
+    public void A_note_payable_on_demand_has_no_payment_date_to_check()
+    {
+        var id = Guid.NewGuid();
+        var onDemand = Terms(maturity: NoteMaturity.OnDemand);
+        var note = Note(id, onDemand, due: null, checks: new NoteChecks(true, true, true, true, PaymentDate: false));
+        Assert.Single(Receipt.RecordNotes(id, 1, Header(), onDemand, [note], User).InstrumentIds);
+        var unsigned = Note(id, onDemand, due: null, checks: new NoteChecks(false, true, true, true));
+        Assert.Equal("Receipt.NoteChecksIncomplete", Assert.Throws<DomainException>(() => Receipt.RecordNotes(id, 1, Header(), onDemand, [unsigned], User)).Code);
     }
 
     [Fact]

@@ -34,7 +34,7 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
     private static NoteTermsInput Terms(NoteReason reason = NoteReason.Debt, NoteMaturity maturity = NoteMaturity.Fixed) => new(reason, NoteForm.Paper, maturity);
 
     private static NoteLineInput Note(string number, string? due = "1405/11/30", decimal amount = 500_000_000, string? issued = "1405/08/20") =>
-        new(number, issued, due, amount, new NoteChecks(Signature: true, AmountInWords: true));
+        new(number, issued, due, amount, new NoteChecks(true, true, true, true, PaymentDate: due is not null));
 
     [Fact]
     public async Task Notes_are_saved_with_their_receipt_and_numbered_in_their_own_series()
@@ -57,8 +57,7 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
         var note = v.Instruments!.Single(i => i.Number == "123456");
         Assert.Equal(("PromissoryNote", "InCashDesk", "1405/08/25", "1405/08/20", "1405/11/30", 500_000_000m, true),
             (note.Kind, note.State, note.IssueDate, note.NoteIssueDate, note.DueDate, note.Amount, note.IsPostDated));
-        Assert.True(note.Details!.Checks!.Signature);
-        Assert.False(note.Details.Checks.Payee);
+        Assert.True(note.Details!.Checks!.IsComplete(onDemand: false));
         Assert.Contains(("purpose-groups", FakeReceiptReference.SalesGroup), _reference.Marked);
         Assert.Equal(2, (await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None)).Count);
     }
@@ -103,7 +102,17 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
         Assert.Equal("Receipt.GuarantorDetailNotFound", await Code(new NoteGuarantorInput("الف", DetailCode: "999999")));
         Assert.Equal("Receipt.GuarantorNoteNotFound", await Code(new NoteGuarantorInput("الف", NoteNumber: "77")));
         Assert.Equal("Instrument.GuarantorNameRequired", await Code(new NoteGuarantorInput(" ")));
-        Assert.Equal("Instrument.TooManyGuarantors", await Code(new NoteGuarantorInput("الف"), new NoteGuarantorInput("ب"), new NoteGuarantorInput("ج")));
+        Assert.Equal("Instrument.TooManyGuarantors", await Code(new NoteGuarantorInput("الف"), new NoteGuarantorInput("ب"), new NoteGuarantorInput("ج"), new NoteGuarantorInput("د")));
+        Assert.Null(await Code(new NoteGuarantorInput("الف"), new NoteGuarantorInput("ب"), new NoteGuarantorInput("ج"))); // three are allowed (answer to Q39)
+        Assert.Single(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_note_not_fully_checked_is_refused_owner_answer_Q40()
+    {
+        var unchecked1 = Note("1") with { Checks = new NoteChecks(Signature: true, Date: true, AmountInWords: true, Payee: false, PaymentDate: true) };
+        Assert.Equal("Receipt.NoteChecksIncomplete", (await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("2"), unchecked1]), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.NoteChecksIncomplete", (await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("1") with { Checks = null }]), CancellationToken.None)).ErrorCode);
         Assert.Empty(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None));
     }
 

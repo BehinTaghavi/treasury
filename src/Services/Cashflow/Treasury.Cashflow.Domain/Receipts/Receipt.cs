@@ -219,8 +219,9 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// <summary>
     /// Promissory notes of one issuer on one receipt (owner's form «فرم دریافت سفته», 16 Nov 2026; report no. 4, item 13). Every note
     /// becomes an instrument in the cash desk: a guarantee note when the notes are held as security or in trust, otherwise an ordinary
-    /// note. With «معین» every note has its due date; with «عندالمطالبه» none has. The receipt records the handing over of the notes
-    /// only; it is not a receipt of money.
+    /// note. With «معین» every note has its due date; with «عندالمطالبه» none has (it can be collected whenever its holder wishes).
+    /// Every note must have passed the checks of article 308 (owner's answer to Q40). The receipt records the handing over of the
+    /// notes only; it is not a receipt of money.
     /// </summary>
     public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId)
     {
@@ -236,6 +237,8 @@ public sealed class Receipt : AggregateRoot<Guid>
             Require(n.Kind == checkedTerms.InstrumentKind && n.Details.OnDemand == onDemand, "Receipt.NoteKindMismatch",
                 "Every note on the receipt follows the receipt's reason and kind of due date.");
             Require(onDemand || n.DueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+            Require(n.Details.Checks?.IsComplete(onDemand) == true, "Receipt.NoteChecksIncomplete",
+                $"Note {n.Number} is received only when every item of article 308 is checked on it.");
             Require(n.Direction == InstrumentDirection.Received && n.ReceiptId == id && n.IssueDate == header.Date && n.Counterparty.Id == receipt.Payer.Id,
                 "Receipt.InstrumentMismatch", "Every cheque and note must be received from this payer on this receipt's date.");
         }

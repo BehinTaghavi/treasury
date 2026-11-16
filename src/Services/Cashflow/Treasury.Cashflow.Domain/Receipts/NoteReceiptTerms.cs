@@ -12,7 +12,7 @@ public enum NoteReason
     /// <summary>«تضمین»: held as security for a commitment; kept off the balance sheet (انتظامی).</summary>
     Guarantee,
 
-    /// <summary>«امانی»: held in trust; kept off the balance sheet like a guarantee (open question Q37).</summary>
+    /// <summary>«امانی»: held in trust; kept off the balance sheet like a guarantee (owner, 16 Nov 2026, answer to Q37).</summary>
     Trust,
 
     /// <summary>«سایر».</summary>
@@ -26,7 +26,10 @@ public enum NoteForm
     Electronic,
 }
 
-/// <summary>«نوع سررسید»: a note with a due date («معین») or payable on demand («عندالمطالبه»).</summary>
+/// <summary>
+/// «نوع سررسید»: a note with a due date («معین») or payable on demand («عندالمطالبه»), which has no due date and can be collected
+/// whenever its holder wishes (owner, 16 Nov 2026).
+/// </summary>
 public enum NoteMaturity
 {
     Fixed,

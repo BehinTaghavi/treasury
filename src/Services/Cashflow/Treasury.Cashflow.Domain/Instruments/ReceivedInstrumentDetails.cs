@@ -13,9 +13,17 @@ public sealed record NoteGuarantor(string Name, string? NationalCode, string? De
 
 /// <summary>
 /// What the treasurer checked on a received note (owner's note receipt form, «کنترل مشخصات روی هر سفته»): the items article 308 of the
-/// Commercial Code asks of a promissory note. Recorded as ticked; a missing tick does not stop the receipt (open question Q40).
+/// Commercial Code asks of a promissory note. Owner, 16 Nov 2026 (answer to Q40): ticked for each note, and a note with an item not
+/// ticked is not received on a note receipt.
 /// </summary>
-public sealed record NoteChecks(bool Signature = false, bool Date = false, bool AmountInWords = false, bool Payee = false, bool PaymentDate = false);
+public sealed record NoteChecks(bool Signature = false, bool Date = false, bool AmountInWords = false, bool Payee = false, bool PaymentDate = false)
+{
+    /// <summary>
+    /// Every item is ticked. A note payable on demand («عندالمطالبه») has no payment date written on it (owner, 16 Nov 2026: «فاقد
+    /// سررسید است»), so that item is not asked of it.
+    /// </summary>
+    public bool IsComplete(bool onDemand) => Signature && Date && AmountInWords && Payee && (onDemand || PaymentDate);
+}
 
 /// <summary>
 /// What is written on a received cheque or note besides number, amount and dates. New-version manual, form «دریافت چک و اسناد
@@ -43,7 +51,8 @@ public sealed record ReceivedInstrumentDetails(
 {
     public const int SayadIdLength = 16;
 
-    public const int MaxGuarantors = 2;
+    /// <summary>Owner, 16 Nov 2026 (answer to Q39): up to three; the new-version manual named a first and a second guarantor.</summary>
+    public const int MaxGuarantors = 3;
 
     public const int MaxPhoneLength = 30;
 
@@ -66,7 +75,7 @@ public sealed record ReceivedInstrumentDetails(
         if (guarantors.Count > 0)
         {
             Require(kind.IsNote(), "Instrument.GuarantorsOnlyForNotes", "Only a promissory note has guarantors.");
-            Require(guarantors.Count <= MaxGuarantors, "Instrument.TooManyGuarantors", "A note has at most two guarantors.");
+            Require(guarantors.Count <= MaxGuarantors, "Instrument.TooManyGuarantors", "A note has at most three guarantors.");
         }
 
         var cleanGuarantors = guarantors.Select(g =>

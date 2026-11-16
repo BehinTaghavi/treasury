@@ -49,5 +49,5 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 
 Built so far: receipts (cash, bank, cheques, guarantee cheques, ordinary and guarantee promissory notes) and the received cheque's
 deposit at the bank, collected and bounced (`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). A guarantee note uses the fixed
-account «سفته انتظامی به نفع شرکت»; a note received in trust («امانی») is booked the same way until Q37 is answered. Next with their
+account «سفته انتظامی به نفع شرکت»; a note received in trust («امانی») is booked the same way (owner's answer to Q37, 16 Nov 2026). Next with their
 screens: payments, petty cash, the steps of a note after receipt, returns and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
