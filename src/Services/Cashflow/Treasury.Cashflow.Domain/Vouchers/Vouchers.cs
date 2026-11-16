@@ -198,11 +198,12 @@ public static class ReceiptVouchers
 
     /// <summary>
     /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
-    /// steps without a voucher here: receiving and replacing (on their receipt), returning to the payer.
+    /// steps without a voucher here: receiving and replacing (on their receipt), returning a cheque to its payer.
     /// </summary>
     /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
     /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
-    public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template)
+    /// <param name="receiptGroupAccount">Handing an ordinary note back: the معین of the purpose group its receipt credited («بدهکاران»).</param>
+    public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template, string? receiptGroupAccount = null)
     {
         ArgumentNullException.ThrowIfNull(cheque);
         ArgumentNullException.ThrowIfNull(bank);
@@ -232,10 +233,17 @@ public static class ReceiptVouchers
                     Fixed(false, template, InCollection(cheque), bank.DetailCode, amount, Text(cheque, "عودت از بانک")));
             case InstrumentAction.ReturnToIssuer when cheque.Kind == InstrumentKind.GuaranteeNote:
                 // «استرداد» of a guarantee or trust note takes it out of the off-balance accounts, as its cancellation does
-                // (owner's table «ابطال چک / سفته انتظامی دریافتی نزد صندوق»; open question Q50).
+                // (owner's table «ابطال چک / سفته انتظامی دریافتی نزد صندوق»; confirmed by the owner, 16 Nov 2026, answer to Q50).
                 return Pair("استرداد سفته انتظامی دریافتی", cheque, e.Date,
                     Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, Text(cheque, "استرداد")),
                     Fixed(false, template, FixedAccount.GuaranteeNotesForCompany, payer, amount, Text(cheque, "استرداد")));
+            case InstrumentAction.ReturnToIssuer when cheque.Kind == InstrumentKind.PromissoryNote:
+                // Owner, 16 Nov 2026 (answer to Q50): handing an ordinary note back debits «بدهکاران» — the account its receipt credited,
+                // with the obligor's تفصیل — and credits «اسناد نزد صندوق / اسناد دریافتنی», where the note is (a note at the bank comes
+                // back first: Dr «اسناد دریافتنی» / Cr «سفته های در جریان وصول»).
+                return Pair("استرداد سفته به متعهد", cheque, e.Date,
+                    new VoucherLine(true, receiptGroupAccount, payer, amount, Text(cheque, "استرداد")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, "استرداد")));
             case InstrumentAction.Cancel:
                 var text = Text(cheque, $"ابطال – دستور {e.Reference} مورخ {e.Details?.DocumentDate?.ToJalaliString()}");
                 return cheque.Kind.IsGuarantee()

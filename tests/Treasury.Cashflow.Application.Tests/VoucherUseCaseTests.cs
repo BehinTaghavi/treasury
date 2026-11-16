@@ -274,6 +274,13 @@ public sealed class VoucherUseCaseTests : IDisposable
         var back = Assert.Single(await _vouchers.ChequeVouchersAsync(guarantee, CancellationToken.None));
         Assert.Equal("استرداد سفته انتظامی دریافتی", back.Operation);
         Assert.Equal(["GuaranteeCounterpart", "GuaranteeNotesForCompany"], back.Lines.Select(l => l.Missing!));
+
+        // An ordinary note handed back debits the account its receipt credited (the purpose group's, «بدهکاران»), answer to Q50.
+        var ordinary = await NoteOf(number: "N-9", amount: 3_000_000);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), ordinary, InstrumentAction.ReturnToIssuer, "1405/08/24", Note: "توافق"), CancellationToken.None)).IsSuccess);
+        var returned = Assert.Single(await _vouchers.ChequeVouchersAsync(ordinary, CancellationToken.None));
+        Assert.Equal(("استرداد سفته به متعهد", true), (returned.Operation, returned.IsComplete));
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], returned.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
     }
 
     [Fact]

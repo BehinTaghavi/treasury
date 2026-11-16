@@ -51,5 +51,6 @@ Built so far: receipts (cash, bank, cheques, guarantee cheques, ordinary and gua
 deposit at the bank, collected and bounced (`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). A guarantee note uses the fixed
 account «سفته انتظامی به نفع شرکت»; a note received in trust («امانی») is booked the same way (owner's answer to Q37, 16 Nov 2026). The steps of a received note
 (owner, 16 Nov 2026) are built too: deposit at the bank with «سفته های در جریان وصول», collected, returned by the bank, protested,
-endorsed, cancelled, and handing a guarantee note back, which reverses the off-balance entry. Next with their screens: payments,
-petty cash, returns to the payer («بدهکاران یا ...», Q50), the conversion of guarantee items (Q52) and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
+endorsed, cancelled, and handing a note back («استرداد»): a guarantee note reverses the off-balance entry; an ordinary note debits
+«بدهکاران» (the معین of its receipt's purpose group, obligor) and credits «اسناد نزد صندوق / اسناد دریافتنی» (owner's answer to Q50).
+Next with their screens: payments, petty cash, the return of a cheque to its payer and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

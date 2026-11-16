@@ -148,10 +148,35 @@ public sealed class NoteStepTests
         Assert.Equal([(true, "9201", "200015"), (false, "9102", "200015")], Lines(v));
         Assert.Equal("استرداد سفته انتظامی دریافتی", v.Operation);
 
-        // An ordinary note handed back has no voucher yet, like a cheque returned to its payer (owner's table: «بدهکاران یا ...»).
-        var ordinary = Note();
-        ordinary.ReturnToIssuer(D("1405/08/02"), User);
-        Assert.Null(ReceiptVouchers.ForStep(ordinary, 2, new LedgerSide(null, null), null, Template()));
+    }
+
+    [Fact]
+    public void Handing_an_ordinary_note_back_debits_what_its_receipt_credited_owner_answer_Q50()
+    {
+        // In the cash desk: Dr «بدهکاران» (the receipt's purpose group, obligor) / Cr «اسناد نزد صندوق / اسناد دریافتنی».
+        var note = Note();
+        note.ReturnToIssuer(D("1405/08/02"), User, "توافق طرفین");
+        var v = ReceiptVouchers.ForStep(note, 2, new LedgerSide(null, null), null, Template(), "4101")!;
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(v));
+        Assert.Equal("استرداد سفته به متعهد", v.Operation);
+        Assert.True(v.IsComplete);
+
+        // At the bank: it comes back first (Dr «اسناد دریافتنی» / Cr «سفته های در جریان وصول»), then it is handed back; together
+        // «بدهکاران» is debited and «سفته های در جریان وصول» credited, as the owner said.
+        var atBank = AtBank();
+        atBank.ReturnFromBank(D("1405/08/20"), User);
+        atBank.ReturnToIssuer(D("1405/08/21"), User);
+        Assert.Equal([(true, "1201", "200015"), (false, "1204", "600001")], Lines(ReceiptVouchers.ForStep(atBank, 3, SideA, null, Template(), "4101")));
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(atBank, 4, SideA, null, Template(), "4101")));
+
+        // A note without a known receipt: the debit account is missing and the voucher cannot be confirmed.
+        Assert.False(ReceiptVouchers.ForStep(note, 2, new LedgerSide(null, null), null, Template())!.IsComplete);
+
+        // A cheque returned to its payer still has no voucher (owner's table: «بدهکاران یا ...»).
+        var cheque = Instrument.Receive(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, "1", "بانک ملت", Money.Rials(1), D("1405/08/01"), D("1405/09/01"),
+            CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User);
+        cheque.ReturnToIssuer(D("1405/08/02"), User);
+        Assert.Null(ReceiptVouchers.ForStep(cheque, 2, new LedgerSide(null, null), null, Template(), "4101"));
     }
 
     [Fact]
