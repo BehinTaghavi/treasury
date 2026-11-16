@@ -98,7 +98,8 @@ public sealed record InstrumentView(
     bool SayadRegistrationRequired = false,
     DateTimeOffset? SayadRegisteredAt = null,
     string? SayadRegisteredBy = null,
-    bool CanChangeSayadRegistration = false)
+    bool CanChangeSayadRegistration = false,
+    bool SayadRegistrationAssumed = false)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -129,7 +130,8 @@ public sealed record InstrumentView(
         i.RequiresSayadRegistration,
         i.SayadRegistration?.At,
         i.SayadRegistration?.UserId,
-        i.CanChangeSayadRegistration);
+        i.CanChangeSayadRegistration,
+        i.SayadRegistration?.IsAssumed ?? false);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);

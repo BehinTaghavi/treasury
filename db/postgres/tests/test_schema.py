@@ -686,6 +686,41 @@ def test_a_cheque_keeps_the_moment_and_user_of_its_sayad_tick(db):
         c.rollback()
 
 
+def test_received_cheques_already_in_the_system_are_ticked_once_when_the_sayad_tick_arrives(db):
+    # Answer to Q39 (owner, 16 Nov 2026): cheques received before the tick existed are assumed to be recorded in Sayad. Script 033
+    # ticks them when it creates the columns, and never again.
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"),
+               PGOPTIONS="-c role=treasury_owner -c client_min_messages=warning")
+    script = ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-d", params["dbname"], "-f", str(HERE / "033_cashflow_sayad_registration.sql")]
+    tick = "SELECT sayad_registered_by, sayad_registered_at IS NOT NULL FROM cashflow.instrument WHERE id = %s"
+    made = []
+    try:
+        with psycopg.connect(db, autocommit=True) as c:
+            # The database as it was before the upgrade: no tick columns, a cheque in the cash desk, a note, an issued cheque.
+            c.execute("ALTER TABLE cashflow.instrument DROP COLUMN sayad_registered_at, DROP COLUMN sayad_registered_by")
+            cheque = insert_instrument(c, 1405)
+            note = insert_instrument(c, 1405)
+            c.execute("UPDATE cashflow.instrument SET kind = 'PromissoryNote' WHERE id = %s", (note,))
+            issued = insert_instrument(c, 1405, state="Issued", direction="Issued")
+            made += [cheque, note, issued]
+        subprocess.run(script, check=True, env=env, capture_output=True)
+        with psycopg.connect(db, autocommit=True) as c:
+            assert c.execute(tick, (cheque,)).fetchone() == ("system:assumed", True)
+            assert c.execute(tick, (note,)).fetchone() == (None, False)
+            assert c.execute(tick, (issued,)).fetchone() == (None, False)
+            later = insert_instrument(c, 1405)  # received after the upgrade: waits for the user's tick
+            made.append(later)
+        subprocess.run(script, check=True, env=env, capture_output=True)
+        with psycopg.connect(db) as c:
+            assert c.execute(tick, (later,)).fetchone() == (None, False)
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("ALTER TABLE cashflow.instrument ADD COLUMN IF NOT EXISTS sayad_registered_at timestamptz")
+            c.execute("ALTER TABLE cashflow.instrument ADD COLUMN IF NOT EXISTS sayad_registered_by text")
+            c.execute("DELETE FROM cashflow.instrument WHERE id = ANY(%s)", (made,))
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

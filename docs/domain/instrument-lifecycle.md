@@ -62,9 +62,9 @@ Every step belongs to the fiscal year in which it happens; the instrument belong
 
 ## «ثبت صیادی شد» (owner, 15 Nov 2026)
 Every cheque is recorded in the banks' Sayad system before it goes to the bank or to its beneficiary. The user ticks «ثبت صیادی شد» on the cheque and the system keeps the computer's date and time and the user. It is **not a state and not a step** (the table of transitions is unchanged, no voucher): it is a condition of two steps.
-- **Received cheque**, current or post-dated: no `DepositForCollection` before the tick (`Instrument.SayadNotRegistered`); the step is not offered until then.
+- **Received cheque**, current or post-dated: no `DepositForCollection` before the tick (`Instrument.SayadNotRegistered`); the step is not offered until then. Only the deposit waits for it: an endorsement does not (answer to Q37).
 - **Issued cheque**: no `Deliver` before the tick. The tick is possible once the cheque has its number (state Issued).
 - Only cheques (ordinary, guarantee, bank, post-dated); notes and instalments are not in Sayad.
 - The tick can be removed only while the step it guards is still ahead (in the cash desk or back from the bank; issued and not delivered). A cheque back from the bank keeps its tick.
-- Not in the old program (`Lcash.mdb` is older than Sayad). Migrated cheques arrive without a tick; those still in the cash desk must be ticked before they are deposited (Q39).
+- Not in the old program (`Lcash.mdb` is older than Sayad). Answer to Q39 (16 Nov 2026): received cheques already in the system, and the old program's received cheques when they are migrated, are assumed to be recorded in Sayad and are ticked once automatically (`system:assumed` in place of a user; schema script 033 and the migration tool). Issued cheques and notes are not.
 

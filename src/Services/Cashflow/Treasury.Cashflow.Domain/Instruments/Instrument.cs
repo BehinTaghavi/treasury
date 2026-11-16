@@ -79,7 +79,17 @@ public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName,
 /// «ثبت صیادی شد»: the user's tick that the cheque has been recorded in the banks' Sayad system, with the computer's date and time
 /// and the user who ticked it (owner, 15 Nov 2026).
 /// </summary>
-public sealed record SayadRegistration(DateTimeOffset At, string UserId);
+public sealed record SayadRegistration(DateTimeOffset At, string UserId)
+{
+    /// <summary>
+    /// Written in place of a user on received cheques that were already in the system when the tick was introduced, and on cheques
+    /// migrated from the old program: the owner assumes they are all recorded in Sayad (answer to Q39, 16 Nov 2026). Set by schema
+    /// script 033 and by the migration tool (a test there fails if the two differ); the moment is that of the upgrade or migration.
+    /// </summary>
+    public const string AssumedBy = "system:assumed";
+
+    public bool IsAssumed => UserId == AssumedBy;
+}
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.

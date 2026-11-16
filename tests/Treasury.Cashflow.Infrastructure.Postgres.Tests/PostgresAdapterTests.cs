@@ -222,6 +222,20 @@ public sealed class PostgresAdapterTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cheque_ticked_as_assumed_by_the_upgrade_or_the_migration_is_deposited_answer_Q39()
+    {
+        var id = (await _useCases.ReceiveAsync(Receive(Key()), CancellationToken.None)).Value;
+        // What schema script 033 and the migration tool write for cheques that were there before the tick existed.
+        await _db.ExecuteAsync($"UPDATE cashflow.instrument SET sayad_registered_at = now(), sayad_registered_by = '{SayadRegistration.AssumedBy}' WHERE id = '{id}'");
+        var view = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.True(view.SayadRegistrationAssumed);
+        Assert.NotNull(view.SayadRegisteredAt);
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "ملت"), CancellationToken.None)).IsSuccess);
+        var deposited = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("DepositedForCollection", true), (deposited.State, deposited.SayadRegistrationAssumed));
+    }
+
+    [Fact]
     public async Task A_rule_violation_returns_its_code_and_saves_nothing()
     {
         var id = (await _useCases.ReceiveAsync(Receive(Key()), CancellationToken.None)).Value;

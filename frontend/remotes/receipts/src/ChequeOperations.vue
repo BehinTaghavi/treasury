@@ -26,6 +26,7 @@ interface Cheque {
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
   details: { branchName: string | null; sayadId: string | null } | null
   sayadRegistrationRequired: boolean; sayadRegisteredAt: string | null; sayadRegisteredBy: string | null; canChangeSayadRegistration: boolean
+  sayadRegistrationAssumed: boolean
 }
 type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
 
@@ -118,6 +119,8 @@ async function depositSelected() {
 // ---- «ثبت صیادی شد»: ticked once the cheque is recorded in the Sayad system; the deposit waits for it (owner, 15 Nov 2026) ----
 const awaitingSayad = computed(() => shown.value.filter(c => c.sayadRegistrationRequired && !c.sayadRegisteredAt && c.canChangeSayadRegistration))
 const sayadMoment = (c: Cheque) => (c.sayadRegisteredAt ? formatJalaliDateTime(c.sayadRegisteredAt, props.locale) : '')
+/** Who ticked it; cheques that were already in the system when the tick arrived count as recorded (answer to Q39, 16 Nov 2026). */
+const sayadBy = (c: Cheque) => (c.sayadRegistrationAssumed ? t('از قبل ثبت‌شده فرض شد', 'assumed, already in the system') : c.sayadRegisteredBy ?? '')
 async function setSayad(c: Cheque, box: HTMLInputElement) {
   const on = box.checked
   if (busy.value) { box.checked = !on; return }
@@ -316,7 +319,7 @@ onMounted(async () => { await L.load(); await load() })
                          @change="setSayad(c, $event.target as HTMLInputElement)" />
                   {{ t('ثبت صیادی شد', 'Recorded in Sayad') }}
                 </label>
-                <div v-if="c.sayadRegisteredAt" class="muted small"><span class="num">{{ sayadMoment(c) }}</span> · {{ c.sayadRegisteredBy }}</div>
+                <div v-if="c.sayadRegisteredAt" class="muted small"><span class="num">{{ sayadMoment(c) }}</span> · {{ sayadBy(c) }}</div>
                 <div v-else-if="c.details?.sayadId" class="muted small">{{ t('شناسه', 'ID') }} <span class="num" dir="ltr">{{ c.details.sayadId }}</span></div>
               </template>
               <span v-else class="muted">—</span>
@@ -369,7 +372,7 @@ onMounted(async () => { await L.load(); await load() })
       </div>
       <p v-if="card.sayadRegistrationRequired" class="small" style="margin: .4rem 0 0">
         {{ t('ثبت صیادی', 'Sayad') }}:
-        <strong v-if="card.sayadRegisteredAt">{{ t('ثبت شد', 'recorded') }} – <span class="num">{{ sayadMoment(card) }}</span> – {{ card.sayadRegisteredBy }}</strong>
+        <strong v-if="card.sayadRegisteredAt">{{ t('ثبت شد', 'recorded') }} – <span class="num">{{ sayadMoment(card) }}</span> – {{ sayadBy(card) }}</strong>
         <strong v-else class="tr-pending">{{ t('هنوز ثبت نشده است', 'not recorded yet') }}</strong>
         <span v-if="card.details?.sayadId" class="muted"> · {{ t('شناسهٔ صیاد', 'Sayad ID') }} <span class="num" dir="ltr">{{ card.details.sayadId }}</span></span>
       </p>

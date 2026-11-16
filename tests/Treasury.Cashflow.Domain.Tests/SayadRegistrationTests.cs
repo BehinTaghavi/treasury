@@ -126,6 +126,32 @@ public sealed class SayadRegistrationTests
     }
 
     [Fact]
+    public void A_cheque_that_was_in_the_system_before_the_tick_counts_as_recorded_in_sayad_answer_Q39()
+    {
+        // Schema script 033 and the migration tool write the tick with SayadRegistration.AssumedBy in place of a user.
+        var cheque = ReceivedCheque();
+        var assumed = new SayadRegistration(TickedAt, SayadRegistration.AssumedBy);
+        var restored = Instrument.Restore(cheque.Id, cheque.Direction, cheque.Kind, cheque.Number, cheque.BankName, null, null, null, Money.Rials(50_000_000),
+            cheque.IssueDate, cheque.DueDate, cheque.Counterparty, cheque.Purpose, null, cheque.State, cheque.OriginFiscalYear, cheque.History, 1,
+            sayadRegistration: assumed);
+        Assert.True(restored.SayadRegistration!.IsAssumed);
+        Assert.False(new SayadRegistration(TickedAt, User).IsAssumed);
+        Assert.Contains(InstrumentAction.DepositForCollection, restored.AllowedActions());
+        restored.DepositForCollection(Mellat, D("1405/08/05"), User);
+        Assert.Equal(InstrumentState.DepositedForCollection, restored.State);
+    }
+
+    [Fact]
+    public void Endorsing_does_not_wait_for_the_tick_answer_Q37()
+    {
+        // Owner, 16 Nov 2026: the tick is required only before the deposit at the bank.
+        var cheque = ReceivedCheque();
+        cheque.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1", Guid.NewGuid()), D("1405/08/02"), User);
+        Assert.Equal(InstrumentState.Endorsed, cheque.State);
+        Assert.Null(cheque.SayadRegistration);
+    }
+
+    [Fact]
     public void The_tick_is_kept_when_the_cheque_is_read_back_from_storage()
     {
         var cheque = ReceivedCheque().Ticked();
