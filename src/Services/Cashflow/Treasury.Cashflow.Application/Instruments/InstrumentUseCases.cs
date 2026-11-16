@@ -91,7 +91,8 @@ public sealed record InstrumentView(
     bool IsPostDated = false,
     ReceivedInstrumentDetails? Details = null,
     Guid? CollectionAccountId = null,
-    string? CounterpartyDetailCode = null)
+    string? CounterpartyDetailCode = null,
+    string? NoteIssueDate = null)
 {
     public static InstrumentView From(Instrument i) => new(
         i.Id,
@@ -118,7 +119,9 @@ public sealed record InstrumentView(
         i.IsPostDated,
         i.Direction == InstrumentDirection.Received ? i.Details : null,
         i.CollectionAccountId,
-        i.Counterparty.DetailCode);
+        i.Counterparty.DetailCode,
+        // A note's «تاریخ صدور» as Jalali text (Details.WrittenOn is the stored ISO date).
+        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);

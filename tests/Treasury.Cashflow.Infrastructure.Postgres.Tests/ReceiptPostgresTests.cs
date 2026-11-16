@@ -91,6 +91,42 @@ public sealed class ReceiptPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_note_receipt_round_trips_with_its_terms_notes_and_guarantors_db_033()
+    {
+        var number = Guid.NewGuid().ToString("N")[..8];
+        var terms = new NoteTermsInput(NoteReason.Guarantee, NoteForm.Electronic, NoteMaturity.Fixed, "0123456789", "021-88990011", "حسن انجام قرارداد ۴۵",
+            "پس از تأیید واحد فنی", "صندوق شرکت", true, "1405/08/24", "ندارد", new NoteAttachments(NoteImage: true, Contract: true), "علی رضایی", "مدیر مالی");
+        var r = await _receipts.RecordNotesAsync(new(Key(), Header(), terms,
+            [new(number, "1405/08/20", "1405/11/30", 500_000_000, new NoteChecks(Signature: true, PaymentDate: true)), new("B" + number, null, "1405/12/25", 250_000_000)],
+            [new("رضا احمدی", "0123456789", "300045", "0912", number)]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+
+        var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(("Notes", 2, 750_000_000m, (string?)null), (v.Kind, v.InstrumentCount, v.TotalRial, v.AccountKind));
+        var t = v.NoteTerms!;
+        Assert.Equal(("Guarantee", "Electronic", "Fixed", "0123456789", "021-88990011", "حسن انجام قرارداد ۴۵", "پس از تأیید واحد فنی", "صندوق شرکت", true, "1405/08/24", "ندارد"),
+            (t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived, t.OriginalReceivedOn, t.Discrepancy));
+        Assert.Equal((true, true, false, "علی رضایی", "مدیر مالی"), (t.Attachments.NoteImage, t.Attachments.Contract, t.Attachments.Other, t.DeliveredBy, t.ApprovedBy));
+        var note = v.Instruments!.Single(i => i.Number == number);
+        Assert.Equal(("GuaranteeNote", "1405/08/20", "1405/11/30", true, true, false),
+            (note.Kind, note.NoteIssueDate, note.DueDate, note.Details!.Checks!.Signature, note.Details.Checks.PaymentDate, note.Details.OnDemand));
+        var guarantor = Assert.Single(note.Details.GuarantorList);
+        Assert.Equal(("رضا احمدی", "0123456789", "300045", "0912"), (guarantor.Name, guarantor.NationalCode, guarantor.DetailCode, guarantor.Phone));
+        var other = v.Instruments!.Single(i => i.Number == "B" + number);
+        Assert.Empty(other.Details!.GuarantorList);
+        Assert.Null(other.NoteIssueDate);
+
+        // Its own series: the next note receipt gets the next number; a cheque receipt does not move it.
+        var next = await _receipts.RecordNotesAsync(new(Key(), Header(), new NoteTermsInput(NoteReason.Debt, NoteForm.Paper, NoteMaturity.OnDemand),
+            [new("C" + number, null, null, 1_000_000)]), CancellationToken.None);
+        Assert.True(next.IsSuccess, next.ErrorCode);
+        var nv = (await _receipts.GetAsync(next.Value, CancellationToken.None))!;
+        Assert.Equal(v.Number + 1, nv.Number);
+        Assert.True(Assert.Single(nv.Instruments!).Details!.OnDemand);
+        Assert.Contains(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None), x => x.Id == r.Value && x.NoteTerms!.Reason == "Guarantee");
+    }
+
+    [Fact]
     public async Task A_confirmed_voucher_is_kept_once_with_its_lines_and_stops_cancellation()
     {
         var vouchers = new Treasury.Cashflow.Application.Vouchers.VoucherUseCases(new PostgresUnitOfWork(_dataSource), new PostgresVoucherTemplateRepository(),

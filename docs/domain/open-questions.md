@@ -15,7 +15,7 @@ Each item is a behaviour the code currently implements one way, with the reason.
 | Q7 | Meaning and use of the old flags **Signed, Hazfhavale, Payit, Calcit, Kasrtime, Delivervag**. | Not migrated (except where listed in the mapping). | Needed to decide whether they are business data or old UI state. |
 | Q8 | **Cash payments** stored in `Checks` with `Checktype = 9`: migrate as payments? | Rejected by the cheque migration and listed in the report. | They are not instruments; the Disbursements context will take them. |
 | Q9 | Please map the MVC version's **PlaningType** codes to the states in `instrument-lifecycle.md`. | — | Needed to migrate clients who already use the MVC version. |
-| Q10 | Is a **due date required** for received instalments and promissory notes? | Required for every kind except guarantee items. | Old `D_Check` requires a due date ("سررسید نامشخص است"). |
+| Q10 | Is a **due date required** for received instalments and promissory notes? | Required for every kind except guarantee items. **Owner's note receipt form, 16 Nov 2026: a note payable on demand («عندالمطالبه») has no due date.** | Old `D_Check` requires a due date ("سررسید نامشخص است"). |
 | Q11 | Rule N2 says a cheque cannot be **cleared** before its due date. Does the same apply to a **bounce** (can the bank return a cheque before its due date)? | **Answered 10 Nov 2026: yes.** A bounce before the due date is refused (`Instrument.BouncedBeforeDueDate`). | See `docs/decisions.md`. |
 
 ## Receipts (owner, 14 Nov 2026)
@@ -54,3 +54,20 @@ Proposal: `received-cheque-steps.md`.
 | Q34 | Your table says «اسناد **درخ**واست شده» for a bounce and «اسناد **واخ**واست شده» for a returned endorsed cheque. Is it **one account** (واخواست = protested)? | **Answered 15 Nov 2026: one account, «اسناد واخواست شده»** (the table's «درخواست شده» was a typing error; corrected everywhere). | Probably a typing difference. |
 | Q35 | When several cheques are deposited together on **one slip** (or collected on one statement date), is it **one voucher** for the slip or one per cheque? | **Answered 15 Nov 2026: one voucher per cheque.** | Your answer "one voucher for each operation" can mean either. |
 | Q36 | **Endorsement and payment requests:** must every endorsement («خرج چک») pay an **approved payment request** (the request then becomes paid), or is the request optional? (Your answer repeated the question.) | **Answered 15 Nov 2026: yes, every endorsement pays an approved payment request** (in full or in part; the request is paid when its payments reach its amount; a returned endorsed cheque takes its payment back). | Decides whether the endorsement screen must choose an approved request. |
+
+## Receipt of promissory notes (owner's form «فرم دریافت سفته», 16 Nov 2026)
+
+The form is built as the owner's sheet and the approved mock-up show it. These points were not settled by the sheet; each is built as proposed until he answers.
+
+| # | Question | Proposed behaviour (built) | Why |
+|---|---|---|---|
+| Q37 | A note received **«امانی»** (in trust): is it kept **off the balance sheet** like a guarantee note (حساب‌های انتظامی), or booked as a receivable like a note for a debt? | Like a guarantee note: Dr «سفته انتظامی به نفع شرکت» / Cr «طرف حساب انتظامی». «سایر» is booked like a note for a debt. | A note held in trust is not a claim of the company; the voucher table has only «عادی» and «انتظامی». |
+| Q38 | **«نوع سررسید»** (معین / عندالمطالبه) and **«نوع سند»** (کاغذی / الکترونیکی): one choice for the **whole receipt**, as on the sheet, or for **each note**? | One choice for the whole receipt. | The sheet has them above the table of notes. |
+| Q39 | **Guarantors / endorsers:** how many may one note have? | At most **two** for each note; a guarantor is for one note or for all notes of the receipt. | New-version manual: «متعهدین (ضامنین) اول و دوم». The mock-up showed up to three. |
+| Q40 | **Checks of article 308** (امضا یا مهر، تاریخ، مبلغ به حروف، گیرنده وجه، تاریخ پرداخت): ticked **for each note** or once for the receipt? Does a **missing tick stop** the receipt? | Ticked for each note; recorded only, a missing tick does not stop saving. The printed receipt ticks an item when every note has it. | The sheet says «کنترل مشخصات روی هر سفته». |
+| Q41 | **«تأییدکنندهٔ مجاز»:** does the approver **approve in the system** (a second person presses «تأیید»), or is the signature on the printed receipt enough? | The approver's name is typed and printed; the three sign the paper. | Approval in the system needs users and permissions (login is not built yet). |
+| Q42 | The sheet has «بابت بدهی / تضمین / امانی / سایر» twice (beside «بابت» and as «دلیل دریافت سفته»), and «شماره حساب معین» as a list box. | The reason is asked **once**; the **معین comes from the purpose group** and is shown, not chosen (for a guarantee or trust note the off-balance accounts are used instead). | Receipts already take the other side of the voucher from the purpose group. |
+| Q43 | **Attachments** (تصویر سفته، قرارداد، مدرک نمایندگی، سایر): are ticks enough for now, or should the **scans be uploaded** with the receipt (as on payment requests)? | Ticks only. | Files need a place to keep them for receipts; quick to add if wanted. |
+| Q44 | **After receipt:** which steps does a note need (واگذاری به بانک، وصول، استرداد به متعهد، واخواست، تبدیل سفتهٔ انتظامی به عادی), and on which screen? | For now a note can be **returned to the obligor or cancelled** on «عملیات چک‌های دریافتی»; its own steps are the next task. | The voucher table lists «واگذاری سفته به بانک» and «تبدیل … انتظامی به عادی». |
+
+Also assumed: note receipts are numbered from 1 each fiscal year in a series of their own (as Q19 for the other kinds); a note's issue date is optional and its due date is not before it; the company's name is written by hand on the printed receipt until the company's particulars are kept in Basic Information.

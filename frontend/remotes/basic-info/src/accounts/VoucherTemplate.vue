@@ -42,6 +42,10 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['مطالبات سوخت شده', 'Bad debts written off'],
     use: ['بدهکار هنگام ابطال چک دریافتی به دستور مدیریت؛ تفصیل: پرداخت کننده', "Debited when a received cheque is cancelled by management's order; detail: the payer"],
   },
+  GuaranteeNotesForCompany: {
+    title: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
+    use: ['بدهکار هنگام دریافت سفتهٔ تضمینی یا امانی؛ بستانکار آن «طرف حساب انتظامی» است', 'Debited when a guarantee or trust note is received; credited to the guarantee counterpart'],
+  },
 }
 
 const rows = ref<Row[]>([])

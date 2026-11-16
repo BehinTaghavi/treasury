@@ -6,6 +6,7 @@
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
 import ReceiptForm from './ReceiptForm.vue'
+import NoteReceiptForm from './NoteReceiptForm.vue'
 import ReceiptList from './ReceiptList.vue'
 import ChequeOperations from './ChequeOperations.vue'
 
@@ -16,6 +17,8 @@ const fa = computed(() => props.locale === 'fa')
 
 const tabs = [
   { id: 'Instruments', title: ['دریافت چک', 'Cheques'] },
+  // Owner's report no. 4, item 13, and his form «فرم دریافت سفته» (16 Nov 2026): promissory notes have a form of their own.
+  { id: 'Notes', title: ['دریافت سفته', 'Promissory notes'] },
   { id: 'Cash', title: ['دریافت نقدی', 'Cash'] },
   { id: 'BankDeposit', title: ['واریز به حساب / کارتخوان', 'Bank deposit / POS'] },
   { id: 'list', title: ['فهرست دریافت‌ها', 'Receipts list'] },
@@ -25,8 +28,10 @@ const tabs = [
 type Tab = (typeof tabs)[number]['id']
 const tab = ref<Tab>('Instruments')
 const hints: Record<string, [string, string]> = {
-  Instruments: ['چک‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند (سفته‌ها فرم جداگانه خواهند داشت). چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
-    'Cheques and notes of one payer are saved on one receipt. Current or post-dated follows the due date; a foreign-currency cheque needs its currency and rate.'],
+  Instruments: ['چک‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند (سفته‌ها در زبانهٔ «دریافت سفته» ثبت می‌شوند). چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
+    'Cheques of one payer are saved on one receipt (promissory notes have their own tab). Current or post-dated follows the due date; a foreign-currency cheque needs its currency and rate.'],
+  Notes: ['سفته‌های یک متعهد با یک شمارهٔ رسید ثبت می‌شوند. این رسید فقط تحویل سفته را نشان می‌دهد و به‌تنهایی تأیید دریافت وجه یا تسویهٔ بدهی نیست.',
+    'Promissory notes of one issuer are saved on one receipt. The receipt only records that the notes were handed over; it is not a receipt of money.'],
   Cash: ['وجه نقد دریافتی به صندوق؛ ارز همان ارز صندوق است.', 'Cash received into a cash desk, in the cash desk\'s currency.'],
   BankDeposit: ['واریز مستقیم مشتری به حساب بانکی شرکت: فیش، حواله (ساتنا/پایا)، کارتخوان یا کارت به کارت.',
     'Money the payer paid straight into a company bank account: slip, transfer, POS or card-to-card.'],
@@ -44,6 +49,7 @@ const hints: Record<string, [string, string]> = {
     <p v-if="tab !== 'list' && tab !== 'collection'" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
     <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
+    <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" />
   </section>
 </template>

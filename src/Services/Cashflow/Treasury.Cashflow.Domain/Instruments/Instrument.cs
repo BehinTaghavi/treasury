@@ -140,7 +140,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Date written on the instrument (received side: date received).</summary>
     public FiscalDate IssueDate { get; }
 
-    /// <summary>Maturity (سررسید). Null only for guarantee items.</summary>
+    /// <summary>Maturity (سررسید). Null only for guarantee items and notes payable on demand («عندالمطالبه»).</summary>
     public FiscalDate? DueDate { get; }
 
     public CounterpartyRef Counterparty { get; }
@@ -206,8 +206,14 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
         Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
         Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
-        ValidateCommon(kind, drawer, purpose, dueDate);
         var checkedDetails = details.Validated(kind);
+
+        // Owner's note receipt form (16 Nov 2026): a note payable on demand («عندالمطالبه») has no due date; a dated note is not due
+        // before the day it was written (old rule R6, which the old program applied to cheques).
+        ValidateCommon(kind, drawer, purpose, dueDate, checkedDetails.OnDemand);
+        Require(!checkedDetails.OnDemand || dueDate is null, "Instrument.OnDemandHasDueDate", "A note payable on demand has no due date.");
+        Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
+            "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
 
         var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
             string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
@@ -509,12 +515,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         }
     }
 
-    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate)
+    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate, bool onDemand = false)
     {
         ArgumentNullException.ThrowIfNull(counterparty);
         Require(!string.IsNullOrWhiteSpace(counterparty.DisplayName), "Instrument.CounterpartyRequired", "Drawer or payee is required.");
         Require(!string.IsNullOrWhiteSpace(purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(kind.IsGuarantee() || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+        Require(kind.IsGuarantee() || onDemand || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
     }
 
     private static void Require(bool condition, string code, string message)
