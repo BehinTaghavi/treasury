@@ -33,7 +33,7 @@ The MVC version is not repaired. The system is rebuilt, and each part runs besid
 
 By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the latest one, #8, was green before it was merged.
 
-**In review (16 Nov 2026) — company information:** a new Basic Information page «اطلاعات شرکت» keeps the company's name and its scanned logo, and the shell shows both at the top of every screen; the page also keeps the company's official details (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone, website, e-mail) for the top of printed forms (`reference-svc`, schemas 033 and 034).
+**In review, [#12](https://github.com/BehinTaghavi/treasury/pull/12) (16 Nov 2026) — company information:** a new Basic Information page «اطلاعات شرکت» keeps the company's name and its scanned logo, and the shell shows both at the top of every screen; the page also keeps the company's official details (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone, website, e-mail) for the top of printed forms (`reference-svc`, schemas 033 and 034).
 
 | Pull request | Subject | What it added |
 |---|---|---|
