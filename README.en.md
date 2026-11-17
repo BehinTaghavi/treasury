@@ -33,6 +33,8 @@ The MVC version is not repaired. The system is rebuilt, and each part runs besid
 
 By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the latest one, #8, was green before it was merged.
 
+**In review, [#12](https://github.com/BehinTaghavi/treasury/pull/12) (16 Nov 2026) — company information:** a new Basic Information page «اطلاعات شرکت» keeps the company's name and its scanned logo, and the shell shows both at the top of every screen; the page also keeps the company's official details (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone, website, e-mail) for the top of printed forms (`reference-svc`, schemas 033 and 034).
+
 | Pull request | Subject | What it added |
 |---|---|---|
 | [#10](https://github.com/BehinTaghavi/treasury/pull/10) (open, in review) | Promissory notes and authorised signatories | **New tab «دریافت سفته»** on the Receipts screen, built from the owner's sheet and the mock-up he approved (16 Nov 2026): the notes of one obligor on one receipt with its own numbers; reason (debt, guarantee, trust, other), paper or electronic, due date or on demand; guarantors with their تفصیل; supplementary information and the article 308 checks on each note; total in figures and words; voucher shown under the form; **printed A4 receipt** for the three signatures. New fixed account «سفته انتظامی به نفع شرکت». With the owner's answers of the same day: up to three guarantors, and a receipt is saved only when every article 308 item of each note is ticked. **Authorised signatories:** new Basic Information page «دارندگان امضای مجاز» (name, position, تفصیل, national code, mobile, landline) with a signature rule for six kinds of document (number of signatures, compulsory and optional signatories); the note receipt asks who signs by its rule and prints them. **Steps of a note after receipt:** new tab «عملیات سفته‌های دریافتی» — deposit at the bank, collected, returned by the bank, protested, handed back to the obligor, endorsed to pay an approved request, cancelled — with their vouchers and the new fixed account «سفته های در جریان وصول». Open questions Q42 and Q43. |
@@ -67,8 +69,14 @@ Phase A is almost finished. Basic Information (Phase B) is built and waits for r
 | `requests-svc` | Payment requests: request, approval, cancellation, the list approved for payment, scanned attachments, payment by an endorsed cheque | Domain, use-case and PostgreSQL tests |
 | Architecture rules | Layers depend inward only; no service references another service's code | Architecture tests |
 | Database | One schema per service (scripts 000 to 033), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
+| `cashflow-svc` | Lifecycle of received and issued cheques and notes with rule N2; cheque types with their scans and cheque books (series, serial, Sayad ID); receipts (cash, bank deposit, cheques and notes); the steps of a received cheque after receipt; treasury vouchers | Domain, use-case and PostgreSQL tests |
+| `reference-svc` | Currencies, country/province/city (Iran's cities pre-filled), bank names; code lengths, chart of accounts and تفصیل with Excel import, allowed تفصیل types; references (عطف), purpose groups and purposes; organisational units, requesters of funds, beneficiaries; the company's name, logo and official details («اطلاعات شرکت») | Domain, use-case, Excel-reader and PostgreSQL tests |
+| `accounts-svc` | The company's bank accounts with their kinds and bank cards, cash desks, petty cash, opening balances | Domain, use-case and PostgreSQL tests |
+| `requests-svc` | Payment requests: request, approval, cancellation, the list approved for payment, scanned attachments, payment by an endorsed cheque | Domain, use-case and PostgreSQL tests |
+| Architecture rules | Layers depend inward only; no service references another service's code | Architecture tests |
+| Database | One schema per service (scripts 000 to 034), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
 | Migration tool | Old cheques moved to the new schema with a reconciliation report; Jalali dates checked day by day against .NET for 1380–1420 | Migration tests |
-| User interface | Nuxt 4 shell and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
+| User interface | Nuxt 4 shell (the company's name and logo at the top of every screen) and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
 | Deployment | Docker Compose for one client's server, and the Windows test server | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |
 | Login with Keycloak | Token validation in the API is compiled | **Not yet run**; comes later in Phase B |
 
