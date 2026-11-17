@@ -72,6 +72,13 @@ def test_migrates_reconciles_and_is_idempotent(database, tmp_path):
                             WHERE i.legacy_source = 'Cashnajoo86.Checks:2' ORDER BY e.seq""").fetchall()
         assert rows == [(1386, "Receive"), (1386, "DepositForCollection"), (1387, "RecordCleared")]
         assert c.execute("SELECT origin_fiscal_year FROM cashflow.instrument WHERE legacy_source = 'Cashnajoo86.Checks:2'").fetchone()[0] == 1386
+        # Answer to Q39 (owner, 16 Nov 2026): the old program's received cheques are assumed to be recorded in Sayad and arrive with
+        # «ثبت صیادی شد» ticked; issued cheques and notes arrive without it.
+        ticks = c.execute("""SELECT direction, kind IN ('OrdinaryCheque', 'GuaranteeCheque', 'BankCheque'), sayad_registered_by, sayad_registered_at IS NOT NULL
+                             FROM cashflow.instrument""").fetchall()
+        assert any(direction == "Received" and cheque for direction, cheque, _, _ in ticks)
+        for direction, cheque, by, has_moment in ticks:
+            assert (by, has_moment) == (("system:assumed", True) if direction == "Received" and cheque else (None, False))
 
     # Second run inserts nothing new and still reconciles.
     assert main(args) == 0

@@ -228,7 +228,7 @@ public sealed class DepositForCollectionTests
     [Fact]
     public void The_cheque_is_at_the_bank_account_with_its_slip_number()
     {
-        var cheque = ReceivedCheque();
+        var cheque = ReceivedCheque().Ticked();
         cheque.DepositForCollection(Mellat, D("1405/08/05"), User, " 4455 ");
         Assert.Equal((InstrumentState.DepositedForCollection, (Guid?)Mellat.Id, "0202-3572"), (cheque.State, cheque.CollectionAccountId, cheque.Destination));
         Assert.Equal("4455", cheque.History[^1].Reference);

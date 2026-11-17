@@ -668,6 +668,59 @@ def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_a
         c.rollback()
 
 
+def test_a_cheque_keeps_the_moment_and_user_of_its_sayad_tick(db):
+    # 033_cashflow_sayad_registration.sql (owner, 15 Nov 2026: «ثبت صیادی شد» before a cheque goes to the bank or its beneficiary).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405)
+        assert c.execute("SELECT sayad_registered_at, sayad_registered_by FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone() == (None, None)
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = '2026-11-15 10:35+03:30', sayad_registered_by = 'treasurer' WHERE id = %s", (iid,))
+        at = c.execute("SELECT sayad_registered_at AT TIME ZONE 'UTC' FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0]
+        assert (at.hour, at.minute) == (7, 5)
+        # The moment and the user go together: neither is kept without the other.
+        for half in ("sayad_registered_at = NULL", "sayad_registered_by = NULL"):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE cashflow.instrument SET {half} WHERE id = %s", (iid,))
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = NULL, sayad_registered_by = NULL WHERE id = %s", (iid,))
+        c.rollback()
+
+
+def test_received_cheques_already_in_the_system_are_ticked_once_when_the_sayad_tick_arrives(db):
+    # Answer to Q39 (owner, 16 Nov 2026): cheques received before the tick existed are assumed to be recorded in Sayad. Script 033
+    # ticks them when it creates the columns, and never again.
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"),
+               PGOPTIONS="-c role=treasury_owner -c client_min_messages=warning")
+    script = ["psql", "-v", "ON_ERROR_STOP=1", "-q", "-d", params["dbname"], "-f", str(HERE / "033_cashflow_sayad_registration.sql")]
+    tick = "SELECT sayad_registered_by, sayad_registered_at IS NOT NULL FROM cashflow.instrument WHERE id = %s"
+    made = []
+    try:
+        with psycopg.connect(db, autocommit=True) as c:
+            # The database as it was before the upgrade: no tick columns, a cheque in the cash desk, a note, an issued cheque.
+            c.execute("ALTER TABLE cashflow.instrument DROP COLUMN sayad_registered_at, DROP COLUMN sayad_registered_by")
+            cheque = insert_instrument(c, 1405)
+            note = insert_instrument(c, 1405)
+            c.execute("UPDATE cashflow.instrument SET kind = 'PromissoryNote' WHERE id = %s", (note,))
+            issued = insert_instrument(c, 1405, state="Issued", direction="Issued")
+            made += [cheque, note, issued]
+        subprocess.run(script, check=True, env=env, capture_output=True)
+        with psycopg.connect(db, autocommit=True) as c:
+            assert c.execute(tick, (cheque,)).fetchone() == ("system:assumed", True)
+            assert c.execute(tick, (note,)).fetchone() == (None, False)
+            assert c.execute(tick, (issued,)).fetchone() == (None, False)
+            later = insert_instrument(c, 1405)  # received after the upgrade: waits for the user's tick
+            made.append(later)
+        subprocess.run(script, check=True, env=env, capture_output=True)
+        with psycopg.connect(db) as c:
+            assert c.execute(tick, (later,)).fetchone() == (None, False)
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("ALTER TABLE cashflow.instrument ADD COLUMN IF NOT EXISTS sayad_registered_at timestamptz")
+            c.execute("ALTER TABLE cashflow.instrument ADD COLUMN IF NOT EXISTS sayad_registered_by text")
+            c.execute("DELETE FROM cashflow.instrument WHERE id = ANY(%s)", (made,))
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:
