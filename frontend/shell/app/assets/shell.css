@@ -10,6 +10,8 @@ body { margin: 0; font-family: Vazirmatn, Tahoma, sans-serif; background: var(--
 .brand .company { font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brand .system { font-size: .8rem; color: var(--c-muted); }
 .brand .system.alone { font-size: 1rem; font-weight: 700; color: var(--c-ink); }
+.bar .version { margin-inline-start: auto; color: #7b8794; font-size: .8rem; direction: ltr; }
+.bar .version + .lang { margin-inline-start: .75rem; }
 .bar .lang { margin-inline-start: auto; background: transparent; border: 1px solid #cbd2d9; border-radius: 6px; padding: .35rem .75rem; cursor: pointer; }
 /* Main menu: dark blue so it stands apart from the page (owner's suggestion, 11 Nov 2026). */
 .menu { display: flex; flex-direction: column; gap: .15rem; padding: 1rem .5rem; background: var(--c-menu); }
