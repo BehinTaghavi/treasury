@@ -34,7 +34,9 @@ public sealed record InstrumentSnapshot(
     Guid? ReceiptId = null,
     ReceivedInstrumentDetails? Details = null,
     string? CounterpartyDetailCode = null,
-    Guid? CollectionAccountId = null)
+    Guid? CollectionAccountId = null,
+    DateTimeOffset? SayadRegisteredAt = null,
+    string? SayadRegisteredBy = null)
 {
     public static InstrumentSnapshot From(Instrument i, long version) => new(
         i.Id, i.Direction, i.Kind, i.Number, i.BankName, i.BankAccountId, i.ChequeBookId, i.PaymentId,
@@ -42,7 +44,8 @@ public sealed record InstrumentSnapshot(
         i.IssueDate.Value, i.DueDate?.Value, i.Counterparty.Id, i.Counterparty.DisplayName, i.Purpose, i.Destination,
         i.State, i.OriginFiscalYear,
         i.History.Select(h => new HistorySnapshot(h.Action, h.From, h.To, h.Date.Value, h.UserId, h.Reference, h.Note, StepDetailsSnapshot.From(h.Details))).ToList(),
-        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode, i.CollectionAccountId);
+        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode, i.CollectionAccountId,
+        i.SayadRegistration?.At, i.SayadRegistration?.UserId);
 
     public Instrument ToDomain() => Instrument.Restore(
         Id, Direction, Kind, Number, BankName, BankAccountId, ChequeBookId, PaymentId,
@@ -50,7 +53,8 @@ public sealed record InstrumentSnapshot(
         new FiscalDate(IssueDate), DueDate is { } d ? new FiscalDate(d) : null,
         new CounterpartyRef(CounterpartyId, CounterpartyName, CounterpartyDetailCode), Purpose, Destination, State, OriginFiscalYear,
         History.Select(h => new InstrumentHistoryEntry(h.Action, h.From, h.To, new FiscalDate(h.Date), h.UserId, h.Reference, h.Note, h.Details?.ToDomain())),
-        Version, ReceiptId, Details, CollectionAccountId);
+        Version, ReceiptId, Details, CollectionAccountId,
+        SayadRegisteredAt is { } at && SayadRegisteredBy is { } by ? new SayadRegistration(at, by) : null);
 }
 
 /// <summary>Flat, storable form of a receipt. Dates are ISO dates.</summary>

@@ -24,6 +24,9 @@ public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumbe
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
 
+/// <param name="Registered">«ثبت صیادی شد» ticked (true) or removed (false).</param>
+public sealed record SayadRegistrationRequest(bool Registered);
+
 public sealed record TemplateAccountRequest(string? Code);
 
 public sealed record ChequeBookRequest(Guid BankAccountId, string Serial, long FirstSheet, long LastSheet, Guid? FormatId = null, string? SayadMiddle = null, string? SayadFirstSerial = null, bool PartlyUsed = false, int? SerialDigits = null);
@@ -77,6 +80,11 @@ public static class Endpoints
 
         api.MapPost("/instruments/{id:guid}/deposit", async (Guid id, DepositRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.DepositForCollectionAsync(new DepositChequeCommand(Key(http), id, r.BankAccountId, r.Date, r.SlipNumber), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/instruments/{id}"));
+
+        // Owner, 15 Nov 2026: «ثبت صیادی شد» before a cheque goes to the bank (received) or to its beneficiary (issued).
+        api.MapPost("/instruments/{id:guid}/sayad-registration", async (Guid id, SayadRegistrationRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.SetSayadRegistrationAsync(new SetSayadRegistrationCommand(Key(http), id, r.Registered), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>

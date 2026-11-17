@@ -54,7 +54,7 @@ To open it again later, type **http://localhost:8080** in the browser, or bookma
 ## 5. What you can try today
 Only the **Receipts** screen (دریافت‌ها) works so far. Suggested checks:
 1. Receive an ordinary cheque (number, bank, amount, received date like `1405/08/19`, due date, drawer, purpose). Press **ثبت** or Ctrl+Enter.
-2. In the list, choose **واگذاری جهت وصول** (deposit for collection), then mark it **cleared**. Watch the status change.
+2. Open the tab **عملیات چک‌های دریافتی**. Tick **ثبت صیادی شد** beside the cheque (the date and time appear under it); only then can the cheque be chosen for **واگذاری به بانک** (deposit for collection). Then mark it **cleared**. Watch the status change.
 3. Receive another cheque and mark it **bounced** after depositing it. Try **return** (عودت) and **endorse** (خرج) on others.
 4. Enter a cheque with the **same bank and number** twice: you should get a duplicate warning, and it is still saved (open question Q1).
 5. Type an impossible date like `1405/13/40`: you should get a clear error and nothing is saved.

@@ -29,6 +29,9 @@ unconfirmed step.
 4. **Cancellation** (f): the treasurer cancels the cheque and types the **number and date of management's order** and the reason
    (answer to Q30); the order cannot be dated after the cancellation.
 5. **A cheque card («کارت چک»):** opening a cheque shows its whole history, its latest state and every voucher with its state.
+6. **«ثبت صیادی شد»** (owner, 15 Nov 2026): in the tabs «نزد صندوق» and «عودت‌شده از بانک و برگشتی» each cheque has the tick box
+   «ثبت صیادی شد»; once ticked, the date and time and the user are shown under it. A cheque can be chosen for deposit at the bank
+   only after the tick (`Instrument.SayadNotRegistered`); the cheque card shows the tick too. It is not a step and has no voucher.
 
 ## 2. States and allowed steps
 

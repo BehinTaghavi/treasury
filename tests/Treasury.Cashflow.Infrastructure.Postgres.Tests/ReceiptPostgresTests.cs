@@ -85,7 +85,8 @@ public sealed class ReceiptPostgresTests : IDisposable
 
         // Report no. 4, item 9: deposited for collection at a company account, read back with the account.
         var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
-            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new EuroBank());
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new EuroBank(), TimeProvider.System);
+        Assert.True((await useCases.SetSayadRegistrationAsync(new(Key(), cheque.Id, true), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque.Id, EuroBank.Id, "1405/08/25", "SLIP-9"), CancellationToken.None)).IsSuccess);
         var deposited = (await useCases.GetAsync(cheque.Id, CancellationToken.None))!;
         Assert.Equal(("DepositedForCollection", (Guid?)EuroBank.Id), (deposited.State, deposited.CollectionAccountId));
@@ -161,13 +162,14 @@ public sealed class ReceiptPostgresTests : IDisposable
     public async Task Steps_of_item_14_keep_their_details_and_a_replacement_names_the_old_cheque()
     {
         var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
-            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new BankAccounts());
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new BankAccounts(), TimeProvider.System);
         var number = Guid.NewGuid().ToString("N")[..8];
         var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
             [new(InstrumentKind.OrdinaryCheque, number, "1405/09/01", new MoneyInput(9_000_000), Bank, SayadId: "1234567890123456")]), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         var cheque = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments![0].Id;
         var account = Guid.NewGuid();
+        Assert.True((await useCases.SetSayadRegistrationAsync(new(Key(), cheque, true), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque, account, "1405/08/25", "F-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28"), CancellationToken.None)).IsSuccess);
         var view = (await useCases.GetAsync(cheque, CancellationToken.None))!;

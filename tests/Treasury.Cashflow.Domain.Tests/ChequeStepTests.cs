@@ -35,7 +35,7 @@ public sealed class ChequeStepTests
 
     private static Instrument AtBank(Guid? account = null)
     {
-        var c = Cheque();
+        var c = Cheque().Ticked();
         c.DepositForCollection(new CollectionAccount(account ?? BankA, "0101", "IRR", true), D("1405/08/05"), User, "F-1");
         return c;
     }

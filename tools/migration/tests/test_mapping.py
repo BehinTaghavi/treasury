@@ -130,6 +130,21 @@ def test_lifecycle_matches_dotnet():
     assert dotnet == TRANSITIONS
 
 
+def test_the_assumed_sayad_tick_is_named_as_in_dotnet_and_in_the_schema():
+    """Answer to Q39: the marker written in place of a user is one text in the .NET domain, schema script 033 and this tool."""
+    from treasury_migration.target import SAYAD_ASSUMED_BY, SAYAD_CHEQUE_KINDS
+    root = Path(__file__).resolve().parents[3]
+    cs = (root / "src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/Instrument.cs").read_text(encoding="utf-8")
+    assert re.search(r'const string AssumedBy = "([^"]+)"', cs).group(1) == SAYAD_ASSUMED_BY
+    sql = (root / "db/postgres/033_cashflow_sayad_registration.sql").read_text(encoding="utf-8")
+    assert f"sayad_registered_by = '{SAYAD_ASSUMED_BY}'" in sql
+    assert "kind IN (" + ", ".join(f"'{k}'" for k in SAYAD_CHEQUE_KINDS) + ")" in sql
+    # The cheque kinds are those of InstrumentKindRules.IsCheque that can be received.
+    types = (root / "src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/InstrumentTypes.cs").read_text(encoding="utf-8")
+    is_cheque = re.search(r"IsCheque\(this InstrumentKind kind\) =>\s*kind is ([^;]+);", types).group(1)
+    assert set(re.findall(r"InstrumentKind\.(\w+)", is_cheque)) - {"PostDatedCheque"} == set(SAYAD_CHEQUE_KINDS)
+
+
 def test_old_cheque_cleared_before_its_due_date_is_kept_with_a_warning_n2():
     # Rule N2 (CEO, 10 Nov 2026) applies to new clearings; old history is kept as recorded but reported.
     m = ok(map_cheque(received(13, d3="13860720", d4="13860725", maturity="13860801"), SRC))

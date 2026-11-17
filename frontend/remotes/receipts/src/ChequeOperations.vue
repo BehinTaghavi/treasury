@@ -11,9 +11,12 @@
  * With `notes` the same screen is «عملیات سفته‌های دریافتی» (owner, 16 Nov 2026: واگذاری به بانک، وصول، استرداد، خرج سفته – ظهرنویسی
  * و انتقال به غیر): it lists promissory notes instead of cheques, a note the bank does not pay is protested («واخواست»), returning it to
  * the obligor is «استرداد», and an endorsement has no Sayad transfer. Guarantee and trust notes are only handed back or cancelled.
+ *
+ * «ثبت صیادی شد» (owner, 15 Nov 2026): a cheque is ticked here once it is recorded in the banks' Sayad system; the server keeps the date
+ * and time. Until then the cheque cannot be chosen for deposit at the bank (the rule itself is in the domain: Instrument.SayadNotRegistered).
  */
 import { computed, onMounted, reactive, ref } from 'vue'
-import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { createApi, formatAmount, formatJalaliDateTime, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import ReceiptForm from './ReceiptForm.vue'
@@ -26,6 +29,8 @@ interface Cheque {
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
   details: { branchName: string | null; sayadId: string | null; onDemand?: boolean } | null
+  sayadRegistrationRequired: boolean; sayadRegisteredAt: string | null; sayadRegisteredBy: string | null; canChangeSayadRegistration: boolean
+  sayadRegistrationAssumed: boolean
 }
 type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
 
@@ -127,6 +132,23 @@ async function depositSelected() {
     `${done} cheque(s) deposited. Each cheque's voucher is confirmed on its card (click the row).`)
   if (failed.length) show(done ? 'warning' : 'error', `${done ? ok + ' ' : ''}${t('واگذار نشد', 'Not deposited')} – ${failed.join('؛ ')}`)
   else { show('ok', ok); deposit.slip = '' }
+}
+
+// ---- «ثبت صیادی شد»: ticked once the cheque is recorded in the Sayad system; the deposit waits for it (owner, 15 Nov 2026) ----
+const awaitingSayad = computed(() => shown.value.filter(c => c.sayadRegistrationRequired && !c.sayadRegisteredAt && c.canChangeSayadRegistration))
+const sayadMoment = (c: Cheque) => (c.sayadRegisteredAt ? formatJalaliDateTime(c.sayadRegisteredAt, props.locale) : '')
+/** Who ticked it; cheques that were already in the system when the tick arrived count as recorded (answer to Q39, 16 Nov 2026). */
+const sayadBy = (c: Cheque) => (c.sayadRegistrationAssumed ? t('از قبل ثبت‌شده فرض شد', 'assumed, already in the system') : c.sayadRegisteredBy ?? '')
+async function setSayad(c: Cheque, box: HTMLInputElement) {
+  const on = box.checked
+  if (busy.value) { box.checked = !on; return }
+  message.value = null
+  busy.value = true
+  const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/sayad-registration`, { registered: on })
+  busy.value = false
+  if (!r.ok) { box.checked = !on; show('error', translate(r.code, props.locale)) }
+  await load()
+  if (card.value?.id === c.id) await openCard(c.id)
 }
 
 // ---- one step on one cheque ----
@@ -297,6 +319,7 @@ onMounted(async () => { await L.load(); await load() })
               <input type="checkbox" :checked="tickable.length > 0 && selected.length === tickable.length" :aria-label="t('همه', 'All')"
                      @change="toggleAll(($event.target as HTMLInputElement).checked)" />
             </th>
+            <th v-if="!notes && (tab === 'desk' || tab === 'back')">{{ t('ثبت صیادی', 'Sayad') }}</th>
             <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ notes ? t('نوع', 'Kind') : t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
             <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('وضعیت', 'State') }}</th><th>{{ t('عملیات', 'Steps') }}</th>
           </tr>
@@ -304,7 +327,20 @@ onMounted(async () => { await L.load(); await load() })
         <tbody>
           <tr v-for="c in shown" :key="c.id" :class="['clickable', { selected: card?.id === c.id || chosen[c.id] }]" @click="openCard(c.id)">
             <td v-if="tab === 'desk' || tab === 'back'" @click.stop>
-              <input v-if="c.allowedActions.includes('DepositForCollection')" v-model="chosen[c.id]" type="checkbox" :aria-label="c.number ?? ''" />
+              <input v-if="c.allowedActions.includes('DepositForCollection')" v-model="chosen[c.id]" type="checkbox"
+                     :aria-label="t(`انتخاب چک ${c.number} برای واگذاری`, `Choose cheque ${c.number} for deposit`)" />
+            </td>
+            <td v-if="!notes && (tab === 'desk' || tab === 'back')" class="tr-sayad" @click.stop>
+              <template v-if="c.sayadRegistrationRequired">
+                <label class="tr-check">
+                  <input type="checkbox" :checked="!!c.sayadRegisteredAt" :disabled="busy || !c.canChangeSayadRegistration"
+                         @change="setSayad(c, $event.target as HTMLInputElement)" />
+                  {{ t('ثبت صیادی شد', 'Recorded in Sayad') }}
+                </label>
+                <div v-if="c.sayadRegisteredAt" class="muted small"><span class="num">{{ sayadMoment(c) }}</span> · {{ sayadBy(c) }}</div>
+                <div v-else-if="c.details?.sayadId" class="muted small">{{ t('شناسه', 'ID') }} <span class="num" dir="ltr">{{ c.details.sayadId }}</span></div>
+              </template>
+              <span v-else class="muted">—</span>
             </td>
             <td class="num">{{ c.dueDate ?? (c.details?.onDemand ? t('عندالمطالبه', 'On demand') : '') }}</td>
             <td class="num">{{ c.number }}</td>
@@ -321,10 +357,15 @@ onMounted(async () => { await L.load(); await load() })
                 {{ name(actionNames, a) }}</button>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('چکی در این زبانه نیست.', 'No cheque here.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="9" class="muted">{{ t('چکی در این زبانه نیست.', 'No cheque here.') }}</td></tr>
         </tbody>
       </table>
     </div>
+
+    <p v-if="(tab === 'desk' || tab === 'back') && awaitingSayad.length" class="tr-msg warning">
+      {{ t(`${awaitingSayad.length.toLocaleString('fa-IR')} چک هنوز «ثبت صیادی» نشده است. هر چک را ابتدا در سامانهٔ صیاد ثبت کنید و «ثبت صیادی شد» را تیک بزنید؛ تا آن زمان برای واگذاری به بانک قابل انتخاب نیست.`,
+        `${awaitingSayad.length} cheque(s) are not recorded in Sayad yet. Record each in the Sayad system and tick "Recorded in Sayad"; until then it cannot be chosen for deposit.`) }}
+    </p>
 
     <fieldset v-if="(tab === 'desk' || tab === 'back') && tickable.length" style="margin-top: .75rem">
       <legend>{{ t('واگذاری چک‌های تیک‌خورده به بانک جهت وصول', 'Deposit the ticked cheques for collection') }}</legend>
@@ -348,6 +389,12 @@ onMounted(async () => { await L.load(); await load() })
         <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}</span>
         <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
       </div>
+      <p v-if="card.sayadRegistrationRequired" class="small" style="margin: .4rem 0 0">
+        {{ t('ثبت صیادی', 'Sayad') }}:
+        <strong v-if="card.sayadRegisteredAt">{{ t('ثبت شد', 'recorded') }} – <span class="num">{{ sayadMoment(card) }}</span> – {{ sayadBy(card) }}</strong>
+        <strong v-else class="tr-pending">{{ t('هنوز ثبت نشده است', 'not recorded yet') }}</strong>
+        <span v-if="card.details?.sayadId" class="muted"> · {{ t('شناسهٔ صیاد', 'Sayad ID') }} <span class="num" dir="ltr">{{ card.details.sayadId }}</span></span>
+      </p>
       <table class="tr-table">
         <thead><tr><th>#</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('مرحله', 'Step') }}</th><th>{{ t('وضعیت پس از آن', 'State after') }}</th><th>{{ t('جزئیات', 'Details') }}</th><th>{{ t('کاربر', 'User') }}</th></tr></thead>
         <tbody>
@@ -372,6 +419,9 @@ onMounted(async () => { await L.load(); await load() })
 <style scoped src="./receipts.css"></style>
 <style scoped>
 .tr-actions { white-space: nowrap; }
+.tr-sayad { white-space: nowrap; }
+.tr-sayad .tr-check { padding-bottom: 0; }
+.tr-pending { color: #7a5200; }
 .tr-subtabs { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .75rem; }
 .tr-subtabs button { background: #fff; color: #1f2933; border: 1px solid #cbd2d9; border-radius: 999px; padding: .35rem .85rem; }
 .tr-subtabs button.active { background: #e8effc; color: #1d4ed8; border-color: #93b4f5; font-weight: 600; }
