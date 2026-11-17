@@ -674,3 +674,50 @@ def test_a_payment_request_keeps_its_payments(db):
         row = c.execute("""SELECT column_default, is_nullable FROM information_schema.columns
                            WHERE table_schema = 'requests' AND table_name = 'payment_request' AND column_name = 'payments'""").fetchone()
         assert row is not None and row[1] == "NO" and "[]" in row[0]
+
+
+def test_one_company_profile_with_a_small_logo(db):
+    # 033_reference_company.sql (owner, 16 Nov 2026): one row per database; the logo is a PNG/JPEG of at most 1 MB.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        company = uuid.uuid4()
+        c.execute("DELETE FROM reference.company_logo")
+        if c.execute("SELECT count(*) FROM reference.company").fetchone()[0] == 0:
+            c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت آزمایشی')", (company,))
+        company = c.execute("SELECT id FROM reference.company").fetchone()[0]
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت دوم')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET name = ''")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET logo_type = 'application/pdf'")
+        c.execute("UPDATE reference.company SET logo_type = 'image/png'")
+        c.execute("INSERT INTO reference.company_logo (company_id, data) VALUES (%s, %s)", (company, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        # 034_reference_company_details.sql (owner's answer to Q38): optional official details, each with its shape.
+        c.execute(
+            "UPDATE reference.company SET national_id = '10101010103', economic_code = '411111111111', registration_number = '12345', "
+            "address = 'تهران', postal_code = '1234567890', phone = '+98-21-88880000', website = 'www.example.ir', email = 'info@example.ir'")
+        for column, bad in (("national_id", "1234567890"), ("economic_code", "4111"), ("registration_number", "12/3"), ("address", "x" * 301),
+                            ("postal_code", "12345"), ("phone", "abc"), ("website", ""), ("email", "info")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE reference.company SET {column} = %s", (bad,))
+        c.execute(
+            "UPDATE reference.company SET national_id = NULL, economic_code = NULL, registration_number = NULL, address = NULL, "
+            "postal_code = NULL, phone = NULL, website = NULL, email = NULL")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM reference.company")  # the profile is corrected, never deleted
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("UPDATE reference.company SET logo_type = NULL")
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("SELECT name FROM reference.company")
+

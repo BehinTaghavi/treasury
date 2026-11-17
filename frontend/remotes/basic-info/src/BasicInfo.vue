@@ -2,7 +2,7 @@
 /**
  * Basic Information (اطلاعات پایه), in the order of the new-version manual.
  * The simple lists share one editor (CatalogueList). All 14 items of the manual's Basic Information are here (owner, 12 Nov 2026:
- * finish Basic Information so it is reviewed at once).
+ * finish Basic Information so it is reviewed at once), after «اطلاعات شرکت» (the company's name and logo; owner, 16 Nov 2026).
  */
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
@@ -16,6 +16,7 @@ import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
 import VoucherTemplate from './accounts/VoucherTemplate.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
+import CompanyInfo from './organization/CompanyInfo.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
 import PurposeGroups from './purposes/PurposeGroups.vue'
@@ -44,6 +45,8 @@ const lists: ListSpec[] = [
 
 /** The menu, in the order of the new-version manual ("اطلاعات پایه" items 1–10), with the copy of the accounting system's accounts. */
 const sections: { id: string; title: [string, string] }[] = [
+  // Owner, 16 Nov 2026: the company's name and logo, shown at the top of every screen. First, as the system is set up with it.
+  { id: 'company', title: ['اطلاعات شرکت', 'Company information'] },
   ...lists.filter(l => l.list !== 'references').map(l => ({ id: l.list, title: l.title })),
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
@@ -82,6 +85,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
         >{{ fa ? s.title[0] : s.title[1] }}</button>
       </nav>
       <CatalogueList v-if="current" :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
+      <CompanyInfo v-else-if="selected === 'company'" :key="'company' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChartAccounts v-else-if="selected === 'chart'" :key="'chart' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <BankAccounts v-else-if="selected === 'bank-accounts'" :key="'bank-accounts' + locale" :api-base="apiBase" :locale="locale" :token="token" />
