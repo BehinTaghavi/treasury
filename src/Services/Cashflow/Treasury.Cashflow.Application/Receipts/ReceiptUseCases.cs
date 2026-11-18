@@ -26,7 +26,8 @@ public sealed record ReceiptHeaderInput(
 public sealed record RecordCashReceiptCommand(string IdempotencyKey, ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial = null);
 
 public sealed record RecordBankReceiptCommand(
-    string IdempotencyKey, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial = null);
+    string IdempotencyKey, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial = null,
+    string? PayerSheba = null);
 
 /// <summary>One cheque or note on the form. <paramref name="BankId"/> is from the bank-names list (decision of 10 Nov 2026).</summary>
 public sealed record ReceivedInstrumentInput(
@@ -89,7 +90,8 @@ public sealed record ReceiptView(
     long Version,
     IReadOnlyList<InstrumentView>? Instruments = null,
     Guid? ReplacedInstrumentId = null,
-    IReadOnlyList<ChequeStatusView>? ChequeStatuses = null)
+    IReadOnlyList<ChequeStatusView>? ChequeStatuses = null,
+    string? PayerSheba = null)
 {
     /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
     public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null, FiscalDate? today = null, IReadOnlyList<ChequeStatusView>? statuses = null) => new(
@@ -98,7 +100,7 @@ public sealed record ReceiptView(
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
         instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
-        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList());
+        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba);
 }
 
 /// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
@@ -360,7 +362,7 @@ public sealed class ReceiptUseCases(
         var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
         var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.BankDeposit, ct).ConfigureAwait(false);
         return (Receipt.RecordBankDeposit(
-            Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId), account);
+            Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId, command.PayerSheba), account);
     }
 
     private async Task<(Receipt Receipt, List<Instrument> Created, bool Duplicate)> BuildInstrumentsAsync(

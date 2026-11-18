@@ -59,19 +59,19 @@ public sealed record ReceiptSnapshot(
     Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1, string? Reference2, Guid? DepartmentId, bool SalesProceeds,
     string? Note, string RecordedBy, ReceiptAccountKind? AccountKind, Guid? AccountId, DepositMethod? Method, string? TrackingNumber,
     decimal? Amount, string? Currency, decimal? RateToRial, IReadOnlyList<Guid> InstrumentIds, decimal TotalRial, ReceiptState State,
-    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null)
+    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null, string? PayerSheba = null)
 {
     public static ReceiptSnapshot From(Receipt r, long version) => new(
         r.Id, r.Kind, r.FiscalYear, r.Number, r.Date.Value, r.Payer.Id, r.Payer.DisplayName, r.Payer.DetailCode, r.PurposeGroupId, r.PurposeGroupName,
         r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note, r.RecordedBy, r.AccountKind, r.AccountId, r.Method,
         r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial, [.. r.InstrumentIds], r.TotalRial, r.State,
-        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId);
+        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId, r.PayerSheba);
 
     public Receipt ToDomain() => Receipt.Restore(
         Id, Kind, Number, new FiscalDate(Date), new CounterpartyRef(PayerId, PayerName, PayerDetailCode), PurposeGroupId, PurposeGroupName, Purpose,
         Reference1, Reference2, DepartmentId, SalesProceeds, Note, RecordedBy, AccountKind, AccountId, Method, TrackingNumber,
         Amount is { } a ? (Currency == Money.Rial ? Money.Rials(a) : Money.Foreign(a, Currency!, RateToRial ?? 0)) : null,
-        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId);
+        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId, PayerSheba);
 }
 
 public sealed record HistorySnapshot(

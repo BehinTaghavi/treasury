@@ -250,9 +250,9 @@ public sealed class ChequeStatusTests
         c.ReturnFromLegal(D("1405/10/01"), User, "توافق با صادرکننده");
         Assert.Equal((InstrumentState.InCashDesk, (int?)null, "توافق با صادرکننده"), (c.State, c.LegalActionStep, c.History[^1].Note));
 
-        // The legal action's entry is taken out: Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده».
+        // Owner, 18 Nov 2026: the first proposal reversed — Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد نزد صندوق» (see Q43).
         var v = ReceiptVouchers.ForStep(c, 6, Bank, null, Template());
-        Assert.Equal([(true, "1201", "200015"), (false, "1204", "200015")], Lines(v));
+        Assert.Equal([(true, "1204", "200015"), (false, "1201", "200015")], Lines(v));
         Assert.Equal("تحویل چک به صندوق پس از اقدام حقوقی", v!.Operation);
 
         // From there it goes on like a new cheque: registered in Sayad (rule N3), deposited, collected.
@@ -268,7 +268,7 @@ public sealed class ChequeStatusTests
         var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
         guarantee.SendToLegal(D("1405/08/10"), User, "اقدام");
         guarantee.ReturnFromLegal(D("1405/09/01"), User);
-        Assert.Equal([(true, "9101", "200015"), (false, "9102", "200015")], Lines(ReceiptVouchers.ForStep(guarantee, 3, Bank, null, Template())));
+        Assert.Equal([(true, "9102", "200015"), (false, "9101", "200015")], Lines(ReceiptVouchers.ForStep(guarantee, 3, Bank, null, Template())));
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => Bounced().ReturnFromLegal(D("1405/10/01"), User)).Code);
     }
 

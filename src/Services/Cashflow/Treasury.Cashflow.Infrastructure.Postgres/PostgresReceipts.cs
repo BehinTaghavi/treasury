@@ -13,7 +13,7 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
     private const string Columns =
         "fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name, purpose, " +
         "reference1, reference2, department_id, sales_proceeds, note, recorded_by, account_kind, account_id, deposit_method, tracking_number, " +
-        "amount, currency, rate_to_rial, instrument_ids, total_rial, state, cancelled_on, cancel_reason, version, replaced_instrument_id";
+        "amount, currency, rate_to_rial, instrument_ids, total_rial, state, cancelled_on, cancel_reason, version, replaced_instrument_id, payer_sheba";
 
     public async Task<Receipt?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -42,7 +42,7 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.receipt ({Columns}) VALUES (@year, @id, @kind, @number, @date, @payer, @payer_name, @payer_code, @group, @group_name, @purpose, " +
             "@ref1, @ref2, @department, @sales, @note, @by, @account_kind, @account, @method, @tracking, @amount, @currency, @rate, @instruments, @total, @state, " +
-            "@cancelled_on, @cancel_reason, 1, @replaced)"))
+            "@cancelled_on, @cancel_reason, 1, @replaced, @sheba)"))
         {
             Bind(cmd, s);
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -119,6 +119,7 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         cmd.Parameters.Add(new NpgsqlParameter("cancelled_on", NpgsqlDbType.Date) { Value = Db(s.CancelledOn) });
         cmd.Parameters.AddWithValue("cancel_reason", Db(s.CancelReason));
         cmd.Parameters.Add(new NpgsqlParameter("replaced", NpgsqlDbType.Uuid) { Value = Db(s.ReplacedInstrumentId) });
+        cmd.Parameters.Add(new NpgsqlParameter("sheba", NpgsqlDbType.Text) { Value = Db(s.PayerSheba) });
     }
 
     private static async Task<IReadOnlyList<Receipt>> ReadAsync(NpgsqlCommand cmd, CancellationToken ct)
@@ -159,7 +160,8 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
                 CancelledOn: r.IsDBNull(27) ? null : r.GetFieldValue<DateOnly>(27),
                 CancelReason: Text(28),
                 Version: r.GetInt64(29),
-                ReplacedInstrumentId: r.IsDBNull(30) ? null : r.GetGuid(30)).ToDomain());
+                ReplacedInstrumentId: r.IsDBNull(30) ? null : r.GetGuid(30),
+                PayerSheba: Text(31)).ToDomain());
         }
 
         return list;

@@ -21,7 +21,7 @@ public sealed class FakeReceiptAccounts : IReceiptAccountLookup
         id == Desk || id == ClosedDesk ? new ReceiptAccountFact(ReceiptAccountKind.CashDesk, id, "صندوق", "IRR", id == Desk, "1101", "500001") : null);
 
     public Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(
-        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true, "1102", "600001")
+        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true, "1102", "600001", HasCards: true)
         : id == DollarBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "USD-1", "USD", true, "1103", "600002") : null);
 }
 
@@ -173,9 +173,31 @@ public sealed class ReceiptUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Paya_transfer_keeps_its_Sheba_and_card_to_card_needs_an_account_with_a_card()
+    {
+        // Owner, 18 Nov 2026: the kinds of a direct deposit.
+        var paya = await _receipts.RecordBankDepositAsync(
+            new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.Paya, "P-1", 2_000_000, PayerSheba: "IR06 2960 0000 0010 0324 2000 01"), CancellationToken.None);
+        Assert.True(paya.IsSuccess, paya.ErrorCode);
+        var v = (await _receipts.GetAsync(paya.Value, CancellationToken.None))!;
+        Assert.Equal(("Paya", "IR062960000000100324200001"), (v.Method, v.PayerSheba));
+        Assert.Equal("IR062960000000100324200001", (await _receipts.ListAsync(1405, ReceiptKind.BankDeposit, CancellationToken.None)).Single().PayerSheba);
+
+        Assert.Equal("Receipt.ShebaRequired",
+            (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.Satna, null, 1_000), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.ShebaRequired",
+            (await _receipts.PreviewBankDepositAsync(new("preview", Header(), FakeReceiptAccounts.RialBank, DepositMethod.Satna, null, 1_000), CancellationToken.None)).ErrorCode);
+        Assert.True((await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.PaymentGateway, "PG-7", 1_000), CancellationToken.None)).IsSuccess);
+
+        // The dollar account of this test has no bank card (and takes no card payments anyway): the Rial rule is checked with it switched.
+        Assert.Equal("Receipt.MethodNotForForeignCurrency",
+            (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.CardToCard, null, 10, 600_000), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task A_dollar_account_takes_dollars_at_a_rate()
     {
-        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.Transfer, "SW-1", 1_500.25m, 600_000), CancellationToken.None);
+        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.InternalTransfer, "SW-1", 1_500.25m, 600_000), CancellationToken.None);
         var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
         Assert.Equal(("USD", 1_500.25m, 900_150_000m), (v.Currency, v.Amount, v.TotalRial));
         Assert.Equal("Money.RateRequired", (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.Transfer, null, 10), CancellationToken.None)).ErrorCode);

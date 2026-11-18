@@ -61,7 +61,7 @@ public sealed class VoucherTests
     [Fact]
     public void A_dollar_deposit_is_in_rial_and_keeps_the_dollar_amount()
     {
-        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.Transfer, null, Money.Foreign(100, "USD", 600_000), User);
+        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.InternalTransfer, null, Money.Foreign(100, "USD", 600_000), User);
         var v = ReceiptVouchers.ForReceipt(r, [], new LedgerSide("1103", "600002"), "4101", new VoucherTemplate());
         Assert.All(v.Lines, l => Assert.Equal((60_000_000m, (decimal?)100m, "USD"), (l.AmountRial, l.ForeignAmount, l.Currency)));
     }

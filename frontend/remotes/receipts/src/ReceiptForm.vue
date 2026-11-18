@@ -1,7 +1,8 @@
 <script setup lang="ts">
 /**
- * One receipt form for the three kinds (owner, 14 Nov 2026): cash into a cash desk (old D_Naghd), money paid into a bank account by
- * deposit slip, transfer, POS or card-to-card (old D_variz), and cheques and promissory notes from one payer (old D_Check with
+ * One receipt form for the three kinds (owner, 14 Nov 2026): cash into a cash desk (old D_Naghd), money paid into a bank account (old
+ * D_variz) by one of the kinds the owner listed on 18 Nov 2026 — Paya or Satna transfer with its Sheba, internal transfer, cash at a
+ * branch, card to card (only into an account that has a bank card), payment gateway — or POS, and cheques and promissory notes from one payer (old D_Check with
  * «ثبت چک بعدی»). Current or post-dated is decided by the due date; Rial or foreign currency by the account or by each cheque.
  * Ctrl+Enter saves. Errors are shown from the API's codes, translated.
  * The voucher the receipt will produce is shown at the bottom while the form is filled (owner's report no. 4, item 8); the treasurer
@@ -15,6 +16,7 @@ import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
+import { depositMethods, forForeignCurrency, needsSheba } from './depositMethods'
 
 type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
 type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
@@ -41,16 +43,14 @@ const lineKinds: { value: LineKind; fa: string; en: string }[] = [
   { value: 'GuaranteeCheque', fa: 'چک تضمینی (انتظامی)', en: 'Guarantee cheque' },
   // Promissory notes get forms of their own later (owner's report no. 4, item 13).
 ]
-const methods = [
-  { value: 'DepositSlip', fa: 'واریز نقدی (فیش واریزی)', en: 'Cash deposit (slip)' },
-  { value: 'Transfer', fa: 'حواله بانکی (ساتنا، پایا)', en: 'Bank transfer (Satna, Paya)' },
-  { value: 'Pos', fa: 'کارتخوان (POS)', en: 'Card reader (POS)' },
-  { value: 'CardToCard', fa: 'کارت به کارت', en: 'Card to card' },
-]
 const isCheque = (k: LineKind) => k.endsWith('Cheque')
-/** A foreign-currency account takes cash deposits and bank transfers only (owner's report no. 4, item 7). */
-const methodChoices = computed<Choice[]>(() => methods
-  .filter(m => accountCurrency.value === 'IRR' || m.value === 'DepositSlip' || m.value === 'Transfer')
+/**
+ * The kinds of deposit the chosen account can take: a foreign-currency account takes cash deposits and bank transfers only (owner's
+ * report no. 4, item 7); card to card needs an account with a bank card (owner, 18 Nov 2026).
+ */
+const accountHasCard = computed(() => (L.bankAccounts.value.find(a => a.id === money1.accountId)?.cards?.length ?? 0) > 0)
+const methodChoices = computed<Choice[]>(() => depositMethods
+  .filter(m => !m.retired && (accountCurrency.value === 'IRR' || forForeignCurrency(m.value)) && (m.value !== 'CardToCard' || accountHasCard.value))
   .map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 
@@ -79,12 +79,13 @@ watch(() => header.groupId, async id => {
 })
 
 // ---- cash and bank deposit ----
-const money1 = reactive({ accountId: '', method: 'DepositSlip', tracking: '', amount: '', rate: '' })
+const money1 = reactive({ accountId: '', method: '', tracking: '', amount: '', rate: '', sheba: '' })
 const deskChoices = computed<Choice[]>(() => L.desks.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name, hint: d.currencyCode })))
 const bankAccountChoices = computed<Choice[]>(() => L.bankAccounts.value.filter(a => a.isActive).map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
 const accountCurrency = computed(() =>
   (props.kind === 'Cash' ? L.desks.value.find(d => d.id === money1.accountId)?.currencyCode : L.bankAccounts.value.find(a => a.id === money1.accountId)?.currencyCode) ?? 'IRR')
-watch(accountCurrency, () => { if (!methodChoices.value.some(c => c.value === money1.method)) money1.method = 'DepositSlip' })
+// The kind of deposit is chosen by the user (no default); a kind the newly chosen account cannot take is cleared.
+watch(methodChoices, () => { if (money1.method && !methodChoices.value.some(c => c.value === money1.method)) money1.method = '' })
 const rialOf = (amount: string, currency: string, rate: string) => {
   const a = parseAmount(amount)
   if (a === null) return null
@@ -185,9 +186,12 @@ function request(): { path: string; body: Record<string, unknown> } | { error: s
   if (amount === null) return { error: 'Money.NotPositive' }
   const rate = accountCurrency.value === 'IRR' ? null : parseAmount(money1.rate)
   if (accountCurrency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
-  return props.kind === 'Cash'
-    ? { path: '/api/cashflow/receipts/cash', body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
-    : { path: '/api/cashflow/receipts/bank', body: { header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate } }
+  if (props.kind === 'Cash') return { path: '/api/cashflow/receipts/cash', body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
+  if (!money1.method) return { error: 'Receipt.DepositMethodRequired' }
+  if (needsSheba(money1.method) && !money1.sheba.trim()) return { error: 'Receipt.ShebaRequired' }
+  return { path: '/api/cashflow/receipts/bank', body: {
+    header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate,
+    payerSheba: needsSheba(money1.method) ? toLatinDigits(money1.sheba.trim()) : null } }
 }
 
 // ---- the voucher at the bottom of the form (nothing is saved) ----
@@ -225,7 +229,7 @@ async function save() {
     const text = t(`رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} saved.`)
     if (r.warnings.length) show('warning', `${text} ${r.warnings.map(w => translate(w, props.locale)).join(' ')}`)
     else show('ok', text)
-    Object.assign(money1, { amount: '', rate: '', tracking: '' })
+    Object.assign(money1, { amount: '', rate: '', tracking: '', sheba: '' })
     Object.assign(header, { purpose: '', ref1: '', ref2: '', note: '' })
     lines.value = [blankLine()]
     emit('saved', r.value)
@@ -278,12 +282,19 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
         <label class="wide">{{ t('حساب بانکی', 'Bank account') }}
           <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />
         </label>
-        <label>{{ t('نوع واریز', 'Paid in by') }}
-          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Paid in by')" />
+        <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
+          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
         </label>
-        <label>{{ money1.method === 'Pos' ? t('شماره پیگیری / مرجع', 'Tracking / reference no.') : money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری', 'Tracking no.') }}
+        <label v-if="needsSheba(money1.method)" class="wide req">{{ t('شماره شبای واریزکننده (حساب مبدأ حواله)', "Payer's Sheba (the transfer's source account)") }}
+          <input v-model="money1.sheba" dir="ltr" placeholder="IR00 0000 0000 0000 0000 0000 00" />
+        </label>
+        <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
           <input v-model="money1.tracking" dir="ltr" />
         </label>
+        <p v-if="money1.accountId && accountCurrency === 'IRR' && !accountHasCard" class="muted small wide">
+          {{ t('این حساب کارت بانک ندارد؛ برای ثبت «کارت به کارت» ابتدا کارت بانک را در اطلاعات پایه ← حساب‌های بانکی تعریف کنید.',
+            'This account has no bank card; define one in Basic Information → Bank accounts to record card-to-card deposits.') }}
+        </p>
       </template>
       <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" /></label>
       <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" /></label>

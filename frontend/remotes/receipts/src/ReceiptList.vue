@@ -14,6 +14,7 @@ import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupCh
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
+import { depositMethodName } from './depositMethods'
 
 interface Instrument {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
@@ -28,6 +29,7 @@ interface Receipt {
   recordedBy: string; version: number; instruments: Instrument[] | null; replacedInstrumentId: string | null
   /** The latest status of each cheque of a cheque receipt. */
   chequeStatuses: ChequeStatus[] | null
+  payerSheba: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
@@ -47,9 +49,6 @@ const kindNames: Record<string, [string, string]> = {
   Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به حساب', 'Bank deposit'], Instruments: ['چک و سفته', 'Cheques and notes'],
 }
 const kindChoices = computed<Choice[]>(() => Object.entries(kindNames).map(([value, [f, e]]) => ({ value, label: fa.value ? f : e })))
-const methodNames: Record<string, [string, string]> = {
-  DepositSlip: ['فیش واریزی', 'Deposit slip'], Transfer: ['حواله / انتقال', 'Transfer'], Pos: ['کارتخوان', 'POS'], CardToCard: ['کارت به کارت', 'Card to card'],
-}
 const instrumentKinds: Record<string, [string, string]> = {
   OrdinaryCheque: ['چک', 'Cheque'], BankCheque: ['چک بانکی', 'Bank cheque'], GuaranteeCheque: ['چک تضمینی', 'Guarantee cheque'],
   PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
@@ -174,7 +173,7 @@ onMounted(async () => { await L.load(); await load() })
         <tbody>
           <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', selected: selected?.id === r.id }]" @click="open(r.id)">
             <td class="num">{{ num(r.number) }}</td>
-            <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ name(methodNames, r.method) }}</span></td>
+            <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ depositMethodName(r.method, fa) }}</span></td>
             <td class="num">{{ r.date }}</td>
             <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
             <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span></td>
@@ -211,6 +210,8 @@ onMounted(async () => { await L.load(); await load() })
         <template v-if="selected.reference2"> · {{ selected.reference2 }}</template>
         <template v-if="selected.departmentId"> · {{ t('واحد سازمانی دریافت کننده', 'Receiving department') }}: {{ L.departments.value.find(d => d.id === selected!.departmentId)?.name }}</template>
         <template v-if="selected.salesProceeds"> · {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</template>
+        <template v-if="selected.method"> · {{ t('نوع واریز', 'Kind of deposit') }}: {{ depositMethodName(selected.method, fa) }}</template>
+        <template v-if="selected.payerSheba"> · {{ t('شبای واریزکننده', "Payer's Sheba") }}: <span class="num">{{ selected.payerSheba }}</span></template>
         <template v-if="selected.trackingNumber"> · {{ t('پیگیری', 'Tracking') }}: {{ selected.trackingNumber }}</template>
         <template v-if="selected.rateToRial"> · {{ t('نرخ', 'Rate') }}: {{ money(selected.rateToRial) }}</template>
         · {{ t('ثبت', 'By') }}: {{ selected.recordedBy }}

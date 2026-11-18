@@ -737,6 +737,27 @@ def test_the_voucher_template_has_the_account_of_cheques_in_legal_action(db):
         c.rollback()
 
 
+def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
+    # 036_cashflow_deposit_kinds.sql (owner, 18 Nov 2026: the kinds of a direct deposit into a bank account).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name,
+                 purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency, total_rial, state, payer_sheba)
+             VALUES (1405, %s, 'BankDeposit', %s, '2026-11-18', %s, 'payer', '200015', %s, 'sales', 'sales', 'clerk', 'BankAccount', %s, %s, 1000, 'IRR', 1000, 'Recorded', %s)"""
+    row = lambda n, method, sheba: (uuid.uuid4(), n, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), method, sheba)
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        for n, (method, sheba) in enumerate([("Paya", "IR062960000000100324200001"), ("Satna", "IR062960000000100324200001"), ("InternalTransfer", None),
+                                             ("PaymentGateway", None), ("CardToCard", None), ("DepositSlip", None), ("Transfer", None), ("Pos", None)]):
+            c.execute(add, row(9000 + n, method, sheba))
+        for method, sheba in (("Paya", None),                                  # a Paya transfer needs its Sheba
+                              ("DepositSlip", "IR062960000000100324200001"),   # other kinds carry none
+                              ("Satna", "IR06-2960"),                          # IR and 24 digits
+                              ("Cheque", None)):                               # an unknown kind
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, row(9100, method, sheba))
+        c.rollback()
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

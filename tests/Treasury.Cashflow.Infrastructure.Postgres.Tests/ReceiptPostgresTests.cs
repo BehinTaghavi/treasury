@@ -56,10 +56,19 @@ public sealed class ReceiptPostgresTests : IDisposable
     [Fact]
     public async Task A_dollar_deposit_keeps_its_rate()
     {
-        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), Accounts.Dollar, DepositMethod.Transfer, "SW-9", 100.5m, 600_000), CancellationToken.None);
+        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), Accounts.Dollar, DepositMethod.InternalTransfer, "SW-9", 100.5m, 600_000), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
-        Assert.Equal(("BankDeposit", "Transfer", "SW-9", 100.5m, "USD", (decimal?)600_000m, 60_300_000m), (v.Kind, v.Method, v.TrackingNumber, v.Amount, v.Currency, v.RateToRial, v.TotalRial));
+        Assert.Equal(("BankDeposit", "InternalTransfer", "SW-9", 100.5m, "USD", (decimal?)600_000m, 60_300_000m), (v.Kind, v.Method, v.TrackingNumber, v.Amount, v.Currency, v.RateToRial, v.TotalRial));
+        Assert.Null(v.PayerSheba);
+
+        // Owner, 18 Nov 2026 (db/postgres/036): a Satna transfer is stored with the Sheba it came from; a gateway deposit has none.
+        var satna = await _receipts.RecordBankDepositAsync(
+            new(Key(), Header(), Guid.NewGuid(), DepositMethod.Satna, "S-1", 7_000_000, PayerSheba: "IR062960000000100324200001"), CancellationToken.None);
+        Assert.True(satna.IsSuccess, satna.ErrorCode);
+        v = (await _receipts.GetAsync(satna.Value, CancellationToken.None))!;
+        Assert.Equal(("Satna", "IR062960000000100324200001"), (v.Method, v.PayerSheba));
+        Assert.True((await _receipts.RecordBankDepositAsync(new(Key(), Header(), Guid.NewGuid(), DepositMethod.PaymentGateway, "PG-1", 1_000), CancellationToken.None)).IsSuccess);
     }
 
     [Fact]

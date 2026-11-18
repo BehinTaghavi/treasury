@@ -63,6 +63,20 @@ const message = ref<{ kind: 'error' | 'ok' | 'warning'; text: string } | null>(n
 const show = (kind: 'error' | 'ok' | 'warning', text: string) => { message.value = { kind, text } }
 
 const current = computed(() => tabs.find(x => x.id === tab.value)!)
+/**
+ * Another tab shows other cheques: the cheque card, the step being entered and the ticks of the tab left behind are closed (owner,
+ * 18 Nov 2026: the card of a cheque at the bank stayed on the screen after switching to «نزد صندوق»).
+ */
+function openTab(id: Tab) {
+  if (id === tab.value) return
+  tab.value = id
+  pending.value = null
+  replacing.value = null
+  card.value = null
+  vouchers.value = []
+  message.value = null
+  for (const k of Object.keys(chosen)) delete chosen[k]
+}
 const shown = computed(() => {
   const until = normaliseJalali(dueUntil.value)
   const key = searchKey(search.value)
@@ -232,7 +246,7 @@ onMounted(async () => { await L.load(); await load() })
   <div>
     <nav class="tr-subtabs" role="tablist">
       <button v-for="x in tabs" :key="x.id" type="button" role="tab" :aria-selected="tab === x.id" :class="{ active: tab === x.id }"
-              @click="tab = x.id; pending = null; replacing = null">
+              @click="openTab(x.id)">
         {{ fa ? x.title[0] : x.title[1] }} <span class="muted small">({{ count(x).toLocaleString(fa ? 'fa-IR' : 'en-US') }})</span>
       </button>
     </nav>

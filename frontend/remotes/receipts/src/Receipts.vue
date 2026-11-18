@@ -9,6 +9,7 @@ import ReceiptForm from './ReceiptForm.vue'
 import ReceiptList from './ReceiptList.vue'
 import ChequeOperations from './ChequeOperations.vue'
 import LegalAction from './LegalAction.vue'
+import ReceiptsPanel from './ReceiptsPanel.vue'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -31,6 +32,13 @@ const tab = ref<Tab>('Instruments')
 const legalCheque = ref<string | undefined>(undefined)
 function openTab(id: Tab) { legalCheque.value = undefined; tab.value = id }
 function startLegal(chequeId: string) { legalCheque.value = chequeId; tab.value = 'legal' }
+/**
+ * Owner, 18 Nov 2026: on every receipt screen a button «فهرست دریافت‌ها» shows the receipts of that screen's kind under the form. The
+ * cheque screens (steps, legal action) show the cheque receipts.
+ */
+const panelKind = computed(() => (tab.value === 'Cash' || tab.value === 'BankDeposit' ? tab.value : 'Instruments'))
+/** Counts saved receipts, so an open list shows the new one. */
+const savedCount = ref(0)
 const hints: Record<string, [string, string]> = {
   Instruments: ['چک‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند (سفته‌ها فرم جداگانه خواهند داشت). چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
     'Cheques and notes of one payer are saved on one receipt. Current or post-dated follows the due date; a foreign-currency cheque needs its currency and rate.'],
@@ -54,7 +62,9 @@ const hints: Record<string, [string, string]> = {
     <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" />
     <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" />
     <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
-    <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" />
+    <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" @saved="savedCount++" />
+    <ReceiptsPanel v-if="tab !== 'list'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
+                   :fiscal-year="fiscalYear" :refresh-key="savedCount" />
   </section>
 </template>
 

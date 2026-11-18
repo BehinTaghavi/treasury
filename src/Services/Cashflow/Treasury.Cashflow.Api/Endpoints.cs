@@ -42,7 +42,9 @@ public sealed record IssueRequest(Guid PaymentId, Guid BankAccountId, Guid Chequ
 
 public sealed record CashReceiptRequest(ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial);
 
-public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial);
+/// <param name="PayerSheba">Paya and Satna transfers: the Sheba the money came from.</param>
+public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial,
+    string? PayerSheba = null);
 
 public sealed record InstrumentReceiptRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
@@ -133,7 +135,7 @@ public static class Endpoints
 
         api.MapPost("/receipts/bank", async (BankReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RecordBankDepositAsync(
-                new RecordBankReceiptCommand(Key(http), r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
+                new RecordBankReceiptCommand(Key(http), r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/receipts/{id}"));
 
         api.MapPost("/receipts/instruments", async (InstrumentReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
@@ -169,7 +171,7 @@ public static class Endpoints
             Preview(await u.PreviewCashAsync(new RecordCashReceiptCommand("preview", r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/bank/voucher-preview", async (BankReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
-            Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
+            Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/instruments/voucher-preview", async (InstrumentReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
             Preview(await u.PreviewInstrumentsAsync(new RecordInstrumentReceiptCommand("preview", r.Header, r.Instruments), ct).ConfigureAwait(false)));
