@@ -27,6 +27,8 @@ const fixedNames: Record<string, [string, string]> = {
   ChequesInCashDesk: ['اسناد نزد صندوق (اسناد دریافتنی)', 'Cheques in the cash desk'],
   ChequesInCollection: ['چک‌های در جریان وصول', 'Cheques in collection'],
   ProtestedCheques: ['اسناد واخواست شده (برگشتی)', 'Protested cheques'],
+  ProtestedChequesInLegal: ['اسناد واخواست شده حقوقی شده', 'Protested cheques in legal action'],
+  GuaranteeChequesInLegal: ['اسناد تضمینی حقوقی شده به نفع شرکت', 'Guarantee items in legal action'],
   GuaranteeChequesForCompany: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
   GuaranteeCounterpart: ['طرف حساب انتظامی', 'Guarantee counterpart'],
   BadDebts: ['مطالبات سوخت شده', 'Bad debts written off'],

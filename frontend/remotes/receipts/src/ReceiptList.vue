@@ -5,16 +5,20 @@
  * mistake is cancelled with a reason; a cheque is returned to the payer instead.
  * The receipt's voucher and the vouchers of each cheque's later steps (deposit, collected, bounced) are shown with «تایید سند»
  * (owner's report no. 4, item 8: one voucher per receipt or operation, the treasurer confirms).
+ * Owner, 18 Nov 2026: the last column «وضعیت» is the latest status: of a cheque receipt, the latest status of its cheques (with the mark
+ * «سررسید چک»); of a cash or bank receipt, recorded or cancelled. The names are the owner's, shared by every screen (ui-kit chequeStatus).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, searchKey, todayJalali, translate,
+  type ChequeStatus, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
+import { depositMethodName } from './depositMethods'
 
 interface Instrument {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
-  dueDate: string | null; state: string; isPostDated: boolean; allowedActions: string[]; version: number
+  dueDate: string | null; state: string; isPostDated: boolean; allowedActions: string[]; version: number; reachedDueDate: boolean
   details: { branchName: string | null; accountNumber: string | null; sayadId: string | null; guarantors: { name: string; nationalCode: string | null }[] | null } | null
 }
 interface Receipt {
@@ -23,6 +27,9 @@ interface Receipt {
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null; currency: string | null
   rateToRial: number | null; totalRial: number; instrumentCount: number; state: string; cancelledOn: string | null; cancelReason: string | null
   recordedBy: string; version: number; instruments: Instrument[] | null; replacedInstrumentId: string | null
+  /** The latest status of each cheque of a cheque receipt. */
+  chequeStatuses: ChequeStatus[] | null
+  payerSheba: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
@@ -42,19 +49,12 @@ const kindNames: Record<string, [string, string]> = {
   Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به حساب', 'Bank deposit'], Instruments: ['چک و سفته', 'Cheques and notes'],
 }
 const kindChoices = computed<Choice[]>(() => Object.entries(kindNames).map(([value, [f, e]]) => ({ value, label: fa.value ? f : e })))
-const methodNames: Record<string, [string, string]> = {
-  DepositSlip: ['فیش واریزی', 'Deposit slip'], Transfer: ['حواله / انتقال', 'Transfer'], Pos: ['کارتخوان', 'POS'], CardToCard: ['کارت به کارت', 'Card to card'],
-}
 const instrumentKinds: Record<string, [string, string]> = {
   OrdinaryCheque: ['چک', 'Cheque'], BankCheque: ['چک بانکی', 'Bank cheque'], GuaranteeCheque: ['چک تضمینی', 'Guarantee cheque'],
   PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
 }
-const stateNames: Record<string, [string, string]> = {
-  // Owner's report no. 4, item 9: «در جریان وصول نزد صندوق» → «در جریان وصول نزد بانک».
-  InCashDesk: ['در جریان وصول نزد صندوق', 'In the cash desk'], DepositedForCollection: ['در جریان وصول نزد بانک', 'At the bank for collection'], Cleared: ['وصول شده', 'Collected'],
-  Bounced: ['برگشت شده', 'Bounced'], ReturnedToIssuer: ['عودت به پرداخت‌کننده', 'Returned to the payer'], Endorsed: ['خرج شده', 'Endorsed'],
-  ReturnedFromBank: ['عودت شده از بانک', 'Back from the bank'], Replaced: ['تعویض شده', 'Replaced'], Cancelled: ['ابطال شده', 'Cancelled'],
-}
+/** The «وضعیت» column: the cheques of a cheque receipt grouped by their latest status. */
+const statusGroups = (r: Receipt) => groupChequeStatuses(r.chequeStatuses, props.locale)
 const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
 
 const receipts = ref<Receipt[]>([])
@@ -66,7 +66,8 @@ const show = (k: 'error' | 'ok', text: string) => { message.value = { kind: k, t
 const shown = computed(() => {
   const key = searchKey(search.value)
   if (!key) return receipts.value
-  return receipts.value.filter(r => searchKey(`${r.number} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date}`).includes(key))
+  return receipts.value.filter(r => searchKey(`${r.number} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date} ${
+    statusGroups(r).map(g => g.name + (g.due ? ` ${dueMark(props.locale)}` : '')).join(' ')}`).includes(key))
 })
 const totalShown = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
 
@@ -154,7 +155,7 @@ onMounted(async () => { await L.load(); await load() })
       <label style="width: 12rem">{{ t('نوع دریافت', 'Kind') }}
         <SearchSelect v-model="kind" :options="kindChoices" :empty-label="t('همه', 'All')" :aria-label="t('نوع دریافت', 'Kind')" />
       </label>
-      <label style="flex: 1; min-width: 14rem">{{ t('جستجو (شماره، پرداخت کننده، بابت، پیگیری)', 'Search (number, payer, purpose, tracking)') }}
+      <label style="flex: 1; min-width: 14rem">{{ t('جستجو (شماره، پرداخت کننده، بابت، پیگیری، وضعیت)', 'Search (number, payer, purpose, tracking, status)') }}
         <input v-model="search" />
       </label>
     </div>
@@ -166,20 +167,29 @@ onMounted(async () => { await L.load(); await load() })
           <tr>
             <th>{{ t('شماره', 'No.') }}</th><th>{{ t('نوع', 'Kind') }}</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
             <th>{{ t('بابت', 'Purpose') }}</th><th>{{ t('صندوق / حساب', 'Cash desk / account') }}</th><th>{{ t('مبلغ', 'Amount') }}</th>
-            <th>{{ t('ریالی', 'Rial') }}</th><th>{{ t('وضعیت', 'State') }}</th>
+            <th>{{ t('ریالی', 'Rial') }}</th><th>{{ t('وضعیت', 'Latest status') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', selected: selected?.id === r.id }]" @click="open(r.id)">
             <td class="num">{{ num(r.number) }}</td>
-            <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ name(methodNames, r.method) }}</span></td>
+            <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ depositMethodName(r.method, fa) }}</span></td>
             <td class="num">{{ r.date }}</td>
             <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
             <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span></td>
             <td>{{ r.kind === 'Instruments' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r) }}</td>
             <td class="num">{{ r.amount !== null && r.currency !== 'IRR' ? `${money(r.amount)} ${r.currency}` : '' }}</td>
             <td class="num">{{ money(r.totalRial) }}</td>
-            <td><span v-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span></td>
+            <td>
+              <span v-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
+              <template v-else-if="r.kind === 'Instruments'">
+                <div v-for="g in statusGroups(r)" :key="g.state">
+                  <span v-if="r.instrumentCount > 1" class="muted small">{{ t(`${num(g.count)} برگ:`, `${g.count} ×`) }}</span> {{ g.name }}
+                  <span v-if="g.due" class="tr-tag due" :title="dueWaitsFor(g.state, locale)">{{ dueMark(locale) }}<template v-if="g.count > 1"> ({{ num(g.due) }})</template></span>
+                </div>
+              </template>
+              <template v-else>{{ t('ثبت شده', 'Recorded') }}</template>
+            </td>
           </tr>
           <tr v-if="!shown.length"><td colspan="9" class="muted">{{ t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
         </tbody>
@@ -200,6 +210,8 @@ onMounted(async () => { await L.load(); await load() })
         <template v-if="selected.reference2"> · {{ selected.reference2 }}</template>
         <template v-if="selected.departmentId"> · {{ t('واحد سازمانی دریافت کننده', 'Receiving department') }}: {{ L.departments.value.find(d => d.id === selected!.departmentId)?.name }}</template>
         <template v-if="selected.salesProceeds"> · {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</template>
+        <template v-if="selected.method"> · {{ t('نوع واریز', 'Kind of deposit') }}: {{ depositMethodName(selected.method, fa) }}</template>
+        <template v-if="selected.payerSheba"> · {{ t('شبای واریزکننده', "Payer's Sheba") }}: <span class="num">{{ selected.payerSheba }}</span></template>
         <template v-if="selected.trackingNumber"> · {{ t('پیگیری', 'Tracking') }}: {{ selected.trackingNumber }}</template>
         <template v-if="selected.rateToRial"> · {{ t('نرخ', 'Rate') }}: {{ money(selected.rateToRial) }}</template>
         · {{ t('ثبت', 'By') }}: {{ selected.recordedBy }}
@@ -218,14 +230,14 @@ onMounted(async () => { await L.load(); await load() })
       </div>
 
       <template v-if="selected.instruments?.length">
-        <p class="muted small">{{ t('مراحل بعدی هر چک (واگذاری، وصول، عودت، برگشت، تعویض، ابطال، خرج) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شوند.',
+        <p class="muted small">{{ t('مراحل بعدی هر چک (ثبت صیادی، واگذاری، وصول، عودت، برگشت، حقوقی، تعویض، ابطال، خرج) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شوند.',
           'The next steps of each cheque are recorded on the «Received cheque steps» tab.') }}</p>
         <div class="tr-scroll">
           <table class="tr-table">
             <thead>
               <tr>
                 <th>{{ t('نوع', 'Kind') }}</th><th>{{ t('شماره', 'No.') }}</th><th>{{ t('بانک / ضامن', 'Bank / guarantor') }}</th><th>{{ t('سررسید', 'Due') }}</th>
-                <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('ریالی', 'Rial') }}</th><th>{{ t('وضعیت', 'State') }}</th><th />
+                <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('ریالی', 'Rial') }}</th><th>{{ t('آخرین وضعیت', 'Latest status') }}</th><th />
               </tr>
             </thead>
             <tbody>
@@ -242,7 +254,10 @@ onMounted(async () => { await L.load(); await load() })
                 <td class="num">{{ i.dueDate }}</td>
                 <td class="num">{{ money(i.amount) }} <span v-if="i.currency !== 'IRR'">{{ i.currency }}</span></td>
                 <td class="num">{{ money(i.amountInRial) }}</td>
-                <td>{{ name(stateNames, i.state) }}</td>
+                <td>{{ chequeStateName(i.state, locale) }}
+                  <span v-if="i.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(i.state, locale)">{{ dueMark(locale) }}</span>
+                  <div v-if="i.reachedDueDate" class="muted small">{{ dueWaitsFor(i.state, locale) }}</div>
+                </td>
                 <td>
                   <button type="button" class="tr-link" @click="toggleSteps(i.id)">{{ steps[i.id] ? t('بستن اسناد مراحل', 'Hide step vouchers') : t('اسناد مراحل چک', 'Step vouchers') }}</button>
                 </td>
@@ -253,7 +268,7 @@ onMounted(async () => { await L.load(); await load() })
         <template v-for="i in selected.instruments" :key="'v' + i.id">
           <div v-if="steps[i.id]">
             <h4>{{ t(`اسناد مراحل چک ${i.number}`, `Vouchers of the steps of cheque ${i.number}`) }}</h4>
-            <p v-if="!steps[i.id]!.length" class="muted small">{{ t('هنوز واگذاری، وصول یا برگشتی ثبت نشده است.', 'No deposit, collection or bounce recorded yet.') }}</p>
+            <p v-if="!steps[i.id]!.length" class="muted small">{{ t('هنوز مرحله‌ای که سند داشته باشد (واگذاری، وصول، عودت، برگشت …) ثبت نشده است.', 'No step with a voucher (deposit, collection, return, bounce…) recorded yet.') }}</p>
             <VoucherTable v-for="v in steps[i.id]" :key="v.step" :voucher="v" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming"
                           @confirm="confirmStep(i.id, v.step)" />
           </div>

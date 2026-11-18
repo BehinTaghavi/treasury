@@ -25,6 +25,14 @@ internal static class TestData
             "فروش محصولات",
             User);
 
+    /// <summary>A received cheque registered in Sayad on the day it was received, so it can go to the bank (rule N3, owner 18 Nov 2026).</summary>
+    public static Instrument RegisteredCheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string receivedOn = "1405/08/01", string? due = "1405/09/01")
+    {
+        var cheque = ReceivedCheque(kind, receivedOn, due);
+        cheque.RegisterSayad(D(receivedOn), User);
+        return cheque;
+    }
+
     public static Instrument ChequeBeingIssued(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string issue = "1405/08/10", string? due = "1405/08/10") =>
         Instrument.PrepareIssue(
             Guid.NewGuid(),

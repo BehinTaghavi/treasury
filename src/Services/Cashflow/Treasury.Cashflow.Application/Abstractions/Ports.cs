@@ -24,6 +24,37 @@ public interface IInstrumentRepository
 
     /// <summary>The cheques and notes received on one receipt, in the order they were entered.</summary>
     Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken);
+
+    /// <summary>The latest state of the cheques and notes of several receipts (the «وضعیت» column of the receipts list).</summary>
+    Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken);
+}
+
+/// <summary>Scans attached to a cheque's legal action (owner, 18 Nov 2026), with the files themselves.</summary>
+public interface IInstrumentAttachmentRepository
+{
+    Task<IReadOnlyList<InstrumentAttachment>> ListAsync(Guid instrumentId, CancellationToken cancellationToken);
+
+    Task<(InstrumentAttachment File, byte[] Content)?> GetAsync(Guid instrumentId, Guid fileId, CancellationToken cancellationToken);
+
+    /// <summary>Stores the scan with its content and its pending events.</summary>
+    Task AddAsync(InstrumentAttachment file, byte[] content, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the scan and writes its pending events.</summary>
+    Task RemoveAsync(InstrumentAttachment file, CancellationToken cancellationToken);
+}
+
+/// <summary>The latest state of one cheque or note of a receipt, with the dates «سررسید چک» is read from.</summary>
+public sealed record ReceiptChequeStatus(Guid ReceiptId, InstrumentState State, FiscalDate ReceivedOn, FiscalDate? DueDate);
+
+/// <summary>
+/// Today's date in Iran (UTC+03:30; Iran has kept no daylight saving time since 1401). «سررسید چک» compares the due date with it.
+/// </summary>
+public static class IranClock
+{
+    private static readonly TimeSpan Offset = new(3, 30, 0);
+
+    public static FiscalDate Today(TimeProvider? clock) =>
+        new(DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().ToOffset(Offset).DateTime));
 }
 
 /// <summary>Receipts (رسید دریافت) of one fiscal year, numbered per kind.</summary>
@@ -85,6 +116,9 @@ public interface IReceiptReferenceLookup
 
     /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The city of the company's address in Basic Information («مشخصات شرکت»); null until it is entered.</summary>
+    Task<string?> CompanyCityAsync(CancellationToken cancellationToken);
 }
 
 public interface IChequeBookRepository

@@ -15,6 +15,7 @@ import ChequeBooks from './accounts/ChequeBooks.vue'
 import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
 import VoucherTemplate from './accounts/VoucherTemplate.vue'
+import CompanyProfile from './company/CompanyProfile.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
@@ -44,6 +45,8 @@ const lists: ListSpec[] = [
 
 /** The menu, in the order of the new-version manual ("اطلاعات پایه" items 1–10), with the copy of the accounting system's accounts. */
 const sections: { id: string; title: [string, string] }[] = [
+  // Owner, 18 Nov 2026: the company's name, address and legal address (its city decides «خارج از مرکز» on received cheques).
+  { id: 'company', title: ['مشخصات شرکت', 'Company particulars'] },
   ...lists.filter(l => l.list !== 'references').map(l => ({ id: l.list, title: l.title })),
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
@@ -82,6 +85,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
         >{{ fa ? s.title[0] : s.title[1] }}</button>
       </nav>
       <CatalogueList v-if="current" :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
+      <CompanyProfile v-else-if="selected === 'company'" :key="'company' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChartAccounts v-else-if="selected === 'chart'" :key="'chart' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <BankAccounts v-else-if="selected === 'bank-accounts'" :key="'bank-accounts' + locale" :api-base="apiBase" :locale="locale" :token="token" />

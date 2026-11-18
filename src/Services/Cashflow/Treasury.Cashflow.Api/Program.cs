@@ -37,6 +37,7 @@ if (!usePostgres)
     builder.Services.AddSingleton<InMemoryVoucherStore>();
     builder.Services.AddSingleton<IVoucherTemplateRepository, InMemoryVoucherTemplateRepository>();
     builder.Services.AddSingleton<IConfirmedVoucherRepository, InMemoryConfirmedVoucherRepository>();
+    builder.Services.AddSingleton<IInstrumentAttachmentRepository, InMemoryInstrumentAttachmentRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 }
 
@@ -79,6 +80,7 @@ builder.Services.AddScoped<Treasury.Cashflow.Application.ChequeBooks.ChequeBookU
 builder.Services.AddScoped<Treasury.Cashflow.Application.ChequeBooks.ChequeFormatUseCases>();
 builder.Services.AddScoped<Treasury.Cashflow.Application.Receipts.ReceiptUseCases>();
 builder.Services.AddScoped<Treasury.Cashflow.Application.Vouchers.VoucherUseCases>();
+builder.Services.AddScoped<Treasury.Cashflow.Application.Instruments.LegalActionUseCases>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 // accounts-svc answers whether a bank account exists and is active (ADR 0001: through its API, never its tables).

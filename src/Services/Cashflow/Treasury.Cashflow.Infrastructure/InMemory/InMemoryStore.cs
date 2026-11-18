@@ -226,6 +226,18 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         }
     }
 
+    public Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            IReadOnlyList<ReceiptChequeStatus> list = db.Instruments.Values
+                .Where(s => s.ReceiptId is { } id && receiptIds.Contains(id))
+                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null))
+                .ToList();
+            return Task.FromResult(list);
+        }
+    }
+
     private static void Stage(Instrument instrument, long newVersion)
     {
         var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");

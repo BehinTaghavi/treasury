@@ -26,7 +26,8 @@ public sealed record ReceiptHeaderInput(
 public sealed record RecordCashReceiptCommand(string IdempotencyKey, ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial = null);
 
 public sealed record RecordBankReceiptCommand(
-    string IdempotencyKey, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial = null);
+    string IdempotencyKey, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial = null,
+    string? PayerSheba = null);
 
 /// <summary>One cheque or note on the form. <paramref name="BankId"/> is from the bank-names list (decision of 10 Nov 2026).</summary>
 public sealed record ReceivedInstrumentInput(
@@ -55,7 +56,7 @@ public sealed record ReplaceChequeCommand(string IdempotencyKey, Guid Instrument
 public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null);
 
 /// <summary>The receiver brings an endorsed cheque back bounced (owner's item 14 (h)), with the bank's bounce notice.</summary>
-public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null);
+public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null, string? TrackingCode = null);
 
 public sealed record ReceiptView(
     Guid Id,
@@ -88,15 +89,22 @@ public sealed record ReceiptView(
     string RecordedBy,
     long Version,
     IReadOnlyList<InstrumentView>? Instruments = null,
-    Guid? ReplacedInstrumentId = null)
+    Guid? ReplacedInstrumentId = null,
+    IReadOnlyList<ChequeStatusView>? ChequeStatuses = null,
+    string? PayerSheba = null)
 {
-    public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null) => new(
+    /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
+    public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null, FiscalDate? today = null, IReadOnlyList<ChequeStatusView>? statuses = null) => new(
         r.Id, r.Kind.ToString(), r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.Payer.DetailCode ?? string.Empty, r.Payer.DisplayName,
         r.PurposeGroupId, r.PurposeGroupName, r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note,
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
-        instruments?.Select(InstrumentView.From).ToList(), r.ReplacedInstrumentId);
+        instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
+        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba);
 }
+
+/// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
+public sealed record ChequeStatusView(string State, bool ReachedDueDate);
 
 /// <summary>
 /// Receipts (owner, 14 Nov 2026): cash, money paid into a bank account (slip, transfer, POS, card-to-card) and cheques and notes,
@@ -116,7 +124,8 @@ public sealed class ReceiptUseCases(
     ICurrentUser currentUser,
     IVoucherTemplateRepository templates,
     IConfirmedVoucherRepository vouchers,
-    IPaymentRequestLookup paymentRequests)
+    IPaymentRequestLookup paymentRequests,
+    TimeProvider? clock = null)
 {
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -269,7 +278,7 @@ public sealed class ReceiptUseCases(
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var step = cheque.History.Count;
             var endorsement = cheque.History[^1];
-            cheque.RecordEndorsementReturned(date, currentUser.UserId, command.NoticeNumber, command.Reason);
+            cheque.RecordEndorsementReturned(date, currentUser.UserId, command.NoticeNumber, command.Reason, command.TrackingCode);
             if (endorsement.Action == InstrumentAction.Endorse && endorsement.Details?.PaymentRequestId is { } requestId)
             {
                 await paymentRequests.ReversePaymentAsync(requestId, cheque.EndorsementPaymentKey(step), ct).ConfigureAwait(false);
@@ -353,7 +362,7 @@ public sealed class ReceiptUseCases(
         var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
         var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.BankDeposit, ct).ConfigureAwait(false);
         return (Receipt.RecordBankDeposit(
-            Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId), account);
+            Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId, command.PayerSheba), account);
     }
 
     private async Task<(Receipt Receipt, List<Instrument> Created, bool Duplicate)> BuildInstrumentsAsync(
@@ -372,6 +381,9 @@ public sealed class ReceiptUseCases(
         var created = new List<Instrument>();
         var seen = new HashSet<(string?, string)>();
         var duplicate = false;
+
+        // Owner, 18 Nov 2026: «خارج از مرکز» follows from the city of the cheque's bank and the city of the company's address.
+        var companyCity = command.Instruments.Any(l => !string.IsNullOrWhiteSpace(l.City)) ? await reference.CompanyCityAsync(ct).ConfigureAwait(false) : null;
         foreach (var line in command.Instruments)
         {
             string? bankName = null;
@@ -385,7 +397,7 @@ public sealed class ReceiptUseCases(
                 Guid.NewGuid(), line.Kind, line.Number, bankName, line.Amount.ToMoney(), date,
                 string.IsNullOrWhiteSpace(line.DueDate) ? null : FiscalDate.ParseJalali(line.DueDate), payer, header.Purpose, user,
                 new ReceivedInstrumentDetails(line.BankId, line.BranchName, line.BranchCode, line.AccountNumber, line.AccountHolder, line.City,
-                    line.OutOfTown, line.SayadId, line.Guarantors),
+                    line.OutOfTown, line.SayadId, line.Guarantors).WithOutOfTownFor(companyCity),
                 receiptId);
             if (!seen.Add((instrument.BankName, instrument.Number!)))
             {
@@ -442,13 +454,24 @@ public sealed class ReceiptUseCases(
             }
 
             IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(id, ct).ConfigureAwait(false) : [];
-            return ReceiptView.From(receipt, lines);
+            return ReceiptView.From(receipt, lines, IranClock.Today(clock));
         }, cancellationToken);
 
-    /// <summary>Receipts of a fiscal year, newest first (without their cheques; open one to see them).</summary>
+    /// <summary>
+    /// Receipts of a fiscal year, newest first, each with the latest state of its cheques (owner, 18 Nov 2026: the last column of the
+    /// receipts list is the latest status); open a receipt to see the cheques themselves.
+    /// </summary>
     public Task<IReadOnlyList<ReceiptView>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<ReceiptView>>(async ct =>
-            (await receipts.ListAsync(fiscalYear, kind, ct).ConfigureAwait(false)).Select(r => ReceiptView.From(r)).ToList(), cancellationToken);
+        {
+            var list = await receipts.ListAsync(fiscalYear, kind, ct).ConfigureAwait(false);
+            var today = IranClock.Today(clock);
+            var withCheques = list.Where(r => r.Kind == ReceiptKind.Instruments).Select(r => r.Id).ToList();
+            var statuses = (await instruments.ListStatusesByReceiptsAsync(withCheques, ct).ConfigureAwait(false)).ToLookup(
+                s => s.ReceiptId,
+                s => new ChequeStatusView(s.State.ToString(), ReceivedChequeStatus.HasReachedDueDate(s.State, s.ReceivedOn, s.DueDate, today)));
+            return list.Select(r => ReceiptView.From(r, statuses: r.Kind == ReceiptKind.Instruments ? statuses[r.Id].ToList() : null)).ToList();
+        }, cancellationToken);
 
     /// <summary>Old D_Naghd / D_variz: date, payer and purpose are required; the date must be in an open fiscal period (rule R2).</summary>
     private async Task<(ReceiptHeader Header, FiscalDate Date)> HeaderAsync(ReceiptHeaderInput input, CancellationToken ct)

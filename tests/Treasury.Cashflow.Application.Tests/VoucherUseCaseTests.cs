@@ -141,18 +141,20 @@ public sealed class VoucherUseCaseTests : IDisposable
         var cheque = (await _receipts.GetAsync(receipt, CancellationToken.None))!.Instruments![0].Id;
         Assert.Empty(await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None));
 
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordCleared, "1405/10/02"), CancellationToken.None)).IsSuccess);
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
-        Assert.Equal([2, 3], steps.Select(s => s.Step));
+        Assert.Equal([3, 4], steps.Select(s => s.Step));
         Assert.Equal([(true, "1202", "600009"), (false, "1201", "200015")], steps[0].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.Equal([(true, "1109", "600009"), (false, "1202", "600009")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.Equal("1405/10/02", steps[1].Date);
 
-        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 2, CancellationToken.None)).IsSuccess);
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 3, CancellationToken.None)).IsSuccess);
         Assert.Equal("treasurer", (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None))[0].ConfirmedBy);
-        Assert.Equal("Voucher.AlreadyConfirmed", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 2, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Voucher.AlreadyConfirmed", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 3, CancellationToken.None)).ErrorCode);
         Assert.Equal("Voucher.NoVoucherForStep", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 1, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Voucher.NoVoucherForStep", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 2, CancellationToken.None)).ErrorCode); // «ثبت صیادی»
         Assert.Equal("Instrument.NotFound", (await _vouchers.ConfirmChequeVoucherAsync(Key(), Guid.NewGuid(), 2, CancellationToken.None)).ErrorCode);
     }
 
@@ -163,6 +165,7 @@ public sealed class VoucherUseCaseTests : IDisposable
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28", Note: "امضا ناقص"), CancellationToken.None)).IsSuccess);
 
@@ -185,7 +188,7 @@ public sealed class VoucherUseCaseTests : IDisposable
         var v = (await _vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
         Assert.Equal([(true, "1201"), (true, "1201"), (false, "1201"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
         Assert.True(v.IsComplete);
-        Assert.Equal([2, 3], (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None)).Select(x => x.Step));
+        Assert.Equal([3, 4], (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None)).Select(x => x.Step));
         Assert.Equal("Instrument.InvalidTransition", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
     }
 
@@ -226,6 +229,7 @@ public sealed class VoucherUseCaseTests : IDisposable
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
         Assert.Equal("Instrument.BounceNoticeRequired",
             (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordBounced, "1405/10/02", Note: "کسری"), CancellationToken.None)).ErrorCode);
@@ -241,7 +245,7 @@ public sealed class VoucherUseCaseTests : IDisposable
         var cancel = (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None))[^1];
         Assert.Equal(("BadDebts", "1203"), (cancel.Lines[0].Missing, cancel.Lines[1].AccountCode));
         Assert.True((await _vouchers.SetTemplateAccountAsync(Key(), FixedAccount.BadDebts, "8101", CancellationToken.None)).IsSuccess);
-        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 4, CancellationToken.None)).IsSuccess);
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 5, CancellationToken.None)).IsSuccess);
     }
 
     private sealed class LedgerBank : IBankAccountLookup

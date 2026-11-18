@@ -73,4 +73,30 @@ public sealed class OrganizationPostgresTests : IDisposable
         Assert.True(await _db.ScalarAsync<bool>("SELECT in_use FROM reference.catalogue_item WHERE id = @id", ("id", bank)));
         Assert.True((await _useCases.ChangeBeneficiaryAsync(new(Key(), b.Value, "delete", 1), CancellationToken.None)).IsSuccess);
     }
+
+    [Fact]
+    public async Task The_company_profile_is_one_row_with_its_city_and_an_outbox_event()
+    {
+        // db/postgres/037 (owner, 18 Nov 2026): «مشخصات شرکت». One row for the database, so the test changes whatever is there.
+        var company = new Treasury.Reference.Application.Company.CompanyUseCases(new PostgresUnitOfWork(_dataSource), new PostgresCompanyProfileRepository(),
+            new PostgresCatalogueRepository(), new PostgresIdempotencyStore(_dataSource), _catalogue);
+        async Task<Guid> Add(CatalogueKind kind, string name, Guid? parent = null)
+        {
+            var r = await _catalogue.AddAsync(new AddCatalogueItemCommand(Guid.NewGuid().ToString(), kind, name + _n, parent), CancellationToken.None);
+            Assert.True(r.IsSuccess, r.ErrorCode);
+            return r.Value;
+        }
+
+        var country = await Add(CatalogueKind.Country, "کشور");
+        var city = await Add(CatalogueKind.City, "شهر", await Add(CatalogueKind.Province, "استان", country));
+        var before = await company.GetAsync(CancellationToken.None);
+        var saved = await company.SetAsync(Guid.NewGuid().ToString(), new("شرکت نمونه " + _n, "نشانی دفتر مرکزی", "نشانی قانونی", city, "1234567890"), before.Version, CancellationToken.None);
+        Assert.True(saved.IsSuccess, saved.ErrorCode);
+        var v = await company.GetAsync(CancellationToken.None);
+        Assert.Equal((true, "شرکت نمونه " + _n, "نشانی دفتر مرکزی", "نشانی قانونی", (Guid?)city, "شهر" + _n, "1234567890", before.Version + 1),
+            (v.IsSet, v.Name, v.Address, v.LegalAddress, v.CityId, v.CityName, v.PostalCode, v.Version));
+        Assert.Equal("Concurrency.Conflict", (await company.SetAsync(Guid.NewGuid().ToString(), new("شرکت دیگر", null, null, city, null), before.Version, CancellationToken.None)).ErrorCode);
+        Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM reference.company_profile"));
+        Assert.True(await _db.ScalarAsync<long>("SELECT count(*) FROM reference.outbox WHERE type = 'CompanyProfileChanged' AND payload->>'Name' = @name", ("name", "شرکت نمونه " + _n)) >= 1);
+    }
 }
