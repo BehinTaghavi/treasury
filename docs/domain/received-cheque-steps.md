@@ -173,5 +173,5 @@ credits «اسناد تضمینی به نفع شرکت» (the template's «چک 
   (the card of a cheque at the bank used to stay on the screen after switching to «نزد صندوق»).
 - **Kinds of a direct deposit** («نوع واریز», to be chosen, no default): حواله پایا با شماره شبا، حواله ساتنا با شماره شبا، انتقال داخلی حساب
   به حساب، واریز نقدی در شعبه، کارت به کارت (only when the bank account has a bank card)، واریز به درگاه پرداخت متصل به حساب شرکت. Paya
-  and Satna are recorded with the Sheba the transfer came from (IR and 24 digits, check digits verified). Kept besides: «کارتخوان
-  (POS)» of 14 Nov (Q44); the old combined «حواله / انتقال» is shown on earlier receipts and no longer chosen. Schema 036.
+  and Satna are recorded with the Sheba the transfer came from (IR and 24 digits, check digits verified). Kept besides, as the owner confirmed (Q44): «کارتخوان
+  (POS)» of 14 Nov; the Sheba is the payer's (Q45); the old combined «حواله / انتقال» is shown on earlier receipts and no longer chosen. Schema 036.
