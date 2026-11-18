@@ -1,11 +1,12 @@
+using Treasury.BuildingBlocks.Application;
 using Treasury.Reference.Application.Company;
+using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Api;
 
-/// <param name="Version">The version the user saw; 0 when the profile is entered for the first time.</param>
-public sealed record CompanyProfileRequest(CompanyProfileForm Form, long Version);
+public sealed record CompanyEditRequest(CompanyForm Form, long Version);
 
-/// <summary>«مشخصات شرکت» (owner, 18 Nov 2026) under /api/reference/company; cashflow-svc reads the company's city from it.</summary>
+/// <summary>«اطلاعات شرکت» (owner, 16 Nov 2026): the company's name, official details and logo under /api/reference/company.</summary>
 public static class CompanyEndpoints
 {
     public static void MapCompanyEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
@@ -16,23 +17,50 @@ public static class CompanyEndpoints
             api.RequireAuthorization();
         }
 
-        api.MapGet("/", async (CompanyUseCases u, CancellationToken ct) => Results.Ok(await u.GetAsync(ct).ConfigureAwait(false)));
+        api.MapGet(string.Empty, async (CompanyUseCases u, CancellationToken ct) => Results.Ok(await u.GetAsync(ct).ConfigureAwait(false)));
 
-        api.MapPut("/", async (CompanyProfileRequest r, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
+        api.MapPut(string.Empty, async (CompanyEditRequest r, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SaveAsync(Key(http), r.Form, r.Version, ct).ConfigureAwait(false)));
+
+        // The logo: multipart form with "file" and "version"; at most 1 MB (checked again by the domain).
+        api.MapPost("/logo", async (IFormFile file, [Microsoft.AspNetCore.Mvc.FromForm] long version, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
         {
-            var result = await u.SetAsync(http.Headers["Idempotency-Key"].ToString(), r.Form, r.Version, ct).ConfigureAwait(false);
-            if (result.IsSuccess)
+            if (file.Length > CompanyProfile.MaxLogoBytes)
             {
-                return Results.Ok(new { value = result.Value });
+                return ToHttp(Result<Guid>.Fail("Company.LogoTooLarge", "The logo file is larger than 1 MB."));
             }
 
-            var status = result.ErrorCode switch
-            {
-                "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
-                "Concurrency.Conflict" => StatusCodes.Status409Conflict,
-                _ => StatusCodes.Status422UnprocessableEntity,
-            };
-            return Results.Problem(statusCode: status, title: result.ErrorCode, detail: result.ErrorMessage, extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            return ToHttp(await u.AttachLogoAsync(Key(http), buffer.ToArray(), version, ct).ConfigureAwait(false));
+        }).DisableAntiforgery();
+
+        api.MapPost("/logo/remove", async (VersionRequest r, HttpRequest http, CompanyUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveLogoAsync(Key(http), r.Version, ct).ConfigureAwait(false)));
+
+        // The logo changes rarely but must change at once when replaced: the browser asks again every time.
+        api.MapGet("/logo", async (HttpResponse response, CompanyUseCases u, CancellationToken ct) =>
+        {
+            response.Headers.CacheControl = "no-cache";
+            return await u.GetLogoAsync(ct).ConfigureAwait(false) is { } logo ? Results.File(logo.Data, logo.ContentType) : Results.NotFound();
         });
+    }
+
+    private static string Key(HttpRequest http) => http.Headers["Idempotency-Key"].ToString();
+
+    private static IResult ToHttp(Result<Guid> result)
+    {
+        if (result.IsSuccess)
+        {
+            return Results.Ok(new { value = result.Value });
+        }
+
+        var status = result.ErrorCode switch
+        {
+            "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
+            "Concurrency.Conflict" => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status422UnprocessableEntity,
+        };
+        return Results.Problem(statusCode: status, title: result.ErrorCode, detail: result.ErrorMessage, extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });
     }
 }

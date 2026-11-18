@@ -32,7 +32,7 @@ if (!usePostgres)
     builder.Services.AddSingleton<ICatalogueRepository, InMemoryCatalogueRepository>();
     builder.Services.AddSingleton<IPurposeRepository, InMemoryPurposeRepository>();
     builder.Services.AddSingleton<IOrganizationRepository, InMemoryOrganizationRepository>();
-    builder.Services.AddSingleton<ICompanyProfileRepository, InMemoryCompanyProfileRepository>();
+    builder.Services.AddSingleton<ICompanyRepository, InMemoryCompanyRepository>();
     builder.Services.AddSingleton<ISignatureRepository, InMemorySignatureRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
     builder.Services.AddSingleton<InMemoryLedgerRepository>();

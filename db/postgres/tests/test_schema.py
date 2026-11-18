@@ -774,25 +774,38 @@ def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
         c.rollback()
 
 
-def test_the_company_profile_is_one_row(db):
-    # 037_reference_company_profile.sql (owner, 18 Nov 2026: «مشخصات شرکت»; the city and postal code are the legal address's).
+def test_the_company_particulars_are_columns_of_the_one_company_row(db):
+    # 039_reference_company_joined.sql (owner, 18 Nov 2026: «مشخصات شرکت» and «اطلاعات شرکت» are one page): the legal address and its city.
     with psycopg.connect(db) as c:
+        assert c.execute("SELECT to_regclass('reference.company_profile')").fetchone()[0] is None
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("DELETE FROM reference.company")
         c.execute("SET ROLE reference_svc")
-        c.execute("INSERT INTO reference.company_profile (name, legal_address, city_id, postal_code) VALUES ('sample', 'legal', %s, '1234567890')", (uuid.uuid4(),))
-        with pytest.raises(psycopg.errors.UniqueViolation):   # one profile per client database
+        city = uuid.uuid4()
+        c.execute("INSERT INTO reference.company (id, name, legal_address, city_id, postal_code) VALUES (%s, 'sample', 'legal', %s, '1234567890')",
+                  (uuid.uuid4(), city))
+        assert c.execute("SELECT legal_address, city_id FROM reference.company").fetchone() == ("legal", city)
+        with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
-                c.execute("INSERT INTO reference.company_profile (name, city_id) VALUES ('second', %s)", (uuid.uuid4(),))
-        for name, postal in ((" ", None), ("sample", "123")):
-            with pytest.raises(psycopg.errors.CheckViolation):
-                with c.transaction():
-                    c.execute("UPDATE reference.company_profile SET name = %s, postal_code = %s", (name, postal))
-        c.execute("RESET ROLE")
-        c.execute("SET ROLE cashflow_svc")
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the table
-            with c.transaction():
-                c.execute("SELECT * FROM reference.company_profile")
+                c.execute("UPDATE reference.company SET legal_address = ''")
         c.rollback()
 
+
+def test_a_profile_entered_before_the_join_moves_into_the_company_row(db):
+    # 039 moves a row of the first 037 (reference.company_profile) into reference.company and drops the old table.
+    import pathlib
+    script = pathlib.Path(__file__).resolve().parents[1] / "039_reference_company_joined.sql"
+    city = uuid.uuid4()
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("DELETE FROM reference.company")
+        c.execute("CREATE TABLE reference.company_profile (only_one boolean PRIMARY KEY DEFAULT true, name text NOT NULL, address text, "
+                  "legal_address text, city_id uuid NOT NULL, postal_code text, version bigint NOT NULL DEFAULT 1)")
+        c.execute("INSERT INTO reference.company_profile (name, address, legal_address, city_id, postal_code) VALUES ('Old', 'a', 'l', %s, '1234567890')", (city,))
+        c.execute(script.read_text(encoding="utf-8"))
+        assert c.execute("SELECT name, address, legal_address, city_id, postal_code FROM reference.company").fetchone() == ("Old", "a", "l", city, "1234567890")
+        assert c.execute("SELECT to_regclass('reference.company_profile')").fetchone()[0] is None
+        c.execute("DELETE FROM reference.company")
 
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
@@ -864,4 +877,48 @@ def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(
             with c.transaction():
                 c.execute("SELECT 1 FROM reference.signatory")
         c.rollback()
+def test_one_company_profile_with_a_small_logo(db):
+    # 033_reference_company.sql (owner, 16 Nov 2026): one row per database; the logo is a PNG/JPEG of at most 1 MB.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        company = uuid.uuid4()
+        c.execute("DELETE FROM reference.company_logo")
+        if c.execute("SELECT count(*) FROM reference.company").fetchone()[0] == 0:
+            c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت آزمایشی')", (company,))
+        company = c.execute("SELECT id FROM reference.company").fetchone()[0]
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت دوم')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET name = ''")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET logo_type = 'application/pdf'")
+        c.execute("UPDATE reference.company SET logo_type = 'image/png'")
+        c.execute("INSERT INTO reference.company_logo (company_id, data) VALUES (%s, %s)", (company, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        # 034_reference_company_details.sql (owner's answer to Q38): optional official details, each with its shape.
+        c.execute(
+            "UPDATE reference.company SET national_id = '10101010103', economic_code = '411111111111', registration_number = '12345', "
+            "address = 'تهران', postal_code = '1234567890', phone = '+98-21-88880000', website = 'www.example.ir', email = 'info@example.ir'")
+        for column, bad in (("national_id", "1234567890"), ("economic_code", "4111"), ("registration_number", "12/3"), ("address", "x" * 301),
+                            ("postal_code", "12345"), ("phone", "abc"), ("website", ""), ("email", "info")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE reference.company SET {column} = %s", (bad,))
+        c.execute(
+            "UPDATE reference.company SET national_id = NULL, economic_code = NULL, registration_number = NULL, address = NULL, "
+            "postal_code = NULL, phone = NULL, website = NULL, email = NULL")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM reference.company")  # the profile is corrected, never deleted
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("UPDATE reference.company SET logo_type = NULL")
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("SELECT name FROM reference.company")
 
