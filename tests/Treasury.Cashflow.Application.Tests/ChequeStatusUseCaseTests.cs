@@ -122,8 +122,8 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Contains("RegisterSayad", view.AllowedActions);
         var back = (await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None))[^1];
         Assert.Equal((6, "تحویل چک به صندوق پس از اقدام حقوقی"), (back.Step, back.Operation));
-        // Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد نزد صندوق» (not set in this test's template), as the owner had it reversed.
-        Assert.Equal([(true, "9201", "200015"), (false, "ChequesInCashDesk", "200015")], back.Lines.Select(l => (l.IsDebit, l.Missing ?? l.AccountCode, l.DetailCode)));
+        // Dr «اسناد نزد صندوق» (not set in this test's template) / Cr «اسناد واخواست شده حقوقی شده».
+        Assert.Equal([(true, "ChequesInCashDesk", "200015"), (false, "9201", "200015")], back.Lines.Select(l => (l.IsDebit, l.Missing ?? l.AccountCode, l.DetailCode)));
     }
 
     [Fact]

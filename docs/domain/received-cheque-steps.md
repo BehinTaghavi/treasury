@@ -64,7 +64,7 @@ of the company bank account.
 | عودت از صندوق (return to the payer) — **18 Nov** | date, note | the account the cheque's receipt credited (its purpose group's account) · payer (guarantee: «طرف حساب انتظامی») | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | owner's table «عودت چک‌های نزد صندوق: بدهکاران یا ...»; confirmed by the owner (Q41) |
 | ثبت صیادی — **18 Nov** | date, tracking no. of the registration (optional) | no voucher: only the latest status changes (owner's answer to Q37) | | owner, 18 Nov 2026 |
 | اقدام حقوقی — **18 Nov** | date of the action and its description (both required); number, date and tracking code of the certificate of non-payment («گواهی عدم پرداخت»); scans of its papers | new fixed account «اسناد واخواست شده حقوقی شده» · payer (guarantee: new fixed account «اسناد تضمینی حقوقی شده به نفع شرکت») | «اسناد واخواست شده» · payer (a cheque still in the cash desk: «اسناد نزد صندوق»; guarantee: «چک انتظامی به نفع شرکت») | owner's answers to Q38 and Q42, 18 Nov 2026 |
-| تحویل به صندوق پس از اقدام حقوقی — **18 Nov** | date, note | «اسناد واخواست شده حقوقی شده» · payer (guarantee: «اسناد تضمینی حقوقی شده به نفع شرکت») | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | owner, 18 Nov 2026: the first proposal reversed; direction asked again (Q43) |
+| تحویل به صندوق پس از اقدام حقوقی — **18 Nov** | date, note | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | «اسناد واخواست شده حقوقی شده» · payer (guarantee: «اسناد تضمینی حقوقی شده به نفع شرکت») | owner's answers to Q38 (2) and Q43, 18 Nov 2026 |
 
 One voucher per step and cheque (answer to Q35), also when several cheques are deposited on one slip.
 
@@ -145,10 +145,9 @@ cheque is in «اسناد واخواست شده حقوقی شده», so its repl
 **After the legal action (owner's answer to Q38 (2)):** "if the cheque or note becomes collectable during the legal action or at its
 end, it is handed to the cash desk at the start of the cycle («نزد صندوق») and from there treated like a new cheque; or it is replaced
 or cancelled". The step «تحویل به صندوق (قابل وصول)» is on the opened cheque of this screen (and on its row of the steps screen): the
-latest status becomes «نزد صندوق» again and the cheque goes through «ثبت صیادی», the deposit and so on. Its voucher was first proposed
-as Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده»; the owner had it **reversed** (18 Nov 2026), so it is built as Dr «اسناد
-واخواست شده حقوقی شده» / Cr «اسناد نزد صندوق». Built as said, but the balances this leaves are put to him again in Q43. The scans stay
-with the cheque.
+latest status becomes «نزد صندوق» again and the cheque goes through «ثبت صیادی», the deposit and so on. Its voucher takes the cheque
+out of the legal account: Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده» (confirmed by the owner, Q43). The scans stay with
+the cheque.
 
 **«گواهی عدم پرداخت» (owner, 18 Nov 2026):** the bank's paper is called so on every screen and in the voucher texts (in the code and in
 this English file: bounce notice). The legal-action screen has its **number, date and tracking code**; number and date are filled

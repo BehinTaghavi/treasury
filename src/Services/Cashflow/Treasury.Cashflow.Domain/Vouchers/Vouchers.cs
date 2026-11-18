@@ -257,17 +257,17 @@ public static class ReceiptVouchers
                         Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),
                         Fixed(false, template, AccountOf(e.From), payer, amount, legal));
             case InstrumentAction.ReturnFromLegal:
-                // Answer to Q38 (2): the cheque became collectable and is back in the cash desk like a new cheque. The owner (18 Nov 2026)
-                // had the first proposal reversed: Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد نزد صندوق» (guarantee items: the same
-                // direction between their two accounts). Whether this is the intended direction is asked again (open question Q43).
+                // Answer to Q38 (2): the cheque became collectable and is back in the cash desk like a new cheque, so it leaves the
+                // legal account: Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده» (guarantee items: between their two accounts).
+                // Confirmed by the owner (answer to Q43, 18 Nov 2026).
                 var handed = Text(cheque, "تحویل به صندوق پس از اقدام حقوقی");
                 return cheque.Kind.IsGuarantee()
                     ? Pair("تحویل چک تضمینی به صندوق پس از اقدام حقوقی", cheque, e.Date,
-                        Fixed(true, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, handed),
-                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, handed))
+                        Fixed(true, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, handed),
+                        Fixed(false, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, handed))
                     : Pair("تحویل چک به صندوق پس از اقدام حقوقی", cheque, e.Date,
-                        Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, handed),
-                        Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, handed));
+                        Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, handed),
+                        Fixed(false, template, FixedAccount.ProtestedChequesInLegal, payer, amount, handed));
             case InstrumentAction.ReturnToIssuer:
                 // Owner's table «عودت چک‌های نزد صندوق»: Dr «بدهکاران یا ...» (payer) / Cr «اسناد نزد صندوق» (payer). The debit is the account
                 // the receipt credited, so the return takes the receipt's entry back (open question Q41). A guarantee cheque leaves the
