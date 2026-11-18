@@ -36,6 +36,12 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     use: ['بدهکار هنگام اقدام حقوقی، در مقابل بستانکار «اسناد واخواست شده» (یا «اسناد نزد صندوق» برای چکی که هنوز نزد صندوق است)؛ تفصیل: پرداخت کننده',
       'Debited at the legal action, against a credit of «Protested cheques» (or «Cheques in the cash desk» for a cheque still there); detail: the payer'],
   },
+  // Owner's answer of 18 Nov 2026 (Q42): the legal action on guarantee cheques and notes.
+  GuaranteeChequesInLegal: {
+    title: ['اسناد تضمینی حقوقی شده به نفع شرکت', 'Guarantee items in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی چک یا سفتهٔ تضمینی، در مقابل بستانکار «چک انتظامی به نفع شرکت»؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action on a guarantee cheque or note, against a credit of «Guarantee cheques for the company»; detail: the payer'],
+  },
   GuaranteeChequesForCompany: {
     title: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
     use: ['بدهکار هنگام دریافت چک تضمینی', 'Debited when a guarantee cheque is received'],

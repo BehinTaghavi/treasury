@@ -82,10 +82,13 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
             (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/27"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.LegalActionDescriptionRequired",
             (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27"), CancellationToken.None)).ErrorCode);
-        await Step(cheques[0], InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل شرکت جهت طرح دعوی");
+        // The legal-action screen sends the certificate of non-payment too: number, date and tracking code (owner, 18 Nov 2026).
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27", Note: "تحویل به وکیل شرکت جهت طرح دعوی",
+            Reference: "BN-9", DocumentDate: "1405/08/26", TrackingCode: "9988776655443322"), CancellationToken.None)).IsSuccess);
         view = (await _instruments.GetAsync(cheques[0], CancellationToken.None))!;
         Assert.Equal(("InLegal", "1405/08/27", "تحویل به وکیل شرکت جهت طرح دعوی"), (view.State, view.History[^1].Date, view.History[^1].Note));
-        Assert.Equal(["Replace", "Cancel"], view.AllowedActions);
+        Assert.Equal(("BN-9", "1405/08/26", "9988776655443322"), (view.History[^1].Reference, view.History[^1].Details!.DocumentDate, view.History[^1].Details!.TrackingCode));
+        Assert.Equal(["Replace", "Cancel", "ReturnFromLegal"], view.AllowedActions);
 
         // Registering in Sayad has no voucher (answer to Q37); deposit, bounce and the legal action have theirs (answer to Q38).
         var steps = await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None);
@@ -104,6 +107,16 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Equal([(true, "9201", "200015"), (false, "1203", "200015")], legal.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 5, CancellationToken.None)).IsSuccess);
         Assert.Single(await _instruments.ListReceivedAsync(InstrumentState.InLegal, CancellationToken.None));
+
+        // Answer to Q38 (2): the cheque became collectable; back in the cash desk it starts again like a new cheque, with its voucher.
+        await Step(cheques[0], InstrumentAction.ReturnFromLegal, "1405/08/27", note: "قابل وصول شد");
+        view = (await _instruments.GetAsync(cheques[0], CancellationToken.None))!;
+        Assert.Equal("InCashDesk", view.State);
+        Assert.Contains("RegisterSayad", view.AllowedActions);
+        var back = (await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None))[^1];
+        Assert.Equal((6, "تحویل چک به صندوق پس از اقدام حقوقی"), (back.Step, back.Operation));
+        // Dr «اسناد نزد صندوق» (not set in this test's template) / Cr «اسناد واخواست شده حقوقی شده».
+        Assert.Equal([(true, "ChequesInCashDesk", "200015"), (false, "9201", "200015")], back.Lines.Select(l => (l.IsDebit, l.Missing ?? l.AccountCode, l.DetailCode)));
     }
 
     [Fact]
@@ -185,21 +198,21 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         var first = await _legal.AttachAsync(Key(), cheque, "دادخواست.pdf", Pdf, CancellationToken.None);
         Assert.True(first.IsSuccess, first.ErrorCode);
         byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7];
-        var second = await _legal.AttachAsync(Key(), cheque, "اعلامیه برگشت.png", png, CancellationToken.None);
+        var second = await _legal.AttachAsync(Key(), cheque, "گواهی عدم پرداخت.png", png, CancellationToken.None);
         Assert.Equal("Instrument.AttachmentType", (await _legal.AttachAsync(Key(), cheque, "x.exe", [1, 2, 3, 4], CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.NotFound", (await _legal.AttachAsync(Key(), Guid.NewGuid(), "a.pdf", Pdf, CancellationToken.None)).ErrorCode);
 
         var list = await _legal.ListAsync(cheque, CancellationToken.None);
-        Assert.Equal([("دادخواست.pdf", "application/pdf", 8, 5, "treasurer"), ("اعلامیه برگشت.png", "image/png", 9, 5, "treasurer")],
+        Assert.Equal([("دادخواست.pdf", "application/pdf", 8, 5, "treasurer"), ("گواهی عدم پرداخت.png", "image/png", 9, 5, "treasurer")],
             list.Select(f => (f.FileName, f.ContentType, f.Size, f.Step, f.UploadedBy)));
         var opened = await _legal.GetAsync(cheque, second.Value, CancellationToken.None);
         Assert.Equal(png, opened!.Value.Content);
-        Assert.Equal(("اعلامیه برگشت.png", "image/png"), (opened.Value.File.FileName, opened.Value.File.ContentType));
+        Assert.Equal(("گواهی عدم پرداخت.png", "image/png"), (opened.Value.File.FileName, opened.Value.File.ContentType));
         Assert.Null(await _legal.GetAsync(Guid.NewGuid(), second.Value, CancellationToken.None));
 
         Assert.True((await _legal.RemoveAsync(Key(), cheque, first.Value, CancellationToken.None)).IsSuccess);
         Assert.Equal("Instrument.AttachmentNotFound", (await _legal.RemoveAsync(Key(), cheque, first.Value, CancellationToken.None)).ErrorCode);
-        Assert.Equal(["اعلامیه برگشت.png"], (await _legal.ListAsync(cheque, CancellationToken.None)).Select(f => f.FileName));
+        Assert.Equal(["گواهی عدم پرداخت.png"], (await _legal.ListAsync(cheque, CancellationToken.None)).Select(f => f.FileName));
     }
 
     [Fact]

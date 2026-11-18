@@ -80,13 +80,14 @@ public sealed record HistorySnapshot(
 /// <summary>Storable form of <see cref="StepDetails"/> (JSON in cashflow.instrument_event.details); dates are ISO dates.</summary>
 public sealed record StepDetailsSnapshot(
     Guid? AccountId = null, string? PartyDetailCode = null, string? PartyName = null, DateOnly? DocumentDate = null, Guid? PurposeGroupId = null,
-    string? Purpose = null, string? SayadTracking = null, Guid? ReceiptId = null, Guid? PaymentRequestId = null)
+    string? Purpose = null, string? SayadTracking = null, Guid? ReceiptId = null, Guid? PaymentRequestId = null, string? TrackingCode = null)
 {
     public static StepDetailsSnapshot? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.Value, d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.Value, d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId, d.TrackingCode);
 
     public StepDetails ToDomain() =>
-        new(AccountId, PartyDetailCode, PartyName, DocumentDate is { } d ? new FiscalDate(d) : null, PurposeGroupId, Purpose, SayadTracking, ReceiptId, PaymentRequestId);
+        new(AccountId, PartyDetailCode, PartyName, DocumentDate is { } d ? new FiscalDate(d) : null, PurposeGroupId, Purpose, SayadTracking, ReceiptId, PaymentRequestId,
+            TrackingCode);
 }
 
 public sealed record ChequeBookSnapshot(

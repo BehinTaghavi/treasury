@@ -177,9 +177,13 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RegisterSayad, "1405/08/23"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), second, Guid.NewGuid(), "1405/08/23", "F-2"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RecordBounced, "1405/08/24", Reference: "BN-3"), CancellationToken.None)).IsSuccess);
-        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Note: "تحویل به وکیل شرکت"), CancellationToken.None)).IsSuccess);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Note: "تحویل به وکیل شرکت",
+            Reference: "BN-3", DocumentDate: "1405/08/24", TrackingCode: "1122334455667788"), CancellationToken.None)).IsSuccess);
         view = (await useCases.GetAsync(second, CancellationToken.None))!;
         Assert.Equal(("InLegal", "1405/08/25", "تحویل به وکیل شرکت"), (view.State, view.History[^1].Date, view.History[^1].Note));
+
+        // The certificate of non-payment of the legal action: number, date and tracking code.
+        Assert.Equal(("BN-3", "1405/08/24", "1122334455667788"), (view.History[^1].Reference, view.History[^1].Details!.DocumentDate, view.History[^1].Details!.TrackingCode));
 
         // The scans of the legal action (db/postgres/034): stored with their content, listed, opened and removed.
         var legal = new LegalActionUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresInstrumentAttachmentRepository(),

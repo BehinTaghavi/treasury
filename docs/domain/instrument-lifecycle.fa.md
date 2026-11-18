@@ -20,8 +20,8 @@
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer (عودت به صادرکننده) | InCashDesk | D_Check_Od_m | همه |
 | — عودت شده از بانک | ReturnedFromBank | ReturnFromBank (عودت به شرکت) | DepositedForCollection | بند ۱۴ (ج) | همه |
 | ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (واگذاری مجدد) | ReturnedFromBank | بند ۱۴، Q33 | چک عادی، چک بانکی |
-| ۱۴ — برگشت شده | Bounced | RecordBounced (شمارهٔ اعلامیهٔ برگشت الزامی؛ تاریخ مرحله تاریخ اعلامیه است) | DepositedForCollection، ReturnedFromBank | بند ۱۴ (ه)، Q33 | همه |
-| ۱۴ — برگشت شده | Bounced | RecordEndorsementReturned (برگشت خرج، با شمارهٔ اعلامیه) | Endorsed | بند ۱۴ (ح) | همه |
+| ۱۴ — برگشت شده | Bounced | RecordBounced (شمارهٔ گواهی عدم پرداخت الزامی؛ تاریخ مرحله تاریخ گواهی است) | DepositedForCollection، ReturnedFromBank | بند ۱۴ (ه)، Q33 | همه |
+| ۱۴ — برگشت شده | Bounced | RecordEndorsementReturned (برگشت خرج، با شمارهٔ گواهی عدم پرداخت) | Endorsed | بند ۱۴ (ح) | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | دستورالعمل | همه |
 | — تعویض چک | Replaced | Replace (با رسید دریافت چک‌های جدید از همان پرداخت‌کننده) | InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal | بند ۱۴ (د)، Q31؛ مدیرعامل ۲۷ آبان ۱۴۰۵ | غیر تضمینی |
 | — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal | بند ۱۴ (و)، Q30 | همه |
@@ -29,6 +29,7 @@
 | ۱۵، ۱۶ | ReturnedToIssuer، Endorsed | سایر مراحل چک نزد صندوق (عودت از صندوق، خرج) | SayadRegistered | مدیرعامل، ۲۷ آبان ۱۴۰۵ | مانند InCashDesk |
 | ۱۴ + GoInlaw — اقدام حقوقی | InLegal | SendToLegal (تاریخ و شرح اقدام، در صفحهٔ «اقدام حقوقی»؛ اسکن ضمائم پس از آن اضافه می‌شود) | Bounced | مدیرعامل، ۲۷ آبان ۱۴۰۵ | همه |
 | — اقدام حقوقی | InLegal | SendToLegal: چک تضمینی و سفتهٔ تضمینی؛ چک عادی به‌عنوان حالت استثنایی | InCashDesk، SayadRegistered | پاسخ مدیرعامل به Q38 و ۲۷ آبان ۱۴۰۵ | چک‌ها و سفتهٔ تضمینی (نه سفتهٔ عادیِ برگشت‌نخورده) |
+| — نزد صندوق | InCashDesk | ReturnFromLegal (چک قابل وصول شد: تحویل به صندوق و ادامه مانند یک چک جدید) | InLegal | پاسخ مدیرعامل به Q38 (۲)، ۲۷ آبان ۱۴۰۵ | همه |
 | ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
 
 بند ۱۴ مدیرعامل (۲۴ آبان ۱۴۰۵) و پاسخ‌های Q30 تا Q35: `docs/domain/received-cheque-steps.fa.md`. «برگشت شده» و «خرج شده» دیگر پایانی نیستند.

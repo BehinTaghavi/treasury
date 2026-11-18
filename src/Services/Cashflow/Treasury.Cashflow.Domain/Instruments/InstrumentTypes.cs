@@ -70,6 +70,7 @@ public enum InstrumentAction
     RecordEndorsementReturned,
     RegisterSayad,
     SendToLegal,
+    ReturnFromLegal,
 }
 
 /// <summary>

@@ -28,6 +28,7 @@ const actionNames: Record<string, [string, string]> = {
   ReturnFromBank: ['عودت چک از بانک', 'Returned by the bank'],
   RecordBounced: ['برگشت چک', 'Bounced'],
   SendToLegal: ['اقدام حقوقی', 'Legal action'],
+  ReturnFromLegal: ['تحویل به صندوق (قابل وصول)', 'Back to the cash desk'],
   Replace: ['تعویض چک', 'Replace'],
   Cancel: ['ابطال', 'Cancel'],
   Endorse: ['خرج چک', 'Endorse'],

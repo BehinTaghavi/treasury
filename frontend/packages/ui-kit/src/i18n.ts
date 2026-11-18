@@ -77,7 +77,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'PaymentRequest.HasPayments': 'قسمتی از این درخواست پرداخت شده است؛ ابطال یا برداشتن تایید آن ممکن نیست.',
     'PaymentRequest.PaymentKeyRequired': 'شناسهٔ پرداخت نامشخص است.',
     'Requests.Unavailable': 'سرویس درخواست وجه در دسترس نیست. چند لحظه بعد دوباره تلاش کنید.',
-    'Instrument.BounceNoticeRequired': 'شمارهٔ اعلامیهٔ برگشت بانک را وارد کنید.',
+    'Instrument.BounceNoticeRequired': 'شمارهٔ گواهی عدم پرداخت بانک را وارد کنید.',
     'Instrument.LegalActionDescriptionRequired': 'شرح اقدام حقوقی را وارد کنید.',
     'Instrument.SayadRegistrationRequired': 'چک ابتدا باید ثبت صیادی شود؛ چک بدون ثبت صیادی به بانک واگذار نمی‌شود.',
     'Instrument.NotInLegalAction': 'اسکن ضمائم فقط برای چکی که در وضعیت اقدام حقوقی است اضافه یا حذف می‌شود.',

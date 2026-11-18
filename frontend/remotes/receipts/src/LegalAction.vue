@@ -7,15 +7,18 @@
  * Owner's answers of 18 Nov 2026 (Q38): the action has its voucher (Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»), shown
  * with «تایید سند» on the opened cheque; and, "unlikely as it is", the action can be taken on a cheque still in the cash desk (then
  * Cr «اسناد نزد صندوق»): a tick box adds those cheques to the list box.
+ * Owner, 18 Nov 2026: the bank's paper is called «گواهی عدم پرداخت»; its number, date and tracking code are on this screen (filled from
+ * the bounce when the cheque has one). A cheque that becomes collectable is handed back to the cash desk («تحویل به صندوق») from here.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { chequeStateName, createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { ACCEPT, MAX_BYTES, openLegalFile, sizeText, uploadLegalFile, type LegalFile } from './legalFiles'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
-interface Step { action: string; to: string; date: string; userId: string; reference: string | null; note: string | null; details: { accountId: string | null } | null }
+interface Step { action: string; to: string; date: string; userId: string; reference: string | null; note: string | null
+  details: { accountId: string | null; documentDate: string | null; trackingCode: string | null } | null }
 interface Cheque {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number; issueDate: string; dueDate: string | null
   counterparty: string; counterpartyDetailCode: string | null; purpose: string; state: string; history: Step[]; allowedActions: string[]
@@ -59,7 +62,7 @@ async function load() {
 }
 
 // ---- the form: choose a bounced cheque, enter the action ----
-const form = reactive({ chequeId: '', date: todayJalali(), description: '' })
+const form = reactive({ chequeId: '', date: todayJalali(), description: '', certificateNo: '', certificateDate: '', certificateCode: '' })
 const queued = ref<File[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 const candidates = computed(() => [...bounced.value, ...inDesk.value.filter(c => guarantee(c) || withDesk.value)])
@@ -69,6 +72,13 @@ const choices = computed<Choice[]>(() => candidates.value.map(c => ({
   hint: `${kindName(c)} · ${money(c.amount)}${c.currency !== 'IRR' ? ' ' + c.currency : ''}${c.dueDate ? ` · ${t('سررسید', 'due')} ${c.dueDate}` : ''} · ${chequeStateName(c.state, props.locale)}`,
 })))
 const chosen = computed(() => candidates.value.find(c => c.id === form.chequeId) ?? null)
+/** The certificate of non-payment (گواهی عدم پرداخت) of the chosen cheque is filled from its bounce; it can be completed or corrected. */
+watch(chosen, c => {
+  const b = c && c.state === 'Bounced' ? bounceOf(c) : null
+  form.certificateNo = b?.notice ?? ''
+  form.certificateDate = b?.date ?? ''
+  form.certificateCode = ''
+})
 
 /** The bounce of a cheque: the bank's notice, its date, the reason and the account it was deposited at. */
 function bounceOf(c: Cheque) {
@@ -106,8 +116,11 @@ async function record() {
   const date = normaliseJalali(form.date)
   if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
   if (!form.description.trim()) return show('error', translate('Instrument.LegalActionDescriptionRequired', props.locale))
+  const certificateDate = form.certificateDate.trim() ? normaliseJalali(form.certificateDate) : null
+  if (form.certificateDate.trim() && !certificateDate) return show('error', translate('FiscalDate.Invalid', props.locale))
   busy.value = true
-  const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/actions/SendToLegal`, { date, note: form.description, destination: null, reference: null })
+  const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/actions/SendToLegal`, {
+    date, note: form.description, destination: null, reference: form.certificateNo.trim() || null, documentDate: certificateDate, trackingCode: form.certificateCode.trim() || null })
   if (!r.ok) { busy.value = false; return show('error', translate(r.code, props.locale)) }
   const files = queued.value
   const failed = await upload(c.id, files)
@@ -167,6 +180,24 @@ async function addFiles(e: Event) {
   else show('ok', t(`${num(chosenFiles.length)} فایل ضمیمه شد.`, `${chosenFiles.length} scan(s) attached.`))
   await open(opened.value.id)
 }
+/** Answer to Q38 (2): the cheque became collectable; it goes back to the cash desk and on like a new cheque. */
+const handBack = reactive({ open: false, date: todayJalali(), note: '' })
+async function returnToDesk() {
+  const c = opened.value
+  if (!c || busy.value) return
+  const date = normaliseJalali(handBack.date)
+  if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
+  busy.value = true
+  const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/actions/ReturnFromLegal`, { date, note: handBack.note || null, destination: null, reference: null })
+  busy.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  handBack.open = false
+  handBack.note = ''
+  openId.value = ''
+  show('ok', t(`${kindName(c)} ${c.number} به صندوق تحویل شد و آخرین وضعیت آن «${chequeStateName('InCashDesk', props.locale)}» است؛ از این پس مانند یک چک جدید در «عملیات چک‌های دریافتی» ادامه می‌یابد. سند آن در کارت چک تایید می‌شود.`,
+    `${kindName(c)} ${c.number} is back in the cash desk; it goes on like a new cheque on the steps screen. Confirm its voucher on the cheque card.`))
+  await load()
+}
 async function removeFile(f: LegalFile) {
   if (!opened.value) return
   const r = await api.post<string>(`/api/cashflow/instruments/${opened.value.id}/legal-files/${f.id}/delete`, {})
@@ -213,7 +244,7 @@ onMounted(async () => {
             <div><dt>{{ t('سررسید', 'Due') }}</dt><dd class="num">{{ chosen.dueDate ?? '—' }}</dd></div>
             <div><dt>{{ t('وضعیت فعلی', 'Status now') }}</dt><dd>{{ chequeStateName(chosen.state, locale) }}</dd></div>
             <template v-if="chosen.state === 'Bounced'">
-              <div><dt>{{ t('اعلامیهٔ برگشت', 'Bounce notice') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
+              <div><dt>{{ t('گواهی عدم پرداخت', 'Certificate of non-payment') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
               <div><dt>{{ t('علت برگشت', 'Reason') }}</dt><dd>{{ bounceOf(chosen).reason || '—' }}</dd></div>
             </template>
             <div v-if="bounceOf(chosen).account"><dt>{{ t('حساب واگذاری', 'Deposited at') }}</dt><dd>{{ bounceOf(chosen).account }}</dd></div>
@@ -224,6 +255,9 @@ onMounted(async () => {
       <fieldset>
         <legend>{{ t('اقدام حقوقی', 'Legal action') }}</legend>
         <label class="req">{{ t('تاریخ اقدام', 'Date of the action') }} <input v-model="form.date" dir="ltr" :disabled="!chosen" /></label>
+        <label>{{ t('شمارهٔ گواهی عدم پرداخت', 'Certificate of non-payment no.') }} <input v-model="form.certificateNo" dir="ltr" :disabled="!chosen" /></label>
+        <label>{{ t('تاریخ گواهی عدم پرداخت', 'Date of the certificate') }} <input v-model="form.certificateDate" dir="ltr" placeholder="1405/08/27" :disabled="!chosen" /></label>
+        <label>{{ t('کد رهگیری گواهی عدم پرداخت', 'Tracking code of the certificate') }} <input v-model="form.certificateCode" dir="ltr" :disabled="!chosen" /></label>
         <label class="full req">{{ t('شرح اقدام حقوقی', 'Description of the legal action') }}
           <textarea v-model="form.description" rows="3" :disabled="!chosen" />
         </label>
@@ -278,7 +312,12 @@ onMounted(async () => {
         {{ opened.bankName }}<template v-if="opened.details?.branchName"> – {{ opened.details.branchName }}</template> · {{ opened.counterparty }} ·
         {{ t('مبلغ', 'Amount') }} <span class="num">{{ money(opened.amount) }}</span> {{ opened.currency === 'IRR' ? '' : opened.currency }} ·
         {{ t('سررسید', 'due') }} <span class="num">{{ opened.dueDate }}</span>
-        <template v-if="bounceOf(opened).notice"> · {{ t('اعلامیهٔ برگشت', 'bounce notice') }} <span class="num">{{ bounceOf(opened).notice }} – {{ bounceOf(opened).date }}</span></template>
+      </p>
+      <p v-if="actionOf(opened)?.reference || actionOf(opened)?.details?.trackingCode">
+        <strong>{{ t('گواهی عدم پرداخت', 'Certificate of non-payment') }}:</strong>
+        {{ t('شماره', 'no.') }} <span class="num">{{ actionOf(opened)?.reference ?? '—' }}</span> ·
+        {{ t('تاریخ', 'date') }} <span class="num">{{ actionOf(opened)?.details?.documentDate ?? '—' }}</span> ·
+        {{ t('کد رهگیری', 'tracking code') }} <span class="num">{{ actionOf(opened)?.details?.trackingCode ?? '—' }}</span>
       </p>
       <p><strong>{{ t('تاریخ اقدام', 'Date of the action') }}:</strong> <span class="num">{{ actionOf(opened)?.date }}</span> ·
         <strong>{{ t('ثبت', 'By') }}:</strong> {{ actionOf(opened)?.userId }}</p>
@@ -297,10 +336,17 @@ onMounted(async () => {
         <input type="file" :accept="ACCEPT" multiple :disabled="busy" @change="addFiles" />
       </label>
       <VoucherTable v-if="voucher" :voucher="voucher" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming" @confirm="confirmVoucher" />
-      <p v-else-if="guarantee(opened)" class="muted small">{{ t('چک و سفتهٔ تضمینی در حساب‌های انتظامی نگهداری می‌شوند؛ سند اقدام حقوقی آن‌ها هنوز تعیین نشده است (پرسش Q42).',
-        'Guarantee cheques and notes are kept in the memorandum accounts; the voucher of their legal action is not decided yet (question Q42).') }}</p>
-      <p class="muted small">{{ t('مراحل بعدی این چک (تعویض چک، ابطال) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شود.',
-        'The next steps of this cheque (replacement, cancellation) are recorded on the «Received cheque steps» tab.') }}</p>
+      <div class="tr-buttons" style="margin-top: .75rem">
+        <button v-if="!handBack.open" type="button" class="tr-secondary" @click="handBack.open = true">{{ t('تحویل به صندوق (چک قابل وصول شد)', 'Back to the cash desk (collectable)') }}</button>
+        <template v-else>
+          <label>{{ t('تاریخ تحویل به صندوق', 'Date') }} <input v-model="handBack.date" dir="ltr" /></label>
+          <label style="flex: 1">{{ t('توضیحات', 'Note') }} <input v-model="handBack.note" /></label>
+          <button type="button" :disabled="busy" @click="returnToDesk">{{ t('ثبت تحویل به صندوق', 'Record') }}</button>
+          <button type="button" class="tr-secondary" @click="handBack.open = false">{{ t('انصراف', 'Back') }}</button>
+        </template>
+      </div>
+      <p class="muted small">{{ t('اگر چک حین اقدام حقوقی یا در پایان آن قابل وصول شود، به صندوق تحویل می‌شود و مانند یک چک جدید ادامه می‌یابد؛ تعویض چک و ابطال در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شود.',
+        'If the cheque becomes collectable it is handed back to the cash desk and goes on like a new cheque; replacement and cancellation are recorded on the «Received cheque steps» tab.') }}</p>
     </section>
   </div>
 </template>

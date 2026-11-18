@@ -26,8 +26,11 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 15, 16 | ReturnedToIssuer, Endorsed | the other steps of a cheque in the cash desk (ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
 | 14 + GoInlaw | InLegal (اقدام حقوقی) | SendToLegal (date and description of the action, on the screen «اقدام حقوقی»; scans attached afterwards) | Bounced | owner, 18 Nov 2026 | all |
 | — | InLegal (اقدام حقوقی) | SendToLegal: guarantee cheques and guarantee notes; ordinary cheques as the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38 and 18 Nov 2026 | cheques and guarantee notes (not an ordinary note that has not bounced) |
+| — | InCashDesk (نزد صندوق) | ReturnFromLegal (the cheque became collectable: back to the cash desk, then like a new cheque) | InLegal | owner's answer to Q38 (2), 18 Nov 2026 | all |
 
 Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-cheque-steps.md`. Bounced and Endorsed are no longer final.
+The bank's paper called "bounce notice" in this file and in the code is «گواهی عدم پرداخت» (certificate of non-payment) on the screens
+(owner, 18 Nov 2026); the legal action keeps its number, date and tracking code.
 
 Latest status as the owner described it on 18 Nov 2026 (`received-cheque-steps.md`, section 5): a cheque registered in Sayad stays in
 the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be replaced or cancelled.

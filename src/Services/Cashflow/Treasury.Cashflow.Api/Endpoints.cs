@@ -13,8 +13,9 @@ namespace Treasury.Cashflow.Api;
 public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string BankName, MoneyInput Amount, string ReceivedOn, string? DueDate, Guid DrawerId, string DrawerName, string Purpose);
 
 /// <param name="Reference">Bounce notice no., management's order no. (cancellation) or bank reference.</param>
-/// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order.</param>
-public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null);
+/// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order. Legal action: the date of the certificate of non-payment.</param>
+/// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment.</param>
+public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null, string? TrackingCode = null);
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
@@ -77,7 +78,7 @@ public static class Endpoints
 
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(
-                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate), ct).ConfigureAwait(false),
+                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate, r.TrackingCode), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
         // Owner's item 14: replacement (a cheque receipt of the new cheques) and endorsement of a received cheque.

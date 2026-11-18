@@ -33,6 +33,12 @@ public enum FixedAccount
     /// legal action, against «اسناد واخواست شده», or «اسناد نزد صندوق» for a cheque that was still in the cash desk).
     /// </summary>
     ProtestedChequesInLegal,
+
+    /// <summary>
+    /// «اسناد تضمینی حقوقی شده به نفع شرکت»: guarantee cheques and notes in legal action (owner's answer to Q42, 18 Nov 2026: debited at
+    /// the legal action, against «اسناد تضمینی به نفع شرکت» — <see cref="GuaranteeChequesForCompany"/>).
+    /// </summary>
+    GuaranteeChequesInLegal,
 }
 
 /// <summary>A cheque receipt that replaces a cheque: the old cheque and where it was when replaced (owner's item 14 (d)).</summary>
@@ -221,10 +227,10 @@ public static class ReceiptVouchers
                 return ForCleared(cheque, bank, e.Date, template);
             case InstrumentAction.RecordBounced when e.From == InstrumentState.ReturnedFromBank:
                 return Pair("برگشت چک (پس از عودت از بانک)", cheque, e.Date,
-                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت – اعلامیه {e.Reference}")),
-                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"برگشت – اعلامیه {e.Reference}")));
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت – گواهی عدم پرداخت {e.Reference}")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"برگشت – گواهی عدم پرداخت {e.Reference}")));
             case InstrumentAction.RecordBounced:
-                return ForBounced(cheque, bank, e.Date, template) is { } b ? b with { Lines = [.. b.Lines.Select(l => l with { Description = $"{l.Description} – اعلامیه {e.Reference}" })] } : null;
+                return ForBounced(cheque, bank, e.Date, template) is { } b ? b with { Lines = [.. b.Lines.Select(l => l with { Description = $"{l.Description} – گواهی عدم پرداخت {e.Reference}" })] } : null;
             case InstrumentAction.ReturnFromBank:
                 return Pair("عودت چک واگذاری توسط بانک", cheque, e.Date,
                     Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, "عودت از بانک")),
@@ -234,23 +240,33 @@ public static class ReceiptVouchers
                 return cheque.Kind.IsGuarantee()
                     ? Pair("ابطال چک انتظامی دریافتی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, text),
-                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, text))
+                        Fixed(false, template, GuaranteeAccountOf(e.From), payer, amount, text))
                     : Pair("ابطال چک دریافتنی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
                         Fixed(false, template, AccountOf(e.From), payer, amount, text));
             case InstrumentAction.SendToLegal:
                 // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»; for a cheque that was
                 // still in the cash desk, Cr «اسناد نزد صندوق». The payer's تفصیل on both sides.
-                // A guarantee cheque or note stays in the memorandum accounts; which entry its legal action needs is open (Q42).
-                if (cheque.Kind.IsGuarantee())
-                {
-                    return null;
-                }
-
+                // A guarantee cheque or note (answer to Q42): Dr «اسناد تضمینی حقوقی شده به نفع شرکت» / Cr «اسناد تضمینی به نفع شرکت».
                 var legal = Text(cheque, "اقدام حقوقی");
-                return Pair("اقدام حقوقی چک", cheque, e.Date,
-                    Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),
-                    Fixed(false, template, AccountOf(e.From), payer, amount, legal));
+                return cheque.Kind.IsGuarantee()
+                    ? Pair("اقدام حقوقی چک تضمینی", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, legal),
+                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, legal))
+                    : Pair("اقدام حقوقی چک", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),
+                        Fixed(false, template, AccountOf(e.From), payer, amount, legal));
+            case InstrumentAction.ReturnFromLegal:
+                // Answer to Q38 (2): the cheque became collectable and is back in the cash desk like a new cheque, so the legal action's
+                // entry is taken out: Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده» (guarantee: the two guarantee accounts).
+                var handed = Text(cheque, "تحویل به صندوق پس از اقدام حقوقی");
+                return cheque.Kind.IsGuarantee()
+                    ? Pair("تحویل چک تضمینی به صندوق پس از اقدام حقوقی", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, handed),
+                        Fixed(false, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, handed))
+                    : Pair("تحویل چک به صندوق پس از اقدام حقوقی", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, handed),
+                        Fixed(false, template, FixedAccount.ProtestedChequesInLegal, payer, amount, handed));
             case InstrumentAction.ReturnToIssuer:
                 // Owner's table «عودت چک‌های نزد صندوق»: Dr «بدهکاران یا ...» (payer) / Cr «اسناد نزد صندوق» (payer). The debit is the account
                 // the receipt credited, so the return takes the receipt's entry back (open question Q41). A guarantee cheque leaves the
@@ -269,8 +285,8 @@ public static class ReceiptVouchers
                     Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"خرج به {e.Details?.PartyName}")));
             case InstrumentAction.RecordEndorsementReturned:
                 return Pair("برگشت چک خرج شده", cheque, e.Date,
-                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – اعلامیه {e.Reference}")),
-                    new VoucherLine(false, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"برگشت خرج – اعلامیه {e.Reference}")));
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – گواهی عدم پرداخت {e.Reference}")),
+                    new VoucherLine(false, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"برگشت خرج – گواهی عدم پرداخت {e.Reference}")));
             default:
                 return null;
         }
@@ -287,6 +303,10 @@ public static class ReceiptVouchers
         InstrumentState.Bounced => FixedAccount.ProtestedCheques,
         _ => FixedAccount.ChequesInCashDesk,
     };
+
+    /// <summary>The memorandum account a guarantee cheque or note is kept in: in legal action its own account (answer to Q42).</summary>
+    public static FixedAccount GuaranteeAccountOf(InstrumentState? state) =>
+        state == InstrumentState.InLegal ? FixedAccount.GuaranteeChequesInLegal : FixedAccount.GuaranteeChequesForCompany;
 
     private static Voucher Pair(string operation, Instrument cheque, FiscalDate date, VoucherLine debit, VoucherLine credit)
     {

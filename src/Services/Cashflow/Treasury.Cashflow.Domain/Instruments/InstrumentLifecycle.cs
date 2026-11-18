@@ -61,6 +61,10 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() || k.IsGuarantee(), "Owner, answer Q38 and 18 Nov 2026: اقدام حقوقی روی چک نزد صندوق، چک تضمینی و سفته تضمینی"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() || k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق (ثبت صیادی شده)"),
 
+        // Owner's answer to Q38 (2), 18 Nov 2026: "if the cheque or note becomes collectable during or at the end of the legal action,
+        // it is handed to the cash desk at the start of the cycle («نزد صندوق») and from there treated like a new cheque".
+        new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.ReturnFromLegal, InstrumentState.InCashDesk, AnyKind, "Owner, answer Q38 (2): تحویل به صندوق پس از اقدام حقوقی"),
+
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),
         new(InstrumentDirection.Issued, InstrumentState.Issued, InstrumentAction.Deliver, InstrumentState.Delivered, AnyKind, "Check_deliv_m: 21 -> 22"),

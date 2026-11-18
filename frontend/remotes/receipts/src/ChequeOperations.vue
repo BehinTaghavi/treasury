@@ -21,7 +21,8 @@ import ReceiptForm from './ReceiptForm.vue'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Step { action: string; from: string | null; to: string; date: string; userId: string; reference: string | null; note: string | null
-  details: { accountId: string | null; partyName: string | null; documentDate: string | null; purpose: string | null; sayadTracking: string | null; receiptId: string | null } | null }
+  details: { accountId: string | null; partyName: string | null; documentDate: string | null; purpose: string | null; sayadTracking: string | null; receiptId: string | null
+    trackingCode: string | null } | null }
 interface Cheque {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
@@ -200,16 +201,19 @@ async function confirmVoucher(step: number) {
 }
 function stepText(s: Step) {
   const d = s.details
-  const parts = [s.reference && (s.action === 'RecordBounced' || s.action === 'RecordEndorsementReturned' ? t(`اعلامیه ${s.reference}`, `notice ${s.reference}`)
+  const parts = [s.reference && (s.action === 'RecordBounced' || s.action === 'RecordEndorsementReturned' ? t(`گواهی عدم پرداخت ${s.reference}`, `certificate ${s.reference}`)
     : s.action === 'Cancel' ? t(`دستور ${s.reference} مورخ ${d?.documentDate ?? ''}`, `order ${s.reference} of ${d?.documentDate ?? ''}`)
-    : s.action === 'Endorse' || s.action === 'RegisterSayad' ? t(`پیگیری صیاد ${s.reference}`, `Sayad ${s.reference}`) : s.reference),
+    : s.action === 'Endorse' || s.action === 'RegisterSayad' ? t(`پیگیری صیاد ${s.reference}`, `Sayad ${s.reference}`)
+    : s.action === 'SendToLegal' ? t(`گواهی عدم پرداخت ${s.reference}${d?.documentDate ? ' مورخ ' + d.documentDate : ''}`, `certificate ${s.reference}${d?.documentDate ? ' of ' + d.documentDate : ''}`)
+    : s.reference),
+  s.action === 'SendToLegal' && d?.trackingCode && t(`کد رهگیری ${d.trackingCode}`, `tracking ${d.trackingCode}`),
   d?.accountId && accountName(d.accountId), d?.partyName, d?.purpose, s.note]
   return parts.filter(Boolean).join(' · ')
 }
 
 const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
 /** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. */
-const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
+const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'ReturnFromLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
 const rank = (a: string) => { const i = stepOrder.indexOf(a); return i < 0 ? stepOrder.length : i }
 /**
  * «اقدام حقوقی» is offered on bounced cheques and notes and on guarantee cheques and notes; the rare action on an ordinary cheque still in
@@ -240,12 +244,12 @@ onMounted(async () => { await L.load(); await load() })
     <!-- one step on one cheque -->
     <fieldset v-if="pending" class="tr-step">
       <legend>{{ actionName(pending.action) }} – {{ t('چک', 'cheque') }} {{ pending.cheque.number }} ({{ money(pending.cheque.amount) }})</legend>
-      <label class="req">{{ pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned' ? t('تاریخ اعلامیهٔ برگشت', 'Date of the bounce notice')
+      <label class="req">{{ pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned' ? t('تاریخ گواهی عدم پرداخت', 'Date of the bounce notice')
         : pending.action === 'Cancel' ? t('تاریخ ابطال', 'Date of cancellation')
         : pending.action === 'RegisterSayad' ? t('تاریخ ثبت در سامانهٔ صیاد', 'Date of the Sayad registration') : t('تاریخ', 'Date') }}
         <input v-model="pending.date" dir="ltr" /></label>
       <template v-if="pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned'">
-        <label class="req">{{ t('شمارهٔ اعلامیهٔ برگشت', 'Bounce notice no.') }} <input v-model="pending.reference" dir="ltr" /></label>
+        <label class="req">{{ t('شمارهٔ گواهی عدم پرداخت', 'Bounce notice no.') }} <input v-model="pending.reference" dir="ltr" /></label>
         <label class="wide">{{ t('علت برگشت', 'Reason') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else-if="pending.action === 'Cancel'">

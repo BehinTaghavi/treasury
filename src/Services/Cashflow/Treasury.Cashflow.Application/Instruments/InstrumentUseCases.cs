@@ -36,7 +36,8 @@ public sealed record ChangeInstrumentStateCommand(
     string? Destination = null,
     string? Note = null,
     string? Reference = null,
-    string? DocumentDate = null);
+    string? DocumentDate = null,
+    string? TrackingCode = null);
 
 
 public sealed record IssueChequeCommand(
@@ -61,10 +62,11 @@ public sealed record InstrumentHistoryView(string Action, string? From, string T
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
     Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
-    Guid? PaymentRequestId = null)
+    Guid? PaymentRequestId = null, string? TrackingCode = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId,
+            d.TrackingCode);
 }
 
 public sealed record InstrumentView(
@@ -206,8 +208,14 @@ public sealed class InstrumentUseCases(
                     instrument.RegisterSayad(date, user, command.Reference, command.Note);
                     break;
                 case InstrumentAction.SendToLegal:
-                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action.
-                    instrument.SendToLegal(date, user, command.Note);
+                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action, the
+                    // reference, document date and tracking code are those of the certificate of non-payment (گواهی عدم پرداخت).
+                    instrument.SendToLegal(date, user, command.Note, new NonPaymentCertificate(
+                        command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate), command.TrackingCode));
+                    break;
+                case InstrumentAction.ReturnFromLegal:
+                    // Owner's answer to Q38 (2): the cheque became collectable and goes back to the cash desk.
+                    instrument.ReturnFromLegal(date, user, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);

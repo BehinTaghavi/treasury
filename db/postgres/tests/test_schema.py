@@ -729,6 +729,8 @@ def test_the_voucher_template_has_the_account_of_cheques_in_legal_action(db):
     with psycopg.connect(db) as c:
         c.execute("SET ROLE cashflow_svc")
         c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('ProtestedChequesInLegal', '1204') ON CONFLICT DO NOTHING")
+        # Guarantee cheques and notes in legal action (answer to Q42): «اسناد تضمینی حقوقی شده به نفع شرکت».
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeChequesInLegal', '9102') ON CONFLICT DO NOTHING")
         with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
                 c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('LegalCheques', '1')")

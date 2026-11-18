@@ -57,6 +57,8 @@ TRANSITIONS = {
     # Owner's answer to Q38 (18 Nov 2026): legal action, unlikely as it is, on a cheque still in the cash desk.
     (RECEIVED, "InCashDesk", "SendToLegal"): "InLegal",
     (RECEIVED, "SayadRegistered", "SendToLegal"): "InLegal",
+    # Owner's answer to Q38 (2): a cheque in legal action that became collectable goes back to the cash desk.
+    (RECEIVED, "InLegal", "ReturnFromLegal"): "InCashDesk",
     (ISSUED, "BeingIssued", "Issue"): "Issued",
     (ISSUED, "Issued", "Deliver"): "Delivered",
     (ISSUED, "BeingIssued", "Cancel"): "Cancelled",

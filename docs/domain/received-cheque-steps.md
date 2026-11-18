@@ -40,7 +40,7 @@ the «وضعیت» column of the receipts list), built the same day.
 | در جریان وصول (at the bank) | (b) collected · (c) returned to the company · (e) bounced |
 | عودت چک از بانک (back from the bank, not collected) | (a) deposit again · (e) bounced (Q33) · (d) replace · (f) cancel · return to the payer (the owner will say which of these stay: Q40) |
 | برگشت چک (bounced, with notice no. and date) | اقدام حقوقی (its own screen, section 6) · (d) replace · (f) cancel |
-| اقدام حقوقی (with the company's lawyer) — **18 Nov** | (d) replace · (f) cancel · scans of the action added or removed |
+| اقدام حقوقی (with the company's lawyer) — **18 Nov** | تحویل به صندوق (the cheque became collectable; then like a new cheque) · (d) replace · (f) cancel · scans of the action added or removed |
 | خرج شده (endorsed) | (h) returned by the endorsee → **برگشت چک** |
 | وصول چک · تعویض چک · ابطال شده · عودت از صندوق | none (final) |
 
@@ -63,7 +63,8 @@ of the company bank account.
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
 | عودت از صندوق (return to the payer) — **18 Nov** | date, note | the account the cheque's receipt credited (its purpose group's account) · payer (guarantee: «طرف حساب انتظامی») | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | owner's table «عودت چک‌های نزد صندوق: بدهکاران یا ...»; confirmed by the owner (Q41) |
 | ثبت صیادی — **18 Nov** | date, tracking no. of the registration (optional) | no voucher: only the latest status changes (owner's answer to Q37) | | owner, 18 Nov 2026 |
-| اقدام حقوقی — **18 Nov** | date of the action and its description (both required), scans of its papers | new fixed account «اسناد واخواست شده حقوقی شده» · payer | «اسناد واخواست شده» · payer (a cheque still in the cash desk: «اسناد نزد صندوق») | owner's answer to Q38, 18 Nov 2026 |
+| اقدام حقوقی — **18 Nov** | date of the action and its description (both required); number, date and tracking code of the certificate of non-payment («گواهی عدم پرداخت»); scans of its papers | new fixed account «اسناد واخواست شده حقوقی شده» · payer (guarantee: new fixed account «اسناد تضمینی حقوقی شده به نفع شرکت») | «اسناد واخواست شده» · payer (a cheque still in the cash desk: «اسناد نزد صندوق»; guarantee: «چک انتظامی به نفع شرکت») | owner's answers to Q38 and Q42, 18 Nov 2026 |
+| تحویل به صندوق پس از اقدام حقوقی — **18 Nov** | date, note | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | «اسناد واخواست شده حقوقی شده» · payer (guarantee: «اسناد تضمینی حقوقی شده به نفع شرکت») | owner's answer to Q38 (2); the entry of the legal action taken out (to be confirmed) |
 
 One voucher per step and cheque (answer to Q35), also when several cheques are deposited on one slip.
 
@@ -139,10 +140,20 @@ sides. The account is a new line of «شابلون اسناد خزانه دار�
 shown under the opened cheque on this screen with «تایید سند» and cannot be confirmed before the account is set. "If, unlikely as it
 is, legal action is taken on a cheque that is «نزد صندوق»", the credit is «اسناد نزد صندوق»: a tick box on the screen adds the
 cheques still in the cash desk (also those registered in Sayad; not guarantee cheques or notes) to the list box. From then on the
-cheque is in «اسناد واخواست شده حقوقی شده», so its replacement or cancellation credits that account. Still open (Q38, 2): what can
-follow the legal action besides replacement.
+cheque is in «اسناد واخواست شده حقوقی شده», so its replacement or cancellation credits that account (confirmed by the owner).
+
+**After the legal action (owner's answer to Q38 (2)):** "if the cheque or note becomes collectable during the legal action or at its
+end, it is handed to the cash desk at the start of the cycle («نزد صندوق») and from there treated like a new cheque; or it is replaced
+or cancelled". The step «تحویل به صندوق (قابل وصول)» is on the opened cheque of this screen (and on its row of the steps screen): the
+latest status becomes «نزد صندوق» again and the cheque goes through «ثبت صیادی», the deposit and so on. Its voucher takes the legal
+action's entry out (Dr «اسناد نزد صندوق» / Cr «اسناد واخواست شده حقوقی شده»; to be confirmed). The scans stay with the cheque.
+
+**«گواهی عدم پرداخت» (owner, 18 Nov 2026):** the bank's paper is called so on every screen and in the voucher texts (in the code and in
+this English file: bounce notice). The legal-action screen has its **number, date and tracking code**; number and date are filled
+from the bounce when the cheque has one and can be corrected; all three are optional, since a guarantee cheque may have none.
 
 **Guarantee cheques, guarantee notes and bounced notes (owner, 18 Nov 2026)** may get legal action too. The list box therefore holds
 the bounced cheques and notes and the guarantee cheques and notes in the cash desk; ordinary cheques in the cash desk appear only with
-the exceptional-case tick. A guarantee cheque or note stays in the memorandum accounts («چک انتظامی به نفع شرکت» / «طرف حساب
-انتظامی»), so its legal action has no voucher yet: question Q42. A bounced note is credited out of «اسناد واخواست شده» like a cheque.
+the exceptional-case tick. A guarantee cheque or note is kept in the memorandum accounts; its legal action (owner's answer to Q42)
+credits «اسناد تضمینی به نفع شرکت» (the template's «چک انتظامی به نفع شرکت») and debits the new template account «اسناد تضمینی حقوقی
+شده به نفع شرکت» (`FixedAccount.GuaranteeChequesInLegal`). A bounced note is credited out of «اسناد واخواست شده» like a cheque.
