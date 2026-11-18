@@ -320,7 +320,7 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// «اقدام حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal
-    /// action and collection. Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
+    /// action and collection; rarely the action is taken on a cheque still in the cash desk (answer to Q38). Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
     /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
     /// </summary>
     public void SendToLegal(FiscalDate date, string userId, string? description) =>

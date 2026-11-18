@@ -25,6 +25,7 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
 | 12, 15, 16 | DepositedForCollection, ReturnedToIssuer, Endorsed | the steps of a cheque in the cash desk (DepositForCollection, ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
 | 14 + GoInlaw | InLegal (اقدام حقوقی) | SendToLegal (date and description of the action, on the screen «اقدام حقوقی»; scans attached afterwards) | Bounced | owner, 18 Nov 2026 | all |
+| — | InLegal (اقدام حقوقی) | SendToLegal, the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38, 18 Nov 2026 | cheques, not guarantee |
 
 Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-cheque-steps.md`. Bounced and Endorsed are no longer final.
 

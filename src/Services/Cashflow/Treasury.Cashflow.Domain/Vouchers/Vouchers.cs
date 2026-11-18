@@ -27,6 +27,12 @@ public enum FixedAccount
 
     /// <summary>«مطالبات سوخت شده»: debited when a received cheque is cancelled (owner's table «ابطال چک دریافتنی نزد صندوق»).</summary>
     BadDebts,
+
+    /// <summary>
+    /// «اسناد واخواست شده حقوقی شده»: cheques in legal action, with the payer's تفصیل (owner's answer to Q38, 18 Nov 2026: debited at the
+    /// legal action, against «اسناد واخواست شده», or «اسناد نزد صندوق» for a cheque that was still in the cash desk).
+    /// </summary>
+    ProtestedChequesInLegal,
 }
 
 /// <summary>A cheque receipt that replaces a cheque: the old cheque and where it was when replaced (owner's item 14 (d)).</summary>
@@ -108,8 +114,8 @@ public static class ReceiptVouchers
     /// </summary>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
     /// <param name="replacement">A replacement (تعویض): Dr «اسناد نزد صندوق» for each new cheque / Cr the old cheque where it was («اسناد نزد
-    /// صندوق» or, if bounced or with the lawyer, «اسناد واخواست شده»); a difference in amount (answer to Q31) goes to the purpose group,
-    /// with the payer.</param>
+    /// صندوق», if bounced «اسناد واخواست شده», in legal action «اسناد واخواست شده حقوقی شده»); a difference in amount (answer to Q31)
+    /// goes to the purpose group, with the payer.</param>
     public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
         Replacement? replacement = null)
     {
@@ -129,7 +135,7 @@ public static class ReceiptVouchers
             }
 
             var (oldForeign, oldCurrency) = Foreign(old);
-            lines.Add(Fixed(false, template, replacement.From.IsProtested() ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk,
+            lines.Add(Fixed(false, template, AccountOf(replacement.From),
                 payer, old.Amount.ToRial(), Text(old, "تعویض"), oldForeign, oldCurrency));
             var difference = instruments.Sum(i => i.Amount.ToRial()) - old.Amount.ToRial();
             if (difference != 0)
@@ -189,8 +195,8 @@ public static class ReceiptVouchers
 
     /// <summary>
     /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
-    /// steps without a voucher here: receiving and replacing (on their receipt); registering in Sayad and handing to the lawyer, which
-    /// move no account of the owner's template (open questions Q37 and Q38).
+    /// steps without a voucher here: receiving and replacing (on their receipt); registering in Sayad, which only changes the latest
+    /// status (owner's answer to Q37, 18 Nov 2026).
     /// </summary>
     /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
     /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
@@ -231,7 +237,14 @@ public static class ReceiptVouchers
                         Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, text))
                     : Pair("ابطال چک دریافتنی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
-                        Fixed(false, template, e.From?.IsProtested() == true ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk, payer, amount, text));
+                        Fixed(false, template, AccountOf(e.From), payer, amount, text));
+            case InstrumentAction.SendToLegal:
+                // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»; for a cheque that was
+                // still in the cash desk, Cr «اسناد نزد صندوق». The payer's تفصیل on both sides.
+                var legal = Text(cheque, "اقدام حقوقی");
+                return Pair("اقدام حقوقی چک", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),
+                    Fixed(false, template, AccountOf(e.From), payer, amount, legal));
             case InstrumentAction.ReturnToIssuer:
                 // Owner's table «عودت چک‌های نزد صندوق»: Dr «بدهکاران یا ...» (payer) / Cr «اسناد نزد صندوق» (payer). The debit is the account
                 // the receipt credited, so the return takes the receipt's entry back (open question Q41). A guarantee cheque leaves the
@@ -256,6 +269,18 @@ public static class ReceiptVouchers
                 return null;
         }
     }
+
+    /// <summary>
+    /// The fixed account a received cheque is kept in while the company holds it: «اسناد واخواست شده حقوقی شده» in legal action,
+    /// «اسناد واخواست شده» once bounced, otherwise «اسناد نزد صندوق» (in the cash desk, registered in Sayad or back from the bank). The
+    /// next step that takes the cheque out (replacement, cancellation, legal action) credits it.
+    /// </summary>
+    public static FixedAccount AccountOf(InstrumentState? state) => state switch
+    {
+        InstrumentState.InLegal => FixedAccount.ProtestedChequesInLegal,
+        InstrumentState.Bounced => FixedAccount.ProtestedCheques,
+        _ => FixedAccount.ChequesInCashDesk,
+    };
 
     private static Voucher Pair(string operation, Instrument cheque, FiscalDate date, VoucherLine debit, VoucherLine credit)
     {

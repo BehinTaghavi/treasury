@@ -53,6 +53,12 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک در وضعیت اقدام حقوقی"),
         new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f): cancellation in any state by management's order"),
 
+        // Owner's answer to Q38 (18 Nov 2026): "if, unlikely as it is, legal action is taken on a cheque that is «نزد صندوق»" — then
+        // «اسناد واخواست شده حقوقی شده» is debited against «اسناد نزد صندوق». A cheque registered in Sayad is still in the cash desk.
+        // Guarantee cheques are kept in the memorandum accounts, not in «اسناد نزد صندوق», so they are left out.
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() && !k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() && !k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق (ثبت صیادی شده)"),
+
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),
         new(InstrumentDirection.Issued, InstrumentState.Issued, InstrumentAction.Deliver, InstrumentState.Delivered, AnyKind, "Check_deliv_m: 21 -> 22"),

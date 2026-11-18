@@ -724,6 +724,17 @@ def test_scans_of_a_legal_action_are_kept_with_the_cheque(db):
             c.execute("DELETE FROM cashflow.instrument_file WHERE fiscal_year = 1404")
 
 
+def test_the_voucher_template_has_the_account_of_cheques_in_legal_action(db):
+    # 035_cashflow_legal_action_voucher.sql (owner's answer to Q38, 18 Nov 2026: «اسناد واخواست شده حقوقی شده»).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('ProtestedChequesInLegal', '1204') ON CONFLICT DO NOTHING")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('LegalCheques', '1')")
+        c.rollback()
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

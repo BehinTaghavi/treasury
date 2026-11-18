@@ -37,10 +37,13 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
 | عملیات | عودت چک پرداختنی صادره نزد ذینفع و ابطال آن | اسناد پرداختنی | ذینفع | بستانکاران یا ... | ذینفع |
 | عملیات | عودت چک‌های خرج شده توسط ما به دیگران (پس از برگشت) | اسناد واخواست شده | ذینفع | بستانکاران یا ... | ذینفع |
+| عملیات | اقدام حقوقی چک برگشتی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد واخواست شده | ذینفع |
+| عملیات | اقدام حقوقی چک نزد صندوق، به فرض محال (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
 
 Built (owner's report no. 4, item 8, and his answers of 15 Nov 2026): a Basic Information page «شابلون اسناد خزانه داری» holds the
 company's account codes for the fixed accounts of this table: اسناد نزد صندوق / اسناد دریافتنی، چک های در جریان وصول، اسناد واخواست
-شده، چک انتظامی به نفع شرکت، طرف حساب انتظامی. The purpose group, bank account and cash desk supply their own accounts.
+شده، چک انتظامی به نفع شرکت، طرف حساب انتظامی، مطالبات سوخت شده, and since the owner's answer of 18 Nov 2026 اسناد واخواست شده حقوقی شده
+(the last two rows of the table were added by him that day). The purpose group, bank account and cash desk supply their own accounts.
 
 - Money paid straight into a bank account: Dr the bank account's معین with the bank account's تفصیل / Cr purpose group, payer.
 - «چک های در جریان وصول» is one account for all banks; its تفصیل is the bank account's تفصیل.
@@ -49,6 +52,6 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 
 Built so far: receipts (cash, bank, cheques, guarantee cheques) and the steps of a received cheque: deposit at the bank, collected,
 returned by the bank, bounced, replaced, cancelled, endorsed and its return (`received-cheque-steps.md`), and since 18 Nov 2026 the
-return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's receipt credited, question Q41)
-(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی», «اقدام حقوقی» and «سررسید چک» have no row in the table and no voucher
-(questions Q37–Q39). Next with their screens: payments, petty cash, notes and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
+return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's receipt credited, confirmed by the owner, Q41) and the
+legal action (Dr «اسناد واخواست شده حقوقی شده», answer to Q38) (`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی» and
+«سررسید چک» have no voucher (answers to Q37 and Q39). Next with their screens: payments, petty cash, notes and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

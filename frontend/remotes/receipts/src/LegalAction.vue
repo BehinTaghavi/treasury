@@ -4,17 +4,21 @@
  * the bounced cheques; its particulars are shown; the date of the action and its description are entered, with a place for the scans
  * of the action's papers. Recording it puts the cheque in the status «اقدام حقوقی». Below, the cheques already in legal action are
  * listed with their action and scans; scans can still be added or removed there.
+ * Owner's answers of 18 Nov 2026 (Q38): the action has its voucher (Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»), shown
+ * with «تایید سند» on the opened cheque; and, "unlikely as it is", the action can be taken on a cheque still in the cash desk (then
+ * Cr «اسناد نزد صندوق»): a tick box adds those cheques to the list box.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { chequeStateName, createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { ACCEPT, MAX_BYTES, openLegalFile, sizeText, uploadLegalFile, type LegalFile } from './legalFiles'
+import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Step { action: string; to: string; date: string; userId: string; reference: string | null; note: string | null; details: { accountId: string | null } | null }
 interface Cheque {
   id: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number; issueDate: string; dueDate: string | null
-  counterparty: string; counterpartyDetailCode: string | null; purpose: string; state: string; history: Step[]
+  counterparty: string; counterpartyDetailCode: string | null; purpose: string; state: string; history: Step[]; allowedActions: string[]
   details: { branchName: string | null; accountNumber: string | null; accountHolder: string | null; sayadId: string | null } | null
 }
 
@@ -28,30 +32,37 @@ const num = (n: number) => (fa.value ? n.toLocaleString('fa-IR') : String(n))
 const L = useLookups(api)
 
 const bounced = ref<Cheque[]>([])
+/** Cheques still in the cash desk that may get a legal action (the rare case of the owner's answer to Q38). */
+const inDesk = ref<Cheque[]>([])
+const withDesk = ref(false)
 const inLegal = ref<Cheque[]>([])
 const busy = ref(false)
 const message = ref<{ kind: 'error' | 'ok' | 'warning'; text: string } | null>(null)
 const show = (kind: 'error' | 'ok' | 'warning', text: string) => { message.value = { kind, text } }
 
 async function load() {
-  const [b, l] = await Promise.all([
+  const [b, l, d, s] = await Promise.all([
     api.get<Cheque[]>('/api/cashflow/instruments/received?state=Bounced'),
     api.get<Cheque[]>('/api/cashflow/instruments/received?state=InLegal'),
+    api.get<Cheque[]>('/api/cashflow/instruments/received?state=InCashDesk'),
+    api.get<Cheque[]>('/api/cashflow/instruments/received?state=SayadRegistered'),
   ])
   if (b.ok) bounced.value = b.value
   if (l.ok) inLegal.value = l.value
+  inDesk.value = [...(d.ok ? d.value : []), ...(s.ok ? s.value : [])].filter(c => c.allowedActions.includes('SendToLegal'))
 }
 
 // ---- the form: choose a bounced cheque, enter the action ----
 const form = reactive({ chequeId: '', date: todayJalali(), description: '' })
 const queued = ref<File[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
-const choices = computed<Choice[]>(() => bounced.value.map(c => ({
+const candidates = computed(() => (withDesk.value ? [...bounced.value, ...inDesk.value] : bounced.value))
+const choices = computed<Choice[]>(() => candidates.value.map(c => ({
   value: c.id,
   label: `${c.number ?? ''} – ${c.bankName ?? ''} – ${c.counterparty}`,
-  hint: `${money(c.amount)}${c.currency !== 'IRR' ? ' ' + c.currency : ''} · ${t('سررسید', 'due')} ${c.dueDate ?? ''}`,
+  hint: `${money(c.amount)}${c.currency !== 'IRR' ? ' ' + c.currency : ''} · ${t('سررسید', 'due')} ${c.dueDate ?? ''}${c.state === 'Bounced' ? '' : ' · ' + chequeStateName(c.state, props.locale)}`,
 })))
-const chosen = computed(() => bounced.value.find(c => c.id === form.chequeId) ?? null)
+const chosen = computed(() => candidates.value.find(c => c.id === form.chequeId) ?? null)
 
 /** The bounce of a cheque: the bank's notice, its date, the reason and the account it was deposited at. */
 function bounceOf(c: Cheque) {
@@ -95,8 +106,8 @@ async function record() {
   const files = queued.value
   const failed = await upload(c.id, files)
   busy.value = false
-  const done = t(`اقدام حقوقی چک ${c.number} ثبت شد؛ آخرین وضعیت چک «${chequeStateName('InLegal', props.locale)}» است.`,
-    `Legal action recorded for cheque ${c.number}; its latest status is "${chequeStateName('InLegal', props.locale)}".`)
+  const done = t(`اقدام حقوقی چک ${c.number} ثبت شد؛ آخرین وضعیت چک «${chequeStateName('InLegal', props.locale)}» است. سند آن را در پایین همین صفحه تایید کنید.`,
+    `Legal action recorded for cheque ${c.number}; its latest status is "${chequeStateName('InLegal', props.locale)}". Confirm its voucher below.`)
   const sent = files.length - failed.length
   const scans = sent ? t(` ${num(sent)} فایل ضمیمه شد.`, ` ${sent} scan(s) attached.`) : ''
   if (failed.length) show('warning', `${done}${scans} ${t('این فایل‌ها ضمیمه نشدند', 'Not attached')} – ${failed.join('؛ ')}`)
@@ -118,10 +129,25 @@ const shown = computed(() => {
 const openId = ref('')
 const opened = computed(() => inLegal.value.find(c => c.id === openId.value) ?? null)
 const files = ref<LegalFile[]>([])
+/** The voucher of the legal action (the step SendToLegal of the opened cheque). */
+const voucher = ref<Voucher | null>(null)
+const confirming = ref(false)
 async function open(id: string) {
   openId.value = id
-  const r = await api.get<LegalFile[]>(`/api/cashflow/instruments/${id}/legal-files`)
+  const [r, v] = await Promise.all([api.get<LegalFile[]>(`/api/cashflow/instruments/${id}/legal-files`), api.get<Voucher[]>(`/api/cashflow/instruments/${id}/vouchers`)])
   files.value = r.ok ? r.value : []
+  const c = inLegal.value.find(x => x.id === id)
+  const step = c ? c.history.map(h => h.action).lastIndexOf('SendToLegal') + 1 : 0
+  voucher.value = (v.ok ? v.value : []).find(x => x.step === step) ?? null
+}
+async function confirmVoucher() {
+  if (!opened.value || !voucher.value || confirming.value) return
+  confirming.value = true
+  const r = await api.post<string>(`/api/cashflow/instruments/${opened.value.id}/vouchers/${voucher.value.step}/confirm`, {})
+  confirming.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  show('ok', t('سند اقدام حقوقی تایید شد.', 'The voucher of the legal action is confirmed.'))
+  await open(opened.value.id)
 }
 async function addFiles(e: Event) {
   const input = e.target as HTMLInputElement
@@ -145,7 +171,8 @@ async function removeFile(f: LegalFile) {
 onMounted(async () => {
   await L.load()
   await load()
-  if (props.chequeId && bounced.value.some(c => c.id === props.chequeId)) form.chequeId = props.chequeId
+  if (props.chequeId && inDesk.value.some(c => c.id === props.chequeId)) withDesk.value = true
+  if (props.chequeId && candidates.value.some(c => c.id === props.chequeId)) form.chequeId = props.chequeId
   else if (props.chequeId && inLegal.value.some(c => c.id === props.chequeId)) await open(props.chequeId)
 })
 </script>
@@ -161,6 +188,10 @@ onMounted(async () => {
           <SearchSelect v-model="form.chequeId" :options="choices" required :aria-label="t('چک برگشتی', 'Bounced cheque')"
                         :none-text="t('چک برگشتی‌ای برای اقدام حقوقی نیست', 'No bounced cheque')" />
         </label>
+        <label class="tr-check full">
+          <input v-model="withDesk" type="checkbox" @change="form.chequeId = ''" />
+          {{ t('حالت استثنایی: چک‌های نزد صندوق هم در فهرست باشند (اقدام حقوقی روی چکی که هنوز برگشت نخورده)', 'Exceptional case: also list cheques still in the cash desk (legal action on a cheque that has not bounced)') }}
+        </label>
         <template v-if="chosen">
           <dl class="tr-facts full">
             <div><dt>{{ t('شماره چک', 'Cheque no.') }}</dt><dd class="num">{{ chosen.number }}</dd></div>
@@ -173,8 +204,11 @@ onMounted(async () => {
             <div><dt>{{ t('بابت', 'Purpose') }}</dt><dd>{{ chosen.purpose }}</dd></div>
             <div><dt>{{ t('تاریخ دریافت', 'Received') }}</dt><dd class="num">{{ chosen.issueDate }}</dd></div>
             <div><dt>{{ t('سررسید', 'Due') }}</dt><dd class="num">{{ chosen.dueDate }}</dd></div>
-            <div><dt>{{ t('اعلامیهٔ برگشت', 'Bounce notice') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
-            <div><dt>{{ t('علت برگشت', 'Reason') }}</dt><dd>{{ bounceOf(chosen).reason || '—' }}</dd></div>
+            <div><dt>{{ t('وضعیت فعلی', 'Status now') }}</dt><dd>{{ chequeStateName(chosen.state, locale) }}</dd></div>
+            <template v-if="chosen.state === 'Bounced'">
+              <div><dt>{{ t('اعلامیهٔ برگشت', 'Bounce notice') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
+              <div><dt>{{ t('علت برگشت', 'Reason') }}</dt><dd>{{ bounceOf(chosen).reason || '—' }}</dd></div>
+            </template>
             <div v-if="bounceOf(chosen).account"><dt>{{ t('حساب واگذاری', 'Deposited at') }}</dt><dd>{{ bounceOf(chosen).account }}</dd></div>
           </dl>
         </template>
@@ -236,8 +270,8 @@ onMounted(async () => {
       <p class="small">
         {{ opened.bankName }}<template v-if="opened.details?.branchName"> – {{ opened.details.branchName }}</template> · {{ opened.counterparty }} ·
         {{ t('مبلغ', 'Amount') }} <span class="num">{{ money(opened.amount) }}</span> {{ opened.currency === 'IRR' ? '' : opened.currency }} ·
-        {{ t('سررسید', 'due') }} <span class="num">{{ opened.dueDate }}</span> ·
-        {{ t('اعلامیهٔ برگشت', 'bounce notice') }} <span class="num">{{ bounceOf(opened).notice }} – {{ bounceOf(opened).date }}</span>
+        {{ t('سررسید', 'due') }} <span class="num">{{ opened.dueDate }}</span>
+        <template v-if="bounceOf(opened).notice"> · {{ t('اعلامیهٔ برگشت', 'bounce notice') }} <span class="num">{{ bounceOf(opened).notice }} – {{ bounceOf(opened).date }}</span></template>
       </p>
       <p><strong>{{ t('تاریخ اقدام', 'Date of the action') }}:</strong> <span class="num">{{ actionOf(opened)?.date }}</span> ·
         <strong>{{ t('ثبت', 'By') }}:</strong> {{ actionOf(opened)?.userId }}</p>
@@ -255,6 +289,7 @@ onMounted(async () => {
       <label style="max-width: 32rem">{{ t('افزودن فایل (PDF، JPG یا PNG، حداکثر ۵ مگابایت)', 'Add files (PDF, JPG or PNG, up to 5 MB)') }}
         <input type="file" :accept="ACCEPT" multiple :disabled="busy" @change="addFiles" />
       </label>
+      <VoucherTable v-if="voucher" :voucher="voucher" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming" @confirm="confirmVoucher" />
       <p class="muted small">{{ t('مراحل بعدی این چک (تعویض چک، ابطال) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شود.',
         'The next steps of this cheque (replacement, cancellation) are recorded on the «Received cheque steps» tab.') }}</p>
     </section>

@@ -30,6 +30,12 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['اسناد واخواست شده (چک برگشتی)', 'Protested (bounced) cheques'],
     use: ['بدهکار هنگام برگشت چک از بانک؛ تفصیل: پرداخت کننده', 'Debited when the bank returns a cheque; detail: the payer'],
   },
+  // Owner's answer of 18 Nov 2026: the voucher of the legal action («اقدام حقوقی»).
+  ProtestedChequesInLegal: {
+    title: ['اسناد واخواست شده حقوقی شده', 'Protested cheques in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی، در مقابل بستانکار «اسناد واخواست شده» (یا «اسناد نزد صندوق» برای چکی که هنوز نزد صندوق است)؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action, against a credit of «Protested cheques» (or «Cheques in the cash desk» for a cheque still there); detail: the payer'],
+  },
   GuaranteeChequesForCompany: {
     title: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
     use: ['بدهکار هنگام دریافت چک تضمینی', 'Debited when a guarantee cheque is received'],

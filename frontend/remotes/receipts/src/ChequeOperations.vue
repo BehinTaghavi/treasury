@@ -209,7 +209,9 @@ function stepText(s: Step) {
 /** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. */
 const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
 const rank = (a: string) => { const i = stepOrder.indexOf(a); return i < 0 ? stepOrder.length : i }
-const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection').sort((a, b) => rank(a) - rank(b))
+/** «اقدام حقوقی» is offered on bounced cheques; the rare action on a cheque still in the cash desk starts on the legal-action screen. */
+const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && (a !== 'SendToLegal' || c.state === 'Bounced'))
+  .sort((a, b) => rank(a) - rank(b))
 
 onMounted(async () => { await L.load(); await load() })
 </script>

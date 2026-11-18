@@ -169,8 +169,8 @@ public sealed class VoucherUseCases(
     }
 
     /// <summary>
-    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher; registering in Sayad and handing to
-    /// the lawyer move no account). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
+    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher; registering in Sayad only changes
+    /// the latest status, owner's answer to Q37). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
     /// another); steps recorded before item 14 use the cheque's last account. A return to the payer debits the account the cheque's
     /// receipt credited (owner, 18 Nov 2026: every state has its voucher; his table «عودت چک‌های نزد صندوق»).
     /// </summary>
@@ -182,7 +182,7 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.RegisterSayad or InstrumentAction.SendToLegal)
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.RegisterSayad)
         {
             return null;
         }

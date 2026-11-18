@@ -28,6 +28,7 @@
 | — ثبت صیادی شد | SayadRegistered | RegisterSayad (تاریخ؛ کد رهگیری ثبت، اختیاری) | InCashDesk | مدیرعامل، ۲۷ آبان ۱۴۰۵ | چک‌ها |
 | ۱۲، ۱۵، ۱۶ | DepositedForCollection، ReturnedToIssuer، Endorsed | همان مراحل چک نزد صندوق (واگذاری به بانک، عودت از صندوق، خرج) | SayadRegistered | مدیرعامل، ۲۷ آبان ۱۴۰۵ | مانند InCashDesk |
 | ۱۴ + GoInlaw — اقدام حقوقی | InLegal | SendToLegal (تاریخ و شرح اقدام، در صفحهٔ «اقدام حقوقی»؛ اسکن ضمائم پس از آن اضافه می‌شود) | Bounced | مدیرعامل، ۲۷ آبان ۱۴۰۵ | همه |
+| — اقدام حقوقی | InLegal | SendToLegal، حالت استثنایی | InCashDesk، SayadRegistered | پاسخ مدیرعامل به Q38، ۲۷ آبان ۱۴۰۵ | چک‌ها، غیر تضمینی |
 | ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
 
 بند ۱۴ مدیرعامل (۲۴ آبان ۱۴۰۵) و پاسخ‌های Q30 تا Q35: `docs/domain/received-cheque-steps.fa.md`. «برگشت شده» و «خرج شده» دیگر پایانی نیستند.

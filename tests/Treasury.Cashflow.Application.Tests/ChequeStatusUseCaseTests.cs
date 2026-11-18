@@ -87,9 +87,22 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Equal(("InLegal", "1405/08/27", "تحویل به وکیل شرکت جهت طرح دعوی"), (view.State, view.History[^1].Date, view.History[^1].Note));
         Assert.Equal(["Replace", "Cancel"], view.AllowedActions);
 
-        // Registering in Sayad and handing to the lawyer have no voucher; deposit and bounce keep theirs.
-        Assert.Equal([3, 4], (await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None)).Select(v => v.Step));
-        Assert.Equal("Voucher.NoVoucherForStep", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 5, CancellationToken.None)).ErrorCode);
+        // Registering in Sayad has no voucher (answer to Q37); deposit, bounce and the legal action have theirs (answer to Q38).
+        var steps = await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None);
+        Assert.Equal([3, 4, 5], steps.Select(v => v.Step));
+        Assert.Equal("Voucher.NoVoucherForStep", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 2, CancellationToken.None)).ErrorCode);
+
+        // The legal action: Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»; confirmed once the new template account is set.
+        Assert.Equal(("اقدام حقوقی چک", "ProtestedChequesInLegal", false), (steps[2].Operation, steps[2].Lines[0].Missing, steps[2].IsComplete));
+        Assert.Equal("Voucher.Incomplete", (await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 5, CancellationToken.None)).ErrorCode);
+        foreach (var (a, code) in new[] { (FixedAccount.ProtestedCheques, "1203"), (FixedAccount.ProtestedChequesInLegal, "9201") })
+        {
+            Assert.True((await _vouchers.SetTemplateAccountAsync(Key(), a, code, CancellationToken.None)).IsSuccess);
+        }
+
+        var legal = (await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None))[2];
+        Assert.Equal([(true, "9201", "200015"), (false, "1203", "200015")], legal.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 5, CancellationToken.None)).IsSuccess);
         Assert.Single(await _instruments.ListReceivedAsync(InstrumentState.InLegal, CancellationToken.None));
     }
 

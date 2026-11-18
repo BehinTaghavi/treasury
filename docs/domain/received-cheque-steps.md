@@ -35,10 +35,10 @@ the «وضعیت» column of the receipts list), built the same day.
 
 | Latest state | Allowed next steps |
 |---|---|
-| نزد صندوق (in the cash desk) | ثبت صیادی (section 5) · (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer |
-| ثبت صیادی شد (registered in Sayad, still in the cash desk) — **18 Nov** | (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer |
+| نزد صندوق (in the cash desk) | ثبت صیادی (section 5) · (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (exceptional, section 6) |
+| ثبت صیادی شد (registered in Sayad, still in the cash desk) — **18 Nov** | (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (exceptional) |
 | در جریان وصول (at the bank) | (b) collected · (c) returned to the company · (e) bounced |
-| عودت چک از بانک (back from the bank, not collected) | (a) deposit again · (e) bounced (Q33) · (d) replace · (f) cancel · return to the payer (see Q40) |
+| عودت چک از بانک (back from the bank, not collected) | (a) deposit again · (e) bounced (Q33) · (d) replace · (f) cancel · return to the payer (the owner will say which of these stay: Q40) |
 | برگشت چک (bounced, with notice no. and date) | اقدام حقوقی (its own screen, section 6) · (d) replace · (f) cancel |
 | اقدام حقوقی (with the company's lawyer) — **18 Nov** | (d) replace · (f) cancel · scans of the action added or removed |
 | خرج شده (endorsed) | (h) returned by the endorsee → **برگشت چک** |
@@ -57,13 +57,13 @@ of the company bank account.
 | (b) collected | date (after checking the statement), reference | bank account's معین · bank | «چک‌های در جریان وصول» · bank | owner's table — built |
 | (c) returned to the company | date, bank's note | «اسناد نزد صندوق» · payer | «چک‌های در جریان وصول» · bank | owner's table «عودت چک واگذاری توسط بانک» |
 | (e) bounced | **bounce notice no. and date** (required), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
-| (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» · payer | Q31 |
+| (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق», «اسناد واخواست شده» or, in legal action, «اسناد واخواست شده حقوقی شده» · payer | Q31 |
 | (f) cancelled | management's order no. and date, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
 | (g) endorsed | an approved payment request (its beneficiary, payment purpose group and purpose), Sayad transfer tracking no. (required) | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
-| عودت از صندوق (return to the payer) — **18 Nov** | date, note | the account the cheque's receipt credited (its purpose group's account) · payer (guarantee: «طرف حساب انتظامی») | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | owner's table «عودت چک‌های نزد صندوق: بدهکاران یا ...» (Q41) |
-| ثبت صیادی — **18 Nov** | date, tracking no. of the registration (optional) | no voucher: no account moves (Q37) | | owner, 18 Nov 2026 |
-| اقدام حقوقی — **18 Nov** | date of the action and its description (both required), scans of its papers | no voucher: the cheque stays in «اسناد واخواست شده» (Q38) | | owner, 18 Nov 2026 |
+| عودت از صندوق (return to the payer) — **18 Nov** | date, note | the account the cheque's receipt credited (its purpose group's account) · payer (guarantee: «طرف حساب انتظامی») | «اسناد نزد صندوق» · payer (guarantee: «چک انتظامی به نفع شرکت») | owner's table «عودت چک‌های نزد صندوق: بدهکاران یا ...»; confirmed by the owner (Q41) |
+| ثبت صیادی — **18 Nov** | date, tracking no. of the registration (optional) | no voucher: only the latest status changes (owner's answer to Q37) | | owner, 18 Nov 2026 |
+| اقدام حقوقی — **18 Nov** | date of the action and its description (both required), scans of its papers | new fixed account «اسناد واخواست شده حقوقی شده» · payer | «اسناد واخواست شده» · payer (a cheque still in the cash desk: «اسناد نزد صندوق») | owner's answer to Q38, 18 Nov 2026 |
 
 One voucher per step and cheque (answer to Q35), also when several cheques are deposited on one slip.
 
@@ -104,8 +104,9 @@ in every part of the system. His statuses, in his words, and what the system doe
 - **One list of names** (`frontend/packages/ui-kit/src/chequeStatus.ts`) serves the receipts list, the opened receipt, the screen
   «عملیات چک‌های دریافتی» and the cheque card, so a cheque is called the same everywhere. «خرج شده» and «ابطال شده» (item 14) stay.
 - **Vouchers:** every step that moves an account has its voucher (table in section 3). The return to the payer got its voucher
-  (the owner's table «عودت چک‌های نزد صندوق»). «ثبت صیادی», «اقدام حقوقی» and «سررسید چک» have no row in the owner's template and move no
-  account as built: questions Q37–Q39.
+  (the owner's table «عودت چک‌های نزد صندوق»; debit confirmed by the owner, Q41). The legal action has its voucher with the new
+  template account «اسناد واخواست شده حقوقی شده» (answer to Q38). «ثبت صیادی» and «سررسید چک» have no voucher: the latest status
+  changes, or the mark is shown, and that is enough (answers to Q37 and Q39).
 - Kept from item 14 although the new description does not name them for a cheque back from the bank: deposit again (Q33), replacement
   and cancellation (question Q40).
 - Code: states `SayadRegistered`, `InLegal`; steps `RegisterSayad`, `SendToLegal`; `ReceivedChequeStatus.HasReachedDueDate`; schema
@@ -131,5 +132,12 @@ which can be opened, added to and removed while the cheque is in legal action. R
 
 Code: `Instrument.SendToLegal(date, user, description)`; the scans are `InstrumentAttachment` (its own small aggregate, one command
 per file, kept in `cashflow.instrument_file`, schema 034, partitioned by the fiscal year the scan is added in);
-`LegalActionUseCases`; `frontend/remotes/receipts/src/LegalAction.vue`. Still open (Q38): the voucher of the legal action and what can
-follow it besides replacement.
+`LegalActionUseCases`; `frontend/remotes/receipts/src/LegalAction.vue`.
+
+**Voucher (owner's answer to Q38, 18 Nov 2026):** Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده», the payer's تفصیل on both
+sides. The account is a new line of «شابلون اسناد خزانه داری» (`FixedAccount.ProtestedChequesInLegal`, schema 035); the voucher is
+shown under the opened cheque on this screen with «تایید سند» and cannot be confirmed before the account is set. "If, unlikely as it
+is, legal action is taken on a cheque that is «نزد صندوق»", the credit is «اسناد نزد صندوق»: a tick box on the screen adds the
+cheques still in the cash desk (also those registered in Sayad; not guarantee cheques or notes) to the list box. From then on the
+cheque is in «اسناد واخواست شده حقوقی شده», so its replacement or cancellation credits that account. Still open (Q38, 2): what can
+follow the legal action besides replacement.
