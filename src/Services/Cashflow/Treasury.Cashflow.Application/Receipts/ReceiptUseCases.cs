@@ -55,7 +55,7 @@ public sealed record ReplaceChequeCommand(string IdempotencyKey, Guid Instrument
 public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null);
 
 /// <summary>The receiver brings an endorsed cheque back bounced (owner's item 14 (h)), with the bank's bounce notice.</summary>
-public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null);
+public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null, string? TrackingCode = null);
 
 public sealed record ReceiptView(
     Guid Id,
@@ -276,7 +276,7 @@ public sealed class ReceiptUseCases(
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var step = cheque.History.Count;
             var endorsement = cheque.History[^1];
-            cheque.RecordEndorsementReturned(date, currentUser.UserId, command.NoticeNumber, command.Reason);
+            cheque.RecordEndorsementReturned(date, currentUser.UserId, command.NoticeNumber, command.Reason, command.TrackingCode);
             if (endorsement.Action == InstrumentAction.Endorse && endorsement.Details?.PaymentRequestId is { } requestId)
             {
                 await paymentRequests.ReversePaymentAsync(requestId, cheque.EndorsementPaymentKey(step), ct).ConfigureAwait(false);

@@ -43,6 +43,9 @@ public sealed class ChequeStatusTests
         return c;
     }
 
+    /// <summary>The certificate of non-payment of the bounce in <see cref="Bounced"/>: required for its legal action (owner, 18 Nov 2026).</summary>
+    private static readonly NonPaymentCertificate Certificate = new("BN-1", D("1405/09/02"), "1234567890123456");
+
     private static (bool, string?, string?)[] Lines(Voucher? v) => [.. v!.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode))];
 
     [Fact]
@@ -93,7 +96,7 @@ public sealed class ChequeStatusTests
 
         // The screen «اقدام حقوقی» records the date of the action and its description (owner, 18 Nov 2026).
         Assert.Equal("Instrument.LegalActionDescriptionRequired", Assert.Throws<DomainException>(() => c.SendToLegal(D("1405/09/10"), User, " ")).Code);
-        c.SendToLegal(D("1405/09/10"), User, " تحویل به وکیل شرکت جهت طرح دعوی ");
+        c.SendToLegal(D("1405/09/10"), User, " تحویل به وکیل شرکت جهت طرح دعوی ", Certificate);
         Assert.Equal((InstrumentState.InLegal, D("1405/09/10"), "تحویل به وکیل شرکت جهت طرح دعوی"), (c.State, c.History[^1].Date, c.History[^1].Note));
         Assert.Equal(5, c.LegalActionStep);
         Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.ReturnFromLegal], c.AllowedActions());
@@ -163,7 +166,7 @@ public sealed class ChequeStatusTests
             [new InstrumentHistoryEntry(InstrumentAction.Receive, null, InstrumentState.InCashDesk, D("1386/10/01"), User, null, null),
              new InstrumentHistoryEntry(InstrumentAction.RecordBounced, InstrumentState.DepositedForCollection, InstrumentState.Bounced, D("1386/11/05"), User, null, null)], 1);
         Assert.Contains(InstrumentAction.SendToLegal, note.AllowedActions());
-        note.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی سفته برگشتی");
+        note.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی سفته برگشتی", Certificate);
         Assert.Equal(InstrumentState.InLegal, note.State);
         Assert.Equal([(true, "1204", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(note, 3, Bank, null, Template())));
     }
@@ -178,8 +181,8 @@ public sealed class ChequeStatusTests
         atBank.ReturnFromBank(D("1405/09/03"), User);
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => atBank.SendToLegal(D("1405/09/10"), User, "اقدام")).Code);
         var c = Bounced();
-        Assert.Equal("Instrument.DateBeforePreviousStep", Assert.Throws<DomainException>(() => c.SendToLegal(D("1405/09/01"), User, "اقدام")).Code);
-        c.SendToLegal(D("1405/09/02"), User, "اقدام");
+        Assert.Equal("Instrument.DateBeforePreviousStep", Assert.Throws<DomainException>(() => c.SendToLegal(D("1405/09/01"), User, "اقدام", Certificate)).Code);
+        c.SendToLegal(D("1405/09/02"), User, "اقدام", Certificate);
         Assert.Equal(InstrumentState.InLegal, c.State);
     }
 
@@ -187,7 +190,7 @@ public sealed class ChequeStatusTests
     public void A_cheque_in_legal_action_is_replaced_or_cancelled_out_of_the_legal_account()
     {
         var old = Bounced();
-        old.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        old.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         var receiptId = Guid.NewGuid();
         var header = new ReceiptHeader(D("1405/10/01"), new PayerFact("200015", "شرکت نمونه", true), new PurposeGroupFact(Guid.NewGuid(), "فروش", true, true, "4101"), "تعویض چک حقوقی");
         var created = new[]
@@ -203,7 +206,7 @@ public sealed class ChequeStatusTests
             Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.InLegal))));
 
         var cancelled = Bounced();
-        cancelled.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        cancelled.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         cancelled.CancelReceived(D("1405/10/01"), User, "م-7", D("1405/09/30"), "لاوصول");
         Assert.Equal([(true, "8101", "200015"), (false, "1204", "200015")], Lines(ReceiptVouchers.ForStep(cancelled, 6, Bank, null, Template())));
     }
@@ -217,6 +220,20 @@ public sealed class ChequeStatusTests
         var step = c.History[^1];
         Assert.Equal(("BN-1", (FiscalDate?)D("1405/09/02"), "1234567890123456"), (step.Reference, step.Details!.DocumentDate, step.Details.TrackingCode));
 
+        // Owner, 18 Nov 2026: for a bounced ordinary cheque or note the three fields are required.
+        foreach (var missing in new NonPaymentCertificate?[] { null, new(null, D("1405/09/02"), "123"), new("BN-1", null, "123"), new("BN-1", D("1405/09/02"), " ") })
+        {
+            Assert.Equal("Instrument.NonPaymentCertificateRequired", Assert.Throws<DomainException>(() => Bounced().SendToLegal(D("1405/09/10"), User, "اقدام", missing)).Code);
+        }
+
+        // The bounce itself may already carry the tracking code (asked by the owner the same day).
+        var withCode = Cheque();
+        withCode.RegisterSayad(D("1405/08/02"), User);
+        withCode.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User);
+        withCode.RecordBounced(D("1405/09/02"), User, "کسری موجودی", "BN-2", " 5555444433332222 ");
+        Assert.Equal(("BN-2", "5555444433332222"), (withCode.History[^1].Reference, withCode.History[^1].Details!.TrackingCode));
+        Assert.NotNull(withCode.History[^1].Details!.AccountId);
+
         // A cheque without a certificate (a guarantee cheque, or one still in the cash desk) records none.
         var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
         guarantee.SendToLegal(D("1405/08/10"), User, "اقدام", new NonPaymentCertificate(" ", null, null));
@@ -228,7 +245,7 @@ public sealed class ChequeStatusTests
     {
         // Owner's answer to Q38 (2), 18 Nov 2026.
         var c = Bounced();
-        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         Assert.Equal("Instrument.DateBeforePreviousStep", Assert.Throws<DomainException>(() => c.ReturnFromLegal(D("1405/09/09"), User)).Code);
         c.ReturnFromLegal(D("1405/10/01"), User, "توافق با صادرکننده");
         Assert.Equal((InstrumentState.InCashDesk, (int?)null, "توافق با صادرکننده"), (c.State, c.LegalActionStep, c.History[^1].Note));
@@ -262,7 +279,7 @@ public sealed class ChequeStatusTests
     public void Scans_are_attached_to_the_legal_action_of_a_cheque()
     {
         var c = Bounced();
-        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         var file = InstrumentAttachment.ForLegalAction(Guid.NewGuid(), c, 0, @"C:\scans\دادخواست.pdf", Pdf, User, Now, D("1405/09/11"));
         Assert.Equal((c.Id, 5, "دادخواست.pdf", "application/pdf", 8, 1405), (file.InstrumentId, file.Step, file.FileName, file.ContentType, file.Size, file.FiscalYear));
         Assert.IsType<InstrumentFileAttached>(Assert.Single(file.PendingEvents));
@@ -277,7 +294,7 @@ public sealed class ChequeStatusTests
     public void A_scan_is_a_pdf_or_picture_of_at_most_5_MB_and_a_cheque_has_at_most_20()
     {
         var c = Bounced();
-        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         string Code(byte[] content, int already = 0) =>
             Assert.Throws<DomainException>(() => InstrumentAttachment.ForLegalAction(Guid.NewGuid(), c, already, "x", content, User, Now, D("1405/09/11"))).Code;
         Assert.Equal("Instrument.AttachmentEmpty", Code([]));
@@ -295,7 +312,7 @@ public sealed class ChequeStatusTests
         Assert.Equal("Instrument.NotInLegalAction",
             Assert.Throws<DomainException>(() => InstrumentAttachment.ForLegalAction(Guid.NewGuid(), bounced, 0, "a.pdf", Pdf, User, Now, D("1405/09/11"))).Code);
 
-        bounced.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
+        bounced.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
         var file = InstrumentAttachment.ForLegalAction(Guid.NewGuid(), bounced, 0, "a.pdf", Pdf, User, Now, D("1405/09/11"));
         var kept = InstrumentAttachment.Restore(file.Id, file.InstrumentId, file.Step, file.FileName, file.ContentType, file.Size, file.UploadedBy, file.UploadedAt, file.FiscalYear);
         kept.Remove(bounced, User);

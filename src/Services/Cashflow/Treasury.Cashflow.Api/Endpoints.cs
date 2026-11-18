@@ -14,14 +14,14 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 
 /// <param name="Reference">Bounce notice no., management's order no. (cancellation) or bank reference.</param>
 /// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order. Legal action: the date of the certificate of non-payment.</param>
-/// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment.</param>
+/// <param name="TrackingCode">Bounce and legal action: the tracking code of the certificate of non-payment.</param>
 public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null, string? TrackingCode = null);
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
 public sealed record EndorseRequest(string Date, Guid PaymentRequestId, string SayadTracking, string? Note);
 
-public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason);
+public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason, string? TrackingCode = null);
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
 
@@ -94,7 +94,7 @@ public static class Endpoints
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         api.MapPost("/instruments/{id:guid}/endorsement-returned", async (Guid id, EndorsementReturnedRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason), ct)
+            ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason, r.TrackingCode), ct)
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         // Legal action (owner, 18 Nov 2026): the scans of its papers. The upload is a multipart form with "file"; at most 5 MB (checked

@@ -321,16 +321,18 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// (e)). From the bank, or after the bank returned the cheque (answer to Q33). Rule N2 also applies (answer to Q11): not before the due
     /// date. The step's date is the notice's date.
     /// </summary>
-    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber)
+    /// <param name="trackingCode">The tracking code of the certificate of non-payment (گواهی عدم پرداخت), when typed (owner, 18 Nov 2026).</param>
+    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber, string? trackingCode = null)
     {
         var fromBank = State == InstrumentState.DepositedForCollection;
+        var code = Clean(trackingCode);
         Apply(InstrumentAction.RecordBounced, date, userId, Clean(noticeNumber), reason,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
                 Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
             },
-            details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
+            details: fromBank || code is not null ? new StepDetails(AccountId: fromBank ? CollectionAccountId : null, TrackingCode: code) : null);
     }
 
     /// <summary>
@@ -346,12 +348,18 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// action and collection; rarely the action is taken on a cheque still in the cash desk (answer to Q38). Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
     /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
     /// </summary>
-    /// <param name="certificate">The certificate of non-payment (گواهی عدم پرداخت): number, date and tracking code, when there is one.</param>
+    /// <param name="certificate">The certificate of non-payment (گواهی عدم پرداخت): number, date and tracking code. Required for a bounced
+    /// ordinary cheque or note (owner, 18 Nov 2026); a guarantee item, or a cheque taken to law from the cash desk, may have none.</param>
     public void SendToLegal(FiscalDate date, string userId, string? description, NonPaymentCertificate? certificate = null)
     {
         var (number, issued, code) = (Clean(certificate?.Number), certificate?.Date, Clean(certificate?.TrackingCode));
         Apply(InstrumentAction.SendToLegal, date, userId, number, Clean(description),
-            validate: () => Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action."),
+            validate: () =>
+            {
+                Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action.");
+                Require(State != InstrumentState.Bounced || Kind.IsGuarantee() || (number is not null && issued is not null && code is not null),
+                    "Instrument.NonPaymentCertificateRequired", "Enter the number, date and tracking code of the certificate of non-payment.");
+            },
             details: issued is null && code is null ? null : new StepDetails(DocumentDate: issued, TrackingCode: code));
     }
 
@@ -402,8 +410,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// The receiver of an endorsed cheque brings it back bounced, with the bank's bounce notice (owner's item 14 (h)). The cheque becomes
     /// «برگشت شده» again in the company's hands; rule N2 applies.
     /// </summary>
-    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null) =>
+    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null, string? trackingCode = null) =>
         Apply(InstrumentAction.RecordEndorsementReturned, date, userId, Clean(noticeNumber), reason,
+            details: Clean(trackingCode) is { } code ? new StepDetails(TrackingCode: code) : null,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");

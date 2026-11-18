@@ -117,6 +117,8 @@ async function depositSelected() {
 // ---- one step on one cheque ----
 interface Pending {
   cheque: Cheque; action: string; date: string; reference: string; documentDate: string; note: string; requestId: string; sayad: string
+  /** The tracking code of the certificate of non-payment, on a bounce. */
+  tracking: string
 }
 /** An approved payment request (requests-svc) an endorsed cheque can pay (answer to Q36). */
 interface PayRequest {
@@ -145,7 +147,7 @@ async function start(c: Cheque, action: string) {
   if (action === 'SendToLegal') { emit('legal', c.id); return }
   if (action === 'Replace') { replacing.value = c; pending.value = null; return }
   replacing.value = null
-  pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', requestId: '', sayad: '' }
+  pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', requestId: '', sayad: '', tracking: '' }
   if (action === 'Endorse') await loadApproved()
 }
 
@@ -159,9 +161,10 @@ async function confirmStep() {
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
         { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: p.sayad, note: p.note || null })
     : p.action === 'RecordEndorsementReturned'
-    ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null })
+    ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null, trackingCode: p.tracking || null })
     : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
-        { date, note: p.note || null, reference: p.reference || null, documentDate: p.action === 'Cancel' ? normaliseJalali(p.documentDate) ?? p.documentDate : null })
+        { date, note: p.note || null, reference: p.reference || null, documentDate: p.action === 'Cancel' ? normaliseJalali(p.documentDate) ?? p.documentDate : null,
+          trackingCode: p.action === 'RecordBounced' ? p.tracking || null : null })
   busy.value = false
   if (!r.ok) return show('error', translate(r.code, props.locale))
   pending.value = null
@@ -206,7 +209,7 @@ function stepText(s: Step) {
     : s.action === 'Endorse' || s.action === 'RegisterSayad' ? t(`پیگیری صیاد ${s.reference}`, `Sayad ${s.reference}`)
     : s.action === 'SendToLegal' ? t(`گواهی عدم پرداخت ${s.reference}${d?.documentDate ? ' مورخ ' + d.documentDate : ''}`, `certificate ${s.reference}${d?.documentDate ? ' of ' + d.documentDate : ''}`)
     : s.reference),
-  s.action === 'SendToLegal' && d?.trackingCode && t(`کد رهگیری ${d.trackingCode}`, `tracking ${d.trackingCode}`),
+  d?.trackingCode && t(`کد رهگیری ${d.trackingCode}`, `tracking ${d.trackingCode}`),
   d?.accountId && accountName(d.accountId), d?.partyName, d?.purpose, s.note]
   return parts.filter(Boolean).join(' · ')
 }
@@ -250,6 +253,7 @@ onMounted(async () => { await L.load(); await load() })
         <input v-model="pending.date" dir="ltr" /></label>
       <template v-if="pending.action === 'RecordBounced' || pending.action === 'RecordEndorsementReturned'">
         <label class="req">{{ t('شمارهٔ گواهی عدم پرداخت', 'Bounce notice no.') }} <input v-model="pending.reference" dir="ltr" /></label>
+        <label>{{ t('کد رهگیری گواهی عدم پرداخت', 'Tracking code of the certificate') }} <input v-model="pending.tracking" dir="ltr" /></label>
         <label class="wide">{{ t('علت برگشت', 'Reason') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else-if="pending.action === 'Cancel'">

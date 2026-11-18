@@ -77,11 +77,18 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.DoesNotContain("RegisterSayad", view.AllowedActions);
 
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheques[0], Bank.Id, "1405/08/24", "SLIP-1"), CancellationToken.None)).IsSuccess);
-        await Step(cheques[0], InstrumentAction.RecordBounced, "1405/08/26", note: "کسری موجودی", reference: "BN-9");
+        // The bounce keeps the certificate's tracking code too.
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RecordBounced, "1405/08/26", Note: "کسری موجودی", Reference: "BN-9",
+            TrackingCode: "9988776655443322"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("9988776655443322", (await _instruments.GetAsync(cheques[0], CancellationToken.None))!.History[^1].Details!.TrackingCode);
         Assert.Equal("Instrument.InvalidTransition",
             (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/27"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.LegalActionDescriptionRequired",
             (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27"), CancellationToken.None)).ErrorCode);
+
+        // Owner, 18 Nov 2026: number, date and tracking code of «گواهی عدم پرداخت» are required for a bounced ordinary cheque.
+        Assert.Equal("Instrument.NonPaymentCertificateRequired", (await _instruments.ChangeStateAsync(
+            new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27", Note: "تحویل به وکیل", Reference: "BN-9", DocumentDate: "1405/08/26"), CancellationToken.None)).ErrorCode);
         // The legal-action screen sends the certificate of non-payment too: number, date and tracking code (owner, 18 Nov 2026).
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27", Note: "تحویل به وکیل شرکت جهت طرح دعوی",
             Reference: "BN-9", DocumentDate: "1405/08/26", TrackingCode: "9988776655443322"), CancellationToken.None)).IsSuccess);
@@ -179,6 +186,14 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
 
     private static readonly byte[] Pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37];
 
+    /// <summary>Legal action on the bounced cheque of <see cref="ChequeInLegalAction"/>, with its certificate of non-payment.</summary>
+    private async Task Legal(Guid cheque)
+    {
+        var r = await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.SendToLegal, "1405/08/27", Note: "تحویل به وکیل",
+            Reference: "BN-9", DocumentDate: "1405/08/26", TrackingCode: "9988776655443322"), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+    }
+
     private async Task<Guid> ChequeInLegalAction()
     {
         var (_, cheques) = await Receipt("1405/08/25");
@@ -193,7 +208,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
     {
         var cheque = await ChequeInLegalAction();
         Assert.Equal("Instrument.NotInLegalAction", (await _legal.AttachAsync(Key(), cheque, "a.pdf", Pdf, CancellationToken.None)).ErrorCode);
-        await Step(cheque, InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل");
+        await Legal(cheque);
 
         var first = await _legal.AttachAsync(Key(), cheque, "دادخواست.pdf", Pdf, CancellationToken.None);
         Assert.True(first.IsSuccess, first.ErrorCode);
@@ -219,7 +234,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
     public async Task The_same_upload_sent_twice_is_stored_once_and_a_closed_year_takes_no_scan()
     {
         var cheque = await ChequeInLegalAction();
-        await Step(cheque, InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل");
+        await Legal(cheque);
         var key = Key();
         var a = await _legal.AttachAsync(key, cheque, "a.pdf", Pdf, CancellationToken.None);
         var b = await _legal.AttachAsync(key, cheque, "a.pdf", Pdf, CancellationToken.None);

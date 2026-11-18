@@ -195,7 +195,7 @@ public sealed class InstrumentUseCases(
                     instrument.RecordCleared(date, user, command.Reference);
                     break;
                 case InstrumentAction.RecordBounced:
-                    instrument.RecordBounced(date, user, command.Note, command.Reference);
+                    instrument.RecordBounced(date, user, command.Note, command.Reference, command.TrackingCode);
                     break;
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);

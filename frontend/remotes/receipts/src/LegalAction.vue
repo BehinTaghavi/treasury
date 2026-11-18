@@ -77,14 +77,16 @@ watch(chosen, c => {
   const b = c && c.state === 'Bounced' ? bounceOf(c) : null
   form.certificateNo = b?.notice ?? ''
   form.certificateDate = b?.date ?? ''
-  form.certificateCode = ''
+  form.certificateCode = b?.code ?? ''
 })
+/** Owner, 18 Nov 2026: the three fields are required for a bounced ordinary cheque or note; a guarantee item may have no certificate. */
+const certificateRequired = computed(() => chosen.value !== null && chosen.value.state === 'Bounced' && !guarantee(chosen.value))
 
 /** The bounce of a cheque: the bank's notice, its date, the reason and the account it was deposited at. */
 function bounceOf(c: Cheque) {
   const s = [...c.history].reverse().find(h => h.action === 'RecordBounced' || h.action === 'RecordEndorsementReturned')
   const a = L.bankAccounts.value.find(x => x.id === s?.details?.accountId)
-  return { notice: s?.reference ?? '', date: s?.date ?? '', reason: s?.note ?? '', account: a ? L.accountTitle(a) : '' }
+  return { notice: s?.reference ?? '', date: s?.date ?? '', reason: s?.note ?? '', account: a ? L.accountTitle(a) : '', code: s?.details?.trackingCode ?? '' }
 }
 /** The legal action of a cheque in legal action: its date, description and who recorded it. */
 const actionOf = (c: Cheque) => [...c.history].reverse().find(h => h.action === 'SendToLegal')
@@ -118,6 +120,8 @@ async function record() {
   if (!form.description.trim()) return show('error', translate('Instrument.LegalActionDescriptionRequired', props.locale))
   const certificateDate = form.certificateDate.trim() ? normaliseJalali(form.certificateDate) : null
   if (form.certificateDate.trim() && !certificateDate) return show('error', translate('FiscalDate.Invalid', props.locale))
+  if (certificateRequired.value && !(form.certificateNo.trim() && certificateDate && form.certificateCode.trim()))
+    return show('error', translate('Instrument.NonPaymentCertificateRequired', props.locale))
   busy.value = true
   const r = await api.post<string>(`/api/cashflow/instruments/${c.id}/actions/SendToLegal`, {
     date, note: form.description, destination: null, reference: form.certificateNo.trim() || null, documentDate: certificateDate, trackingCode: form.certificateCode.trim() || null })
@@ -255,9 +259,9 @@ onMounted(async () => {
       <fieldset>
         <legend>{{ t('اقدام حقوقی', 'Legal action') }}</legend>
         <label class="req">{{ t('تاریخ اقدام', 'Date of the action') }} <input v-model="form.date" dir="ltr" :disabled="!chosen" /></label>
-        <label>{{ t('شمارهٔ گواهی عدم پرداخت', 'Certificate of non-payment no.') }} <input v-model="form.certificateNo" dir="ltr" :disabled="!chosen" /></label>
-        <label>{{ t('تاریخ گواهی عدم پرداخت', 'Date of the certificate') }} <input v-model="form.certificateDate" dir="ltr" placeholder="1405/08/27" :disabled="!chosen" /></label>
-        <label>{{ t('کد رهگیری گواهی عدم پرداخت', 'Tracking code of the certificate') }} <input v-model="form.certificateCode" dir="ltr" :disabled="!chosen" /></label>
+        <label :class="{ req: certificateRequired }">{{ t('شمارهٔ گواهی عدم پرداخت', 'Certificate of non-payment no.') }} <input v-model="form.certificateNo" dir="ltr" :disabled="!chosen" /></label>
+        <label :class="{ req: certificateRequired }">{{ t('تاریخ گواهی عدم پرداخت', 'Date of the certificate') }} <input v-model="form.certificateDate" dir="ltr" placeholder="1405/08/27" :disabled="!chosen" /></label>
+        <label :class="{ req: certificateRequired }">{{ t('کد رهگیری گواهی عدم پرداخت', 'Tracking code of the certificate') }} <input v-model="form.certificateCode" dir="ltr" :disabled="!chosen" /></label>
         <label class="full req">{{ t('شرح اقدام حقوقی', 'Description of the legal action') }}
           <textarea v-model="form.description" rows="3" :disabled="!chosen" />
         </label>
