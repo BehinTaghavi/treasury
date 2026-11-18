@@ -48,6 +48,9 @@ In its first-start screen, choose the container engine **dockerd (moby)** and un
    - If Windows asks *"Do you want to allow…"* for Docker, click **Allow**.
 3. When the window says **Treasury is running at http://localhost:8080**, your browser opens the Receipts screen.
    You can close the black window; the system keeps running.
+   - The window also shows **Version in this folder** (for example `5df88c1 2026-11-16`) and the folder it builds from.
+     The same version appears at the top of every screen, next to the **English** button: compare it with the version
+     Claude gives you to be sure the newest one is running. If the screen still shows an older one, press **Ctrl+F5**.
 
 To open it again later, type **http://localhost:8080** in the browser, or bookmark it.
 

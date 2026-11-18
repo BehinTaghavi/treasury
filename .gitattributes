@@ -5,3 +5,5 @@
 # The old program's source (1,200+ files) stays in the repository but is left out of GitHub ZIP downloads:
 # the owner's test PC does not need it, and antivirus scanners can stop the extraction on old VBA code.
 legacy/** export-ignore
+# The version stamp (commit and date) is written into this file by every ZIP made from GitHub or git archive.
+frontend/shell/public/version.txt export-subst

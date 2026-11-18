@@ -2,7 +2,7 @@
 import { COMPANY_CHANGED_EVENT } from '@treasury/ui-kit'
 
 const { locale, fiscalYear, t } = useShell()
-// Owner, 16 Nov 2026: the company's name and logo (Basic Information → «اطلاعات شرکت») at the top of every screen.
+// Owner, 16 Nov 2026: the company's name and logo (Basic Information → «مشخصات شرکت») at the top of every screen.
 const company = useCompany()
 onMounted(() => {
   void company.load()
@@ -10,6 +10,14 @@ onMounted(() => {
 })
 onBeforeUnmount(() => window.removeEventListener(COMPANY_CHANGED_EVENT, company.load))
 useHead({ title: () => (company.name.value ? `${company.name.value} – ${t('خزانه‌داری', 'Treasury')}` : t('خزانه‌داری', 'Treasury')) })
+// The version running (commit and date, written into public/version.txt when the ZIP is made), so the owner can see it is the newest.
+const version = ref('')
+onMounted(async () => {
+  try {
+    const text = (await (await fetch('/version.txt', { cache: 'no-store' })).text()).trim()
+    if (text && !text.startsWith('$Format')) version.value = text
+  } catch { /* no stamp in a development run */ }
+})
 const years = [1406, 1405, 1404, 1403]
 watchEffect(() => {
   if (import.meta.client) {
@@ -43,6 +51,7 @@ const menu = computed(() => [
       <label>{{ t('سال مالی', 'Fiscal year') }}
         <select v-model.number="fiscalYear"><option v-for="y in years" :key="y" :value="y">{{ y }}</option></select>
       </label>
+      <span v-if="version" class="version" :title="t('نسخهٔ در حال اجرا', 'Version running')">{{ t('نسخه', 'Version') }} {{ version }}</span>
       <button type="button" class="lang" @click="locale = locale === 'fa' ? 'en' : 'fa'">{{ locale === 'fa' ? 'English' : 'فارسی' }}</button>
     </header>
     <nav class="menu">

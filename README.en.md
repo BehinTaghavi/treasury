@@ -50,6 +50,8 @@ By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the la
 
 Before these, the first package (Phase 0) was loaded on 9 Nov 2026: repository skeleton, the cheque and cheque-book domain model, the database schema, the migration tool, the Nuxt shell with the receipts screen, the design document, and the old programs' source for reference.
 
+**Waiting for review (not yet in `main`), [pull request #13](https://github.com/BehinTaghavi/treasury/pull/13):** the version running (commit and date) is shown in the top bar of every screen, next to the «English» button, and in the «Start Treasury» window together with the folder the system is built from, so the owner can see he runs the newest version (17 Nov 2026).
+
 ## Current status
 
 Phase A is almost finished. Basic Information (Phase B) is built and waits for review. Payment requests (Phase C) and receipts with the steps of a received cheque (Phase D) were started early at the owner's request. Login with Keycloak is not built yet.
@@ -64,7 +66,7 @@ Phase A is almost finished. Basic Information (Phase B) is built and waits for r
 | Database | One schema per service (scripts 000 to 039), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
 | Migration tool | Old cheques moved to the new schema with a reconciliation report; Jalali dates checked day by day against .NET for 1380–1420 | Migration tests |
 | User interface | Nuxt 4 shell (the company's name and logo at the top of every screen) and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
-| Deployment | Docker Compose for one client's server, and the Windows test server | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |
+| Deployment | Docker Compose for one client's server, and the Windows test server; the version running is shown at the top of the screen | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |
 | Login with Keycloak | Token validation in the API is compiled | **Not yet run**; comes later in Phase B |
 
 The CI run of pull request #8 had 510 .NET tests: 509 passed, and one is skipped on CI because it runs only locally, with a client's real files.
