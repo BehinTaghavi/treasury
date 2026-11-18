@@ -173,16 +173,36 @@ public sealed class ReceiptPostgresTests : IDisposable
 
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), second, Guid.NewGuid(), "1405/08/23", "F-2"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RecordBounced, "1405/08/24", Reference: "BN-3"), CancellationToken.None)).IsSuccess);
-        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Destination: "دفتر وکالت", Reference: "پرونده 5"),
-            CancellationToken.None)).IsSuccess);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Note: "تحویل به وکیل شرکت"), CancellationToken.None)).IsSuccess);
         view = (await useCases.GetAsync(second, CancellationToken.None))!;
-        Assert.Equal(("InLegal", "دفتر وکالت", "پرونده 5", "دفتر وکالت"), (view.State, view.Destination, view.History[^1].Reference, view.History[^1].Details!.PartyName));
+        Assert.Equal(("InLegal", "1405/08/25", "تحویل به وکیل شرکت"), (view.State, view.History[^1].Date, view.History[^1].Note));
+
+        // The scans of the legal action (db/postgres/034): stored with their content, listed, opened and removed.
+        var legal = new LegalActionUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresInstrumentAttachmentRepository(),
+            new DevelopmentPolicies().OpenYear(1405), new PostgresIdempotencyStore(_dataSource), new User(), new Aban1405());
+        byte[] pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37];
+        var key = Key();
+        var file = await legal.AttachAsync(key, second, "دادخواست.pdf", pdf, CancellationToken.None);
+        Assert.True(file.IsSuccess, file.ErrorCode);
+        Assert.Equal(file.Value, (await legal.AttachAsync(key, second, "دادخواست.pdf", pdf, CancellationToken.None)).Value);
+        Assert.Equal("Instrument.NotInLegalAction", (await legal.AttachAsync(Key(), first, "a.pdf", pdf, CancellationToken.None)).ErrorCode);
+        var stored = Assert.Single(await legal.ListAsync(second, CancellationToken.None));
+        Assert.Equal(("دادخواست.pdf", "application/pdf", 8, 4, "clerk-1"), (stored.FileName, stored.ContentType, stored.Size, stored.Step, stored.UploadedBy));
+        Assert.Equal(pdf, (await legal.GetAsync(second, file.Value, CancellationToken.None))!.Value.Content);
+        Assert.True((await legal.RemoveAsync(Key(), second, file.Value, CancellationToken.None)).IsSuccess);
+        Assert.Empty(await legal.ListAsync(second, CancellationToken.None));
 
         var row = (await _receipts.ListAsync(1405, ReceiptKind.Instruments, CancellationToken.None)).Single(x => x.Id == r.Value);
         Assert.Equal(["InLegal", "SayadRegistered"], row.ChequeStatuses!.Select(s => s.State).Order());
 
         // Both due dates are in the past by now: the cheque still in the cash desk is marked «سررسید چک», the one with the lawyer is not.
         Assert.Equal([("InLegal", false), ("SayadRegistered", true)], row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.State, s.ReachedDueDate)));
+    }
+
+    /// <summary>A day in 1405, a year the test database has partitions for: a scan belongs to the year it is added in.</summary>
+    private sealed class Aban1405 : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => new(2026, 11, 18, 8, 0, 0, TimeSpan.Zero);
     }
 
     private sealed class EuroBank : IBankAccountLookup

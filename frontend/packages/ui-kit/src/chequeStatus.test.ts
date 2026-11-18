@@ -15,7 +15,7 @@ describe('latest status of a received cheque (owner, 18 Nov 2026)', () => {
   it('uses the owner\'s words', () => {
     expect(['InCashDesk', 'SayadRegistered', 'DepositedForCollection', 'Cleared', 'ReturnedToIssuer', 'ReturnedFromBank', 'Bounced', 'InLegal', 'Replaced']
       .map(s => chequeStateName(s, 'fa')))
-      .toEqual(['نزد صندوق', 'ثبت صیادی شد', 'در جریان وصول', 'وصول چک', 'عودت از صندوق', 'عودت چک از بانک', 'برگشت چک', 'حقوقی', 'تعویض چک'])
+      .toEqual(['نزد صندوق', 'ثبت صیادی شد', 'در جریان وصول', 'وصول چک', 'عودت از صندوق', 'عودت چک از بانک', 'برگشت چک', 'اقدام حقوقی', 'تعویض چک'])
     expect(dueMark('fa')).toBe('سررسید چک')
   })
 

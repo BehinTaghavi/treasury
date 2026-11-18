@@ -528,7 +528,8 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -571,7 +572,8 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -643,7 +645,8 @@ def test_a_voucher_is_confirmed_once_per_receipt_or_cheque_step_and_read_only_in
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -681,6 +684,44 @@ def test_received_cheques_can_be_registered_in_sayad_and_handed_to_the_lawyer(db
         index = c.execute("SELECT indexdef FROM pg_indexes WHERE schemaname = 'cashflow' AND indexname = 'instrument_due'").fetchone()
         assert index is not None and "SayadRegistered" in index[0]
         c.rollback()
+
+
+def test_scans_of_a_legal_action_are_kept_with_the_cheque(db):
+    # 034_cashflow_legal_action_files.sql (owner, 18 Nov 2026: the screen «اقدام حقوقی» keeps the scans of the action's papers).
+    add = """INSERT INTO cashflow.instrument_file (fiscal_year, file_id, instrument_id, step, file_name, content_type, size, uploaded_by, uploaded_at, content)
+             VALUES (%s, %s, %s, 4, 'a.pdf', %s, %s, 'treasurer', now(), %s)"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid, fid = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (1405, fid, iid, "application/pdf", 4, b"%PDF"))
+        assert c.execute("SELECT tableoid::regclass::text FROM cashflow.instrument_file WHERE file_id = %s", (fid,)).fetchone()[0] == "cashflow.instrument_file_fy1405"
+        for row in ((1405, uuid.uuid4(), iid, "text/html", 4, b"%PDF"),       # only PDF, JPEG or PNG
+                    (1405, uuid.uuid4(), iid, "application/pdf", 5, b"%PDF"),  # the size is the content's size
+                    (1405, uuid.uuid4(), iid, "application/pdf", 0, b"")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, row)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # a scan is added or removed, never changed
+            with c.transaction():
+                c.execute("UPDATE cashflow.instrument_file SET file_name = 'b.pdf'")
+        c.execute("DELETE FROM cashflow.instrument_file WHERE file_id = %s", (fid,))
+        c.execute(add, (1404, uuid.uuid4(), iid, "application/pdf", 4, b"%PDF"))
+        c.commit()
+
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+    try:
+        with psycopg.connect(db) as c:
+            c.execute("SET ROLE cashflow_svc")
+            with pytest.raises(psycopg.errors.RaiseException):  # a closed year takes no new scan
+                c.execute(add, (1404, uuid.uuid4(), uuid.uuid4(), "application/pdf", 4, b"%PDF"))
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+            c.execute("DELETE FROM cashflow.instrument_file WHERE fiscal_year = 1404")
 
 
 def test_a_payment_request_keeps_its_payments(db):

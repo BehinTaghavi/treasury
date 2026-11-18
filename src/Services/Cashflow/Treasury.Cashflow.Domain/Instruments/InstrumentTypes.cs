@@ -38,7 +38,7 @@ public enum InstrumentState
     ReturnedFromBank,        // عودت شده از بانک: back in the cash desk, not collected (owner's item 14 (c))
     Replaced,                // تعویض شده: replaced by new cheques of the same payer (owner's item 14 (d))
     SayadRegistered,         // ثبت صیادی شد: still in the cash desk, registered in the banks' Sayad system (owner, 18 Nov 2026)
-    InLegal,                 // حقوقی: a bounced cheque handed to the company's lawyer (owner, 18 Nov 2026; old flag GoInlaw)
+    InLegal,                 // اقدام حقوقی: a bounced cheque handed to the company's lawyer (owner, 18 Nov 2026; old flag GoInlaw)
 
     // Issued side
     BeingIssued,             // [20] در جریان صدور
@@ -81,7 +81,7 @@ public static class ReceivedChequeStatus
     /// <summary>«نزد صندوق» or «ثبت صیادی شد»: the cheque is in the cash desk and was never sent to a bank.</summary>
     public static bool IsInCashDesk(this InstrumentState state) => state is InstrumentState.InCashDesk or InstrumentState.SayadRegistered;
 
-    /// <summary>«برگشت چک» or «حقوقی»: the bank issued its bounce notice; the cheque is in «اسناد واخواست شده».</summary>
+    /// <summary>«برگشت چک» or «اقدام حقوقی»: the bank issued its bounce notice; the cheque is in «اسناد واخواست شده».</summary>
     public static bool IsProtested(this InstrumentState state) => state is InstrumentState.Bounced or InstrumentState.InLegal;
 
     /// <summary>

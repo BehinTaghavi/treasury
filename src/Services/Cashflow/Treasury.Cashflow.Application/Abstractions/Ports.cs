@@ -29,6 +29,20 @@ public interface IInstrumentRepository
     Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken);
 }
 
+/// <summary>Scans attached to a cheque's legal action (owner, 18 Nov 2026), with the files themselves.</summary>
+public interface IInstrumentAttachmentRepository
+{
+    Task<IReadOnlyList<InstrumentAttachment>> ListAsync(Guid instrumentId, CancellationToken cancellationToken);
+
+    Task<(InstrumentAttachment File, byte[] Content)?> GetAsync(Guid instrumentId, Guid fileId, CancellationToken cancellationToken);
+
+    /// <summary>Stores the scan with its content and its pending events.</summary>
+    Task AddAsync(InstrumentAttachment file, byte[] content, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the scan and writes its pending events.</summary>
+    Task RemoveAsync(InstrumentAttachment file, CancellationToken cancellationToken);
+}
+
 /// <summary>The latest state of one cheque or note of a receipt, with the dates «سررسید چک» is read from.</summary>
 public sealed record ReceiptChequeStatus(Guid ReceiptId, InstrumentState State, FiscalDate ReceivedOn, FiscalDate? DueDate);
 

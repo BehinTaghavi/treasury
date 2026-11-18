@@ -319,12 +319,16 @@ public sealed class Instrument : AggregateRoot<Guid>
             details: Clean(trackingNumber) is { } tracking ? new StepDetails(SayadTracking: tracking) : null);
 
     /// <summary>
-    /// «حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal action
-    /// and collection. The lawyer's name is kept as the place of the cheque.
+    /// «اقدام حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal
+    /// action and collection. Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
+    /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
     /// </summary>
-    public void SendToLegal(FiscalDate date, string userId, string? lawyer = null, string? reference = null, string? note = null) =>
-        Apply(InstrumentAction.SendToLegal, date, userId, Clean(reference), Clean(note), () => Destination = Clean(lawyer),
-            details: Clean(lawyer) is { } name ? new StepDetails(PartyName: name) : null);
+    public void SendToLegal(FiscalDate date, string userId, string? description) =>
+        Apply(InstrumentAction.SendToLegal, date, userId, null, Clean(description),
+            validate: () => Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action."));
+
+    /// <summary>The step (1 = received) that put the cheque in legal action, while it is there; scans are attached to it.</summary>
+    public int? LegalActionStep => State == InstrumentState.InLegal ? _history.FindLastIndex(h => h.Action == InstrumentAction.SendToLegal) + 1 : null;
 
     /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
     public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>

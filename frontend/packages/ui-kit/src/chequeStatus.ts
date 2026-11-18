@@ -2,7 +2,7 @@ import type { Locale } from './format'
 
 /**
  * The latest status («آخرین وضعیت») of a received cheque, in the owner's words of 18 Nov 2026 (docs/domain/received-cheque-steps.md,
- * section 5). One list for every screen, so a cheque is called the same everywhere. Which status a cheque has, and whether it has
+ * section 5; «اقدام حقوقی» is the name he asked for the same day). One list for every screen, so a cheque is called the same everywhere. Which status a cheque has, and whether it has
  * reached its due date, is decided by cashflow-svc; this file only names them.
  */
 const stateNames: Record<string, [string, string]> = {
@@ -13,7 +13,7 @@ const stateNames: Record<string, [string, string]> = {
   ReturnedToIssuer: ['عودت از صندوق', 'Returned to the payer'],
   ReturnedFromBank: ['عودت چک از بانک', 'Returned by the bank'],
   Bounced: ['برگشت چک', 'Bounced'],
-  InLegal: ['حقوقی', 'Legal action'],
+  InLegal: ['اقدام حقوقی', 'Legal action'],
   Replaced: ['تعویض چک', 'Replaced'],
   Endorsed: ['خرج شده', 'Endorsed'],
   Cancelled: ['ابطال شده', 'Cancelled'],
@@ -27,7 +27,7 @@ const actionNames: Record<string, [string, string]> = {
   RecordCleared: ['وصول چک', 'Collected'],
   ReturnFromBank: ['عودت چک از بانک', 'Returned by the bank'],
   RecordBounced: ['برگشت چک', 'Bounced'],
-  SendToLegal: ['حقوقی', 'Legal action'],
+  SendToLegal: ['اقدام حقوقی', 'Legal action'],
   Replace: ['تعویض چک', 'Replace'],
   Cancel: ['ابطال', 'Cancel'],
   Endorse: ['خرج چک', 'Endorse'],

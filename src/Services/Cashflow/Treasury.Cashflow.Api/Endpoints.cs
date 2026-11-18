@@ -96,6 +96,29 @@ public static class Endpoints
             ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason), ct)
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
+        // Legal action (owner, 18 Nov 2026): the scans of its papers. The upload is a multipart form with "file"; at most 5 MB (checked
+        // again by the domain). The action itself is the step SendToLegal with its date and description.
+        api.MapGet("/instruments/{id:guid}/legal-files", async (Guid id, LegalActionUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(id, ct).ConfigureAwait(false)));
+
+        api.MapPost("/instruments/{id:guid}/legal-files", async (Guid id, IFormFile file, HttpRequest http, LegalActionUseCases u, CancellationToken ct) =>
+        {
+            if (file.Length > InstrumentAttachment.MaxBytes)
+            {
+                return ToHttp(Result<Guid>.Fail("Instrument.AttachmentTooLarge", "A scan is at most 5 MB."), _ => string.Empty);
+            }
+
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            return ToHttp(await u.AttachAsync(Key(http), id, file.FileName, buffer.ToArray(), ct).ConfigureAwait(false), fileId => $"/api/cashflow/instruments/{id}/legal-files/{fileId}");
+        }).DisableAntiforgery();
+
+        api.MapGet("/instruments/{id:guid}/legal-files/{fileId:guid}", async (Guid id, Guid fileId, LegalActionUseCases u, CancellationToken ct) =>
+            await u.GetAsync(id, fileId, ct).ConfigureAwait(false) is { } f ? Results.File(f.Content, f.File.ContentType, f.File.FileName) : Results.NotFound());
+
+        api.MapPost("/instruments/{id:guid}/legal-files/{fileId:guid}/delete", async (Guid id, Guid fileId, HttpRequest http, LegalActionUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveAsync(Key(http), id, fileId, ct).ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}/legal-files"));
+
         // Receipts (owner, 14 Nov 2026): cash, money paid into a bank account, cheques and notes.
         api.MapGet("/receipts", async (int year, ReceiptKind? kind, ReceiptUseCases useCases, CancellationToken ct) =>
             Results.Ok(await useCases.ListAsync(year, kind, ct).ConfigureAwait(false)));
@@ -232,7 +255,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" => StatusCodes.Status404NotFound,
+            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" or "Instrument.AttachmentNotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Accounts.Unavailable" or "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

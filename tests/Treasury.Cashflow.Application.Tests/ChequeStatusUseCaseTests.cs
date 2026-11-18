@@ -12,7 +12,7 @@ using Xunit;
 namespace Treasury.Cashflow.Application.Tests;
 
 /// <summary>
-/// The latest status of a received cheque (owner, 18 Nov 2026): «ثبت صیادی شد» and «حقوقی» are recorded like the other steps, the
+/// The latest status of a received cheque (owner, 18 Nov 2026): «ثبت صیادی شد» and «اقدام حقوقی» are recorded like the other steps, the
 /// receipts list carries the latest state of each receipt's cheques with the «سررسید چک» mark, and the return to the payer has its voucher.
 /// </summary>
 public sealed class ChequeStatusUseCaseTests : IDisposable
@@ -24,11 +24,15 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
     private readonly ReceiptUseCases _receipts;
     private readonly InstrumentUseCases _instruments;
     private readonly VoucherUseCases _vouchers;
+    private readonly LegalActionUseCases _legal;
+    private readonly DevelopmentPolicies _policies = new DevelopmentPolicies().OpenYear(1405);
 
     public ChequeStatusUseCaseTests()
     {
-        var policies = new DevelopmentPolicies().OpenYear(1405);
+        var policies = _policies;
         var bank = new Bank();
+        _legal = new LegalActionUseCases(new InMemoryUnitOfWork(_db), new InMemoryInstrumentRepository(_db), new InMemoryInstrumentAttachmentRepository(), policies,
+            new InMemoryIdempotencyStore(_db), new Treasurer(), _clock);
         _receipts = new ReceiptUseCases(
             new InMemoryUnitOfWork(_db), new InMemoryReceiptRepository(_db), new InMemoryInstrumentRepository(_db), new FakeReceiptAccounts(), bank, _reference,
             policies, new InMemoryIdempotencyStore(_db), new Treasurer(), new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store),
@@ -76,9 +80,11 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         await Step(cheques[0], InstrumentAction.RecordBounced, "1405/08/26", note: "کسری موجودی", reference: "BN-9");
         Assert.Equal("Instrument.InvalidTransition",
             (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/27"), CancellationToken.None)).ErrorCode);
-        await Step(cheques[0], InstrumentAction.SendToLegal, "1405/08/27", destination: "دفتر وکالت الف", reference: "پرونده 3");
+        Assert.Equal("Instrument.LegalActionDescriptionRequired",
+            (await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.SendToLegal, "1405/08/27"), CancellationToken.None)).ErrorCode);
+        await Step(cheques[0], InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل شرکت جهت طرح دعوی");
         view = (await _instruments.GetAsync(cheques[0], CancellationToken.None))!;
-        Assert.Equal(("InLegal", "دفتر وکالت الف", "پرونده 3"), (view.State, view.Destination, view.History[^1].Reference));
+        Assert.Equal(("InLegal", "1405/08/27", "تحویل به وکیل شرکت جهت طرح دعوی"), (view.State, view.History[^1].Date, view.History[^1].Note));
         Assert.Equal(["Replace", "Cancel"], view.AllowedActions);
 
         // Registering in Sayad and handing to the lawyer have no voucher; deposit and bounce keep theirs.
@@ -142,6 +148,59 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         // Debit: the account the receipt credited (the purpose group's, 4101) with the payer; credit: «اسناد نزد صندوق».
         Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheques[0], 2, CancellationToken.None)).IsSuccess);
+    }
+
+    private static readonly byte[] Pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37];
+
+    private async Task<Guid> ChequeInLegalAction()
+    {
+        var (_, cheques) = await Receipt("1405/08/25");
+        Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheques[0], Bank.Id, "1405/08/24", "SLIP-1"), CancellationToken.None)).IsSuccess);
+        await Step(cheques[0], InstrumentAction.RecordBounced, "1405/08/26", reference: "BN-9");
+        return cheques[0];
+    }
+
+    [Fact]
+    public async Task The_scans_of_a_legal_action_are_attached_listed_opened_and_removed()
+    {
+        var cheque = await ChequeInLegalAction();
+        Assert.Equal("Instrument.NotInLegalAction", (await _legal.AttachAsync(Key(), cheque, "a.pdf", Pdf, CancellationToken.None)).ErrorCode);
+        await Step(cheque, InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل");
+
+        var first = await _legal.AttachAsync(Key(), cheque, "دادخواست.pdf", Pdf, CancellationToken.None);
+        Assert.True(first.IsSuccess, first.ErrorCode);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 7];
+        var second = await _legal.AttachAsync(Key(), cheque, "اعلامیه برگشت.png", png, CancellationToken.None);
+        Assert.Equal("Instrument.AttachmentType", (await _legal.AttachAsync(Key(), cheque, "x.exe", [1, 2, 3, 4], CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.NotFound", (await _legal.AttachAsync(Key(), Guid.NewGuid(), "a.pdf", Pdf, CancellationToken.None)).ErrorCode);
+
+        var list = await _legal.ListAsync(cheque, CancellationToken.None);
+        Assert.Equal([("دادخواست.pdf", "application/pdf", 8, 4, "treasurer"), ("اعلامیه برگشت.png", "image/png", 9, 4, "treasurer")],
+            list.Select(f => (f.FileName, f.ContentType, f.Size, f.Step, f.UploadedBy)));
+        var opened = await _legal.GetAsync(cheque, second.Value, CancellationToken.None);
+        Assert.Equal(png, opened!.Value.Content);
+        Assert.Equal(("اعلامیه برگشت.png", "image/png"), (opened.Value.File.FileName, opened.Value.File.ContentType));
+        Assert.Null(await _legal.GetAsync(Guid.NewGuid(), second.Value, CancellationToken.None));
+
+        Assert.True((await _legal.RemoveAsync(Key(), cheque, first.Value, CancellationToken.None)).IsSuccess);
+        Assert.Equal("Instrument.AttachmentNotFound", (await _legal.RemoveAsync(Key(), cheque, first.Value, CancellationToken.None)).ErrorCode);
+        Assert.Equal(["اعلامیه برگشت.png"], (await _legal.ListAsync(cheque, CancellationToken.None)).Select(f => f.FileName));
+    }
+
+    [Fact]
+    public async Task The_same_upload_sent_twice_is_stored_once_and_a_closed_year_takes_no_scan()
+    {
+        var cheque = await ChequeInLegalAction();
+        await Step(cheque, InstrumentAction.SendToLegal, "1405/08/27", note: "تحویل به وکیل");
+        var key = Key();
+        var a = await _legal.AttachAsync(key, cheque, "a.pdf", Pdf, CancellationToken.None);
+        var b = await _legal.AttachAsync(key, cheque, "a.pdf", Pdf, CancellationToken.None);
+        Assert.Equal(a.Value, b.Value);
+        Assert.Single(await _legal.ListAsync(cheque, CancellationToken.None));
+
+        // A scan belongs to the fiscal year it is added in (rule R2): 1406 is not open here.
+        _clock.Now = new DateTimeOffset(FiscalDate.ParseJalali("1406/01/15").Value.ToDateTime(new TimeOnly(8, 0)), TimeSpan.Zero);
+        Assert.Equal("FiscalPeriod.Closed", (await _legal.AttachAsync(Key(), cheque, "b.pdf", Pdf, CancellationToken.None)).ErrorCode);
     }
 
     private sealed class Clock(string jalali, TimeSpan? time = null) : TimeProvider

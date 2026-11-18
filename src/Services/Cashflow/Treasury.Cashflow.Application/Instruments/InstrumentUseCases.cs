@@ -206,8 +206,8 @@ public sealed class InstrumentUseCases(
                     instrument.RegisterSayad(date, user, command.Reference, command.Note);
                     break;
                 case InstrumentAction.SendToLegal:
-                    // Owner, 18 Nov 2026: «حقوقی»; the destination is the lawyer's name, the reference the case or letter number.
-                    instrument.SendToLegal(date, user, command.Destination, command.Reference, command.Note);
+                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action.
+                    instrument.SendToLegal(date, user, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);

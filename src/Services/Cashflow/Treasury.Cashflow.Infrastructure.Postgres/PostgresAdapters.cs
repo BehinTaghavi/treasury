@@ -26,6 +26,7 @@ public static class PostgresRegistration
         services.AddSingleton<IVoucherTemplateRepository, PostgresVoucherTemplateRepository>();
         services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
+        services.AddSingleton<IInstrumentAttachmentRepository, PostgresInstrumentAttachmentRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
