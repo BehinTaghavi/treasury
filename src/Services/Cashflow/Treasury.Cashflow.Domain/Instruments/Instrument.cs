@@ -127,6 +127,10 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// </summary>
     public bool IsPostDated => Direction == InstrumentDirection.Received && DueDate is { } due && due > IssueDate;
 
+    /// <summary>«سررسید چک» (owner, 18 Nov 2026): see <see cref="ReceivedChequeStatus.HasReachedDueDate"/>.</summary>
+    public bool HasReachedDueDate(FiscalDate today) =>
+        Direction == InstrumentDirection.Received && ReceivedChequeStatus.HasReachedDueDate(State, IssueDate, DueDate, today);
+
     /// <summary>Our bank account for issued cheques.</summary>
     public Guid? BankAccountId { get; private set; }
 
@@ -305,6 +309,22 @@ public sealed class Instrument : AggregateRoot<Guid>
             },
             details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
     }
+
+    /// <summary>
+    /// «ثبت صیادی شد» (owner, 18 Nov 2026): the cheque in the cash desk is registered in the banks' Sayad system. The tracking number of
+    /// the registration may be recorded. The cheque stays in the cash desk.
+    /// </summary>
+    public void RegisterSayad(FiscalDate date, string userId, string? trackingNumber = null, string? note = null) =>
+        Apply(InstrumentAction.RegisterSayad, date, userId, Clean(trackingNumber), Clean(note),
+            details: Clean(trackingNumber) is { } tracking ? new StepDetails(SayadTracking: tracking) : null);
+
+    /// <summary>
+    /// «حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal action
+    /// and collection. The lawyer's name is kept as the place of the cheque.
+    /// </summary>
+    public void SendToLegal(FiscalDate date, string userId, string? lawyer = null, string? reference = null, string? note = null) =>
+        Apply(InstrumentAction.SendToLegal, date, userId, Clean(reference), Clean(note), () => Destination = Clean(lawyer),
+            details: Clean(lawyer) is { } name ? new StepDetails(PartyName: name) : null);
 
     /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
     public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>

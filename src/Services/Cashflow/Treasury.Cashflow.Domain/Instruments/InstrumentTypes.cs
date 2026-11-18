@@ -1,3 +1,5 @@
+using Treasury.BuildingBlocks.Domain;
+
 namespace Treasury.Cashflow.Domain.Instruments;
 
 /// <summary>Whether we received the instrument or issued it. Old system: Check.Dp (1 = received, 2 = issued).</summary>
@@ -35,6 +37,8 @@ public enum InstrumentState
     Endorsed,                // [16] واگذار به سایرین (خرج شده)
     ReturnedFromBank,        // عودت شده از بانک: back in the cash desk, not collected (owner's item 14 (c))
     Replaced,                // تعویض شده: replaced by new cheques of the same payer (owner's item 14 (d))
+    SayadRegistered,         // ثبت صیادی شد: still in the cash desk, registered in the banks' Sayad system (owner, 18 Nov 2026)
+    InLegal,                 // حقوقی: a bounced cheque handed to the company's lawyer (owner, 18 Nov 2026; old flag GoInlaw)
 
     // Issued side
     BeingIssued,             // [20] در جریان صدور
@@ -64,6 +68,29 @@ public enum InstrumentAction
     ReturnFromBank,
     Replace,
     RecordEndorsementReturned,
+    RegisterSayad,
+    SendToLegal,
+}
+
+/// <summary>
+/// Where a received cheque is, read from its latest state (owner, 18 Nov 2026: «آخرین وضعیت»). The accounts of the next step's voucher
+/// follow from it.
+/// </summary>
+public static class ReceivedChequeStatus
+{
+    /// <summary>«نزد صندوق» or «ثبت صیادی شد»: the cheque is in the cash desk and was never sent to a bank.</summary>
+    public static bool IsInCashDesk(this InstrumentState state) => state is InstrumentState.InCashDesk or InstrumentState.SayadRegistered;
+
+    /// <summary>«برگشت چک» or «حقوقی»: the bank issued its bounce notice; the cheque is in «اسناد واخواست شده».</summary>
+    public static bool IsProtested(this InstrumentState state) => state is InstrumentState.Bounced or InstrumentState.InLegal;
+
+    /// <summary>
+    /// «سررسید چک» (owner, 18 Nov 2026): a post-dated cheque (مدت‌دار, due after the day it was received) that is still in the cash desk
+    /// or at the bank has reached its due date. In the cash desk it waits for the deposit at the bank or a replacement; at the bank for
+    /// collected, returned by the bank or bounced. Not a step: it follows from the dates and the latest state.
+    /// </summary>
+    public static bool HasReachedDueDate(InstrumentState state, FiscalDate receivedOn, FiscalDate? dueDate, FiscalDate today) =>
+        dueDate is { } due && due > receivedOn && due <= today && (state.IsInCashDesk() || state == InstrumentState.DepositedForCollection);
 }
 
 public static class InstrumentKindRules

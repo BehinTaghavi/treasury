@@ -286,7 +286,8 @@ public sealed class LifecycleTableTests
     public void Received_and_issued_states_never_mix_except_cancelled()
     {
         InstrumentState[] received = [InstrumentState.InCashDesk, InstrumentState.DepositedForCollection, InstrumentState.Cleared, InstrumentState.Bounced,
-            InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed, InstrumentState.ReturnedFromBank, InstrumentState.Replaced];
+            InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed, InstrumentState.ReturnedFromBank, InstrumentState.Replaced,
+            InstrumentState.SayadRegistered, InstrumentState.InLegal];
 
         // «ابطال شده» ends both lives: an issued cheque before delivery, a received one by management's order (owner's item 14 (f)).
         foreach (var t in InstrumentLifecycle.All)

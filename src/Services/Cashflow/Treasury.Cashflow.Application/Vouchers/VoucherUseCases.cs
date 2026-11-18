@@ -96,7 +96,7 @@ public sealed class VoucherUseCases(
             return Result<Guid>.Ok(voucher.Id);
         }, cancellationToken);
 
-    /// <summary>The vouchers of a received cheque's steps after it was received: deposit at the bank, collected, bounced.</summary>
+    /// <summary>The vouchers of a received cheque's steps after it was received: deposit at the bank, collected, bounced, returned…</summary>
     public Task<IReadOnlyList<VoucherView>> ChequeVouchersAsync(Guid instrumentId, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<VoucherView>>(async ct =>
         {
@@ -169,8 +169,10 @@ public sealed class VoucherUseCases(
     }
 
     /// <summary>
-    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher). Each step uses the bank account it
-    /// recorded (a cheque returned from one bank may be deposited at another); steps recorded before item 14 use the cheque's last account.
+    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher; registering in Sayad and handing to
+    /// the lawyer move no account). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
+    /// another); steps recorded before item 14 use the cheque's last account. A return to the payer debits the account the cheque's
+    /// receipt credited (owner, 18 Nov 2026: every state has its voucher; his table «عودت چک‌های نزد صندوق»).
     /// </summary>
     private async Task<Voucher?> ComputeStepAsync(Instrument cheque, int step, CancellationToken ct)
     {
@@ -180,9 +182,16 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.ReturnToIssuer)
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.RegisterSayad or InstrumentAction.SendToLegal)
         {
             return null;
+        }
+
+        string? receiptAccount = null;
+        if (entry.Action == InstrumentAction.ReturnToIssuer && cheque.ReceiptId is { } receiptId
+            && await receipts.GetAsync(receiptId, ct).ConfigureAwait(false) is { } receipt)
+        {
+            receiptAccount = (await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false))?.LedgerAccountCode;
         }
 
         var bank = new LedgerSide(null, null);
@@ -205,7 +214,7 @@ public sealed class VoucherUseCases(
         }
 
         var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template);
+        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template, receiptAccount);
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

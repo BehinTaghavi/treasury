@@ -88,15 +88,21 @@ public sealed record ReceiptView(
     string RecordedBy,
     long Version,
     IReadOnlyList<InstrumentView>? Instruments = null,
-    Guid? ReplacedInstrumentId = null)
+    Guid? ReplacedInstrumentId = null,
+    IReadOnlyList<ChequeStatusView>? ChequeStatuses = null)
 {
-    public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null) => new(
+    /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
+    public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null, FiscalDate? today = null, IReadOnlyList<ChequeStatusView>? statuses = null) => new(
         r.Id, r.Kind.ToString(), r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.Payer.DetailCode ?? string.Empty, r.Payer.DisplayName,
         r.PurposeGroupId, r.PurposeGroupName, r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note,
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
-        instruments?.Select(InstrumentView.From).ToList(), r.ReplacedInstrumentId);
+        instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
+        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList());
 }
+
+/// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
+public sealed record ChequeStatusView(string State, bool ReachedDueDate);
 
 /// <summary>
 /// Receipts (owner, 14 Nov 2026): cash, money paid into a bank account (slip, transfer, POS, card-to-card) and cheques and notes,
@@ -116,7 +122,8 @@ public sealed class ReceiptUseCases(
     ICurrentUser currentUser,
     IVoucherTemplateRepository templates,
     IConfirmedVoucherRepository vouchers,
-    IPaymentRequestLookup paymentRequests)
+    IPaymentRequestLookup paymentRequests,
+    TimeProvider? clock = null)
 {
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -442,13 +449,24 @@ public sealed class ReceiptUseCases(
             }
 
             IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(id, ct).ConfigureAwait(false) : [];
-            return ReceiptView.From(receipt, lines);
+            return ReceiptView.From(receipt, lines, IranClock.Today(clock));
         }, cancellationToken);
 
-    /// <summary>Receipts of a fiscal year, newest first (without their cheques; open one to see them).</summary>
+    /// <summary>
+    /// Receipts of a fiscal year, newest first, each with the latest state of its cheques (owner, 18 Nov 2026: the last column of the
+    /// receipts list is the latest status); open a receipt to see the cheques themselves.
+    /// </summary>
     public Task<IReadOnlyList<ReceiptView>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<ReceiptView>>(async ct =>
-            (await receipts.ListAsync(fiscalYear, kind, ct).ConfigureAwait(false)).Select(r => ReceiptView.From(r)).ToList(), cancellationToken);
+        {
+            var list = await receipts.ListAsync(fiscalYear, kind, ct).ConfigureAwait(false);
+            var today = IranClock.Today(clock);
+            var withCheques = list.Where(r => r.Kind == ReceiptKind.Instruments).Select(r => r.Id).ToList();
+            var statuses = (await instruments.ListStatusesByReceiptsAsync(withCheques, ct).ConfigureAwait(false)).ToLookup(
+                s => s.ReceiptId,
+                s => new ChequeStatusView(s.State.ToString(), ReceivedChequeStatus.HasReachedDueDate(s.State, s.ReceivedOn, s.DueDate, today)));
+            return list.Select(r => ReceiptView.From(r, statuses: r.Kind == ReceiptKind.Instruments ? statuses[r.Id].ToList() : null)).ToList();
+        }, cancellationToken);
 
     /// <summary>Old D_Naghd / D_variz: date, payer and purpose are required; the date must be in an open fiscal period (rule R2).</summary>
     private async Task<(ReceiptHeader Header, FiscalDate Date)> HeaderAsync(ReceiptHeaderInput input, CancellationToken ct)

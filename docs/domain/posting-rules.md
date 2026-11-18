@@ -47,6 +47,8 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 - One voucher for each receipt or operation (each step of a cheque); the treasurer confirms it. A voucher with an account not set
   cannot be confirmed; a confirmed voucher keeps its lines and its receipt can no longer be cancelled.
 
-Built so far: receipts (cash, bank, cheques, guarantee cheques) and the received cheque's deposit at the bank, collected and bounced
-(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). Next with their screens: payments, petty cash, notes, returns and the other
-operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
+Built so far: receipts (cash, bank, cheques, guarantee cheques) and the steps of a received cheque: deposit at the bank, collected,
+returned by the bank, bounced, replaced, cancelled, endorsed and its return (`received-cheque-steps.md`), and since 18 Nov 2026 the
+return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's receipt credited, question Q41)
+(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی», «حقوقی» and «سررسید چک» have no row in the table and no voucher
+(questions Q37–Q39). Next with their screens: payments, petty cash, notes and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

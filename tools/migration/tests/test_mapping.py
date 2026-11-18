@@ -45,9 +45,11 @@ def test_collected_cheque_rebuilds_its_history_from_d3_and_d4():
     assert m.destination == "ملت جاری" and m.warnings == []
 
 
-def test_bounced_cheque_in_legal_action_keeps_a_note():
+def test_bounced_cheque_in_legal_action_becomes_in_legal():
     m = ok(map_cheque(received(14, d3="13860720", d4="13860801", goinlaw=True), SRC))
-    assert m.state == "Bounced" and m.steps[-1].note == "legal action (GoInlaw)"
+    # Owner, 18 Nov 2026: «حقوقی» is a state of its own; the old flag GoInlaw has no date, so the step takes the bounce's date.
+    assert m.state == "InLegal" and [s.action for s in m.steps][-2:] == ["RecordBounced", "SendToLegal"]
+    assert m.steps[-1].event_date == m.steps[-2].event_date and "GoInlaw" in m.steps[-1].note and m.warnings == []
 
 
 def test_returned_and_endorsed():

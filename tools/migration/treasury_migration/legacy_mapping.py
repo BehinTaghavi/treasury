@@ -45,6 +45,16 @@ TRANSITIONS = {
     (RECEIVED, "ReturnedFromBank", "Cancel"): "Cancelled",
     (RECEIVED, "Bounced", "Cancel"): "Cancelled",
     (RECEIVED, "Endorsed", "RecordEndorsementReturned"): "Bounced",
+    # Owner, 18 Nov 2026 (latest status of a received cheque): registered in Sayad, handed to the lawyer.
+    (RECEIVED, "InCashDesk", "RegisterSayad"): "SayadRegistered",
+    (RECEIVED, "SayadRegistered", "DepositForCollection"): "DepositedForCollection",
+    (RECEIVED, "SayadRegistered", "ReturnToIssuer"): "ReturnedToIssuer",
+    (RECEIVED, "SayadRegistered", "Endorse"): "Endorsed",
+    (RECEIVED, "SayadRegistered", "Replace"): "Replaced",
+    (RECEIVED, "SayadRegistered", "Cancel"): "Cancelled",
+    (RECEIVED, "Bounced", "SendToLegal"): "InLegal",
+    (RECEIVED, "InLegal", "Replace"): "Replaced",
+    (RECEIVED, "InLegal", "Cancel"): "Cancelled",
     (ISSUED, "BeingIssued", "Issue"): "Issued",
     (ISSUED, "Issued", "Deliver"): "Delivered",
     (ISSUED, "BeingIssued", "Cancel"): "Cancelled",
@@ -230,9 +240,13 @@ def map_cheque(row: LegacyCheque, source_db: str, currency_by_curid: dict[int, s
                     if due is not None and b.last_date < due:
                         warnings.append(f"cleared on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
                 elif row.stcode == 14:
-                    b.apply("RecordBounced", d4, "D4 (bounced)", "legal action (GoInlaw)" if row.goinlaw else None)
+                    b.apply("RecordBounced", d4, "D4 (bounced)")
                     if due is not None and b.last_date < due:  # rule N2 / Q11, as for clearings above
                         warnings.append(f"bounced on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
+                    if row.goinlaw:
+                        # Owner, 18 Nov 2026: «حقوقی» is a state of its own. The old program kept only the flag GoInlaw, without a
+                        # date, so the step takes the date of the bounce.
+                        b.apply("SendToLegal", b.last_date, "GoInlaw (legal action)", "legal action (GoInlaw); date of the bounce used")
             elif row.stcode == 15:
                 b.apply("ReturnToIssuer", d3, "D3 (returned)")
             elif row.stcode == 16:

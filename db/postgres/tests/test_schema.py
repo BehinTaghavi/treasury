@@ -668,6 +668,21 @@ def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_a
         c.rollback()
 
 
+def test_received_cheques_can_be_registered_in_sayad_and_handed_to_the_lawyer(db):
+    # 033_cashflow_cheque_status.sql (owner, 18 Nov 2026: the latest status of a received cheque).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405)
+        for state in ("SayadRegistered", "DepositedForCollection", "Bounced", "InLegal", "Replaced"):
+            c.execute("UPDATE cashflow.instrument SET state = %s WHERE id = %s", (state, iid))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.instrument SET state = 'WithLawyer' WHERE id = %s", (iid,))
+        index = c.execute("SELECT indexdef FROM pg_indexes WHERE schemaname = 'cashflow' AND indexname = 'instrument_due'").fetchone()
+        assert index is not None and "SayadRegistered" in index[0]
+        c.rollback()
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

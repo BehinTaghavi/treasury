@@ -20,10 +20,18 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
 | 14 | Bounced | RecordEndorsementReturned (bounce notice no.) | Endorsed | owner's item 14 (h) | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | manual | all |
-| — | Replaced (تعویض شده) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, ReturnedFromBank, Bounced | owner's item 14 (d), Q31 | not guarantee |
-| — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, ReturnedFromBank, Bounced | owner's item 14 (f), Q30 | all |
+| — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (d), Q31; owner, 18 Nov 2026 | not guarantee |
+| — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (f), Q30 | all |
+| — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
+| 12, 15, 16 | DepositedForCollection, ReturnedToIssuer, Endorsed | the steps of a cheque in the cash desk (DepositForCollection, ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
+| 14 + GoInlaw | InLegal (حقوقی) | SendToLegal (date; lawyer and case no., optional) | Bounced | owner, 18 Nov 2026 | all |
 
 Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-cheque-steps.md`. Bounced and Endorsed are no longer final.
+
+Latest status as the owner described it on 18 Nov 2026 (`received-cheque-steps.md`, section 5): a cheque registered in Sayad stays in
+the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be replaced or cancelled.
+**«سررسید چک» is not a state**: it is a mark on a post-dated cheque (due after the day it was received) that is still in the cash
+desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDueDate`); no step is recorded for it.
 
 ## Issued (old Dp = 2)
 
@@ -51,7 +59,8 @@ Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-c
 | 9 | — | cash payment: not an instrument (Q8) |
 
 ## Dates of each step in the old data (used by the migration)
-Received: D1 receipt, D3 sent for collection / returned / endorsed, D4 collected or bounced.
+Received: D1 receipt, D3 sent for collection / returned / endorsed, D4 collected or bounced. A bounced cheque with the flag `GoInlaw`
+is migrated as «حقوقی» (InLegal); the old program kept no date for it, so the step takes the date of the bounce.
 Issued: D1 issue, D2 delivery (or cancellation), D3 maturity reclassification, D4 paid or returned by our bank.
 
 Every step belongs to the fiscal year in which it happens; the instrument belongs to the year it was created in (doc 7.4).

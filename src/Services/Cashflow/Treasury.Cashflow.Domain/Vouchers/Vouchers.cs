@@ -108,7 +108,8 @@ public static class ReceiptVouchers
     /// </summary>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
     /// <param name="replacement">A replacement (تعویض): Dr «اسناد نزد صندوق» for each new cheque / Cr the old cheque where it was («اسناد نزد
-    /// صندوق» or, if bounced, «اسناد واخواست شده»); a difference in amount (answer to Q31) goes to the purpose group, with the payer.</param>
+    /// صندوق» or, if bounced or with the lawyer, «اسناد واخواست شده»); a difference in amount (answer to Q31) goes to the purpose group,
+    /// with the payer.</param>
     public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
         Replacement? replacement = null)
     {
@@ -128,7 +129,7 @@ public static class ReceiptVouchers
             }
 
             var (oldForeign, oldCurrency) = Foreign(old);
-            lines.Add(Fixed(false, template, replacement.From == InstrumentState.Bounced ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk,
+            lines.Add(Fixed(false, template, replacement.From.IsProtested() ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk,
                 payer, old.Amount.ToRial(), Text(old, "تعویض"), oldForeign, oldCurrency));
             var difference = instruments.Sum(i => i.Amount.ToRial()) - old.Amount.ToRial();
             if (difference != 0)
@@ -188,11 +189,13 @@ public static class ReceiptVouchers
 
     /// <summary>
     /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
-    /// steps without a voucher here: receiving and replacing (on their receipt), returning to the payer.
+    /// steps without a voucher here: receiving and replacing (on their receipt); registering in Sayad and handing to the lawyer, which
+    /// move no account of the owner's template (open questions Q37 and Q38).
     /// </summary>
     /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
     /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
-    public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template)
+    /// <param name="receiptAccount">Return to the payer: the account the cheque's receipt credited (its purpose group's account).</param>
+    public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template, string? receiptAccount = null)
     {
         ArgumentNullException.ThrowIfNull(cheque);
         ArgumentNullException.ThrowIfNull(bank);
@@ -228,7 +231,19 @@ public static class ReceiptVouchers
                         Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, text))
                     : Pair("ابطال چک دریافتنی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
-                        Fixed(false, template, e.From == InstrumentState.Bounced ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk, payer, amount, text));
+                        Fixed(false, template, e.From?.IsProtested() == true ? FixedAccount.ProtestedCheques : FixedAccount.ChequesInCashDesk, payer, amount, text));
+            case InstrumentAction.ReturnToIssuer:
+                // Owner's table «عودت چک‌های نزد صندوق»: Dr «بدهکاران یا ...» (payer) / Cr «اسناد نزد صندوق» (payer). The debit is the account
+                // the receipt credited, so the return takes the receipt's entry back (open question Q41). A guarantee cheque leaves the
+                // memorandum accounts as in «ابطال چک انتظامی دریافتی».
+                var back = Text(cheque, "عودت از صندوق");
+                return cheque.Kind.IsGuarantee()
+                    ? Pair("عودت چک انتظامی دریافتی به پرداخت‌کننده", cheque, e.Date,
+                        Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, back),
+                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, back))
+                    : Pair("عودت چک نزد صندوق", cheque, e.Date,
+                        new VoucherLine(true, receiptAccount, payer, amount, back),
+                        Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, back));
             case InstrumentAction.Endorse:
                 return Pair("خرج چک", cheque, e.Date,
                     new VoucherLine(true, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"خرج به {e.Details?.PartyName} – {e.Details?.Purpose}")),

@@ -31,6 +31,8 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-tag.current { background: #e6f4ea; color: #1e5631; }
 .tr-tag.later { background: #fff1d6; color: #7a5200; }
 .tr-tag.cancelled { background: #fdecea; color: #8a1c1c; }
+/* «سررسید چک»: a post-dated cheque that reached its due date (owner, 18 Nov 2026). */
+.tr-tag.due { background: #ffe8d9; color: #9c3b00; font-weight: 600; }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .muted { color: #7b8794; }
 .small { font-size: .8rem; }

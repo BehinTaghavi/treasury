@@ -346,6 +346,27 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
 
         return list;
     }
+
+    public async Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken)
+    {
+        var list = new List<ReceiptChequeStatus>();
+        if (receiptIds.Count == 0)
+        {
+            return list;
+        }
+
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            "SELECT receipt_id, state, issue_date, due_date FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
+        cmd.Parameters.Add(new NpgsqlParameter("receipts", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = receiptIds.ToArray() });
+        await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            list.Add(new ReceiptChequeStatus(r.GetGuid(0), Enum.Parse<InstrumentState>(r.GetString(1)), new FiscalDate(r.GetFieldValue<DateOnly>(2)),
+                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3))));
+        }
+
+        return list;
+    }
 }
 
 public sealed class PostgresChequeBookRepository : IChequeBookRepository

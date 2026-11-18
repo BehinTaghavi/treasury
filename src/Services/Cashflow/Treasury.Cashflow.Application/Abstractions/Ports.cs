@@ -24,6 +24,23 @@ public interface IInstrumentRepository
 
     /// <summary>The cheques and notes received on one receipt, in the order they were entered.</summary>
     Task<IReadOnlyList<Instrument>> ListByReceiptAsync(Guid receiptId, CancellationToken cancellationToken);
+
+    /// <summary>The latest state of the cheques and notes of several receipts (the «وضعیت» column of the receipts list).</summary>
+    Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken);
+}
+
+/// <summary>The latest state of one cheque or note of a receipt, with the dates «سررسید چک» is read from.</summary>
+public sealed record ReceiptChequeStatus(Guid ReceiptId, InstrumentState State, FiscalDate ReceivedOn, FiscalDate? DueDate);
+
+/// <summary>
+/// Today's date in Iran (UTC+03:30; Iran has kept no daylight saving time since 1401). «سررسید چک» compares the due date with it.
+/// </summary>
+public static class IranClock
+{
+    private static readonly TimeSpan Offset = new(3, 30, 0);
+
+    public static FiscalDate Today(TimeProvider? clock) =>
+        new(DateOnly.FromDateTime((clock ?? TimeProvider.System).GetUtcNow().ToOffset(Offset).DateTime));
 }
 
 /// <summary>Receipts (رسید دریافت) of one fiscal year, numbered per kind.</summary>

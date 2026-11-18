@@ -149,6 +149,42 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Equal(("Cancelled", "م-1", "1405/08/29"), (view.State, view.History[^1].Reference, view.History[^1].Details!.DocumentDate));
     }
 
+    [Fact]
+    public async Task Sayad_registration_and_legal_action_are_stored_and_the_receipts_list_carries_each_cheques_latest_status()
+    {
+        // Owner, 18 Nov 2026 (db/postgres/033): «ثبت صیادی شد», «حقوقی», and the «وضعیت» column of the receipts list.
+        var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new BankAccounts());
+        var number = Guid.NewGuid().ToString("N")[..8];
+        var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
+        [
+            new(InstrumentKind.OrdinaryCheque, number, "1405/08/25", new MoneyInput(9_000_000), Bank, SayadId: "1234567890123456"),
+            new(InstrumentKind.OrdinaryCheque, "B" + number, "1405/08/24", new MoneyInput(1_000_000), Bank, SayadId: "1234567890123456"),
+        ]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var cheques = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments!;
+        var first = cheques.Single(c => c.Number == number).Id;
+        var second = cheques.Single(c => c.Number == "B" + number).Id;
+
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), first, InstrumentAction.RegisterSayad, "1405/08/23", Reference: "SY-7"), CancellationToken.None)).IsSuccess);
+        var view = (await useCases.GetAsync(first, CancellationToken.None))!;
+        Assert.Equal(("SayadRegistered", "SY-7", "SY-7"), (view.State, view.History[^1].Reference, view.History[^1].Details!.SayadTracking));
+        Assert.Contains(await useCases.ListReceivedAsync(InstrumentState.SayadRegistered, CancellationToken.None), i => i.Id == first);
+
+        Assert.True((await useCases.DepositForCollectionAsync(new(Key(), second, Guid.NewGuid(), "1405/08/23", "F-2"), CancellationToken.None)).IsSuccess);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RecordBounced, "1405/08/24", Reference: "BN-3"), CancellationToken.None)).IsSuccess);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Destination: "دفتر وکالت", Reference: "پرونده 5"),
+            CancellationToken.None)).IsSuccess);
+        view = (await useCases.GetAsync(second, CancellationToken.None))!;
+        Assert.Equal(("InLegal", "دفتر وکالت", "پرونده 5", "دفتر وکالت"), (view.State, view.Destination, view.History[^1].Reference, view.History[^1].Details!.PartyName));
+
+        var row = (await _receipts.ListAsync(1405, ReceiptKind.Instruments, CancellationToken.None)).Single(x => x.Id == r.Value);
+        Assert.Equal(["InLegal", "SayadRegistered"], row.ChequeStatuses!.Select(s => s.State).Order());
+
+        // Both due dates are in the past by now: the cheque still in the cash desk is marked «سررسید چک», the one with the lawyer is not.
+        Assert.Equal([("InLegal", false), ("SayadRegistered", true)], row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.State, s.ReachedDueDate)));
+    }
+
     private sealed class EuroBank : IBankAccountLookup
     {
         public static readonly Guid Id = Guid.NewGuid();

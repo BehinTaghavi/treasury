@@ -74,7 +74,7 @@ public sealed class ChequeStepTests
         var v = ReceiptVouchers.ForStep(c, 3, SideA, null, Template());
         Assert.Equal([(true, "1203", "200015"), (false, "1202", "600001")], Lines(v));
         Assert.Contains("BN-77", v!.Lines[0].Description, StringComparison.Ordinal);
-        Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel], c.AllowedActions());
+        Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.SendToLegal], c.AllowedActions());
     }
 
     [Fact]

@@ -40,6 +40,19 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f)"),
         new(InstrumentDirection.Received, InstrumentState.Endorsed, InstrumentAction.RecordEndorsementReturned, InstrumentState.Bounced, AnyKind, "Owner item 14 (h); voucher table: عودت چک‌های خرج شده (پس از برگشت)"),
 
+        // Received: the owner's description of the latest status («آخرین وضعیت») of a received cheque, 18 Nov 2026: «ثبت صیادی شد» (the
+        // cheque is registered in the banks' Sayad system; it stays in the cash desk, so every step of «نزد صندوق» stays open) and «حقوقی»
+        // (a bounced cheque handed to the company's lawyer; it can still be replaced). Cancellation "in any state" is item 14 (f).
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.RegisterSayad, InstrumentState.SayadRegistered, k => k.IsCheque(), "Owner, 18 Nov 2026: ثبت صیادی; cheques only (notes have no Sayad ID)"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner, 18 Nov 2026: ثبت صیادی → واگذاری به بانک; D_Check_Vag_m, Checktype 0/2 only"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Owner, 18 Nov 2026: عودت از صندوق; D_Check_Od_m"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "Owner item 14 (g) for a cheque in the cash desk; D_Check_Kh_m, Checktype 0/2 only"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک نزد صندوق"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f) for a cheque in the cash desk"),
+        new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.SendToLegal, InstrumentState.InLegal, AnyKind, "Owner, 18 Nov 2026: حقوقی (تحویل چک برگشتی به وکیل شرکت); old flag GoInlaw"),
+        new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک در وضعیت حقوقی"),
+        new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f): cancellation in any state by management's order"),
+
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),
         new(InstrumentDirection.Issued, InstrumentState.Issued, InstrumentAction.Deliver, InstrumentState.Delivered, AnyKind, "Check_deliv_m: 21 -> 22"),
