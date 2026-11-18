@@ -19,8 +19,9 @@ public static class InstrumentLifecycle
 
     public static IReadOnlyList<Transition> All { get; } =
     [
-        // Received
-        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "D_Check_Vag_m: 11 -> 12, Checktype 0/2 only"),
+        // Received. The old program's D_Check_Vag_m sent a cheque from the cash desk straight to the bank (11 -> 12); since the owner's
+        // rule of 18 Nov 2026 (N3) a cheque is deposited only after «ثبت صیادی», so that step starts at SayadRegistered (below). Old
+        // history is migrated as recorded (tools/migration: LEGACY_TRANSITIONS).
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordCleared, InstrumentState.Cleared, AnyKind, "D_Check_vos_m: 12 -> 13"),
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "D_Check_vos_m / Checkbacked: 12 -> 14"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "D_Check_Od_m: 11 -> 15"),
@@ -55,9 +56,10 @@ public static class InstrumentLifecycle
 
         // Owner's answer to Q38 (18 Nov 2026): "if, unlikely as it is, legal action is taken on a cheque that is «نزد صندوق»" — then
         // «اسناد واخواست شده حقوقی شده» is debited against «اسناد نزد صندوق». A cheque registered in Sayad is still in the cash desk.
-        // Guarantee cheques are kept in the memorandum accounts, not in «اسناد نزد صندوق», so they are left out.
-        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() && !k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق"),
-        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() && !k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق (ثبت صیادی شده)"),
+        // Owner, 18 Nov 2026: guarantee cheques and guarantee notes may get legal action too (they are always in the cash desk), and
+        // bounced notes (from Bounced, above). An ordinary note that has not bounced gets none.
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() || k.IsGuarantee(), "Owner, answer Q38 and 18 Nov 2026: اقدام حقوقی روی چک نزد صندوق، چک تضمینی و سفته تضمینی"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.SendToLegal, InstrumentState.InLegal, k => k.IsCheque() || k.IsGuarantee(), "Owner, answer Q38: اقدام حقوقی روی چک نزد صندوق (ثبت صیادی شده)"),
 
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),

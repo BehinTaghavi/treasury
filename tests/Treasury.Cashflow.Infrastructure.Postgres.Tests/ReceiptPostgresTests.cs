@@ -84,6 +84,7 @@ public sealed class ReceiptPostgresTests : IDisposable
         // Report no. 4, item 9: deposited for collection at a company account, read back with the account.
         var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
             new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new EuroBank());
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque.Id, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque.Id, EuroBank.Id, "1405/08/25", "SLIP-9"), CancellationToken.None)).IsSuccess);
         var deposited = (await useCases.GetAsync(cheque.Id, CancellationToken.None))!;
         Assert.Equal(("DepositedForCollection", (Guid?)EuroBank.Id), (deposited.State, deposited.CollectionAccountId));
@@ -129,10 +130,11 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.True(r.IsSuccess, r.ErrorCode);
         var cheque = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments![0].Id;
         var account = Guid.NewGuid();
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), cheque, account, "1405/08/25", "F-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28"), CancellationToken.None)).IsSuccess);
         var view = (await useCases.GetAsync(cheque, CancellationToken.None))!;
-        Assert.Equal(("ReturnedFromBank", (Guid?)account, (Guid?)account), (view.State, view.History[1].Details!.AccountId, view.History[2].Details!.AccountId));
+        Assert.Equal(("ReturnedFromBank", (Guid?)account, (Guid?)account), (view.State, view.History[2].Details!.AccountId, view.History[3].Details!.AccountId));
 
         var replace = await _receipts.ReplaceAsync(new(Key(), cheque, Header() with { Date = "1405/08/29" },
             [new(InstrumentKind.OrdinaryCheque, "N" + number, "1405/10/01", new MoneyInput(9_500_000), Bank, SayadId: "6543210987654321")]), CancellationToken.None);
@@ -171,6 +173,8 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Equal(("SayadRegistered", "SY-7", "SY-7"), (view.State, view.History[^1].Reference, view.History[^1].Details!.SayadTracking));
         Assert.Contains(await useCases.ListReceivedAsync(InstrumentState.SayadRegistered, CancellationToken.None), i => i.Id == first);
 
+        Assert.Equal("Instrument.SayadRegistrationRequired", (await useCases.DepositForCollectionAsync(new(Key(), second, Guid.NewGuid(), "1405/08/23", "F-2"), CancellationToken.None)).ErrorCode);
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RegisterSayad, "1405/08/23"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await useCases.DepositForCollectionAsync(new(Key(), second, Guid.NewGuid(), "1405/08/23", "F-2"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.RecordBounced, "1405/08/24", Reference: "BN-3"), CancellationToken.None)).IsSuccess);
         Assert.True((await useCases.ChangeStateAsync(new(Key(), second, InstrumentAction.SendToLegal, "1405/08/25", Note: "تحویل به وکیل شرکت"), CancellationToken.None)).IsSuccess);
@@ -187,7 +191,7 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Equal(file.Value, (await legal.AttachAsync(key, second, "دادخواست.pdf", pdf, CancellationToken.None)).Value);
         Assert.Equal("Instrument.NotInLegalAction", (await legal.AttachAsync(Key(), first, "a.pdf", pdf, CancellationToken.None)).ErrorCode);
         var stored = Assert.Single(await legal.ListAsync(second, CancellationToken.None));
-        Assert.Equal(("دادخواست.pdf", "application/pdf", 8, 4, "clerk-1"), (stored.FileName, stored.ContentType, stored.Size, stored.Step, stored.UploadedBy));
+        Assert.Equal(("دادخواست.pdf", "application/pdf", 8, 5, "clerk-1"), (stored.FileName, stored.ContentType, stored.Size, stored.Step, stored.UploadedBy));
         Assert.Equal(pdf, (await legal.GetAsync(second, file.Value, CancellationToken.None))!.Value.Content);
         Assert.True((await legal.RemoveAsync(Key(), second, file.Value, CancellationToken.None)).IsSuccess);
         Assert.Empty(await legal.ListAsync(second, CancellationToken.None));

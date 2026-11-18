@@ -10,7 +10,7 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | Old | New state | Reached by | From | Old form | Kinds |
 |---|---|---|---|---|---|
 | 11 | InCashDesk | Receive | — | D_Check | all |
-| 12 | DepositedForCollection | DepositForCollection (needs collection account) | InCashDesk | D_Check_Vag_m | ordinary, bank cheque |
+| 12 | DepositedForCollection | DepositForCollection (needs collection account) | SayadRegistered (rule N3; in the old data: InCashDesk) | D_Check_Vag_m; owner, 18 Nov 2026 | ordinary, bank cheque |
 | 13 | Cleared | RecordCleared | DepositedForCollection | D_Check_vos_m | all |
 | 14 | Bounced | RecordBounced | DepositedForCollection | D_Check_vos_m, Checkbacked | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | InCashDesk | D_Check_Od_m | all |
@@ -23,9 +23,9 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (d), Q31; owner, 18 Nov 2026 | not guarantee |
 | — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (f), Q30 | all |
 | — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
-| 12, 15, 16 | DepositedForCollection, ReturnedToIssuer, Endorsed | the steps of a cheque in the cash desk (DepositForCollection, ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
+| 15, 16 | ReturnedToIssuer, Endorsed | the other steps of a cheque in the cash desk (ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
 | 14 + GoInlaw | InLegal (اقدام حقوقی) | SendToLegal (date and description of the action, on the screen «اقدام حقوقی»; scans attached afterwards) | Bounced | owner, 18 Nov 2026 | all |
-| — | InLegal (اقدام حقوقی) | SendToLegal, the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38, 18 Nov 2026 | cheques, not guarantee |
+| — | InLegal (اقدام حقوقی) | SendToLegal: guarantee cheques and guarantee notes; ordinary cheques as the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38 and 18 Nov 2026 | cheques and guarantee notes (not an ordinary note that has not bounced) |
 
 Owner's item 14 (15 Nov 2026) and his answers Q30–Q35: `docs/domain/received-cheque-steps.md`. Bounced and Endorsed are no longer final.
 
@@ -68,5 +68,9 @@ Every step belongs to the fiscal year in which it happens; the instrument belong
 
 ## Date rules for new operations
 - **N1** (new, Q6): a step may not be dated before the previous step of the same instrument.
+- **N3** (CEO, 18 Nov 2026): **«ثبت صیادی» is required**: a cheque is deposited at the bank only after it is registered in Sayad
+  (`Instrument.SayadRegistrationRequired`). A cheque the bank gave back was registered before its first deposit and is deposited
+  again without a new registration. Not in the old program, which sent a cheque straight from the cash desk (D_Check_Vag_m);
+  migrated history is kept as recorded (`LEGACY_TRANSITIONS` in the migration tool, outside the table the two copies share).
 - **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. The same applies to **bounces** (`Instrument.BouncedBeforeDueDate`; answer to Q11, 10 Nov 2026).
 

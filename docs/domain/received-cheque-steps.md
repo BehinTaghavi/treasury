@@ -35,8 +35,8 @@ the «وضعیت» column of the receipts list), built the same day.
 
 | Latest state | Allowed next steps |
 |---|---|
-| نزد صندوق (in the cash desk) | ثبت صیادی (section 5) · (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (exceptional, section 6) |
-| ثبت صیادی شد (registered in Sayad, still in the cash desk) — **18 Nov** | (a) deposit at the bank · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (exceptional) |
+| نزد صندوق (in the cash desk) | ثبت صیادی (required before the deposit, rule N3) · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (guarantee cheques and notes; ordinary cheques as the exceptional case, section 6) |
+| ثبت صیادی شد (registered in Sayad, still in the cash desk) — **18 Nov** | (a) deposit at the bank (only from here, rule N3) · (d) replace · (f) cancel · (g) endorse · return to the payer · اقدام حقوقی (exceptional) |
 | در جریان وصول (at the bank) | (b) collected · (c) returned to the company · (e) bounced |
 | عودت چک از بانک (back from the bank, not collected) | (a) deposit again · (e) bounced (Q33) · (d) replace · (f) cancel · return to the payer (the owner will say which of these stay: Q40) |
 | برگشت چک (bounced, with notice no. and date) | اقدام حقوقی (its own screen, section 6) · (d) replace · (f) cancel |
@@ -86,7 +86,7 @@ in every part of the system. His statuses, in his words, and what the system doe
 | Status (as shown) | The owner's meaning | In the system |
 |---|---|---|
 | نزد صندوق | the cheque is received and recorded | state after the receipt |
-| ثبت صیادی شد | the cheque is registered in the banks' Sayad system | **new** step «ثبت صیادی» on a cheque in the cash desk; the cheque stays in the cash desk |
+| ثبت صیادی شد | the cheque is registered in the banks' Sayad system | **new** step «ثبت صیادی» on a cheque in the cash desk; the cheque stays in the cash desk. **Required before the deposit at the bank** (rule N3, owner 18 Nov 2026) |
 | در جریان وصول | deposited at the bank for collection | step «واگذاری به بانک» |
 | وصول چک | collected by the bank at the due date, into the company's account | step «وصول چک» (not before the due date, rule N2) |
 | عودت از صندوق | a cheque in the cash desk is given back to its owner | step «عودت از صندوق»; **now with its voucher** |
@@ -141,3 +141,8 @@ is, legal action is taken on a cheque that is «نزد صندوق»", the credit
 cheques still in the cash desk (also those registered in Sayad; not guarantee cheques or notes) to the list box. From then on the
 cheque is in «اسناد واخواست شده حقوقی شده», so its replacement or cancellation credits that account. Still open (Q38, 2): what can
 follow the legal action besides replacement.
+
+**Guarantee cheques, guarantee notes and bounced notes (owner, 18 Nov 2026)** may get legal action too. The list box therefore holds
+the bounced cheques and notes and the guarantee cheques and notes in the cash desk; ordinary cheques in the cash desk appear only with
+the exceptional-case tick. A guarantee cheque or note stays in the memorandum accounts («چک انتظامی به نفع شرکت» / «طرف حساب
+انتظامی»), so its legal action has no voucher yet: question Q42. A bounced note is credited out of «اسناد واخواست شده» like a cheque.

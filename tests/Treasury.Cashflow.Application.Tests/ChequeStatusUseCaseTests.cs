@@ -122,6 +122,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Null(list.Single(r => r.Id == cash.Value).ChequeStatuses);
 
         // The same on the opened receipt and on the cheque itself; at the bank the mark stays until the bank answers.
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheques[0], Bank.Id, "1405/08/24"), CancellationToken.None)).IsSuccess);
         var opened = (await _receipts.GetAsync(receipt, CancellationToken.None))!;
         Assert.Equal([("DepositedForCollection", true), ("InCashDesk", false), ("ReturnedToIssuer", false)], opened.ChequeStatuses!.Select(s => (s.State, s.ReachedDueDate)));
@@ -168,6 +169,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
     private async Task<Guid> ChequeInLegalAction()
     {
         var (_, cheques) = await Receipt("1405/08/25");
+        await Step(cheques[0], InstrumentAction.RegisterSayad, "1405/08/24");
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheques[0], Bank.Id, "1405/08/24", "SLIP-1"), CancellationToken.None)).IsSuccess);
         await Step(cheques[0], InstrumentAction.RecordBounced, "1405/08/26", reference: "BN-9");
         return cheques[0];
@@ -188,7 +190,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Equal("Instrument.NotFound", (await _legal.AttachAsync(Key(), Guid.NewGuid(), "a.pdf", Pdf, CancellationToken.None)).ErrorCode);
 
         var list = await _legal.ListAsync(cheque, CancellationToken.None);
-        Assert.Equal([("دادخواست.pdf", "application/pdf", 8, 4, "treasurer"), ("اعلامیه برگشت.png", "image/png", 9, 4, "treasurer")],
+        Assert.Equal([("دادخواست.pdf", "application/pdf", 8, 5, "treasurer"), ("اعلامیه برگشت.png", "image/png", 9, 5, "treasurer")],
             list.Select(f => (f.FileName, f.ContentType, f.Size, f.Step, f.UploadedBy)));
         var opened = await _legal.GetAsync(cheque, second.Value, CancellationToken.None);
         Assert.Equal(png, opened!.Value.Content);

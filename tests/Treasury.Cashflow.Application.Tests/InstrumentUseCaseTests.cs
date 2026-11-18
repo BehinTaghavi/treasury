@@ -37,6 +37,11 @@ public sealed class InstrumentUseCaseTests : IDisposable
     {
         var id = (await _useCases.ReceiveAsync(Receive(Guid.NewGuid().ToString(), "770001"), CancellationToken.None)).Value;
         Assert.Contains(await _useCases.ListReceivedAsync(InstrumentState.InCashDesk, CancellationToken.None), i => i.Id == id);
+
+        // Rule N3 (owner, 18 Nov 2026): not before «ثبت صیادی».
+        Assert.Equal("Instrument.SayadRegistrationRequired",
+            (await _useCases.DepositForCollectionAsync(new(Guid.NewGuid().ToString(), id, Guid.NewGuid(), "1405/08/05"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.ChangeStateAsync(new(Guid.NewGuid().ToString(), id, InstrumentAction.RegisterSayad, "1405/08/02"), CancellationToken.None)).IsSuccess);
         Assert.Equal("Instrument.CollectionAccountNotFound",
             (await _useCases.DepositForCollectionAsync(new(Guid.NewGuid().ToString(), id, FakeBankAccounts.Unknown, "1405/08/05"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.CollectionAccountInactive",
@@ -64,7 +69,8 @@ public sealed class InstrumentUseCaseTests : IDisposable
         Assert.NotNull(view);
         Assert.Equal("InCashDesk", view!.State);
         Assert.Equal("1405/08/01", view.IssueDate);
-        Assert.Contains("DepositForCollection", view.AllowedActions);
+        Assert.Contains("RegisterSayad", view.AllowedActions);
+        Assert.DoesNotContain("DepositForCollection", view.AllowedActions); // rule N3: only after «ثبت صیادی»
         var message = Assert.Single(_db.OutboxMessages);
         Assert.Equal(nameof(InstrumentStateChanged), message.Type);
         Assert.Contains("\"Date\":\"2026-10-23\"", message.Payload); // events carry ISO dates, not Jalali text
@@ -112,12 +118,13 @@ public sealed class InstrumentUseCaseTests : IDisposable
     public async Task Collection_path_through_the_use_cases()
     {
         var id = (await _useCases.ReceiveAsync(Receive("r"), CancellationToken.None)).Value;
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RegisterSayad, "1405/08/02"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "حساب جاری ملت"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RecordCleared, "1405/09/02"), CancellationToken.None)).IsSuccess);
         var view = await _useCases.GetAsync(id, CancellationToken.None);
         Assert.Equal("Cleared", view!.State);
-        Assert.Equal(3, view.History.Count);
-        Assert.Equal(3L, view.Version);
+        Assert.Equal(4, view.History.Count);
+        Assert.Equal(4L, view.Version);
     }
 
     [Fact]

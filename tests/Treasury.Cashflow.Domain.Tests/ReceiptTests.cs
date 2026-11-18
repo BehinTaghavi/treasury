@@ -228,7 +228,7 @@ public sealed class DepositForCollectionTests
     [Fact]
     public void The_cheque_is_at_the_bank_account_with_its_slip_number()
     {
-        var cheque = ReceivedCheque();
+        var cheque = RegisteredCheque();
         cheque.DepositForCollection(Mellat, D("1405/08/05"), User, " 4455 ");
         Assert.Equal((InstrumentState.DepositedForCollection, (Guid?)Mellat.Id, "0202-3572"), (cheque.State, cheque.CollectionAccountId, cheque.Destination));
         Assert.Equal("4455", cheque.History[^1].Reference);
@@ -239,9 +239,9 @@ public sealed class DepositForCollectionTests
     public void Only_at_a_switched_on_account_in_the_cheque_currency()
     {
         Assert.Equal("Instrument.CollectionAccountInactive", Assert.Throws<DomainException>(() =>
-            ReceivedCheque().DepositForCollection(Mellat with { IsActive = false }, D("1405/08/05"), User)).Code);
+            RegisteredCheque().DepositForCollection(Mellat with { IsActive = false }, D("1405/08/05"), User)).Code);
         Assert.Equal("Instrument.CollectionAccountCurrency", Assert.Throws<DomainException>(() =>
-            ReceivedCheque().DepositForCollection(Mellat with { CurrencyCode = "USD" }, D("1405/08/05"), User)).Code);
+            RegisteredCheque().DepositForCollection(Mellat with { CurrencyCode = "USD" }, D("1405/08/05"), User)).Code);
     }
 
     [Fact]

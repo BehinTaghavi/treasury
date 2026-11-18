@@ -241,6 +241,12 @@ public static class ReceiptVouchers
             case InstrumentAction.SendToLegal:
                 // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»; for a cheque that was
                 // still in the cash desk, Cr «اسناد نزد صندوق». The payer's تفصیل on both sides.
+                // A guarantee cheque or note stays in the memorandum accounts; which entry its legal action needs is open (Q42).
+                if (cheque.Kind.IsGuarantee())
+                {
+                    return null;
+                }
+
                 var legal = Text(cheque, "اقدام حقوقی");
                 return Pair("اقدام حقوقی چک", cheque, e.Date,
                     Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),

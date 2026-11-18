@@ -132,6 +132,14 @@ def test_lifecycle_matches_dotnet():
     assert dotnet == TRANSITIONS
 
 
+def test_old_cheques_went_to_the_bank_without_sayad_registration_n3():
+    # Rule N3 (owner, 18 Nov 2026) is for new deposits; the old program sent a cheque straight from the cash desk (D_Check_Vag_m).
+    from treasury_migration.legacy_mapping import LEGACY_TRANSITIONS
+    assert ("Received", "InCashDesk", "DepositForCollection") in LEGACY_TRANSITIONS and not (LEGACY_TRANSITIONS.keys() & TRANSITIONS.keys())
+    m = ok(map_cheque(received(12, d3="13860720"), SRC))
+    assert m.state == "DepositedForCollection" and [s.action for s in m.steps] == ["Receive", "DepositForCollection"] and m.warnings == []
+
+
 def test_old_cheque_cleared_before_its_due_date_is_kept_with_a_warning_n2():
     # Rule N2 (CEO, 10 Nov 2026) applies to new clearings; old history is kept as recorded but reported.
     m = ok(map_cheque(received(13, d3="13860720", d4="13860725", maturity="13860801"), SRC))

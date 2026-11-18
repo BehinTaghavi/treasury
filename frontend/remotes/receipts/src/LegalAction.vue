@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * «اقدام حقوقی» (owner, 18 Nov 2026): the legal action on a bounced cheque has its own screen. The cheque is chosen from a list box of
- * the bounced cheques; its particulars are shown; the date of the action and its description are entered, with a place for the scans
+ * the bounced cheques and notes and of the guarantee cheques and notes (owner, 18 Nov 2026: they may get legal action too); its particulars are shown; the date of the action and its description are entered, with a place for the scans
  * of the action's papers. Recording it puts the cheque in the status «اقدام حقوقی». Below, the cheques already in legal action are
  * listed with their action and scans; scans can still be added or removed there.
  * Owner's answers of 18 Nov 2026 (Q38): the action has its voucher (Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»), shown
@@ -17,7 +17,7 @@ import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Step { action: string; to: string; date: string; userId: string; reference: string | null; note: string | null; details: { accountId: string | null } | null }
 interface Cheque {
-  id: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number; issueDate: string; dueDate: string | null
+  id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number; issueDate: string; dueDate: string | null
   counterparty: string; counterpartyDetailCode: string | null; purpose: string; state: string; history: Step[]; allowedActions: string[]
   details: { branchName: string | null; accountNumber: string | null; accountHolder: string | null; sayadId: string | null } | null
 }
@@ -32,9 +32,15 @@ const num = (n: number) => (fa.value ? n.toLocaleString('fa-IR') : String(n))
 const L = useLookups(api)
 
 const bounced = ref<Cheque[]>([])
-/** Cheques still in the cash desk that may get a legal action (the rare case of the owner's answer to Q38). */
+/** In the cash desk and allowed a legal action: guarantee cheques and notes, and (the rare case of the answer to Q38) ordinary cheques. */
 const inDesk = ref<Cheque[]>([])
 const withDesk = ref(false)
+const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
+const kindNames: Record<string, [string, string]> = {
+  OrdinaryCheque: ['چک', 'Cheque'], BankCheque: ['چک بانکی', 'Bank cheque'], GuaranteeCheque: ['چک تضمینی', 'Guarantee cheque'],
+  PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
+}
+const kindName = (c: Cheque) => (kindNames[c.kind] ? kindNames[c.kind]![fa.value ? 0 : 1] : c.kind)
 const inLegal = ref<Cheque[]>([])
 const busy = ref(false)
 const message = ref<{ kind: 'error' | 'ok' | 'warning'; text: string } | null>(null)
@@ -56,11 +62,11 @@ async function load() {
 const form = reactive({ chequeId: '', date: todayJalali(), description: '' })
 const queued = ref<File[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
-const candidates = computed(() => (withDesk.value ? [...bounced.value, ...inDesk.value] : bounced.value))
+const candidates = computed(() => [...bounced.value, ...inDesk.value.filter(c => guarantee(c) || withDesk.value)])
 const choices = computed<Choice[]>(() => candidates.value.map(c => ({
   value: c.id,
-  label: `${c.number ?? ''} – ${c.bankName ?? ''} – ${c.counterparty}`,
-  hint: `${money(c.amount)}${c.currency !== 'IRR' ? ' ' + c.currency : ''} · ${t('سررسید', 'due')} ${c.dueDate ?? ''}${c.state === 'Bounced' ? '' : ' · ' + chequeStateName(c.state, props.locale)}`,
+  label: `${c.number ?? ''} – ${c.bankName ?? kindName(c)} – ${c.counterparty}`,
+  hint: `${kindName(c)} · ${money(c.amount)}${c.currency !== 'IRR' ? ' ' + c.currency : ''}${c.dueDate ? ` · ${t('سررسید', 'due')} ${c.dueDate}` : ''} · ${chequeStateName(c.state, props.locale)}`,
 })))
 const chosen = computed(() => candidates.value.find(c => c.id === form.chequeId) ?? null)
 
@@ -96,7 +102,7 @@ async function upload(chequeId: string, files: File[]): Promise<string[]> {
 async function record() {
   message.value = null
   const c = chosen.value
-  if (!c) return show('error', t('چک برگشتی را از فهرست انتخاب کنید.', 'Choose the bounced cheque from the list.'))
+  if (!c) return show('error', t('چک را از فهرست انتخاب کنید.', 'Choose the cheque from the list.'))
   const date = normaliseJalali(form.date)
   if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
   if (!form.description.trim()) return show('error', translate('Instrument.LegalActionDescriptionRequired', props.locale))
@@ -106,8 +112,8 @@ async function record() {
   const files = queued.value
   const failed = await upload(c.id, files)
   busy.value = false
-  const done = t(`اقدام حقوقی چک ${c.number} ثبت شد؛ آخرین وضعیت چک «${chequeStateName('InLegal', props.locale)}» است. سند آن را در پایین همین صفحه تایید کنید.`,
-    `Legal action recorded for cheque ${c.number}; its latest status is "${chequeStateName('InLegal', props.locale)}". Confirm its voucher below.`)
+  const done = t(`اقدام حقوقی ${kindName(c)} ${c.number} ثبت شد؛ آخرین وضعیت آن «${chequeStateName('InLegal', props.locale)}» است.${guarantee(c) ? '' : ' سند آن را در پایین همین صفحه تایید کنید.'}`,
+    `Legal action recorded for ${kindName(c)} ${c.number}; its latest status is "${chequeStateName('InLegal', props.locale)}".${guarantee(c) ? '' : ' Confirm its voucher below.'}`)
   const sent = files.length - failed.length
   const scans = sent ? t(` ${num(sent)} فایل ضمیمه شد.`, ` ${sent} scan(s) attached.`) : ''
   if (failed.length) show('warning', `${done}${scans} ${t('این فایل‌ها ضمیمه نشدند', 'Not attached')} – ${failed.join('؛ ')}`)
@@ -171,7 +177,7 @@ async function removeFile(f: LegalFile) {
 onMounted(async () => {
   await L.load()
   await load()
-  if (props.chequeId && inDesk.value.some(c => c.id === props.chequeId)) withDesk.value = true
+  if (props.chequeId && inDesk.value.some(c => c.id === props.chequeId && !guarantee(c))) withDesk.value = true
   if (props.chequeId && candidates.value.some(c => c.id === props.chequeId)) form.chequeId = props.chequeId
   else if (props.chequeId && inLegal.value.some(c => c.id === props.chequeId)) await open(props.chequeId)
 })
@@ -183,18 +189,19 @@ onMounted(async () => {
 
     <form class="tr-form" @submit.prevent="record">
       <fieldset>
-        <legend>{{ t('چک برگشتی', 'Bounced cheque') }}</legend>
-        <label class="full">{{ t('انتخاب چک از فهرست چک‌های برگشتی (شماره، بانک، پرداخت‌کننده)', 'Choose from the bounced cheques (number, bank, payer)') }}
+        <legend>{{ t('چک یا سفتهٔ مورد اقدام حقوقی', 'Cheque or note') }}</legend>
+        <label class="full">{{ t('انتخاب از فهرست چک‌ها و سفته‌های برگشتی و چک‌ها و سفته‌های تضمینی (شماره، بانک، پرداخت‌کننده)', 'Choose from the bounced cheques and notes and the guarantee cheques and notes (number, bank, payer)') }}
           <SearchSelect v-model="form.chequeId" :options="choices" required :aria-label="t('چک برگشتی', 'Bounced cheque')"
-                        :none-text="t('چک برگشتی‌ای برای اقدام حقوقی نیست', 'No bounced cheque')" />
+                        :none-text="t('چک برگشتی یا تضمینی‌ای برای اقدام حقوقی نیست', 'No bounced or guarantee cheque')" />
         </label>
         <label class="tr-check full">
           <input v-model="withDesk" type="checkbox" @change="form.chequeId = ''" />
-          {{ t('حالت استثنایی: چک‌های نزد صندوق هم در فهرست باشند (اقدام حقوقی روی چکی که هنوز برگشت نخورده)', 'Exceptional case: also list cheques still in the cash desk (legal action on a cheque that has not bounced)') }}
+          {{ t('حالت استثنایی: چک‌های عادیِ نزد صندوق هم در فهرست باشند (اقدام حقوقی روی چکی که هنوز برگشت نخورده)', 'Exceptional case: also list ordinary cheques still in the cash desk (legal action on a cheque that has not bounced)') }}
         </label>
         <template v-if="chosen">
           <dl class="tr-facts full">
-            <div><dt>{{ t('شماره چک', 'Cheque no.') }}</dt><dd class="num">{{ chosen.number }}</dd></div>
+            <div><dt>{{ t('نوع', 'Kind') }}</dt><dd>{{ kindName(chosen) }}</dd></div>
+            <div><dt>{{ t('شماره', 'No.') }}</dt><dd class="num">{{ chosen.number }}</dd></div>
             <div><dt>{{ t('شناسهٔ صیاد', 'Sayad ID') }}</dt><dd class="num">{{ chosen.details?.sayadId ?? '—' }}</dd></div>
             <div><dt>{{ t('بانک و شعبه', 'Bank and branch') }}</dt><dd>{{ chosen.bankName }}<template v-if="chosen.details?.branchName"> – {{ chosen.details.branchName }}</template></dd></div>
             <div><dt>{{ t('شماره حساب چک', 'Account no.') }}</dt><dd class="num">{{ chosen.details?.accountNumber ?? '—' }}</dd></div>
@@ -203,7 +210,7 @@ onMounted(async () => {
             <div><dt>{{ t('مبلغ', 'Amount') }}</dt><dd class="num">{{ money(chosen.amount) }} {{ chosen.currency === 'IRR' ? t('ریال', 'Rial') : chosen.currency }}</dd></div>
             <div><dt>{{ t('بابت', 'Purpose') }}</dt><dd>{{ chosen.purpose }}</dd></div>
             <div><dt>{{ t('تاریخ دریافت', 'Received') }}</dt><dd class="num">{{ chosen.issueDate }}</dd></div>
-            <div><dt>{{ t('سررسید', 'Due') }}</dt><dd class="num">{{ chosen.dueDate }}</dd></div>
+            <div><dt>{{ t('سررسید', 'Due') }}</dt><dd class="num">{{ chosen.dueDate ?? '—' }}</dd></div>
             <div><dt>{{ t('وضعیت فعلی', 'Status now') }}</dt><dd>{{ chequeStateName(chosen.state, locale) }}</dd></div>
             <template v-if="chosen.state === 'Bounced'">
               <div><dt>{{ t('اعلامیهٔ برگشت', 'Bounce notice') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
@@ -290,6 +297,8 @@ onMounted(async () => {
         <input type="file" :accept="ACCEPT" multiple :disabled="busy" @change="addFiles" />
       </label>
       <VoucherTable v-if="voucher" :voucher="voucher" :locale="locale" :account-name="L.accountName" can-confirm :busy="confirming" @confirm="confirmVoucher" />
+      <p v-else-if="guarantee(opened)" class="muted small">{{ t('چک و سفتهٔ تضمینی در حساب‌های انتظامی نگهداری می‌شوند؛ سند اقدام حقوقی آن‌ها هنوز تعیین نشده است (پرسش Q42).',
+        'Guarantee cheques and notes are kept in the memorandum accounts; the voucher of their legal action is not decided yet (question Q42).') }}</p>
       <p class="muted small">{{ t('مراحل بعدی این چک (تعویض چک، ابطال) در زبانهٔ «عملیات چک‌های دریافتی» ثبت می‌شود.',
         'The next steps of this cheque (replacement, cancellation) are recorded on the «Received cheque steps» tab.') }}</p>
     </section>

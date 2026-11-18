@@ -33,7 +33,7 @@ The MVC version is not repaired. The system is rebuilt, and each part runs besid
 
 By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the latest one, #8, was green before it was merged.
 
-**18 Nov 2026, waiting for review — latest status of a received cheque:** as the product owner described it, the «وضعیت» column of the receipts list shows the latest status of each receipt's cheques; two new statuses, «ثبت صیادی شد» (registered in Sayad, for a cheque in the cash desk) and «اقدام حقوقی» (a bounced cheque handed to the company's lawyer, which can still be replaced) with its own screen: the bounced cheque chosen from a list, its particulars shown, the date and description of the action, the scans of its papers and its voucher (Dr «اسناد واخواست شده حقوقی شده», a new template account); the automatic mark «سررسید چک» on post-dated cheques in the cash desk or at the bank, with what the cheque waits for; a voucher for the return to the payer; and one list of status names (the owner's words) for every screen. Details in `docs/domain/received-cheque-steps.md` (sections 5 and 6); Q37, Q39 and Q41 are answered, Q38 (2) and Q40 are open.
+**18 Nov 2026, waiting for review — latest status of a received cheque:** as the product owner described it, the «وضعیت» column of the receipts list shows the latest status of each receipt's cheques; two new statuses, «ثبت صیادی شد» (registered in Sayad, for a cheque in the cash desk; required before the deposit at the bank) and «اقدام حقوقی» (a bounced cheque handed to the company's lawyer, which can still be replaced) with its own screen: the bounced cheque chosen from a list, its particulars shown, the date and description of the action, the scans of its papers and its voucher (Dr «اسناد واخواست شده حقوقی شده», a new template account); the automatic mark «سررسید چک» on post-dated cheques in the cash desk or at the bank, with what the cheque waits for; a voucher for the return to the payer; and one list of status names (the owner's words) for every screen. Details in `docs/domain/received-cheque-steps.md` (sections 5 and 6); Q37, Q39 and Q41 are answered, Q38 (2), Q40 and Q42 are open.
 
 | Pull request | Subject | What it added |
 |---|---|---|
@@ -77,8 +77,8 @@ The full plan and phases A–G are in `docs/plan.md`.
 - **Payment requests (Phase C):** the owner's answers to Q25–Q29, then paying approved requests (Phase E).
 - **Payments and cheque printing (Phase E):** the proposal in `docs/domain/cheque-printing.md` waits for the owner's answers to Q12–Q18.
 - **Later phases:** accounting vouchers sent to the general ledger (F), reports and the full pilot (G).
-- **Latest status of a received cheque (Phase D):** the owner's answers to Q38 (2) (what follows a legal action) and Q40 (which steps stay for a cheque back from the bank).
-- **Open business questions:** Q1–Q10, Q25–Q29, Q38 and Q40 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
+- **Latest status of a received cheque (Phase D):** the owner's answers to Q38 (2) (what follows a legal action), Q40 (which steps stay for a cheque back from the bank) and Q42 (voucher of the legal action on a guarantee cheque or note).
+- **Open business questions:** Q1–Q10, Q25–Q29, Q38, Q40 and Q42 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
 
 ## Repository layout
 

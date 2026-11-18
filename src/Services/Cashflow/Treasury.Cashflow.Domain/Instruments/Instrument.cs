@@ -263,11 +263,12 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// The cheque leaves the cash desk («در جریان وصول نزد صندوق») for one of our bank accounts («در جریان وصول نزد بانک»), owner's
     /// report no. 4, item 9; old form D_Check_Vag_m (account and deposit slip «شماره فیش واگذاری»). The account must be switched on and
-    /// in the cheque's currency.
+    /// in the cheque's currency. Rule N3 (owner, 18 Nov 2026): a cheque is deposited only after «ثبت صیادی».
     /// </summary>
     public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
     {
         ArgumentNullException.ThrowIfNull(account);
+        RequireSayadRegistration();
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -281,7 +282,21 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
+        RequireSayadRegistration();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
+    }
+
+    /// <summary>
+    /// Rule N3 (owner, 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ چک بدون آن به بانک واگذار نمی‌شود"): a cheque still «نزد صندوق» is
+    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m).
+    /// </summary>
+    private void RequireSayadRegistration()
+    {
+        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk)
+        {
+            Require(Kind.IsCollectable(), "Instrument.KindNotAllowedForAction", $"'{InstrumentAction.DepositForCollection}' is not allowed for {Kind}."); // R3
+            throw new DomainException("Instrument.SayadRegistrationRequired", "Register the cheque in Sayad before depositing it at the bank.");
+        }
     }
 
     /// <summary>

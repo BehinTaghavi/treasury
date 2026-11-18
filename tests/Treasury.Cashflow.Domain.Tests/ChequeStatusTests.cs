@@ -36,6 +36,7 @@ public sealed class ChequeStatusTests
     private static Instrument Bounced()
     {
         var c = Cheque();
+        c.RegisterSayad(D("1405/08/02"), User);
         c.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User, "F-1");
         c.RecordBounced(D("1405/09/02"), User, "کسری موجودی", "BN-1");
         return c;
@@ -48,12 +49,13 @@ public sealed class ChequeStatusTests
     {
         var c = Cheque();
         var before = c.AllowedActions().Where(a => a != InstrumentAction.RegisterSayad).ToList();
+        Assert.DoesNotContain(InstrumentAction.DepositForCollection, before); // rule N3: not before the registration
         c.RegisterSayad(D("1405/08/02"), User, " SY-100 ", "تایید شد");
         Assert.Equal((InstrumentState.SayadRegistered, "SY-100", "SY-100"), (c.State, c.History[^1].Reference, c.History[^1].Details!.SayadTracking));
         Assert.True(c.State.IsInCashDesk());
 
-        // Every step of «نزد صندوق» stays open; the registration itself is recorded once.
-        Assert.Equal(before, c.AllowedActions());
+        // Every step of «نزد صندوق» stays open and the deposit at the bank opens (rule N3); the registration itself is recorded once.
+        Assert.Equal([InstrumentAction.DepositForCollection, .. before], c.AllowedActions());
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.RegisterSayad(D("1405/08/03"), User)).Code);
 
         // No voucher: only the latest status changes (owner's answer to Q37, 18 Nov 2026).
@@ -92,16 +94,16 @@ public sealed class ChequeStatusTests
         Assert.Equal("Instrument.LegalActionDescriptionRequired", Assert.Throws<DomainException>(() => c.SendToLegal(D("1405/09/10"), User, " ")).Code);
         c.SendToLegal(D("1405/09/10"), User, " تحویل به وکیل شرکت جهت طرح دعوی ");
         Assert.Equal((InstrumentState.InLegal, D("1405/09/10"), "تحویل به وکیل شرکت جهت طرح دعوی"), (c.State, c.History[^1].Date, c.History[^1].Note));
-        Assert.Equal(4, c.LegalActionStep);
+        Assert.Equal(5, c.LegalActionStep);
         Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel], c.AllowedActions());
 
         // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده», the payer on both sides.
-        var v = ReceiptVouchers.ForStep(c, 4, Bank, null, Template());
+        var v = ReceiptVouchers.ForStep(c, 5, Bank, null, Template());
         Assert.Equal([(true, "1204", "200015"), (false, "1203", "200015")], Lines(v));
         Assert.Equal(("اقدام حقوقی چک", D("1405/09/10"), true), (v!.Operation, v.Date, v.IsComplete));
 
         // Until the new account is set in the template the voucher names it and cannot be confirmed.
-        var unset = ReceiptVouchers.ForStep(c, 4, Bank, null, new VoucherTemplate(new Dictionary<FixedAccount, string> { [FixedAccount.ProtestedCheques] = "1203" }));
+        var unset = ReceiptVouchers.ForStep(c, 5, Bank, null, new VoucherTemplate(new Dictionary<FixedAccount, string> { [FixedAccount.ProtestedCheques] = "1203" }));
         Assert.Equal((FixedAccount.ProtestedChequesInLegal, false), (unset!.Lines[0].Missing!.Value, unset.IsComplete));
     }
 
@@ -119,15 +121,52 @@ public sealed class ChequeStatusTests
         registered.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی");
         Assert.Equal([(true, "1204", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(registered, 3, Bank, null, Template())));
 
-        // Guarantee cheques and notes are not in «اسناد نزد صندوق» as cheques to collect: no legal action from the cash desk.
-        Assert.DoesNotContain(InstrumentAction.SendToLegal, Cheque(InstrumentKind.GuaranteeCheque, due: null).AllowedActions());
+        // An ordinary note that has not bounced gets no legal action.
         Assert.DoesNotContain(InstrumentAction.SendToLegal, Cheque(InstrumentKind.PromissoryNote).AllowedActions());
+    }
+
+    [Fact]
+    public void Guarantee_cheques_and_guarantee_notes_may_get_legal_action()
+    {
+        // Owner, 18 Nov 2026: "چک تضمینی و سفته تضمینی بعلاوه سفته های برگشتی ممکن است اقدام حقوقی شوند".
+        var cheque = Cheque(InstrumentKind.GuaranteeCheque, due: null);
+        cheque.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی روی چک تضمینی");
+        Assert.Equal((InstrumentState.InLegal, 2), (cheque.State, cheque.LegalActionStep!.Value));
+        Assert.Equal([InstrumentAction.Cancel], cheque.AllowedActions());
+
+        var note = Cheque(InstrumentKind.GuaranteeNote, due: null);
+        note.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی روی سفته تضمینی");
+        Assert.Equal(InstrumentState.InLegal, note.State);
+
+        // They stay in the memorandum accounts: which entry the legal action needs is open (Q42); cancelling still reverses them.
+        Assert.Null(ReceiptVouchers.ForStep(cheque, 2, Bank, null, Template()));
+        cheque.CancelReceived(D("1405/09/01"), User, "م-3", D("1405/08/30"), "پایان دعوی");
+        Assert.Equal([(true, "9201", "200015"), (false, "9101", "200015")], Lines(ReceiptVouchers.ForStep(cheque, 3, Bank, null, Template())));
+
+        // Scans are attached to it like to any legal action.
+        var file = InstrumentAttachment.ForLegalAction(Guid.NewGuid(), note, 0, "a.pdf", Pdf, User, Now, D("1405/08/11"));
+        Assert.Equal(2, file.Step);
+    }
+
+    [Fact]
+    public void A_bounced_note_may_get_legal_action()
+    {
+        // Notes are not deposited through this system yet; a bounced note comes from the old data (Stcode 14).
+        var note = Instrument.Restore(Guid.NewGuid(), InstrumentDirection.Received, InstrumentKind.PromissoryNote, "S-17", null, null, null, null, Money.Rials(5_000_000),
+            D("1386/10/01"), D("1386/11/01"), CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", null, InstrumentState.Bounced, 1386,
+            [new InstrumentHistoryEntry(InstrumentAction.Receive, null, InstrumentState.InCashDesk, D("1386/10/01"), User, null, null),
+             new InstrumentHistoryEntry(InstrumentAction.RecordBounced, InstrumentState.DepositedForCollection, InstrumentState.Bounced, D("1386/11/05"), User, null, null)], 1);
+        Assert.Contains(InstrumentAction.SendToLegal, note.AllowedActions());
+        note.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی سفته برگشتی");
+        Assert.Equal(InstrumentState.InLegal, note.State);
+        Assert.Equal([(true, "1204", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(note, 3, Bank, null, Template())));
     }
 
     [Fact]
     public void A_cheque_at_the_bank_or_back_from_it_gets_no_legal_action_and_the_action_is_not_dated_before_the_bounce()
     {
         var atBank = Cheque();
+        atBank.RegisterSayad(D("1405/08/02"), User);
         atBank.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User);
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => atBank.SendToLegal(D("1405/09/10"), User, "اقدام")).Code);
         atBank.ReturnFromBank(D("1405/09/03"), User);
@@ -160,7 +199,7 @@ public sealed class ChequeStatusTests
         var cancelled = Bounced();
         cancelled.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
         cancelled.CancelReceived(D("1405/10/01"), User, "م-7", D("1405/09/30"), "لاوصول");
-        Assert.Equal([(true, "8101", "200015"), (false, "1204", "200015")], Lines(ReceiptVouchers.ForStep(cancelled, 5, Bank, null, Template())));
+        Assert.Equal([(true, "8101", "200015"), (false, "1204", "200015")], Lines(ReceiptVouchers.ForStep(cancelled, 6, Bank, null, Template())));
     }
 
     private static readonly byte[] Pdf = [0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x37];
@@ -172,7 +211,7 @@ public sealed class ChequeStatusTests
         var c = Bounced();
         c.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل");
         var file = InstrumentAttachment.ForLegalAction(Guid.NewGuid(), c, 0, @"C:\scans\دادخواست.pdf", Pdf, User, Now, D("1405/09/11"));
-        Assert.Equal((c.Id, 4, "دادخواست.pdf", "application/pdf", 8, 1405), (file.InstrumentId, file.Step, file.FileName, file.ContentType, file.Size, file.FiscalYear));
+        Assert.Equal((c.Id, 5, "دادخواست.pdf", "application/pdf", 8, 1405), (file.InstrumentId, file.Step, file.FileName, file.ContentType, file.Size, file.FiscalYear));
         Assert.IsType<InstrumentFileAttached>(Assert.Single(file.PendingEvents));
 
         byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1];
@@ -252,10 +291,11 @@ public sealed class ChequeStatusTests
 
         // After the bank gave it back (the owner's case «الف» for cheques returned to the cash desk) it is the same voucher.
         var back = Cheque();
+        back.RegisterSayad(D("1405/08/02"), User);
         back.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User);
         back.ReturnFromBank(D("1405/09/03"), User);
         back.ReturnToIssuer(D("1405/09/04"), User);
-        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(back, 4, Bank, null, Template(), "4101")));
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(back, 5, Bank, null, Template(), "4101")));
 
         var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
         guarantee.ReturnToIssuer(D("1405/08/03"), User);

@@ -14,7 +14,7 @@
 | کد قدیم | وضعیت جدید | گام | از وضعیت | فرم قدیم | انواع |
 |---|---|---|---|---|---|
 | ۱۱ — نزد صندوق | InCashDesk | Receive (دریافت) | — | D_Check | همه |
-| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (حساب وصول لازم است) | InCashDesk | D_Check_Vag_m | چک عادی، چک بانکی |
+| ۱۲ — واگذار جهت وصول | DepositedForCollection | DepositForCollection (حساب وصول لازم است) | SayadRegistered (قاعدهٔ N3؛ در داده‌های قدیم: InCashDesk) | D_Check_Vag_m؛ مدیرعامل ۲۷ آبان ۱۴۰۵ | چک عادی، چک بانکی |
 | ۱۳ — وصول شده | Cleared | RecordCleared (ثبت وصول) | DepositedForCollection | D_Check_vos_m | همه |
 | ۱۴ — برگشت شده | Bounced | RecordBounced (ثبت برگشت) | DepositedForCollection | D_Check_vos_m، Checkbacked | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer (عودت به صادرکننده) | InCashDesk | D_Check_Od_m | همه |
@@ -26,9 +26,9 @@
 | — تعویض چک | Replaced | Replace (با رسید دریافت چک‌های جدید از همان پرداخت‌کننده) | InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal | بند ۱۴ (د)، Q31؛ مدیرعامل ۲۷ آبان ۱۴۰۵ | غیر تضمینی |
 | — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal | بند ۱۴ (و)، Q30 | همه |
 | — ثبت صیادی شد | SayadRegistered | RegisterSayad (تاریخ؛ کد رهگیری ثبت، اختیاری) | InCashDesk | مدیرعامل، ۲۷ آبان ۱۴۰۵ | چک‌ها |
-| ۱۲، ۱۵، ۱۶ | DepositedForCollection، ReturnedToIssuer، Endorsed | همان مراحل چک نزد صندوق (واگذاری به بانک، عودت از صندوق، خرج) | SayadRegistered | مدیرعامل، ۲۷ آبان ۱۴۰۵ | مانند InCashDesk |
+| ۱۵، ۱۶ | ReturnedToIssuer، Endorsed | سایر مراحل چک نزد صندوق (عودت از صندوق، خرج) | SayadRegistered | مدیرعامل، ۲۷ آبان ۱۴۰۵ | مانند InCashDesk |
 | ۱۴ + GoInlaw — اقدام حقوقی | InLegal | SendToLegal (تاریخ و شرح اقدام، در صفحهٔ «اقدام حقوقی»؛ اسکن ضمائم پس از آن اضافه می‌شود) | Bounced | مدیرعامل، ۲۷ آبان ۱۴۰۵ | همه |
-| — اقدام حقوقی | InLegal | SendToLegal، حالت استثنایی | InCashDesk، SayadRegistered | پاسخ مدیرعامل به Q38، ۲۷ آبان ۱۴۰۵ | چک‌ها، غیر تضمینی |
+| — اقدام حقوقی | InLegal | SendToLegal: چک تضمینی و سفتهٔ تضمینی؛ چک عادی به‌عنوان حالت استثنایی | InCashDesk، SayadRegistered | پاسخ مدیرعامل به Q38 و ۲۷ آبان ۱۴۰۵ | چک‌ها و سفتهٔ تضمینی (نه سفتهٔ عادیِ برگشت‌نخورده) |
 | ۱۶ — واگذار به سایرین | Endorsed | Endorse (خرج؛ گیرنده (هر تفصیل)، گروه بابت پرداخت، بابت، کد پیگیری صیاد) | InCashDesk | D_Check_Kh_m | چک عادی، چک بانکی |
 
 بند ۱۴ مدیرعامل (۲۴ آبان ۱۴۰۵) و پاسخ‌های Q30 تا Q35: `docs/domain/received-cheque-steps.fa.md`. «برگشت شده» و «خرج شده» دیگر پایانی نیستند.
@@ -74,6 +74,9 @@
 ## قواعد تاریخ برای عملیات جدید
 
 - **N1** (جدید، Q6): تاریخ هر گام نمی‌تواند قبل از تاریخ گام قبلی همان سند باشد.
+- **N3** (مدیرعامل، ۲۷ آبان ۱۴۰۵): **«ثبت صیادی» اجباری است**: چک فقط پس از ثبت صیادی به بانک واگذار می‌شود
+  (`Instrument.SayadRegistrationRequired`). چکی که بانک عودت داده قبل از واگذاری اول ثبت صیادی شده و بدون ثبت دوباره واگذار می‌شود.
+  در برنامهٔ قدیم نبود (چک مستقیم از صندوق واگذار می‌شد)؛ سابقهٔ منتقل‌شده همان‌گونه که ثبت شده نگه داشته می‌شود.
 - **N2** (مدیرعامل، ۱۹ آبان ۱۴۰۵): تاریخ **وصول** چک دریافتی نمی‌تواند قبل از تاریخ سررسید باشد (`Instrument.ClearedBeforeDueDate`). واگذاری جهت وصول قبل از سررسید همچنان مجاز است. این قاعده در برنامه قدیم نبود؛ سوابق مهاجرت‌شده‌ای که آن را رعایت نمی‌کنند همان‌طور که ثبت شده‌اند نگه داشته می‌شوند و در گزارش هشدارها فهرست می‌شوند. همین قاعده برای **برگشت** چک هم صدق می‌کند (`Instrument.BouncedBeforeDueDate`؛ پاسخ Q11، ۱۹ آبان ۱۴۰۵).
 
 </div>

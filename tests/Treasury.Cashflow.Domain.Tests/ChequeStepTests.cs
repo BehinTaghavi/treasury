@@ -36,6 +36,7 @@ public sealed class ChequeStepTests
     private static Instrument AtBank(Guid? account = null)
     {
         var c = Cheque();
+        c.RegisterSayad(D("1405/08/02"), User); // rule N3 (owner, 18 Nov 2026): registered in Sayad before it goes to the bank
         c.DepositForCollection(new CollectionAccount(account ?? BankA, "0101", "IRR", true), D("1405/08/05"), User, "F-1");
         return c;
     }
@@ -49,7 +50,7 @@ public sealed class ChequeStepTests
         c.ReturnFromBank(D("1405/09/03"), User, "مدارک ناقص");
         Assert.Equal(InstrumentState.ReturnedFromBank, c.State);
         Assert.Equal(BankA, c.History[^1].Details!.AccountId);
-        Assert.Equal([(true, "1201", "200015"), (false, "1202", "600001")], Lines(ReceiptVouchers.ForStep(c, 3, SideA, null, Template())));
+        Assert.Equal([(true, "1201", "200015"), (false, "1202", "600001")], Lines(ReceiptVouchers.ForStep(c, 4, SideA, null, Template())));
         Assert.Equal([InstrumentAction.DepositForCollection, InstrumentAction.RecordBounced, InstrumentAction.ReturnToIssuer, InstrumentAction.Replace, InstrumentAction.Cancel],
             c.AllowedActions());
     }
@@ -61,8 +62,8 @@ public sealed class ChequeStepTests
         c.ReturnFromBank(D("1405/09/03"), User);
         var other = Guid.NewGuid();
         c.DepositForCollection(new CollectionAccount(other, "0909", "IRR", true), D("1405/09/04"), User, "F-2");
-        Assert.Equal((BankA, other), (c.History[1].Details!.AccountId!.Value, c.History[3].Details!.AccountId!.Value));
-        Assert.Equal([(true, "1202", "600009"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 4, SideB, null, Template())));
+        Assert.Equal((BankA, other), (c.History[2].Details!.AccountId!.Value, c.History[4].Details!.AccountId!.Value));
+        Assert.Equal([(true, "1202", "600009"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 5, SideB, null, Template())));
     }
 
     [Fact]
@@ -71,7 +72,7 @@ public sealed class ChequeStepTests
         var c = AtBank();
         Assert.Equal("Instrument.BounceNoticeRequired", Assert.Throws<DomainException>(() => c.RecordBounced(D("1405/09/02"), User, "کسری موجودی", " ")).Code);
         c.RecordBounced(D("1405/09/02"), User, "کسری موجودی", "BN-77");
-        var v = ReceiptVouchers.ForStep(c, 3, SideA, null, Template());
+        var v = ReceiptVouchers.ForStep(c, 4, SideA, null, Template());
         Assert.Equal([(true, "1203", "200015"), (false, "1202", "600001")], Lines(v));
         Assert.Contains("BN-77", v!.Lines[0].Description, StringComparison.Ordinal);
         Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.SendToLegal], c.AllowedActions());
@@ -84,7 +85,7 @@ public sealed class ChequeStepTests
         c.ReturnFromBank(D("1405/09/03"), User);
         c.RecordBounced(D("1405/09/10"), User, null, "BN-78");
         Assert.Equal(InstrumentState.Bounced, c.State);
-        Assert.Equal([(true, "1203", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 4, SideA, null, Template())));
+        Assert.Equal([(true, "1203", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 5, SideA, null, Template())));
     }
 
     [Fact]
@@ -108,7 +109,7 @@ public sealed class ChequeStepTests
         var bounced = AtBank();
         bounced.RecordBounced(D("1405/09/02"), User, null, "BN-1");
         bounced.CancelReceived(D("1405/09/20"), User, "م-1", D("1405/09/19"), "سوخت");
-        Assert.Equal([(true, "8101", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(bounced, 4, SideA, null, Template())));
+        Assert.Equal([(true, "8101", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(bounced, 5, SideA, null, Template())));
 
         var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
         guarantee.CancelReceived(D("1405/08/10"), User, "م-2", D("1405/08/10"), "پایان قرارداد");

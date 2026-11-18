@@ -8,7 +8,8 @@
  * replaced by new cheques (a cheque receipt of its own), cancelled by management's order (its no. and date), endorsed to pay an approved
  * payment request (answer to Q36; its beneficiary receives the cheque; with the Sayad transfer's tracking no.), endorsement returned (the
  * request's payment is taken back), returned to the payer.
- * Owner, 18 Nov 2026 (the latest status of a received cheque): «ثبت صیادی» for a cheque in the cash desk, the mark «سررسید چک» on
+ * Owner, 18 Nov 2026 (the latest status of a received cheque): «ثبت صیادی» for a cheque in the cash desk — required before the cheque
+ * can be deposited at the bank (rule N3), so only registered cheques have a tick box for the deposit —, the mark «سررسید چک» on
  * post-dated cheques that reached their due date in the cash desk or at the bank, with what they wait for, and «اقدام حقوقی» for a
  * bounced cheque, which is recorded on its own screen (LegalAction.vue): the button on a bounced cheque's row opens it with that cheque. The names of the statuses are the owner's and shared by every screen (ui-kit chequeStatus).
  */
@@ -206,11 +207,15 @@ function stepText(s: Step) {
   return parts.filter(Boolean).join(' · ')
 }
 
+const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
 /** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. */
 const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
 const rank = (a: string) => { const i = stepOrder.indexOf(a); return i < 0 ? stepOrder.length : i }
-/** «اقدام حقوقی» is offered on bounced cheques; the rare action on a cheque still in the cash desk starts on the legal-action screen. */
-const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && (a !== 'SendToLegal' || c.state === 'Bounced'))
+/**
+ * «اقدام حقوقی» is offered on bounced cheques and notes and on guarantee cheques and notes; the rare action on an ordinary cheque still in
+ * the cash desk starts on the legal-action screen.
+ */
+const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && (a !== 'SendToLegal' || c.state === 'Bounced' || guarantee(c)))
   .sort((a, b) => rank(a) - rank(b))
 
 onMounted(async () => { await L.load(); await load() })
@@ -286,6 +291,8 @@ onMounted(async () => { await L.load(); await load() })
                    :api-base="apiBase" :locale="locale" :token="token" @saved="replaced" />
     </section>
 
+    <p v-if="tab === 'desk'" class="muted small">{{ t('چک پس از «ثبت صیادی» به بانک واگذار می‌شود: ابتدا «ثبت صیادی» را در ردیف چک ثبت کنید؛ سپس چک برای واگذاری قابل تیک‌زدن است.',
+      'A cheque is deposited at the bank after «ثبت صیادی»: record it on the cheque\'s row first; then the cheque can be ticked for the deposit.') }}</p>
     <div class="tr-scroll">
       <table class="tr-table">
         <thead>
