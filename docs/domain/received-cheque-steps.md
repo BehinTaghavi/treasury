@@ -175,3 +175,11 @@ credits «اسناد تضمینی به نفع شرکت» (the template's «چک 
   به حساب، واریز نقدی در شعبه، کارت به کارت (only when the bank account has a bank card)، واریز به درگاه پرداخت متصل به حساب شرکت. Paya
   and Satna are recorded with the Sheba the transfer came from (IR and 24 digits, check digits verified). Kept besides, as the owner confirmed (Q44): «کارتخوان
   (POS)» of 14 Nov; the Sheba is the payer's (Q45); the old combined «حواله / انتقال» is shown on earlier receipts and no longer chosen. Schema 036.
+- **«خارج از مرکز»** on the cheque receipt form is ticked by the system: when the city of the cheque's bank is not the city of the
+  company's legal address (Basic Information → «مشخصات شرکت»: name, address, legal address with its city and postal code; schema 037),
+  the cheque is out of town. The screen ticks it as soon as the city is chosen and cashflow-svc decides it again when the receipt is
+  saved (`ReceivedInstrumentDetails.WithOutOfTownFor`). Without a city on the cheque, or before the company's city is entered, the
+  user's own tick stays. Which city is the company's centre is asked in Q46.
+- **«نوع حساب تفصیل»** before the payer of the three receipt forms: the types of تفصیل accounts of the accounting system that may pay
+  (customers, persons and companies, Q22). Choosing a type fills the payer list with the accounts of that type, to pick directly or to
+  search within; «همه» shows them all. Other screens: Q47.

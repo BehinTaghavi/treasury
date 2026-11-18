@@ -381,6 +381,9 @@ public sealed class ReceiptUseCases(
         var created = new List<Instrument>();
         var seen = new HashSet<(string?, string)>();
         var duplicate = false;
+
+        // Owner, 18 Nov 2026: «خارج از مرکز» follows from the city of the cheque's bank and the city of the company's address.
+        var companyCity = command.Instruments.Any(l => !string.IsNullOrWhiteSpace(l.City)) ? await reference.CompanyCityAsync(ct).ConfigureAwait(false) : null;
         foreach (var line in command.Instruments)
         {
             string? bankName = null;
@@ -394,7 +397,7 @@ public sealed class ReceiptUseCases(
                 Guid.NewGuid(), line.Kind, line.Number, bankName, line.Amount.ToMoney(), date,
                 string.IsNullOrWhiteSpace(line.DueDate) ? null : FiscalDate.ParseJalali(line.DueDate), payer, header.Purpose, user,
                 new ReceivedInstrumentDetails(line.BankId, line.BranchName, line.BranchCode, line.AccountNumber, line.AccountHolder, line.City,
-                    line.OutOfTown, line.SayadId, line.Guarantors),
+                    line.OutOfTown, line.SayadId, line.Guarantors).WithOutOfTownFor(companyCity),
                 receiptId);
             if (!seen.Add((instrument.BankName, instrument.Number!)))
             {

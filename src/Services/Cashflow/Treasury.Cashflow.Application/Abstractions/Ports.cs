@@ -116,6 +116,9 @@ public interface IReceiptReferenceLookup
 
     /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The city of the company's address in Basic Information («مشخصات شرکت»); null until it is entered.</summary>
+    Task<string?> CompanyCityAsync(CancellationToken cancellationToken);
 }
 
 public interface IChequeBookRepository

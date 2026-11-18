@@ -34,6 +34,17 @@ public sealed record ReceivedInstrumentDetails(
 
     public IReadOnlyList<NoteGuarantor> GuarantorList => Guarantors ?? [];
 
+    /// <summary>
+    /// «خارج از مرکز» (owner, 18 Nov 2026): ticked by the system when the city of the cheque's bank is not the city of the company's
+    /// address in Basic Information — a Tehran company with a cheque on a Shiraz bank, or a Shiraz company with a cheque on an Isfahan
+    /// bank. Names are compared as PersianText.Key does (Arabic and Persian letters alike). When either city is not known, what the
+    /// user ticked stays. Manual, form «دریافت چک و اسناد دریافتنی»: «خارج از مرکز».
+    /// </summary>
+    public ReceivedInstrumentDetails WithOutOfTownFor(string? companyCity) =>
+        string.IsNullOrWhiteSpace(City) || string.IsNullOrWhiteSpace(companyCity)
+            ? this
+            : this with { OutOfTown = !string.Equals(PersianText.Key(City), PersianText.Key(companyCity), StringComparison.Ordinal) };
+
     /// <summary>Checks the details against the kind of instrument and returns them with empty texts removed.</summary>
     internal ReceivedInstrumentDetails Validated(InstrumentKind kind)
     {

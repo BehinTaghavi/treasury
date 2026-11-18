@@ -76,3 +76,10 @@ Built as described in `received-cheque-steps.md`, section 5. These points were n
 | Q44 | **«کارتخوان (POS)»** is not in your list of the kinds of a direct deposit, but you asked for it on 14 Nov. Keep it as a seventh kind, or remove it? | **Answered 18 Nov 2026: it stays.** «کارتخوان (POS)» is the seventh kind of a direct deposit. | Removing a kind you asked for needs your word. |
 | Q45 | **«حواله پایا / ساتنا با شماره شبا»:** which Sheba is recorded — the **payer's** (the account the transfer came from), as built, or the company's? And is it required? | **Answered 18 Nov 2026: the payer's Sheba.** Recorded for Paya and Satna transfers (the account the transfer came from), required and checked with the Sheba check digits. | The company's own account is already chosen on the form. |
 
+## Company particulars and the type list of تفصیل (owner, 18 Nov 2026)
+
+| # | Question | Built for now | Why |
+|---|---|---|---|
+| Q46 | **Which city is the company's centre for «خارج از مرکز»?** «مشخصات شرکت» now has the address and the legal address; only the legal address has a city field, as you described it. Is the city of the **legal address** the one a cheque's bank is compared with, or should the ordinary address also get a city of its own, and that one be compared (e.g. factory in Shiraz, legal address in Tehran)? | The city of the legal address is the company's centre. | It is the only city on the page; your examples speak of «محل اصلی شرکت». |
+| Q47 | **«نوع حساب تفصیل» on other screens:** the list is now before the payer of the three receipt forms. Do you want the same list before the other تفصیل fields (bank accounts, cash desks, petty cash, beneficiaries, requesters of funds)? And in the receipt forms, should it offer **all** types, or only the types that may pay (customers, persons and companies, your answer to Q22)? | Receipt forms only; only the types that may pay. | Your note was about the cheque receipt; Q22 limits who may pay. |
+

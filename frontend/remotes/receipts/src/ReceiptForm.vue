@@ -66,11 +66,25 @@ const refTitle = (id: string | null | undefined) => L.references.value.find(r =>
 const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
 const payerChoices = computed<Choice[]>(() => payers.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
 const departmentChoices = computed<Choice[]>(() => L.departments.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name })))
+/**
+ * «نوع حساب تفصیل» (owner, 18 Nov 2026): the types of تفصیل of the accounting system that may pay; choosing one fills the payer list
+ * with the accounts of that type, to pick directly or search within.
+ */
+const payerType = ref('')
+const payerTypeChoices = computed<Choice[]>(() => L.detailTypes.value
+  .filter(x => x.role !== null && PayerRoles.split(',').includes(x.role))
+  .map(x => ({ value: x.type, label: x.type })))
 let searchTimer: ReturnType<typeof setTimeout> | undefined
 function onPayerSearch(text: string) {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(async () => { payers.value = await L.searchDetails(text, header.payer, PayerRoles) }, 250)
+  searchTimer = setTimeout(async () => { payers.value = await L.searchDetails(text, header.payer, PayerRoles, payerType.value || undefined) }, 250)
 }
+watch(payerType, async type => {
+  // A payer of another type than the one now chosen is no longer the choice.
+  if (type && header.payer && !props.replaces && payers.value.find(d => d.code === header.payer)?.type !== type) header.payer = ''
+  clearTimeout(searchTimer)
+  payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles, type || undefined)
+})
 watch(() => header.groupId, async id => {
   purposes.value = []
   if (!id) return
@@ -104,6 +118,16 @@ const lines = ref<Line[]>([blankLine()])
 const bankChoices = computed<Choice[]>(() => L.banks.value.filter(b => b.isActive !== false).map(b => ({ value: b.id, label: b.name })))
 const currencyChoices = computed<Choice[]>(() => L.currencies.value.filter(c => c.code).map(c => ({ value: c.code!, label: c.name, hint: c.code! })))
 const cityChoices = computed<Choice[]>(() => L.cities.value.map(c => ({ value: c.name, label: c.name })))
+/**
+ * «خارج از مرکز» (owner, 18 Nov 2026): ticked by the system when the city of the cheque's bank is not the city of the company's legal
+ * address (Basic Information → «مشخصات شرکت»); the server decides the same way. Without either city the user ticks it by hand.
+ */
+const cityKey = (s: string) => s.replace(/[\s\u200c]/g, '').replace(/ي/g, 'ی').replace(/ك/g, 'ک')
+const outOfTownIsAutomatic = (l: Line) => L.companyCity.value !== '' && l.city !== ''
+function setCity(l: Line, city: string) {
+  l.city = city
+  if (outOfTownIsAutomatic(l)) l.outOfTown = cityKey(city) !== cityKey(L.companyCity.value)
+}
 const kindChoices = computed<Choice[]>(() => lineKinds.filter(k => !props.replaces || !isGuarantee(k.value)).map(k => ({ value: k.value, label: fa.value ? k.fa : k.en })))
 
 /** «ثبت چک بعدی»: the next line starts as a copy of the last one (same bank, account, due date…), with the next cheque number. */
@@ -250,6 +274,9 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
     <fieldset>
       <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
       <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" /></label>
+      <label v-if="payerTypeChoices.length && !replaces">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
+        <SearchSelect v-model="payerType" :options="payerTypeChoices" :empty-label="t('— همه —', '— all —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')" />
+      </label>
       <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
         <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="!!replaces" :aria-label="t('پرداخت کننده', 'Payer')"
                       :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
@@ -332,9 +359,16 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
           <label class="req">{{ t('شناسهٔ صیاد (۱۶ رقم)', 'Sayad ID (16 digits)') }} <input v-model="l.sayadId" maxlength="16" dir="ltr" inputmode="numeric" /></label>
           <label>{{ t('نام دارندهٔ حساب', 'Account holder') }} <input v-model="l.accountHolder" :placeholder="t('اگر چک شخص دیگری است', 'If someone else\'s cheque')" /></label>
           <label>{{ t('شهر', 'City') }}
-            <SearchSelect v-model="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" />
+            <SearchSelect :model-value="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" @update:model-value="setCity(l, $event)" />
           </label>
-          <label class="tr-check"><input v-model="l.outOfTown" type="checkbox" /> {{ t('خارج از مرکز', 'Out of town') }}</label>
+          <label class="tr-check" :title="outOfTownIsAutomatic(l) ? t(`خودکار: شهر شرکت «${L.companyCity.value}» است.`, `Automatic: the company is in ${L.companyCity.value}.`) : undefined">
+            <input v-model="l.outOfTown" type="checkbox" :disabled="outOfTownIsAutomatic(l)" /> {{ t('خارج از مرکز', 'Out of town') }}
+            <span v-if="outOfTownIsAutomatic(l)" class="muted small">{{ t('(خودکار)', '(automatic)') }}</span>
+          </label>
+          <p v-if="!L.companyCity.value" class="muted small wide">
+            {{ t('شهر شرکت در اطلاعات پایه ← مشخصات شرکت ثبت نشده است؛ تا آن زمان «خارج از مرکز» دستی تیک می‌خورد.',
+              'The company\'s city is not entered in Basic Information → Company particulars; until then tick "out of town" by hand.') }}
+          </p>
         </template>
       </fieldset>
       <div class="tr-buttons">

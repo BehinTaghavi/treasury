@@ -758,6 +758,26 @@ def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
         c.rollback()
 
 
+def test_the_company_profile_is_one_row(db):
+    # 037_reference_company_profile.sql (owner, 18 Nov 2026: «مشخصات شرکت»; the city and postal code are the legal address's).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        c.execute("INSERT INTO reference.company_profile (name, legal_address, city_id, postal_code) VALUES ('sample', 'legal', %s, '1234567890')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.UniqueViolation):   # one profile per client database
+            with c.transaction():
+                c.execute("INSERT INTO reference.company_profile (name, city_id) VALUES ('second', %s)", (uuid.uuid4(),))
+        for name, postal in ((" ", None), ("sample", "123")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute("UPDATE reference.company_profile SET name = %s, postal_code = %s", (name, postal))
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the table
+            with c.transaction():
+                c.execute("SELECT * FROM reference.company_profile")
+        c.rollback()
+
+
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
     with psycopg.connect(db) as c:

@@ -80,6 +80,11 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
             ? new PurposeGroupFact(g.Id, g.Name, g.Direction == "Receipt", g.IsActive, g.LedgerAccountCode)
             : null;
 
+    private sealed record Company(bool IsSet, string? CityName);
+
+    public async Task<string?> CompanyCityAsync(CancellationToken cancellationToken) =>
+        (await ServiceHttp.GetAsync<Company>(http, "api/reference/company", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.CityName;
+
     public async Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Entry>(http, $"api/reference/banks/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.Name;
 
