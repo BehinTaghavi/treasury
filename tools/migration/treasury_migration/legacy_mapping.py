@@ -59,6 +59,9 @@ TRANSITIONS = {
     (RECEIVED, "SayadRegistered", "SendToLegal"): "InLegal",
     # Owner's answer to Q38 (2): a cheque in legal action that became collectable goes back to the cash desk.
     (RECEIVED, "InLegal", "ReturnFromLegal"): "InCashDesk",
+    # A promissory note has no Sayad registration, so an ordinary note goes to the bank straight from the cash desk
+    # (owner, 16 and 18 Nov 2026). The .NET table allows this step for notes only; this copy does not check kinds.
+    (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
     (ISSUED, "BeingIssued", "Issue"): "Issued",
     (ISSUED, "Issued", "Deliver"): "Delivered",
     (ISSUED, "BeingIssued", "Cancel"): "Cancelled",
@@ -74,10 +77,9 @@ TRANSITIONS = {
 
 # Steps the old program allowed that new operations no longer do; old history is migrated as it was recorded.
 # Rule N3 (owner, 18 Nov 2026): a cheque is deposited at the bank only after «ثبت صیادی». The old program had no such step
-# (D_Check_Vag_m: 11 -> 12), and most old cheques are from before the Sayad system.
-LEGACY_TRANSITIONS = {
-    (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
-}
+# (D_Check_Vag_m: 11 -> 12), and most old cheques are from before the Sayad system. That step (InCashDesk -> DepositForCollection)
+# is in TRANSITIONS since notes use it (a note has no Sayad registration), so old cheques are migrated with it as recorded.
+LEGACY_TRANSITIONS: dict[tuple[str, str, str], str] = {}
 
 
 @dataclass(frozen=True)

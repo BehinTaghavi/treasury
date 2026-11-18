@@ -1,5 +1,15 @@
 <script setup lang="ts">
+import { COMPANY_CHANGED_EVENT } from '@treasury/ui-kit'
+
 const { locale, fiscalYear, t } = useShell()
+// Owner, 16 Nov 2026: the company's name and logo (Basic Information → «مشخصات شرکت») at the top of every screen.
+const company = useCompany()
+onMounted(() => {
+  void company.load()
+  window.addEventListener(COMPANY_CHANGED_EVENT, company.load)
+})
+onBeforeUnmount(() => window.removeEventListener(COMPANY_CHANGED_EVENT, company.load))
+useHead({ title: () => (company.name.value ? `${company.name.value} – ${t('خزانه‌داری', 'Treasury')}` : t('خزانه‌داری', 'Treasury')) })
 // The version running (commit and date, written into public/version.txt when the ZIP is made), so the owner can see it is the newest.
 const version = ref('')
 onMounted(async () => {
@@ -31,7 +41,13 @@ const menu = computed(() => [
 <template>
   <div class="shell">
     <header class="bar">
-      <strong>{{ t('سیستم خزانه‌داری', 'Treasury') }}</strong>
+      <div class="brand">
+        <img v-if="company.logoUrl.value" class="logo" :src="company.logoUrl.value" :alt="t('آرم شرکت', 'Company logo')" />
+        <div class="names">
+          <strong v-if="company.name.value" class="company">{{ company.name.value }}</strong>
+          <span :class="company.name.value ? 'system' : 'system alone'">{{ t('سیستم خزانه‌داری', 'Treasury') }}</span>
+        </div>
+      </div>
       <label>{{ t('سال مالی', 'Fiscal year') }}
         <select v-model.number="fiscalYear"><option v-for="y in years" :key="y" :value="y">{{ y }}</option></select>
       </label>

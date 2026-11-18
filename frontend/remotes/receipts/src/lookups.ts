@@ -6,7 +6,9 @@ import { ref } from 'vue'
 import type { TreasuryApi } from '@treasury/ui-kit'
 
 export interface Entry { id: string; name: string; code?: string | null; parentId?: string | null; isActive?: boolean }
-export interface PurposeGroup { id: string; number: number; direction: 'Receipt' | 'Payment'; name: string; reference1Id: string | null; reference2Id: string | null; isActive: boolean }
+export interface PurposeGroup {
+  id: string; number: number; direction: 'Receipt' | 'Payment'; name: string; ledgerAccountCode?: string | null; reference1Id: string | null; reference2Id: string | null; isActive: boolean
+}
 export interface Purpose { id: string; groupId: string; name: string; isActive: boolean }
 export interface Department { id: string; number: number; name: string; isActive: boolean }
 export interface CashDesk { id: string; name: string; currencyCode: string; isActive: boolean }

@@ -12,6 +12,9 @@
  * can be deposited at the bank (rule N3), so only registered cheques have a tick box for the deposit —, the mark «سررسید چک» on
  * post-dated cheques that reached their due date in the cash desk or at the bank, with what they wait for, and «اقدام حقوقی» for a
  * bounced cheque, which is recorded on its own screen (LegalAction.vue): the button on a bounced cheque's row opens it with that cheque. The names of the statuses are the owner's and shared by every screen (ui-kit chequeStatus).
+ * With `notes` the same screen is «عملیات سفته‌های دریافتی» (owner, 16 Nov 2026: واگذاری به بانک، وصول، استرداد، خرج سفته – ظهرنویسی
+ * و انتقال به غیر): it lists promissory notes instead of cheques, a note the bank does not pay is protested («واخواست»), returning it to
+ * the obligor is «استرداد», and an endorsement has no Sayad transfer. Guarantee and trust notes are only handed back or cancelled.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { chequeActionName, chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -28,16 +31,24 @@ interface Cheque {
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
   reachedDueDate: boolean
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
-  details: { branchName: string | null; sayadId: string | null } | null
+  details: { branchName: string | null; sayadId: string | null; onDemand?: boolean } | null
 }
 type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
 
-const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
+const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; notes?: boolean }>(),
+  { apiBase: '', locale: 'fa', token: undefined, notes: false })
 /** «اقدام حقوقی» has its own screen: the parent opens it with the cheque. */
 const emit = defineEmits<{ legal: [chequeId: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
-const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
+/** The words of the cheque screen in the notes screen: سفته for چک, واخواست‌نامه for the bounce notice, متعهد for the payer. */
+const noteWords: [string, string][] = props.locale === 'fa'
+  ? [['چکی ', 'سفته‌ای '], ['چک', 'سفته'], ['اعلامیهٔ برگشت', 'واخواست‌نامه'], ['اعلامیه', 'واخواست‌نامه'], ['علت برگشت', 'علت واخواست'],
+      ['پرداخت کننده', 'متعهد'], ['پرداخت‌کننده', 'متعهد']]
+  : [['cheques', 'notes'], ['Cheque', 'Note'], ['cheque', 'note'], ['bounce notice', 'protest'], ['Bounce notice', 'Protest'], ['Payer', 'Obligor'], ['payer', 'obligor']]
+const words = (text: string) => (props.notes ? noteWords.reduce((s, [a, b]) => s.replaceAll(a, b), text) : text)
+const t = (f: string, e: string) => words(props.locale === 'fa' ? f : e)
+const isNote = (kind: string) => kind.endsWith('Note')
 const money = (n: number) => formatAmount(n, props.locale)
 const L = useLookups(api)
 
@@ -47,8 +58,18 @@ const tabs: { id: Tab; title: [string, string]; states: string[] }[] = [
   { id: 'back', title: ['عودت از بانک، برگشتی و اقدام حقوقی', 'Back from the bank, bounced and legal action'], states: ['ReturnedFromBank', 'Bounced', 'InLegal'] },
   { id: 'endorsed', title: ['خرج‌شده', 'Endorsed'], states: ['Endorsed'] },
 ]
-const stateName = (k: string | null | undefined) => chequeStateName(k, props.locale)
-const actionName = (k: string | null | undefined) => chequeActionName(k, props.locale)
+// The owner's names, shared by every screen (ui-kit chequeStatus); on the note screen a bounce is «واخواست» and a return «استرداد» (#10).
+const noteStateNames: Record<string, [string, string]> = {
+  Bounced: ['واخواست شده', 'Protested'], ReturnedToIssuer: ['مسترد شده به متعهد', 'Handed back to the obligor'],
+}
+const noteActionNames: Record<string, [string, string]> = {
+  RecordBounced: ['واخواست', 'Protest'], ReturnToIssuer: ['استرداد به متعهد', 'Hand back to the obligor'],
+}
+const stateName = (k: string | null | undefined) =>
+  props.notes && k && noteStateNames[k] ? (fa.value ? noteStateNames[k][0] : noteStateNames[k][1]) : words(chequeStateName(k, props.locale))
+const actionName = (k: string | null | undefined) =>
+  props.notes && k && noteActionNames[k] ? (fa.value ? noteActionNames[k][0] : noteActionNames[k][1]) : words(chequeActionName(k, props.locale))
+if (props.notes) tabs[2]!.title = ['عودت‌شده از بانک، واخواستی و اقدام حقوقی', 'Back from the bank, protested and legal action']
 
 const tab = ref<Tab>('desk')
 const lists = reactive<Record<string, Cheque[]>>({})
@@ -89,7 +110,8 @@ const accountName = (id: string | null | undefined) => { const a = L.bankAccount
 async function load() {
   const states = tabs.flatMap(x => x.states)
   const results = await Promise.all(states.map(s => api.get<Cheque[]>(`/api/cashflow/instruments/received?state=${s}`)))
-  states.forEach((s, i) => { const r = results[i]!; if (r.ok) lists[s] = r.value })
+  // Cheques on the cheque screen, promissory notes on the notes screen.
+  states.forEach((s, i) => { const r = results[i]!; if (r.ok) lists[s] = r.value.filter(c => isNote(c.kind) === props.notes) })
   for (const k of Object.keys(chosen)) if (!tickable.value.some(c => c.id === k)) delete chosen[k]
 }
 
@@ -173,7 +195,7 @@ async function confirmStep() {
   busy.value = true
   const r = p.action === 'Endorse'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
-        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: p.sayad, note: p.note || null })
+        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: props.notes ? '' : p.sayad, note: p.note || null })
     : p.action === 'RecordEndorsementReturned'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null, trackingCode: p.tracking || null })
     : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
@@ -229,14 +251,15 @@ function stepText(s: Step) {
 }
 
 const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
-/** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. */
+/** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. A note is not replaced here (replacement is a cheque receipt). */
 const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'ReturnFromLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
 const rank = (a: string) => { const i = stepOrder.indexOf(a); return i < 0 ? stepOrder.length : i }
 /**
  * «اقدام حقوقی» is offered on bounced cheques and notes and on guarantee cheques and notes; the rare action on an ordinary cheque still in
  * the cash desk starts on the legal-action screen.
  */
-const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && (a !== 'SendToLegal' || c.state === 'Bounced' || guarantee(c)))
+const rowActions = (c: Cheque) => c.allowedActions.filter(a => a !== 'DepositForCollection' && !(props.notes && a === 'Replace')
+  && (a !== 'SendToLegal' || c.state === 'Bounced' || guarantee(c)))
   .sort((a, b) => rank(a) - rank(b))
 
 onMounted(async () => { await L.load(); await load() })
@@ -290,7 +313,7 @@ onMounted(async () => { await L.load(); await load() })
           {{ t('مبلغ درخواست', 'Request') }} {{ money(chosenRequest.amount) }} · {{ t('پرداخت‌شده', 'paid') }} {{ money(chosenRequest.paidAmount) }} ·
           {{ t('پس از این چک مانده', 'left after this cheque') }} {{ money(chosenRequest.amount - chosenRequest.paidAmount - pending.cheque.amount) }}
         </p>
-        <label class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
+        <label v-if="!notes" class="req">{{ t('کد پیگیری انتقال در سامانهٔ صیاد', 'Sayad transfer tracking no.') }} <input v-model="pending.sayad" dir="ltr" /></label>
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else>
@@ -313,7 +336,10 @@ onMounted(async () => { await L.load(); await load() })
                    :api-base="apiBase" :locale="locale" :token="token" @saved="replaced" />
     </section>
 
-    <p v-if="tab === 'desk'" class="muted small">{{ t('چک پس از «ثبت صیادی» به بانک واگذار می‌شود: ابتدا «ثبت صیادی» را در ردیف چک ثبت کنید؛ سپس چک برای واگذاری قابل تیک‌زدن است.',
+    <!-- A note has no Sayad registration (owner, 16 and 18 Nov 2026): an ordinary note is ticked straight from the cash desk. -->
+    <p v-if="tab === 'desk' && notes" class="muted small">{{ t('سفته در سامانهٔ صیاد ثبت نمی‌شود: سفته‌های عادی نزد صندوق را تیک بزنید و «واگذاری به بانک» را بزنید. سفتهٔ تضمینی یا امانی به بانک واگذار نمی‌شود.',
+      'A note has no Sayad registration: tick the ordinary notes in the cash desk and press «واگذاری به بانک». A guarantee or trust note is not deposited.') }}</p>
+    <p v-else-if="tab === 'desk'" class="muted small">{{ t('چک پس از «ثبت صیادی» به بانک واگذار می‌شود: ابتدا «ثبت صیادی» را در ردیف چک ثبت کنید؛ سپس چک برای واگذاری قابل تیک‌زدن است.',
       'A cheque is deposited at the bank after «ثبت صیادی»: record it on the cheque\'s row first; then the cheque can be ticked for the deposit.') }}</p>
     <div class="tr-scroll">
       <table class="tr-table">
@@ -323,7 +349,7 @@ onMounted(async () => { await L.load(); await load() })
               <input type="checkbox" :checked="tickable.length > 0 && selected.length === tickable.length" :aria-label="t('همه', 'All')"
                      @change="toggleAll(($event.target as HTMLInputElement).checked)" />
             </th>
-            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
+            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ notes ? t('نوع', 'Kind') : t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
             <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('آخرین وضعیت', 'Latest status') }}</th><th>{{ t('عملیات', 'Steps') }}</th>
           </tr>
         </thead>
@@ -332,9 +358,10 @@ onMounted(async () => { await L.load(); await load() })
             <td v-if="tab === 'desk' || tab === 'back'" @click.stop>
               <input v-if="c.allowedActions.includes('DepositForCollection')" v-model="chosen[c.id]" type="checkbox" :aria-label="c.number ?? ''" />
             </td>
-            <td class="num">{{ c.dueDate }}</td>
+            <td class="num">{{ c.dueDate ?? (c.details?.onDemand ? t('عندالمطالبه', 'On demand') : '') }}</td>
             <td class="num">{{ c.number }}</td>
-            <td>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
+            <td v-if="notes">{{ c.kind === 'GuaranteeNote' ? t('تضمینی / امانی', 'Guarantee / trust') : t('عادی', 'Ordinary') }}</td>
+            <td v-else>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
             <td>{{ c.counterparty }}</td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ stateName(c.state) }}
@@ -374,7 +401,7 @@ onMounted(async () => { await L.load(); await load() })
         <h3 style="margin: 0">{{ t(`کارت چک ${card.number}`, `Cheque ${card.number}`) }}</h3>
         <span class="tr-tag">{{ t('آخرین وضعیت', 'Latest status') }}: {{ stateName(card.state) }}</span>
         <span v-if="card.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(card.state, locale)">{{ dueMark(locale) }}</span>
-        <span class="muted small">{{ card.bankName }} · {{ card.counterparty }} · {{ t('سررسید', 'due') }} {{ card.dueDate }} · {{ money(card.amount) }} {{ card.currency }}</span>
+        <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}</span>
         <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
       </div>
       <table class="tr-table">

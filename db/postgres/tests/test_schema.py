@@ -737,6 +737,22 @@ def test_the_voucher_template_has_the_account_of_cheques_in_legal_action(db):
         c.rollback()
 
 
+def test_the_voucher_template_accepts_every_fixed_account_of_the_domain(db):
+    # 038_cashflow_voucher_accounts_notes_and_legal.sql: the notes (#10) and the legal action (#14) each added fixed accounts.
+    import re
+    from pathlib import Path
+    cs = (Path(__file__).resolve().parents[3] / "src/Services/Cashflow/Treasury.Cashflow.Domain/Vouchers/Vouchers.cs").read_text(encoding="utf-8")
+    body = re.search(r"public enum FixedAccount\s*\{(.*?)\}", cs, re.S).group(1)
+    names = re.findall(r"^\s*(\w+),?\s*$", re.sub(r"///.*", "", body), re.M)
+    assert "NotesInCollection" in names and "ProtestedChequesInLegal" in names
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        for name in names:
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '9999') ON CONFLICT DO NOTHING", (name,))
+        c.rollback()
+
+
 def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
     # 036_cashflow_deposit_kinds.sql (owner, 18 Nov 2026: the kinds of a direct deposit into a bank account).
     add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name,
@@ -758,25 +774,38 @@ def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
         c.rollback()
 
 
-def test_the_company_profile_is_one_row(db):
-    # 037_reference_company_profile.sql (owner, 18 Nov 2026: «مشخصات شرکت»; the city and postal code are the legal address's).
+def test_the_company_particulars_are_columns_of_the_one_company_row(db):
+    # 039_reference_company_joined.sql (owner, 18 Nov 2026: «مشخصات شرکت» and «اطلاعات شرکت» are one page): the legal address and its city.
     with psycopg.connect(db) as c:
+        assert c.execute("SELECT to_regclass('reference.company_profile')").fetchone()[0] is None
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("DELETE FROM reference.company")
         c.execute("SET ROLE reference_svc")
-        c.execute("INSERT INTO reference.company_profile (name, legal_address, city_id, postal_code) VALUES ('sample', 'legal', %s, '1234567890')", (uuid.uuid4(),))
-        with pytest.raises(psycopg.errors.UniqueViolation):   # one profile per client database
+        city = uuid.uuid4()
+        c.execute("INSERT INTO reference.company (id, name, legal_address, city_id, postal_code) VALUES (%s, 'sample', 'legal', %s, '1234567890')",
+                  (uuid.uuid4(), city))
+        assert c.execute("SELECT legal_address, city_id FROM reference.company").fetchone() == ("legal", city)
+        with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
-                c.execute("INSERT INTO reference.company_profile (name, city_id) VALUES ('second', %s)", (uuid.uuid4(),))
-        for name, postal in ((" ", None), ("sample", "123")):
-            with pytest.raises(psycopg.errors.CheckViolation):
-                with c.transaction():
-                    c.execute("UPDATE reference.company_profile SET name = %s, postal_code = %s", (name, postal))
-        c.execute("RESET ROLE")
-        c.execute("SET ROLE cashflow_svc")
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the table
-            with c.transaction():
-                c.execute("SELECT * FROM reference.company_profile")
+                c.execute("UPDATE reference.company SET legal_address = ''")
         c.rollback()
 
+
+def test_a_profile_entered_before_the_join_moves_into_the_company_row(db):
+    # 039 moves a row of the first 037 (reference.company_profile) into reference.company and drops the old table.
+    import pathlib
+    script = pathlib.Path(__file__).resolve().parents[1] / "039_reference_company_joined.sql"
+    city = uuid.uuid4()
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("DELETE FROM reference.company")
+        c.execute("CREATE TABLE reference.company_profile (only_one boolean PRIMARY KEY DEFAULT true, name text NOT NULL, address text, "
+                  "legal_address text, city_id uuid NOT NULL, postal_code text, version bigint NOT NULL DEFAULT 1)")
+        c.execute("INSERT INTO reference.company_profile (name, address, legal_address, city_id, postal_code) VALUES ('Old', 'a', 'l', %s, '1234567890')", (city,))
+        c.execute(script.read_text(encoding="utf-8"))
+        assert c.execute("SELECT name, address, legal_address, city_id, postal_code FROM reference.company").fetchone() == ("Old", "a", "l", city, "1234567890")
+        assert c.execute("SELECT to_regclass('reference.company_profile')").fetchone()[0] is None
+        c.execute("DELETE FROM reference.company")
 
 def test_a_payment_request_keeps_its_payments(db):
     # 032_requests_payments.sql (owner's answer to Q36: an endorsed cheque pays an approved payment request).
@@ -784,3 +813,112 @@ def test_a_payment_request_keeps_its_payments(db):
         row = c.execute("""SELECT column_default, is_nullable FROM information_schema.columns
                            WHERE table_schema = 'requests' AND table_name = 'payment_request' AND column_name = 'payments'""").fetchone()
         assert row is not None and row[1] == "NO" and "[]" in row[0]
+
+
+def test_a_note_receipt_has_its_own_numbers_names_its_notes_and_keeps_its_terms(db):
+    # 033_cashflow_note_receipts.sql (owner's report no. 4, item 13, and his form «فرم دریافت سفته» of 16 Nov 2026).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code,
+                 purpose_group_id, purpose_group_name, purpose, recorded_by, instrument_ids, total_rial, state, note_terms)
+             VALUES (1405, %s, %s, %s, '2026-11-16', %s, 'الف', '200015', %s, 'تضمین', 'تضمین قرارداد', 'test', %s, 1000, 'Recorded', %s)"""
+    terms = '{"reason": "Guarantee", "form": "Paper", "maturity": "OnDemand"}'
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        rid = uuid.uuid4()
+        c.execute(add, (rid, "Notes", 1, uuid.uuid4(), uuid.uuid4(), [uuid.uuid4()], terms))
+        assert c.execute("SELECT note_terms->>'maturity' FROM cashflow.receipt WHERE id = %s", (rid,)).fetchone()[0] == "OnDemand"
+        for kind, number, notes, note_terms in (
+                ("Notes", 2, [], terms),                        # a note receipt names its notes
+                ("Notes", 2, [uuid.uuid4()], None),             # and always has its terms
+                ("Instruments", 90, [uuid.uuid4()], terms),     # which no other kind has
+                ("Bills", 1, [uuid.uuid4()], None)):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), kind, number, uuid.uuid4(), uuid.uuid4(), notes, note_terms))
+        c.execute("""INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'Notes', 1)
+                     ON CONFLICT (fiscal_year, kind) DO UPDATE SET last_number = cashflow.receipt_number.last_number + 1""")
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeNotesForCompany', '9102') ON CONFLICT DO NOTHING")
+        # 035_cashflow_note_steps.sql (owner, 16 Nov 2026: steps of a note after receipt): «سفته های در جریان وصول».
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesInCollection', '1204') ON CONFLICT DO NOTHING")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('NotesProtested', '1205')")
+        c.rollback()
+
+
+def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(db):
+    # 034_reference_signatories.sql (owner, 16 Nov 2026: authorised signatories in Basic Information and a rule per kind of document).
+    add = """INSERT INTO reference.signatory (id, full_name, name_key, position, national_code, mobile) VALUES (%s, %s, %s, 'مدیر عامل', %s, %s)"""
+    rule = "INSERT INTO reference.signature_rule (document, id, required_count, compulsory, optional) VALUES (%s, %s, %s, %s, %s)"
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        ceo, cfo = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (ceo, "علی رضایی", "علیرضایی", "0123456789", "09121234567"))
+        c.execute(add, (cfo, "بهرام کریمی", "بهرامکریمی", None, None))
+        for row, error in (
+                ((uuid.uuid4(), "علی رضایی", "علیرضایی", None, None), psycopg.errors.UniqueViolation),       # the same name
+                ((uuid.uuid4(), "دیگری", "دیگری", "0123456789", None), psycopg.errors.UniqueViolation),       # the same national code
+                ((uuid.uuid4(), "دیگری", "دیگری", "12345", None), psycopg.errors.CheckViolation),
+                ((uuid.uuid4(), "دیگری", "دیگری", None, "02188990011"), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, row)
+        c.execute(rule, ("NoteReceipt", uuid.uuid4(), 2, [ceo], [cfo]))
+        for row, error in (
+                (("NoteReceipt", uuid.uuid4(), 1, [ceo], []), psycopg.errors.UniqueViolation),                # one rule per kind of document
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo, cfo], []), psycopg.errors.CheckViolation),           # fewer than the compulsory ones
+                (("IssuedCheque", uuid.uuid4(), 3, [ceo], [cfo]), psycopg.errors.CheckViolation),             # more than those named
+                (("IssuedCheque", uuid.uuid4(), 1, [ceo], [ceo]), psycopg.errors.CheckViolation),             # compulsory and optional
+                (("Invoice", uuid.uuid4(), 0, [], []), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(rule, row)
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not read reference-svc's tables
+            with c.transaction():
+                c.execute("SELECT 1 FROM reference.signatory")
+        c.rollback()
+def test_one_company_profile_with_a_small_logo(db):
+    # 033_reference_company.sql (owner, 16 Nov 2026): one row per database; the logo is a PNG/JPEG of at most 1 MB.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        company = uuid.uuid4()
+        c.execute("DELETE FROM reference.company_logo")
+        if c.execute("SELECT count(*) FROM reference.company").fetchone()[0] == 0:
+            c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت آزمایشی')", (company,))
+        company = c.execute("SELECT id FROM reference.company").fetchone()[0]
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute("INSERT INTO reference.company (id, name) VALUES (%s, 'شرکت دوم')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET name = ''")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company SET logo_type = 'application/pdf'")
+        c.execute("UPDATE reference.company SET logo_type = 'image/png'")
+        c.execute("INSERT INTO reference.company_logo (company_id, data) VALUES (%s, %s)", (company, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        # 034_reference_company_details.sql (owner's answer to Q38): optional official details, each with its shape.
+        c.execute(
+            "UPDATE reference.company SET national_id = '10101010103', economic_code = '411111111111', registration_number = '12345', "
+            "address = 'تهران', postal_code = '1234567890', phone = '+98-21-88880000', website = 'www.example.ir', email = 'info@example.ir'")
+        for column, bad in (("national_id", "1234567890"), ("economic_code", "4111"), ("registration_number", "12/3"), ("address", "x" * 301),
+                            ("postal_code", "12345"), ("phone", "abc"), ("website", ""), ("email", "info")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE reference.company SET {column} = %s", (bad,))
+        c.execute(
+            "UPDATE reference.company SET national_id = NULL, economic_code = NULL, registration_number = NULL, address = NULL, "
+            "postal_code = NULL, phone = NULL, website = NULL, email = NULL")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM reference.company")  # the profile is corrected, never deleted
+        c.execute("DELETE FROM reference.company_logo")
+        c.execute("UPDATE reference.company SET logo_type = NULL")
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("SELECT name FROM reference.company")
+

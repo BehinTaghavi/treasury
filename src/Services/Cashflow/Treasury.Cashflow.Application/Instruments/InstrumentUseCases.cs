@@ -94,7 +94,8 @@ public sealed record InstrumentView(
     ReceivedInstrumentDetails? Details = null,
     Guid? CollectionAccountId = null,
     string? CounterpartyDetailCode = null,
-    bool ReachedDueDate = false)
+    bool ReachedDueDate = false,
+    string? NoteIssueDate = null)
 {
     /// <param name="today">Today's date, to mark «سررسید چک» (owner, 18 Nov 2026); without it the mark stays off.</param>
     public static InstrumentView From(Instrument i, FiscalDate? today = null) => new(
@@ -123,7 +124,9 @@ public sealed record InstrumentView(
         i.Direction == InstrumentDirection.Received ? i.Details : null,
         i.CollectionAccountId,
         i.Counterparty.DetailCode,
-        today is { } t && i.HasReachedDueDate(t));
+        today is { } t && i.HasReachedDueDate(t),
+        // A note's «تاریخ صدور» as Jalali text (Details.WrittenOn is the stored ISO date).
+        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
