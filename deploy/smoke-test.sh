@@ -53,13 +53,15 @@ for _ in $(seq 1 60); do
 done
 [[ "$issuer" == "\"issuer\":\"$base/auth/realms/master\"" ]] || fail "Keycloak issuer is $issuer, expected $base/auth/realms/master"
 
-# Receive a cheque, read it back, deposit it (API -> PostgreSQL as cashflow_svc).
+# Receive a cheque, read it back, register it in Sayad, deposit it (API -> PostgreSQL as cashflow_svc).
 key="smoke-$(date +%s)-$RANDOM"
 body='{"kind":"OrdinaryCheque","number":"'"$RANDOM"'","bankName":"SMOKE-TEST","amount":{"amount":1000000},"receivedOn":"1405/08/19","dueDate":"1405/09/30","drawerId":"5b1d3c6e-2f43-4a51-9a5b-0c3e1d2f4a11","drawerName":"Smoke test","purpose":"Smoke test"}'
 created="$(curl -s -D - -o /dev/null -X POST "$base/api/cashflow/instruments/received" -H 'Content-Type: application/json' -H "Idempotency-Key: $key" -d "$body")"
 grep -q '^HTTP/[0-9.]* 201' <<<"$created" || fail "receiving a cheque: $(head -1 <<<"$created")"
 path="$(grep -i '^location:' <<<"$created" | tr -d '\r' | awk '{print $2}')"
 curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheque back"
+# Rule N3 (owner, 18 Nov 2026): a cheque is deposited at the bank only after «ثبت صیادی».
+[[ "$(status -X POST "$base$path/actions/RegisterSayad" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-sayad" -d '{"date":"1405/08/19"}')" == 201 ]] || fail "registering the cheque in Sayad"
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 
