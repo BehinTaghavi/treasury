@@ -336,7 +336,10 @@ onMounted(async () => { await L.load(); await load() })
                    :api-base="apiBase" :locale="locale" :token="token" @saved="replaced" />
     </section>
 
-    <p v-if="tab === 'desk'" class="muted small">{{ t('چک پس از «ثبت صیادی» به بانک واگذار می‌شود: ابتدا «ثبت صیادی» را در ردیف چک ثبت کنید؛ سپس چک برای واگذاری قابل تیک‌زدن است.',
+    <!-- A note has no Sayad registration (owner, 16 and 18 Nov 2026): an ordinary note is ticked straight from the cash desk. -->
+    <p v-if="tab === 'desk' && notes" class="muted small">{{ t('سفته در سامانهٔ صیاد ثبت نمی‌شود: سفته‌های عادی نزد صندوق را تیک بزنید و «واگذاری به بانک» را بزنید. سفتهٔ تضمینی یا امانی به بانک واگذار نمی‌شود.',
+      'A note has no Sayad registration: tick the ordinary notes in the cash desk and press «واگذاری به بانک». A guarantee or trust note is not deposited.') }}</p>
+    <p v-else-if="tab === 'desk'" class="muted small">{{ t('چک پس از «ثبت صیادی» به بانک واگذار می‌شود: ابتدا «ثبت صیادی» را در ردیف چک ثبت کنید؛ سپس چک برای واگذاری قابل تیک‌زدن است.',
       'A cheque is deposited at the bank after «ثبت صیادی»: record it on the cheque\'s row first; then the cheque can be ticked for the deposit.') }}</p>
     <div class="tr-scroll">
       <table class="tr-table">
