@@ -28,8 +28,6 @@ for _ in $(seq 1 60); do
 done
 curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank names list (reference-svc) is missing or empty"
 curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
-# «اطلاعات شرکت»: the company's name and logo for the top bar of every screen (schemas 033, 034).
-curl -sf "$base/api/reference/company" | grep -q '"nationalId"' || fail "company information (reference-svc) is not served"
 
 # Bank accounts (accounts-svc -> PostgreSQL as accounts_svc).
 for _ in $(seq 1 60); do
@@ -53,17 +51,13 @@ for _ in $(seq 1 60); do
 done
 [[ "$issuer" == "\"issuer\":\"$base/auth/realms/master\"" ]] || fail "Keycloak issuer is $issuer, expected $base/auth/realms/master"
 
-# Receive a cheque, read it back, tick «ثبت صیادی شد», deposit it (API -> PostgreSQL as cashflow_svc).
+# Receive a cheque, read it back, deposit it (API -> PostgreSQL as cashflow_svc).
 key="smoke-$(date +%s)-$RANDOM"
 body='{"kind":"OrdinaryCheque","number":"'"$RANDOM"'","bankName":"SMOKE-TEST","amount":{"amount":1000000},"receivedOn":"1405/08/19","dueDate":"1405/09/30","drawerId":"5b1d3c6e-2f43-4a51-9a5b-0c3e1d2f4a11","drawerName":"Smoke test","purpose":"Smoke test"}'
 created="$(curl -s -D - -o /dev/null -X POST "$base/api/cashflow/instruments/received" -H 'Content-Type: application/json' -H "Idempotency-Key: $key" -d "$body")"
 grep -q '^HTTP/[0-9.]* 201' <<<"$created" || fail "receiving a cheque: $(head -1 <<<"$created")"
 path="$(grep -i '^location:' <<<"$created" | tr -d '\r' | awk '{print $2}')"
 curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheque back"
-# Owner, 15 Nov 2026: a cheque is not deposited at the bank before «ثبت صیادی شد» is ticked.
-[[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-early" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 422 ]] || fail "a cheque without the Sayad tick was deposited"
-[[ "$(status -X POST "$base$path/sayad-registration" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-sayad" -d '{"registered":true}')" == 201 ]] || fail "ticking the Sayad registration"
-curl -sf "$base$path" | grep -q '"sayadRegisteredAt":"20' || fail "the Sayad tick has no date and time"
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 

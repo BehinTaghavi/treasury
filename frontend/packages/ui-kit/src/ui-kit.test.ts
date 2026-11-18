@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createApi, formatAmount, formatJalaliDateTime, hasTranslation, logoFileProblem, normaliseJalali, parseAmount, translate } from './index'
+import { createApi, formatAmount, hasTranslation, normaliseJalali, parseAmount, translate } from './index'
 
 describe('formatting', () => {
   it('accepts Persian digits and separators in amounts', () => {
@@ -16,13 +16,6 @@ describe('formatting', () => {
     expect(normaliseJalali('14050818')).toBe('1405/08/18')
     expect(normaliseJalali('1405/07/31')).toBeNull()
     expect(normaliseJalali('1405/13/01')).toBeNull()
-  })
-  it('shows a moment sent by the server as the Jalali date and the time in Iran', () => {
-    // 15 Nov 2026 07:05 UTC is 10:35 in Tehran, 24 Aban 1405 (the moment of «ثبت صیادی شد»).
-    expect(formatJalaliDateTime('2026-11-15T07:05:00+00:00', 'en')).toBe('1405/08/24 10:35')
-    expect(formatJalaliDateTime('2026-11-15T07:05:00Z', 'fa')).toBe('۱۴۰۵/۰۸/۲۴ ۱۰:۳۵')
-    expect(formatJalaliDateTime('2026-11-15T21:00:00Z', 'en')).toBe('1405/08/25 00:30') // after midnight in Iran: the next day
-    expect(formatJalaliDateTime('not a date')).toBe('')
   })
 })
 
@@ -74,19 +67,5 @@ describe('api client', () => {
     expect(seen?.body).toBeInstanceOf(FormData)
     expect(h['Idempotency-Key']).toBeTruthy()
     expect(h['Content-Type']).toBeUndefined()
-  })
-})
-
-describe('company logo', () => {
-  // Owner, 16 Nov 2026: the logo scanned by the user is a PNG or JPEG picture; the domain allows at most 1 MB (CompanyProfile).
-  it('accepts a PNG or JPEG picture of at most 1 MB', () => {
-    expect(logoFileProblem({ size: 20_000, type: 'image/png' })).toBeNull()
-    expect(logoFileProblem({ size: 1024 * 1024, type: 'image/jpeg' })).toBeNull()
-  })
-  it('names the problem of any other file with an error code that has a text', () => {
-    expect(logoFileProblem({ size: 20_000, type: 'application/pdf' })).toBe('Company.LogoInvalid')
-    expect(logoFileProblem({ size: 0, type: 'image/png' })).toBe('Company.LogoInvalid')
-    expect(logoFileProblem({ size: 1024 * 1024 + 1, type: 'image/png' })).toBe('Company.LogoTooLarge')
-    expect(hasTranslation('Company.LogoInvalid') && hasTranslation('Company.LogoTooLarge')).toBe(true)
   })
 })

@@ -4,67 +4,65 @@ using Treasury.Reference.Domain.Company;
 
 namespace Treasury.Reference.Infrastructure.InMemory;
 
-public sealed record CompanySnapshot(Guid Id, string Name, string? LogoType, byte[]? Logo, long Version, CompanyDetails Details);
+public sealed record CompanyProfileSnapshot(string Name, string? Address, string? LegalAddress, Guid CityId, string? PostalCode, long Version);
 
-/// <summary>In-memory company profile (local runs, tests): one row, same version checks and outbox as the database.</summary>
-public sealed class InMemoryCompanyRepository(InMemoryReferenceDatabase db) : ICompanyRepository
+/// <summary>In-memory company profile (local runs, tests): one row, with the same version check and outbox as the database.</summary>
+public sealed class InMemoryCompanyProfileRepository(InMemoryReferenceDatabase db) : ICompanyProfileRepository
 {
     private const string Table = "company";
 
     public Task<CompanyProfile?> GetAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(Stored() is { } s ? CompanyProfile.Restore(s.Id, s.Name, s.LogoType, s.Version, s.Details) : null);
+        Task.FromResult(Row() is { } s ? CompanyProfile.Restore(s.Name, s.Address, s.LegalAddress, s.CityId, s.PostalCode, s.Version) : null);
 
-    public Task AddAsync(CompanyProfile company, CancellationToken cancellationToken)
+    public Task AddAsync(CompanyProfile profile, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(company);
-        if (Stored() is not null)
+        ArgumentNullException.ThrowIfNull(profile);
+        if (Row() is not null)
         {
-            throw new ConcurrencyConflictException("The company profile was entered by someone else.");
+            throw new ConcurrencyConflictException("The company's particulars were entered by someone else.");
         }
 
-        return Write(company, 1, null);
+        return Write(profile, 1);
     }
 
-    public Task SaveAsync(CompanyProfile company, CancellationToken cancellationToken, byte[]? logo = null)
+    public Task SaveAsync(CompanyProfile profile, CancellationToken cancellationToken)
     {
-        ArgumentNullException.ThrowIfNull(company);
-        if (Stored() is not { } stored || stored.Id != company.Id || stored.Version != company.Version)
+        ArgumentNullException.ThrowIfNull(profile);
+        if (Row()?.Version != profile.Version)
         {
-            throw new ConcurrencyConflictException("The company profile was changed by someone else.");
+            throw new ConcurrencyConflictException("The company's particulars were changed by someone else.");
         }
 
-        return Write(company, company.Version + 1, company.HasLogo ? logo ?? stored.Logo : null);
+        return Write(profile, profile.Version + 1);
     }
-
-    public Task<(string ContentType, byte[] Data)?> GetLogoAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<(string, byte[])?>(Stored() is { LogoType: { } type, Logo: { } data } ? (type, data) : null);
 
     /// <summary>The committed row overlaid with this transaction's own change.</summary>
-    private CompanySnapshot? Stored()
+    private CompanyProfileSnapshot? Row()
     {
-        if (InMemoryUnitOfWork.Pending.Tables.TryGetValue(Table, out var mine) && mine.Count > 0)
+        var pending = InMemoryUnitOfWork.Pending;
+        if (pending.Tables.TryGetValue(Table, out var mine) && mine.TryGetValue(CompanyProfile.TheId, out var changed))
         {
-            return mine.Values.OfType<CompanySnapshot>().SingleOrDefault();
+            return (CompanyProfileSnapshot?)changed;
         }
 
         lock (db.Gate)
         {
-            return db.Tables.TryGetValue(Table, out var rows) ? rows.Values.OfType<CompanySnapshot>().SingleOrDefault() : null;
+            return db.Tables.TryGetValue(Table, out var rows) && rows.TryGetValue(CompanyProfile.TheId, out var row) ? (CompanyProfileSnapshot)row : null;
         }
     }
 
-    private static Task Write(CompanyProfile company, long newVersion, byte[]? logo)
+    private static Task Write(CompanyProfile profile, long newVersion)
     {
-        var tables = InMemoryUnitOfWork.Pending.Tables;
-        if (!tables.TryGetValue(Table, out var rows))
+        var pending = InMemoryUnitOfWork.Pending;
+        if (!pending.Tables.TryGetValue(Table, out var rows))
         {
             rows = [];
-            tables[Table] = rows;
+            pending.Tables[Table] = rows;
         }
 
-        rows[company.Id] = new CompanySnapshot(company.Id, company.Name, company.LogoType, logo, newVersion, company.Details);
-        InMemoryUnitOfWork.Pending.Outbox.AddRange(company.PendingEvents.Select(OutboxMessage.From));
-        company.MarkSaved(newVersion);
+        rows[CompanyProfile.TheId] = new CompanyProfileSnapshot(profile.Name, profile.Address, profile.LegalAddress, profile.CityId, profile.PostalCode, newVersion);
+        pending.Outbox.AddRange(profile.PendingEvents.Select(OutboxMessage.From));
+        profile.MarkSaved(newVersion);
         return Task.CompletedTask;
     }
 }

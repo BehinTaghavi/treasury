@@ -3,13 +3,6 @@
 body { margin: 0; font-family: Vazirmatn, Tahoma, sans-serif; background: var(--c-bg); color: var(--c-ink); }
 .shell { display: grid; grid-template-columns: 13rem 1fr; grid-template-rows: auto 1fr; min-height: 100vh; }
 .bar { grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center; padding: .75rem 1.25rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
-/* The company's logo and name (Basic Information → «اطلاعات شرکت») lead the bar of every screen; the system's name sits under them. */
-.brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
-.brand .logo { height: 2.75rem; width: auto; max-width: 9rem; object-fit: contain; }
-.brand .names { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
-.brand .company { font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brand .system { font-size: .8rem; color: var(--c-muted); }
-.brand .system.alone { font-size: 1rem; font-weight: 700; color: var(--c-ink); }
 .bar .version { margin-inline-start: auto; color: #7b8794; font-size: .8rem; direction: ltr; }
 .bar .version + .lang { margin-inline-start: .75rem; }
 .bar .lang { margin-inline-start: auto; background: transparent; border: 1px solid #cbd2d9; border-radius: 6px; padding: .35rem .75rem; cursor: pointer; }

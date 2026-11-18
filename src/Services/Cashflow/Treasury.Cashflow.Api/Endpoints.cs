@@ -13,19 +13,17 @@ namespace Treasury.Cashflow.Api;
 public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string BankName, MoneyInput Amount, string ReceivedOn, string? DueDate, Guid DrawerId, string DrawerName, string Purpose);
 
 /// <param name="Reference">Bounce notice no., management's order no. (cancellation) or bank reference.</param>
-/// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order.</param>
-public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null);
+/// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order. Legal action: the date of the certificate of non-payment.</param>
+/// <param name="TrackingCode">Bounce and legal action: the tracking code of the certificate of non-payment.</param>
+public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null, string? TrackingCode = null);
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
 public sealed record EndorseRequest(string Date, Guid PaymentRequestId, string SayadTracking, string? Note);
 
-public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason);
+public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason, string? TrackingCode = null);
 
 public sealed record DepositRequest(Guid BankAccountId, string Date, string? SlipNumber);
-
-/// <param name="Registered">«ثبت صیادی شد» ticked (true) or removed (false).</param>
-public sealed record SayadRegistrationRequest(bool Registered);
 
 public sealed record TemplateAccountRequest(string? Code);
 
@@ -44,13 +42,11 @@ public sealed record IssueRequest(Guid PaymentId, Guid BankAccountId, Guid Chequ
 
 public sealed record CashReceiptRequest(ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial);
 
-public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial);
+/// <param name="PayerSheba">Paya and Satna transfers: the Sheba the money came from.</param>
+public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial,
+    string? PayerSheba = null);
 
 public sealed record InstrumentReceiptRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
-
-/// <summary>The note receipt form (owner's form «فرم دریافت سفته», 16 Nov 2026).</summary>
-public sealed record NoteReceiptRequest(
-    ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null, IReadOnlyList<Guid>? SignerIds = null);
 
 public sealed record CancelReceiptRequest(string Date, string Reason, long Version);
 
@@ -82,14 +78,9 @@ public static class Endpoints
             ToHttp(await useCases.DepositForCollectionAsync(new DepositChequeCommand(Key(http), id, r.BankAccountId, r.Date, r.SlipNumber), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
-        // Owner, 15 Nov 2026: «ثبت صیادی شد» before a cheque goes to the bank (received) or to its beneficiary (issued).
-        api.MapPost("/instruments/{id:guid}/sayad-registration", async (Guid id, SayadRegistrationRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.SetSayadRegistrationAsync(new SetSayadRegistrationCommand(Key(http), id, r.Registered), ct).ConfigureAwait(false),
-                _ => $"/api/cashflow/instruments/{id}"));
-
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(
-                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate), ct).ConfigureAwait(false),
+                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate, r.TrackingCode), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
         // Owner's item 14: replacement (a cheque receipt of the new cheques) and endorsement of a received cheque.
@@ -105,8 +96,31 @@ public static class Endpoints
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         api.MapPost("/instruments/{id:guid}/endorsement-returned", async (Guid id, EndorsementReturnedRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason), ct)
+            ToHttp(await useCases.EndorsementReturnedAsync(new EndorsementReturnedCommand(Key(http), id, r.Date, r.NoticeNumber, r.Reason, r.TrackingCode), ct)
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
+
+        // Legal action (owner, 18 Nov 2026): the scans of its papers. The upload is a multipart form with "file"; at most 5 MB (checked
+        // again by the domain). The action itself is the step SendToLegal with its date and description.
+        api.MapGet("/instruments/{id:guid}/legal-files", async (Guid id, LegalActionUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(id, ct).ConfigureAwait(false)));
+
+        api.MapPost("/instruments/{id:guid}/legal-files", async (Guid id, IFormFile file, HttpRequest http, LegalActionUseCases u, CancellationToken ct) =>
+        {
+            if (file.Length > InstrumentAttachment.MaxBytes)
+            {
+                return ToHttp(Result<Guid>.Fail("Instrument.AttachmentTooLarge", "A scan is at most 5 MB."), _ => string.Empty);
+            }
+
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            return ToHttp(await u.AttachAsync(Key(http), id, file.FileName, buffer.ToArray(), ct).ConfigureAwait(false), fileId => $"/api/cashflow/instruments/{id}/legal-files/{fileId}");
+        }).DisableAntiforgery();
+
+        api.MapGet("/instruments/{id:guid}/legal-files/{fileId:guid}", async (Guid id, Guid fileId, LegalActionUseCases u, CancellationToken ct) =>
+            await u.GetAsync(id, fileId, ct).ConfigureAwait(false) is { } f ? Results.File(f.Content, f.File.ContentType, f.File.FileName) : Results.NotFound());
+
+        api.MapPost("/instruments/{id:guid}/legal-files/{fileId:guid}/delete", async (Guid id, Guid fileId, HttpRequest http, LegalActionUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveAsync(Key(http), id, fileId, ct).ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}/legal-files"));
 
         // Receipts (owner, 14 Nov 2026): cash, money paid into a bank account, cheques and notes.
         api.MapGet("/receipts", async (int year, ReceiptKind? kind, ReceiptUseCases useCases, CancellationToken ct) =>
@@ -121,20 +135,12 @@ public static class Endpoints
 
         api.MapPost("/receipts/bank", async (BankReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RecordBankDepositAsync(
-                new RecordBankReceiptCommand(Key(http), r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
+                new RecordBankReceiptCommand(Key(http), r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/receipts/{id}"));
 
         api.MapPost("/receipts/instruments", async (InstrumentReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RecordInstrumentsAsync(new RecordInstrumentReceiptCommand(Key(http), r.Header, r.Instruments), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/receipts/{id}"));
-
-        // Promissory notes have a receipt of their own (owner's report no. 4, item 13; his form of 16 Nov 2026).
-        api.MapPost("/receipts/notes", async (NoteReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.RecordNotesAsync(new RecordNoteReceiptCommand(Key(http), r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false),
-                id => $"/api/cashflow/receipts/{id}"));
-
-        api.MapPost("/receipts/notes/voucher-preview", async (NoteReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
-            Preview(await u.PreviewNotesAsync(new RecordNoteReceiptCommand("preview", r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/{id:guid}/cancel", async (Guid id, CancelReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),
@@ -165,7 +171,7 @@ public static class Endpoints
             Preview(await u.PreviewCashAsync(new RecordCashReceiptCommand("preview", r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/bank/voucher-preview", async (BankReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
-            Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial), ct).ConfigureAwait(false)));
+            Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/instruments/voucher-preview", async (InstrumentReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
             Preview(await u.PreviewInstrumentsAsync(new RecordInstrumentReceiptCommand("preview", r.Header, r.Instruments), ct).ConfigureAwait(false)));
@@ -252,7 +258,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" => StatusCodes.Status404NotFound,
+            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" or "Instrument.AttachmentNotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Accounts.Unavailable" or "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

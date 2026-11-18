@@ -32,8 +32,7 @@ if (!usePostgres)
     builder.Services.AddSingleton<ICatalogueRepository, InMemoryCatalogueRepository>();
     builder.Services.AddSingleton<IPurposeRepository, InMemoryPurposeRepository>();
     builder.Services.AddSingleton<IOrganizationRepository, InMemoryOrganizationRepository>();
-    builder.Services.AddSingleton<ISignatureRepository, InMemorySignatureRepository>();
-    builder.Services.AddSingleton<ICompanyRepository, InMemoryCompanyRepository>();
+    builder.Services.AddSingleton<ICompanyProfileRepository, InMemoryCompanyProfileRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
     builder.Services.AddSingleton<InMemoryLedgerRepository>();
     builder.Services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<InMemoryLedgerRepository>());
@@ -71,9 +70,8 @@ if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(keycloakAu
 builder.Services.AddSingleton<CatalogueUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Purposes.PurposeUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Organization.OrganizationUseCases>();
-builder.Services.AddSingleton<Treasury.Reference.Application.Signatures.SignatureUseCases>();
-builder.Services.AddSingleton<Treasury.Reference.Application.Ledger.LedgerUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Company.CompanyUseCases>();
+builder.Services.AddSingleton<Treasury.Reference.Application.Ledger.LedgerUseCases>();
 
 var app = builder.Build();
 
@@ -89,7 +87,6 @@ app.MapCatalogueEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycl
 app.MapLedgerEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 app.MapPurposeEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 app.MapOrganizationEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
-app.MapSignatureEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 app.MapCompanyEndpoints(requireAuthorization: !string.IsNullOrWhiteSpace(keycloakAuthority));
 
 // A new client database starts with usable lists (currencies, provinces and capitals, banks); see DefaultLists.

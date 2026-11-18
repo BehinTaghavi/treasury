@@ -12,21 +12,11 @@ from .legacy_mapping import MigratedInstrument, Rejected
 
 MIGRATION_USER = "migration"
 
-# Answer to Q39 (owner, 16 Nov 2026): received cheques of the old program are assumed to be recorded in the banks' Sayad system, so
-# they arrive with «ثبت صیادی شد» ticked (moment: the migration; in place of a user: SayadRegistration.AssumedBy of the .NET domain).
-SAYAD_ASSUMED_BY = "system:assumed"
-SAYAD_CHEQUE_KINDS = ("OrdinaryCheque", "GuaranteeCheque", "BankCheque")
-
 
 def ensure_fiscal_years(conn: psycopg.Connection, years: set[int]) -> None:
     for y in sorted(years):
         starts, ends = jalali.fiscal_year_bounds(y)
         conn.execute("SELECT cashflow.open_fiscal_year(%s, %s, %s)", (y, starts, ends))
-
-
-def assumed_in_sayad(i: MigratedInstrument) -> bool:
-    """A received cheque of the old program counts as recorded in Sayad (answer to Q39); notes and issued cheques do not."""
-    return i.direction == "Received" and i.kind in SAYAD_CHEQUE_KINDS
 
 
 def load(conn: psycopg.Connection, items: list[MigratedInstrument]) -> int:
@@ -38,14 +28,12 @@ def load(conn: psycopg.Connection, items: list[MigratedInstrument]) -> int:
         for i in items:
             cur = conn.execute(
                 """INSERT INTO cashflow.instrument (origin_fiscal_year, id, direction, kind, number, bank_name, amount, currency, rate_to_rial,
-                       amount_rial, issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, legacy_source, version,
-                       sayad_registered_at, sayad_registered_by)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1,
-                           CASE WHEN %s::boolean THEN now() END, CASE WHEN %s::boolean THEN %s::text END)
+                       amount_rial, issue_date, due_date, counterparty_id, counterparty_name, purpose, destination, state, legacy_source, version)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1)
                    ON CONFLICT (origin_fiscal_year, id) DO NOTHING""",
                 (i.origin_fiscal_year, i.id, i.direction, i.kind, i.number, i.bank_name, i.amount, i.currency, i.rate_to_rial,
                  i.amount_rial, i.issue_date, i.due_date, i.counterparty_id, i.counterparty_name, i.purpose, i.destination, i.state,
-                 i.legacy_source, assumed_in_sayad(i), assumed_in_sayad(i), SAYAD_ASSUMED_BY))
+                 i.legacy_source))
             if cur.rowcount == 0:
                 continue
             inserted += 1

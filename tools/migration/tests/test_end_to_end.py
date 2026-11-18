@@ -20,7 +20,7 @@ pytestmark = pytest.mark.skipif(not DSN, reason="TREASURY_TEST_DSN not set")
 HEADER = ["Checkid", "Dp", "Checktype", "Stcode", "Checkno", "BankName", "Amount", "Iscur", "Curid", "Currate", "Person", "Babat",
           "Maturity", "D1", "D2", "D3", "D4", "Vagno", "Baccno", "Bundleid", "Vos", "Backed", "RegVos", "Ctocash", "GoInlaw"]
 ROWS = [
-    # received: in cash desk, collected (crossing into 1387), bounced, returned, endorsed
+    # received: in cash desk, collected (crossing into 1387), bounced and in legal action (GoInlaw), returned, endorsed
     [1, 1, 0, 11, "100001", "ملت", "5000000", 0, "", "", "مشتری الف", "فروش", "13861201", "13861110", "", "", "", "", "", "", 0, 0, 0, 0, 0],
     [2, 1, 0, 13, "100002", "ملی", "7000000", 0, "", "", "مشتری ب", "فروش", "13870115", "13861215", "", "13861220", "13870116", "ملت جاری", "", "", 1, 0, 1, 0, 0],
     [3, 1, 2, 14, "100003", "تجارت", "2500000", 0, "", "", "مشتری ج", "فروش", "13861020", "13861001", "", "13861005", "13861021", "ملت جاری", "", "", 0, 1, 1, 0, 1],
@@ -66,25 +66,18 @@ def test_migrates_reconciles_and_is_idempotent(database, tmp_path):
         assert c.execute("SELECT count(*) FROM cashflow.instrument").fetchone()[0] == 8
         states = dict(c.execute("SELECT legacy_source, state FROM cashflow.instrument").fetchall())
         assert states["Cashnajoo86.Checks:7"] == "PaidByBank"
-        assert states["Cashnajoo86.Checks:3"] == "Bounced"
+        assert states["Cashnajoo86.Checks:3"] == "InLegal"  # bounced with the old flag GoInlaw: «حقوقی» (owner, 18 Nov 2026)
         # The cheque received in 1386 and collected in 1387: instrument in 1386, collection step in 1387.
         rows = c.execute("""SELECT e.fiscal_year, e.action FROM cashflow.instrument_event e JOIN cashflow.instrument i ON i.id = e.instrument_id
                             WHERE i.legacy_source = 'Cashnajoo86.Checks:2' ORDER BY e.seq""").fetchall()
         assert rows == [(1386, "Receive"), (1386, "DepositForCollection"), (1387, "RecordCleared")]
         assert c.execute("SELECT origin_fiscal_year FROM cashflow.instrument WHERE legacy_source = 'Cashnajoo86.Checks:2'").fetchone()[0] == 1386
-        # Answer to Q39 (owner, 16 Nov 2026): the old program's received cheques are assumed to be recorded in Sayad and arrive with
-        # «ثبت صیادی شد» ticked; issued cheques and notes arrive without it.
-        ticks = c.execute("""SELECT direction, kind IN ('OrdinaryCheque', 'GuaranteeCheque', 'BankCheque'), sayad_registered_by, sayad_registered_at IS NOT NULL
-                             FROM cashflow.instrument""").fetchall()
-        assert any(direction == "Received" and cheque for direction, cheque, _, _ in ticks)
-        for direction, cheque, by, has_moment in ticks:
-            assert (by, has_moment) == (("system:assumed", True) if direction == "Received" and cheque else (None, False))
 
     # Second run inserts nothing new and still reconciles.
     assert main(args) == 0
     with psycopg.connect(database) as c:
         assert c.execute("SELECT count(*) FROM cashflow.instrument").fetchone()[0] == 8
-        assert c.execute("SELECT count(*) FROM cashflow.instrument_event").fetchone()[0] == 22  # 1+3+3+2+2 received, 3+5+3 issued
+        assert c.execute("SELECT count(*) FROM cashflow.instrument_event").fetchone()[0] == 23  # 1+3+4+2+2 received, 3+5+3 issued
 
     rejected = (tmp_path / "Cashnajoo86_rejected.csv").read_text(encoding="utf-8-sig")
     assert "cash payment" in rejected and "Stcode 42" in rejected

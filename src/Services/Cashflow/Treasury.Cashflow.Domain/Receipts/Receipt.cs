@@ -8,23 +8,82 @@ namespace Treasury.Cashflow.Domain.Receipts;
 /// The kinds of receipt (new-version manual, «دریافت ها شامل»): cash into a cash desk, money paid into one of our bank accounts
 /// (deposit slip, transfer, POS, card-to-card), and cheques and promissory notes, current or post-dated, guarantee or not. Each
 /// kind has its own serial number per fiscal year, as in the old program (Subs.Scode 17 «دريافت نقدي», 16 «واريز به حساب», D_Check).
-/// Promissory notes have a receipt of their own (owner's report no. 4, item 13, and his form «فرم دریافت سفته» of 16 Nov 2026).
 /// </summary>
 public enum ReceiptKind
 {
     Cash,
     BankDeposit,
     Instruments,
-    Notes,
 }
 
-/// <summary>How money reached the bank account (old D_variz «نوع واريز»; manual: «ثبت دریافتهای از محل عابر بانک – POS – (کارت به کارت)»).</summary>
+/// <summary>
+/// How money reached the bank account (old D_variz «نوع واريز»; manual: «ثبت دریافتهای از محل عابر بانک – POS – (کارت به کارت)»).
+/// Owner, 18 Nov 2026: the kind of a direct deposit is one of حواله پایا با شماره شبا، حواله ساتنا با شماره شبا، انتقال داخلی حساب به حساب،
+/// واریز نقدی در شعبه، کارت به کارت (when the account has a bank card)، واریز به درگاه پرداخت متصل به حساب شرکت.
+/// </summary>
 public enum DepositMethod
 {
+    /// <summary>«واریز نقدی در شعبه»: cash paid in at a branch, with its slip (فیش واریزی).</summary>
     DepositSlip,
+
+    /// <summary>«حواله / انتقال» of receipts recorded before 18 Nov 2026, when Paya, Satna and internal transfers were one kind. Not for new receipts.</summary>
     Transfer,
+
+    /// <summary>«کارتخوان (POS)».</summary>
     Pos,
+
+    /// <summary>«کارت به کارت»: only into an account that has a bank card.</summary>
     CardToCard,
+
+    /// <summary>«حواله پایا با شماره شبا».</summary>
+    Paya,
+
+    /// <summary>«حواله ساتنا با شماره شبا».</summary>
+    Satna,
+
+    /// <summary>«انتقال داخلی حساب به حساب»: from another account of the same bank.</summary>
+    InternalTransfer,
+
+    /// <summary>«واریز به درگاه پرداخت متصل به حساب شرکت».</summary>
+    PaymentGateway,
+}
+
+public static class DepositMethodRules
+{
+    /// <summary>Paya and Satna transfers are recorded with the Sheba they came from.</summary>
+    public static bool NeedsSheba(this DepositMethod method) => method is DepositMethod.Paya or DepositMethod.Satna;
+
+    /// <summary>A foreign-currency account receives cash deposits and bank transfers only (owner's report no. 4, item 7).</summary>
+    public static bool IsForForeignCurrency(this DepositMethod method) =>
+        method is DepositMethod.DepositSlip or DepositMethod.Paya or DepositMethod.Satna or DepositMethod.InternalTransfer;
+
+    /// <summary>
+    /// An Iranian Sheba (IBAN): IR and 24 digits, checked with the IBAN check digits. The same rule as reference-svc's beneficiary Sheba;
+    /// repeated here because services share no domain code (ADR 0001). Returns it without spaces and in capitals, or null when invalid.
+    /// </summary>
+    public static string? NormaliseSheba(string? text)
+    {
+        var s = new string((text ?? string.Empty).Where(c => !char.IsWhiteSpace(c) && c != '-').ToArray()).ToUpperInvariant();
+        if (s.Length == 24 && s.All(char.IsAsciiDigit))
+        {
+            s = "IR" + s;
+        }
+
+        if (s.Length != 26 || !s.StartsWith("IR", StringComparison.Ordinal) || !s[2..].All(char.IsAsciiDigit))
+        {
+            return null;
+        }
+
+        // IBAN check: move "IRkk" to the end, I = 18 and R = 27, the number mod 97 is 1.
+        var rearranged = s[4..] + "1827" + s[2..4];
+        var remainder = 0;
+        foreach (var c in rearranged)
+        {
+            remainder = ((remainder * 10) + (c - '0')) % 97;
+        }
+
+        return remainder == 1 ? s : null;
+    }
 }
 
 public enum ReceiptState
@@ -42,7 +101,9 @@ public enum ReceiptAccountKind
 /// <summary>A cash desk or one of our bank accounts as accounts-svc describes it when a receipt is recorded.</summary>
 /// <param name="LedgerAccountCode">Its معین, for the voucher (owner's report no. 4, item 8).</param>
 /// <param name="DetailCode">Its تفصیل: the cash desk holder's, or the bank account's تفصیل 1.</param>
-public sealed record ReceiptAccountFact(ReceiptAccountKind Kind, Guid Id, string Name, string CurrencyCode, bool IsActive, string? LedgerAccountCode = null, string? DetailCode = null);
+/// <param name="HasCards">A bank account with at least one bank card (card-to-card deposits need one; owner, 18 Nov 2026).</param>
+public sealed record ReceiptAccountFact(ReceiptAccountKind Kind, Guid Id, string Name, string CurrencyCode, bool IsActive, string? LedgerAccountCode = null, string? DetailCode = null,
+    bool HasCards = false);
 
 /// <summary>A purpose group (گروه بابت) as reference-svc describes it; its معین is the other side of the voucher.</summary>
 public sealed record PurposeGroupFact(Guid Id, string Name, bool IsForReceipts, bool IsActive, string? LedgerAccountCode = null);
@@ -137,14 +198,14 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// <summary>Deposit slip, transfer tracking or POS reference number.</summary>
     public string? TrackingNumber { get; private init; }
 
+    /// <summary>Paya and Satna transfers: the Sheba the money came from (owner, 18 Nov 2026: «حواله … با شماره شبا»).</summary>
+    public string? PayerSheba { get; private init; }
+
     /// <summary>Cash and bank deposits: the amount, in the currency of the cash desk or bank account.</summary>
     public Money? Amount { get; private init; }
 
     /// <summary>Cheques and notes received on this receipt.</summary>
     public IReadOnlyList<Guid> InstrumentIds => _instrumentIds;
-
-    /// <summary>A receipt of promissory notes: why and how they were received (owner's form «فرم دریافت سفته»); null for the other kinds.</summary>
-    public NoteReceiptTerms? NoteTerms { get; private init; }
 
     /// <summary>Rial total: the amount, or the sum of the cheques and notes (foreign currency at its rate).</summary>
     public decimal TotalRial { get; private set; }
@@ -167,16 +228,30 @@ public sealed class Receipt : AggregateRoot<Guid>
     }
 
     /// <summary>Money paid into one of our bank accounts (old Access form D_variz, Scode 16; POS and card-to-card per the manual).</summary>
+    /// <param name="payerSheba">Paya and Satna: the Sheba the transfer came from.</param>
     public static Receipt RecordBankDeposit(
-        Guid id, int number, ReceiptHeader header, ReceiptAccountFact bankAccount, DepositMethod method, string? trackingNumber, Money amount, string userId)
+        Guid id, int number, ReceiptHeader header, ReceiptAccountFact bankAccount, DepositMethod method, string? trackingNumber, Money amount, string userId,
+        string? payerSheba = null)
     {
         ArgumentNullException.ThrowIfNull(bankAccount);
         Require(bankAccount.Kind == ReceiptAccountKind.BankAccount, "Receipt.AccountKindWrong", "A deposit is received into a bank account.");
-        Require(Enum.IsDefined(method), "Receipt.DepositMethodRequired", "Choose how the money was paid in (old: \"نوع واريز نامشخص است\").");
+
+        // Owner, 18 Nov 2026: the kind of deposit is one of the kinds he listed; the old combined «حواله / انتقال» is no longer chosen.
+        Require(Enum.IsDefined(method) && method != DepositMethod.Transfer, "Receipt.DepositMethodRequired",
+            "Choose how the money was paid in (old: \"نوع واريز نامشخص است\").");
         // Owner's report no. 4, item 7: a foreign-currency account receives cash deposits and bank transfers (فیش واریزی، حواله).
-        Require(string.Equals(bankAccount.CurrencyCode.Trim(), "IRR", StringComparison.OrdinalIgnoreCase) || method is DepositMethod.DepositSlip or DepositMethod.Transfer,
+        Require(string.Equals(bankAccount.CurrencyCode.Trim(), "IRR", StringComparison.OrdinalIgnoreCase) || method.IsForForeignCurrency(),
             "Receipt.MethodNotForForeignCurrency", "A foreign-currency account receives cash deposits and bank transfers only.");
-        return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId);
+        Require(method != DepositMethod.CardToCard || bankAccount.HasCards, "Receipt.AccountHasNoCard", "Card-to-card is for a bank account that has a bank card.");
+
+        string? sheba = null;
+        if (method.NeedsSheba())
+        {
+            Require(!string.IsNullOrWhiteSpace(payerSheba), "Receipt.ShebaRequired", "Enter the Sheba number of the Paya or Satna transfer.");
+            sheba = DepositMethodRules.NormaliseSheba(payerSheba) ?? throw new DomainException("Receipt.ShebaInvalid", "The Sheba number is not valid.");
+        }
+
+        return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId, sheba);
     }
 
     /// <summary>
@@ -217,49 +292,12 @@ public sealed class Receipt : AggregateRoot<Guid>
     }
 
     /// <summary>
-    /// Promissory notes of one issuer on one receipt (owner's form «فرم دریافت سفته», 16 Nov 2026; report no. 4, item 13). Every note
-    /// becomes an instrument in the cash desk: a guarantee note when the notes are held as security or in trust, otherwise an ordinary
-    /// note. With «معین» every note has its due date; with «عندالمطالبه» none has (it can be collected whenever its holder wishes).
-    /// Every note must have passed the checks of article 308 (owner's answer to Q40). The receipt records the handing over of the
-    /// notes only; it is not a receipt of money. The authorised signatories who sign it are chosen by the signature rule of the note
-    /// receipt (Basic Information, owner's answers to Q41 and Q45–Q47).
-    /// </summary>
-    /// <param name="rule">The signature rule of the note receipt; null when none is set (no authorised signature needed).</param>
-    /// <param name="signerIds">The signatories chosen on the form.</param>
-    public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId,
-        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
-    {
-        ArgumentNullException.ThrowIfNull(terms);
-        ArgumentNullException.ThrowIfNull(notes);
-        Validate(header, number, userId);
-        var checkedTerms = terms.Validated() with { Signers = (rule ?? SignatureRuleFact.None).Choose(signerIds) };
-        Require(notes.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
-        var onDemand = checkedTerms.Maturity == NoteMaturity.OnDemand;
-        var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
-        foreach (var n in notes)
-        {
-            Require(n.Kind == checkedTerms.InstrumentKind && n.Details.OnDemand == onDemand, "Receipt.NoteKindMismatch",
-                "Every note on the receipt follows the receipt's reason and kind of due date.");
-            Require(onDemand || n.DueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
-            Require(n.Details.Checks?.IsComplete(onDemand) == true, "Receipt.NoteChecksIncomplete",
-                $"Note {n.Number} is received only when every item of article 308 is checked on it.");
-            Require(n.Direction == InstrumentDirection.Received && n.ReceiptId == id && n.IssueDate == header.Date && n.Counterparty.Id == receipt.Payer.Id,
-                "Receipt.InstrumentMismatch", "Every cheque and note must be received from this payer on this receipt's date.");
-        }
-
-        receipt._instrumentIds.AddRange(notes.Select(n => n.Id));
-        receipt.TotalRial = notes.Sum(n => n.Amount.ToRial());
-        receipt.Raise(receipt.Recorded());
-        return receipt;
-    }
-
-    /// <summary>
     /// Cancels (ابطال) a cash or bank receipt entered by mistake. Cheques and notes are not cancelled with their receipt: each one is
     /// returned to the payer (عودت) through its own steps, which keeps its history.
     /// </summary>
     public void Cancel(FiscalDate date, string reason, string userId)
     {
-        Require(Kind is not (ReceiptKind.Instruments or ReceiptKind.Notes), "Receipt.CancelInstruments", "Return each cheque or note to the payer instead of cancelling the receipt.");
+        Require(Kind != ReceiptKind.Instruments, "Receipt.CancelInstruments", "Return each cheque or note to the payer instead of cancelling the receipt.");
         Require(State == ReceiptState.Recorded, "Receipt.AlreadyCancelled", "The receipt is already cancelled.");
         Require(!string.IsNullOrWhiteSpace(reason), "Receipt.CancelReasonRequired", "Give the reason for cancelling.");
         Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
@@ -275,7 +313,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         string? reference1, string? reference2, Guid? departmentId, bool salesProceeds, string? note, string recordedBy,
         ReceiptAccountKind? accountKind, Guid? accountId, DepositMethod? method, string? trackingNumber, Money? amount,
         IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version,
-        Guid? replacedInstrumentId = null, NoteReceiptTerms? noteTerms = null)
+        Guid? replacedInstrumentId = null, string? payerSheba = null)
     {
         ArgumentNullException.ThrowIfNull(payer);
         var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true, true),
@@ -292,7 +330,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             CancelledOn = cancelledOn,
             CancelReason = cancelReason,
             ReplacedInstrumentId = replacedInstrumentId,
-            NoteTerms = noteTerms,
+            PayerSheba = payerSheba,
         };
         r._instrumentIds.AddRange(instrumentIds);
         r.SetLoadedVersion(version);
@@ -300,7 +338,8 @@ public sealed class Receipt : AggregateRoot<Guid>
     }
 
     private static Receipt RecordMoney(
-        Guid id, ReceiptKind kind, int number, ReceiptHeader header, ReceiptAccountFact account, DepositMethod? method, string? tracking, Money amount, string userId)
+        Guid id, ReceiptKind kind, int number, ReceiptHeader header, ReceiptAccountFact account, DepositMethod? method, string? tracking, Money amount, string userId,
+        string? payerSheba = null)
     {
         ArgumentNullException.ThrowIfNull(amount);
         Validate(header, number, userId);
@@ -313,6 +352,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             AccountId = account.Id,
             Method = method,
             TrackingNumber = Clean(tracking),
+            PayerSheba = payerSheba,
             Amount = amount,
             TotalRial = amount.ToRial(),
         };

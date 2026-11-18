@@ -1,121 +1,83 @@
+using Treasury.Reference.Application.Catalogue;
 using Treasury.Reference.Application.Company;
+using Treasury.Reference.Domain.Catalogue;
 using Treasury.Reference.Infrastructure.InMemory;
 using Xunit;
 
 namespace Treasury.Reference.Application.Tests;
 
-/// <summary>«اطلاعات شرکت» (owner, 16 Nov 2026): one profile per database, with the company's name and logo.</summary>
+/// <summary>«مشخصات شرکت» (owner, 18 Nov 2026): entered once, changed afterwards; its city comes from the list of cities and is kept in use.</summary>
 public sealed class CompanyUseCaseTests : IDisposable
 {
-    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
-    private static readonly byte[] Jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 9];
-
     private readonly InMemoryReferenceDatabase _db = new();
-    private readonly CompanyUseCases _useCases;
+    private readonly CatalogueUseCases _catalogue;
+    private readonly CompanyUseCases _company;
 
-    public CompanyUseCaseTests() =>
-        _useCases = new CompanyUseCases(new InMemoryUnitOfWork(_db), new InMemoryCompanyRepository(_db), new InMemoryIdempotencyStore(_db));
+    public CompanyUseCaseTests()
+    {
+        var uow = new InMemoryUnitOfWork(_db);
+        var items = new InMemoryCatalogueRepository(_db);
+        var idempotency = new InMemoryIdempotencyStore(_db);
+        _catalogue = new CatalogueUseCases(uow, items, idempotency);
+        _company = new CompanyUseCases(uow, new InMemoryCompanyProfileRepository(_db), items, idempotency, _catalogue);
+    }
 
     public void Dispose() => _db.Dispose();
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private Task<CompanyView> Company() => _useCases.GetAsync(CancellationToken.None);
-
-    [Fact]
-    public async Task A_new_database_has_no_company_name_and_no_logo()
+    private async Task<Guid> Add(CatalogueKind kind, string name, Guid? parent = null)
     {
-        Assert.Equal(new CompanyView(string.Empty, false, 0), await Company());
-        Assert.Null(await _useCases.GetLogoAsync(CancellationToken.None));
+        var r = await _catalogue.AddAsync(new AddCatalogueItemCommand(Key(), kind, name, parent), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        return r.Value;
     }
 
     [Fact]
-    public async Task The_name_is_entered_once_and_corrected_afterwards()
+    public async Task The_profile_is_entered_once_then_changed_and_its_city_is_kept_in_use()
     {
-        var first = await _useCases.SaveAsync(Key(), new(" شرکت  ایران ناژو "), 0, CancellationToken.None);
+        Assert.Equal(CompanyProfileView.NotSet, await _company.GetAsync(CancellationToken.None));
+
+        var iran = await Add(CatalogueKind.Country, "ایران");
+        var province = await Add(CatalogueKind.Province, "تهران", iran);
+        var tehran = await Add(CatalogueKind.City, "تهران", province);
+        var shiraz = await Add(CatalogueKind.City, "شیراز", await Add(CatalogueKind.Province, "فارس", iran));
+
+        var first = await _company.SetAsync(Key(), new("شرکت نمونه", "خیابان ولیعصر", "خیابان انقلاب", tehran, "1234567890"), 0, CancellationToken.None);
         Assert.True(first.IsSuccess, first.ErrorCode);
-        Assert.Equal(new CompanyView("شرکت ایران ناژو", false, 1), await Company());
+        var v = await _company.GetAsync(CancellationToken.None);
+        Assert.Equal(
+            (true, "شرکت نمونه", "خیابان ولیعصر", "خیابان انقلاب", (Guid?)tehran, "تهران", "1234567890", 1L),
+            (v.IsSet, v.Name, v.Address, v.LegalAddress, v.CityId, v.CityName, v.PostalCode, v.Version));
 
-        var corrected = await _useCases.SaveAsync(Key(), new("شرکت ایران ناژو (سهامی خاص)"), 1, CancellationToken.None);
-        Assert.Equal(first.Value, corrected.Value); // still the one profile of the database
-        Assert.Equal(new CompanyView("شرکت ایران ناژو (سهامی خاص)", false, 2), await Company());
+        // The city named by the profile is in use: it can no longer be deleted from the list of cities.
+        Assert.True((await _catalogue.GetAsync(tehran, CancellationToken.None))!.IsInUse);
 
-        Assert.Equal("Company.NameRequired", (await _useCases.SaveAsync(Key(), new(" "), 2, CancellationToken.None)).ErrorCode);
-        Assert.Equal(2, _db.OutboxMessages.Count(m => m.Type == "CompanyProfileChanged"));
+        // A second "first entry" or a change based on an old copy is refused.
+        Assert.Equal("Concurrency.Conflict", (await _company.SetAsync(Key(), new("شرکت دیگر", null, null, shiraz, null), 0, CancellationToken.None)).ErrorCode);
+        var moved = await _company.SetAsync(Key(), new("شرکت نمونه", "شیراز، بلوار زند", null, shiraz, null), 1, CancellationToken.None);
+        Assert.True(moved.IsSuccess, moved.ErrorCode);
+        v = await _company.GetAsync(CancellationToken.None);
+        Assert.Equal(("شیراز", 2L, (string?)null, (string?)null), (v.CityName, v.Version, v.PostalCode, v.LegalAddress));
     }
 
     [Fact]
-    public async Task The_official_details_are_saved_with_the_name_and_survive_a_new_logo_owner_answer_Q38()
+    public async Task The_city_must_be_a_city_of_the_list_and_the_name_is_required()
     {
-        var form = new CompanyForm("شرکت نمونه", "۱۰۱۰۱۰۱۰۱۰۳", "411111111111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir");
-        Assert.True((await _useCases.SaveAsync(Key(), form, 0, CancellationToken.None)).IsSuccess);
-        var saved = new CompanyView("شرکت نمونه", false, 1, "10101010103", "411111111111", "12345", "تهران، خیابان آزادی، پلاک ۱", "1234567890", "021-88880000", "www.example.ir", "info@example.ir");
-        Assert.Equal(saved, await Company());
+        var iran = await Add(CatalogueKind.Country, "ایران");
+        var bank = await Add(CatalogueKind.Bank, "بانک نمونه");
+        var city = await Add(CatalogueKind.City, "کاشان", await Add(CatalogueKind.Province, "اصفهان", iran));
 
-        Assert.True((await _useCases.AttachLogoAsync(Key(), Png, 1, CancellationToken.None)).IsSuccess);
-        Assert.Equal(saved with { HasLogo = true, Version = 2 }, await Company());
+        Assert.Equal("Company.CityNotFound", (await _company.SetAsync(Key(), new("شرکت نمونه", null, null, Guid.NewGuid(), null), 0, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Company.CityNotFound", (await _company.SetAsync(Key(), new("شرکت نمونه", null, null, bank, null), 0, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Company.CityRequired", (await _company.SetAsync(Key(), new("شرکت نمونه", null, null, null, null), 0, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Company.NameRequired", (await _company.SetAsync(Key(), new(" ", null, null, city, null), 0, CancellationToken.None)).ErrorCode);
+        Assert.False((await _company.GetAsync(CancellationToken.None)).IsSet);
 
-        // A detail that is wrong refuses the whole form; an emptied detail is removed.
-        Assert.Equal("Company.EmailInvalid", (await _useCases.SaveAsync(Key(), form with { Name = "دیگر", Email = "info" }, 2, CancellationToken.None)).ErrorCode);
-        Assert.Equal(saved with { HasLogo = true, Version = 2 }, await Company());
-        Assert.True((await _useCases.SaveAsync(Key(), form with { Website = " ", Email = null }, 2, CancellationToken.None)).IsSuccess);
-        Assert.Equal(saved with { HasLogo = true, Version = 3, Website = null, Email = null }, await Company());
-    }
-
-    [Fact]
-    public async Task A_change_made_on_an_old_copy_of_the_form_is_refused()
-    {
-        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
-        Assert.Equal("Concurrency.Conflict", (await _useCases.SaveAsync(Key(), new("دیگر"), 0, CancellationToken.None)).ErrorCode);
-        Assert.Equal("Concurrency.Conflict", (await _useCases.AttachLogoAsync(Key(), Png, 5, CancellationToken.None)).ErrorCode);
-        Assert.Equal("شرکت نمونه", (await Company()).Name);
-    }
-
-    [Fact]
-    public async Task The_same_request_sent_twice_is_saved_once()
-    {
+        // The same request sent twice enters the profile once.
         var key = Key();
-        var first = await _useCases.SaveAsync(key, new("شرکت نمونه"), 0, CancellationToken.None);
-        var again = await _useCases.SaveAsync(key, new("شرکت نمونه"), 0, CancellationToken.None);
-        Assert.Equal(first.Value, again.Value);
-        Assert.Equal(1, (await Company()).Version);
-        Assert.Equal("Request.IdempotencyKeyRequired", (await _useCases.SaveAsync(" ", new("شرکت نمونه"), 1, CancellationToken.None)).ErrorCode);
-    }
-
-    [Fact]
-    public async Task The_logo_follows_the_name_is_replaced_and_survives_a_name_correction()
-    {
-        Assert.Equal("Company.NameRequired", (await _useCases.AttachLogoAsync(Key(), Png, 0, CancellationToken.None)).ErrorCode);
-        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
-
-        Assert.Equal("Company.LogoInvalid", (await _useCases.AttachLogoAsync(Key(), [1, 2, 3], 1, CancellationToken.None)).ErrorCode);
-        Assert.Null(await _useCases.GetLogoAsync(CancellationToken.None));
-
-        Assert.True((await _useCases.AttachLogoAsync(Key(), Png, 1, CancellationToken.None)).IsSuccess);
-        Assert.Equal(new CompanyView("شرکت نمونه", true, 2), await Company());
-        var logo = await _useCases.GetLogoAsync(CancellationToken.None);
-        Assert.Equal("image/png", logo!.Value.ContentType);
-        Assert.Equal(Png, logo.Value.Data);
-
-        Assert.True((await _useCases.SaveAsync(Key(), new("شرکت نمونه نو"), 2, CancellationToken.None)).IsSuccess);
-        Assert.Equal(Png, (await _useCases.GetLogoAsync(CancellationToken.None))!.Value.Data);
-
-        Assert.True((await _useCases.AttachLogoAsync(Key(), Jpeg, 3, CancellationToken.None)).IsSuccess);
-        logo = await _useCases.GetLogoAsync(CancellationToken.None);
-        Assert.Equal("image/jpeg", logo!.Value.ContentType);
-        Assert.Equal(Jpeg, logo.Value.Data);
-    }
-
-    [Fact]
-    public async Task The_logo_can_be_removed()
-    {
-        Assert.Equal("Company.NoLogo", (await _useCases.RemoveLogoAsync(Key(), 0, CancellationToken.None)).ErrorCode);
-        await _useCases.SaveAsync(Key(), new("شرکت نمونه"), 0, CancellationToken.None);
-        Assert.Equal("Company.NoLogo", (await _useCases.RemoveLogoAsync(Key(), 1, CancellationToken.None)).ErrorCode);
-        await _useCases.AttachLogoAsync(Key(), Png, 1, CancellationToken.None);
-
-        Assert.True((await _useCases.RemoveLogoAsync(Key(), 2, CancellationToken.None)).IsSuccess);
-        Assert.Equal(new CompanyView("شرکت نمونه", false, 3), await Company());
-        Assert.Null(await _useCases.GetLogoAsync(CancellationToken.None));
+        Assert.True((await _company.SetAsync(key, new("شرکت نمونه", null, null, city, null), 0, CancellationToken.None)).IsSuccess);
+        Assert.True((await _company.SetAsync(key, new("شرکت نمونه", null, null, city, null), 0, CancellationToken.None)).IsSuccess);
+        Assert.Equal(1L, (await _company.GetAsync(CancellationToken.None)).Version);
     }
 }

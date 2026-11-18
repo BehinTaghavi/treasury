@@ -38,7 +38,8 @@ public sealed class HttpReceiptAccountLookup(HttpClient http) : IReceiptAccountL
 {
     private sealed record Desk(Guid Id, string Name, string CurrencyCode, bool IsActive, string? LedgerAccountCode, string? HolderDetailCode);
 
-    private sealed record Account(Guid Id, string AccountNumber, string CurrencyCode, bool IsActive, string? LedgerAccountCode, string? Detail1Code);
+    private sealed record Account(Guid Id, string AccountNumber, string CurrencyCode, bool IsActive, string? LedgerAccountCode, string? Detail1Code,
+        IReadOnlyList<System.Text.Json.JsonElement>? Cards = null);
 
     public async Task<ReceiptAccountFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -49,7 +50,7 @@ public sealed class HttpReceiptAccountLookup(HttpClient http) : IReceiptAccountL
 
     public async Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Account>(http, $"api/accounts/bank-accounts/{id}", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) is { } a
-            ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, a.Id, a.AccountNumber, a.CurrencyCode, a.IsActive, a.LedgerAccountCode, a.Detail1Code)
+            ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, a.Id, a.AccountNumber, a.CurrencyCode, a.IsActive, a.LedgerAccountCode, a.Detail1Code, a.Cards is { Count: > 0 })
             : null;
 }
 
@@ -79,19 +80,13 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
             ? new PurposeGroupFact(g.Id, g.Name, g.Direction == "Receipt", g.IsActive, g.LedgerAccountCode)
             : null;
 
+    private sealed record Company(bool IsSet, string? CityName);
+
+    public async Task<string?> CompanyCityAsync(CancellationToken cancellationToken) =>
+        (await ServiceHttp.GetAsync<Company>(http, "api/reference/company", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.CityName;
+
     public async Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Entry>(http, $"api/reference/banks/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.Name;
-
-    private sealed record RuleSignatory(Guid Id, string FullName, string? Position);
-
-    private sealed record Rule(int Required, RuleSignatory[]? Compulsory, RuleSignatory[]? Optional);
-
-    public async Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken)
-    {
-        static List<SignerFact> Facts(RuleSignatory[]? list) => (list ?? []).Select(s => new SignerFact(s.Id, s.FullName, s.Position)).ToList();
-        return await ServiceHttp.GetAsync<Rule>(http, $"api/reference/signature-rules/{Uri.EscapeDataString(document)}", "Reference.Unavailable", cancellationToken)
-            .ConfigureAwait(false) is { } r ? new SignatureRuleFact(r.Required, Facts(r.Compulsory), Facts(r.Optional)) : null;
-    }
 
     public async Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {

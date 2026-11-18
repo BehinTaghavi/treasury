@@ -36,7 +36,8 @@ public sealed record ChangeInstrumentStateCommand(
     string? Destination = null,
     string? Note = null,
     string? Reference = null,
-    string? DocumentDate = null);
+    string? DocumentDate = null,
+    string? TrackingCode = null);
 
 
 public sealed record IssueChequeCommand(
@@ -56,18 +57,16 @@ public sealed record IssueChequeCommand(
 /// <param name="SlipNumber">Deposit slip number («شماره فیش واگذاری»).</param>
 public sealed record DepositChequeCommand(string IdempotencyKey, Guid InstrumentId, Guid BankAccountId, string Date, string? SlipNumber = null);
 
-/// <summary>«ثبت صیادی شد» ticked (true) or removed (false) on a cheque (owner, 15 Nov 2026).</summary>
-public sealed record SetSayadRegistrationCommand(string IdempotencyKey, Guid InstrumentId, bool Registered);
-
 public sealed record InstrumentHistoryView(string Action, string? From, string To, string Date, string UserId, string? Reference, string? Note, StepDetailsView? Details = null);
 
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
     Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
-    Guid? PaymentRequestId = null)
+    Guid? PaymentRequestId = null, string? TrackingCode = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId,
+            d.TrackingCode);
 }
 
 public sealed record InstrumentView(
@@ -95,14 +94,10 @@ public sealed record InstrumentView(
     ReceivedInstrumentDetails? Details = null,
     Guid? CollectionAccountId = null,
     string? CounterpartyDetailCode = null,
-    string? NoteIssueDate = null,
-    bool SayadRegistrationRequired = false,
-    DateTimeOffset? SayadRegisteredAt = null,
-    string? SayadRegisteredBy = null,
-    bool CanChangeSayadRegistration = false,
-    bool SayadRegistrationAssumed = false)
+    bool ReachedDueDate = false)
 {
-    public static InstrumentView From(Instrument i) => new(
+    /// <param name="today">Today's date, to mark «سررسید چک» (owner, 18 Nov 2026); without it the mark stays off.</param>
+    public static InstrumentView From(Instrument i, FiscalDate? today = null) => new(
         i.Id,
         i.Direction.ToString(),
         i.Kind.ToString(),
@@ -128,13 +123,7 @@ public sealed record InstrumentView(
         i.Direction == InstrumentDirection.Received ? i.Details : null,
         i.CollectionAccountId,
         i.Counterparty.DetailCode,
-        // A note's «تاریخ صدور» as Jalali text (Details.WrittenOn is the stored ISO date).
-        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null,
-        i.RequiresSayadRegistration,
-        i.SayadRegistration?.At,
-        i.SayadRegistration?.UserId,
-        i.CanChangeSayadRegistration,
-        i.SayadRegistration?.IsAssumed ?? false);
+        today is { } t && i.HasReachedDueDate(t));
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -150,7 +139,7 @@ public sealed class InstrumentUseCases(
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser,
     IBankAccountLookup bankAccountLookup,
-    TimeProvider clock)
+    TimeProvider? clock = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -206,13 +195,27 @@ public sealed class InstrumentUseCases(
                     instrument.RecordCleared(date, user, command.Reference);
                     break;
                 case InstrumentAction.RecordBounced:
-                    instrument.RecordBounced(date, user, command.Note, command.Reference);
+                    instrument.RecordBounced(date, user, command.Note, command.Reference, command.TrackingCode);
                     break;
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);
                     break;
                 case InstrumentAction.ReturnFromBank:
                     instrument.ReturnFromBank(date, user, command.Note);
+                    break;
+                case InstrumentAction.RegisterSayad:
+                    // Owner, 18 Nov 2026: «ثبت صیادی شد»; the reference is the tracking number of the registration, when typed.
+                    instrument.RegisterSayad(date, user, command.Reference, command.Note);
+                    break;
+                case InstrumentAction.SendToLegal:
+                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action, the
+                    // reference, document date and tracking code are those of the certificate of non-payment (گواهی عدم پرداخت).
+                    instrument.SendToLegal(date, user, command.Note, new NonPaymentCertificate(
+                        command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate), command.TrackingCode));
+                    break;
+                case InstrumentAction.ReturnFromLegal:
+                    // Owner's answer to Q38 (2): the cheque became collectable and goes back to the cash desk.
+                    instrument.ReturnFromLegal(date, user, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
@@ -322,33 +325,7 @@ public sealed class InstrumentUseCases(
         },
         cancellationToken);
 
-    /// <summary>
-    /// «ثبت صیادی شد» (owner, 15 Nov 2026): the user ticks that the cheque is recorded in the banks' Sayad system; the server's date and
-    /// time and the user are kept. Until then a received cheque cannot be deposited at the bank and an issued cheque cannot be handed
-    /// to its beneficiary. The tick is not a step of the cheque: no voucher, no fiscal-period check.
-    /// </summary>
-    public Task<Result<Guid>> SetSayadRegistrationAsync(SetSayadRegistrationCommand command, CancellationToken cancellationToken) =>
-        _runner.RunAsync(command.IdempotencyKey, async ct =>
-        {
-            var instrument = await instruments.GetAsync(command.InstrumentId, ct).ConfigureAwait(false);
-            if (instrument is null)
-            {
-                return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
-            }
-
-            if (command.Registered)
-            {
-                instrument.ConfirmSayadRegistration(clock.GetUtcNow(), currentUser.UserId);
-            }
-            else
-            {
-                instrument.WithdrawSayadRegistration(clock.GetUtcNow(), currentUser.UserId);
-            }
-
-            await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
-            return Result<Guid>.Ok(instrument.Id);
-        }, id => id.ToString(), Guid.Parse, cancellationToken);
-
+    /// <summary>Reads run in a unit of work too: the PostgreSQL adapters need its connection (found by the adapter integration tests).</summary>
     /// <summary>
     /// Deposits a received cheque at one of our bank accounts for collection (owner's report no. 4, item 9). The account is checked
     /// with accounts-svc and marked in use; the deposit may be before the due date (rule N2 only stops clearing early).
@@ -372,17 +349,16 @@ public sealed class InstrumentUseCases(
             return Result<Guid>.Ok(instrument.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
 
-    /// <summary>Reads run in a unit of work too: the PostgreSQL adapters need its connection (found by the adapter integration tests).</summary>
     /// <summary>Received cheques in a state, by due date: in the cash desk (to deposit) or at the bank (to record collected or bounced).</summary>
     public Task<IReadOnlyList<InstrumentView>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<InstrumentView>>(async ct =>
-            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(InstrumentView.From).ToList(), cancellationToken);
+            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(i => InstrumentView.From(i, IranClock.Today(clock))).ToList(), cancellationToken);
 
     public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>
         {
             var instrument = await instruments.GetAsync(id, ct).ConfigureAwait(false);
-            return instrument is null ? null : InstrumentView.From(instrument);
+            return instrument is null ? null : InstrumentView.From(instrument, IranClock.Today(clock));
         }, cancellationToken);
 
     private async Task EnsureOpenAsync(FiscalDate date, CancellationToken ct)

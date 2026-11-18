@@ -45,9 +45,11 @@ def test_collected_cheque_rebuilds_its_history_from_d3_and_d4():
     assert m.destination == "ملت جاری" and m.warnings == []
 
 
-def test_bounced_cheque_in_legal_action_keeps_a_note():
+def test_bounced_cheque_in_legal_action_becomes_in_legal():
     m = ok(map_cheque(received(14, d3="13860720", d4="13860801", goinlaw=True), SRC))
-    assert m.state == "Bounced" and m.steps[-1].note == "legal action (GoInlaw)"
+    # Owner, 18 Nov 2026: «حقوقی» is a state of its own; the old flag GoInlaw has no date, so the step takes the bounce's date.
+    assert m.state == "InLegal" and [s.action for s in m.steps][-2:] == ["RecordBounced", "SendToLegal"]
+    assert m.steps[-1].event_date == m.steps[-2].event_date and "GoInlaw" in m.steps[-1].note and m.warnings == []
 
 
 def test_returned_and_endorsed():
@@ -130,19 +132,12 @@ def test_lifecycle_matches_dotnet():
     assert dotnet == TRANSITIONS
 
 
-def test_the_assumed_sayad_tick_is_named_as_in_dotnet_and_in_the_schema():
-    """Answer to Q39: the marker written in place of a user is one text in the .NET domain, schema script 033 and this tool."""
-    from treasury_migration.target import SAYAD_ASSUMED_BY, SAYAD_CHEQUE_KINDS
-    root = Path(__file__).resolve().parents[3]
-    cs = (root / "src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/Instrument.cs").read_text(encoding="utf-8")
-    assert re.search(r'const string AssumedBy = "([^"]+)"', cs).group(1) == SAYAD_ASSUMED_BY
-    sql = (root / "db/postgres/033_cashflow_sayad_registration.sql").read_text(encoding="utf-8")
-    assert f"sayad_registered_by = '{SAYAD_ASSUMED_BY}'" in sql
-    assert "kind IN (" + ", ".join(f"'{k}'" for k in SAYAD_CHEQUE_KINDS) + ")" in sql
-    # The cheque kinds are those of InstrumentKindRules.IsCheque that can be received.
-    types = (root / "src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/InstrumentTypes.cs").read_text(encoding="utf-8")
-    is_cheque = re.search(r"IsCheque\(this InstrumentKind kind\) =>\s*kind is ([^;]+);", types).group(1)
-    assert set(re.findall(r"InstrumentKind\.(\w+)", is_cheque)) - {"PostDatedCheque"} == set(SAYAD_CHEQUE_KINDS)
+def test_old_cheques_went_to_the_bank_without_sayad_registration_n3():
+    # Rule N3 (owner, 18 Nov 2026) is for new deposits; the old program sent a cheque straight from the cash desk (D_Check_Vag_m).
+    from treasury_migration.legacy_mapping import LEGACY_TRANSITIONS
+    assert ("Received", "InCashDesk", "DepositForCollection") in LEGACY_TRANSITIONS and not (LEGACY_TRANSITIONS.keys() & TRANSITIONS.keys())
+    m = ok(map_cheque(received(12, d3="13860720"), SRC))
+    assert m.state == "DepositedForCollection" and [s.action for s in m.steps] == ["Receive", "DepositForCollection"] and m.warnings == []
 
 
 def test_old_cheque_cleared_before_its_due_date_is_kept_with_a_warning_n2():

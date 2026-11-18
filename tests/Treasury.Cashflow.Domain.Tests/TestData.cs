@@ -10,16 +10,6 @@ internal static class TestData
 
     public static FiscalDate D(string jalali) => FiscalDate.ParseJalali(jalali);
 
-    /// <summary>The moment «ثبت صیادی شد» is ticked in the tests: 15 Nov 2026, 10:35 in Tehran.</summary>
-    public static DateTimeOffset TickedAt { get; } = new(2026, 11, 15, 7, 5, 0, TimeSpan.Zero);
-
-    /// <summary>The cheque with «ثبت صیادی شد» ticked (owner, 15 Nov 2026), ready for the bank or its beneficiary.</summary>
-    public static Instrument Ticked(this Instrument cheque)
-    {
-        cheque.ConfirmSayadRegistration(TickedAt, User);
-        return cheque;
-    }
-
     public static CounterpartyRef Drawer { get; } = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), "شرکت نمونه");
 
     public static Instrument ReceivedCheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string receivedOn = "1405/08/01", string? due = "1405/09/01") =>
@@ -34,6 +24,14 @@ internal static class TestData
             Drawer,
             "فروش محصولات",
             User);
+
+    /// <summary>A received cheque registered in Sayad on the day it was received, so it can go to the bank (rule N3, owner 18 Nov 2026).</summary>
+    public static Instrument RegisteredCheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string receivedOn = "1405/08/01", string? due = "1405/09/01")
+    {
+        var cheque = ReceivedCheque(kind, receivedOn, due);
+        cheque.RegisterSayad(D(receivedOn), User);
+        return cheque;
+    }
 
     public static Instrument ChequeBeingIssued(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string issue = "1405/08/10", string? due = "1405/08/10") =>
         Instrument.PrepareIssue(
