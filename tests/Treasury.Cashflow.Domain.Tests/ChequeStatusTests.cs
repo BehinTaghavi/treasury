@@ -27,6 +27,7 @@ public sealed class ChequeStatusTests
         [FixedAccount.BadDebts] = "8101",
         [FixedAccount.ProtestedChequesInLegal] = "1204",
         [FixedAccount.GuaranteeChequesInLegal] = "9102",
+        [FixedAccount.GuaranteeNotesForCompany] = "9103",
     });
 
     private static Instrument Cheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string received = "1405/08/01", string? due = "1405/09/01") =>
@@ -47,6 +48,26 @@ public sealed class ChequeStatusTests
     private static readonly NonPaymentCertificate Certificate = new("BN-1", D("1405/09/02"), "1234567890123456");
 
     private static (bool, string?, string?)[] Lines(Voucher? v) => [.. v!.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode))];
+
+    [Fact]
+    public void A_note_has_no_Sayad_registration_and_goes_to_the_bank_straight_from_the_cash_desk()
+    {
+        // Owner, 16 Nov 2026 (واگذاری سفته به بانک) and 18 Nov 2026 when the notes (#10) and rule N3 were joined: Sayad is for cheques
+        // only, so an ordinary note is deposited from «نزد صندوق»; a cheque needs «ثبت صیادی» first.
+        var note = Cheque(InstrumentKind.PromissoryNote);
+        Assert.Contains(InstrumentAction.DepositForCollection, note.AllowedActions());
+        Assert.DoesNotContain(InstrumentAction.RegisterSayad, note.AllowedActions());
+        Assert.Equal("Instrument.KindNotAllowedForAction", Assert.Throws<DomainException>(() => note.RegisterSayad(D("1405/08/02"), User)).Code);
+        note.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User);
+        Assert.Equal(InstrumentState.DepositedForCollection, note.State);
+
+        var cheque = Cheque();
+        Assert.Equal("Instrument.SayadRegistrationRequired",
+            Assert.Throws<DomainException>(() => cheque.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User)).Code);
+
+        // A guarantee note is still not deposited.
+        Assert.DoesNotContain(InstrumentAction.DepositForCollection, Cheque(InstrumentKind.GuaranteeNote, due: null).AllowedActions());
+    }
 
     [Fact]
     public void A_cheque_in_the_cash_desk_is_registered_in_Sayad_and_stays_in_the_cash_desk()
@@ -146,7 +167,8 @@ public sealed class ChequeStatusTests
         var v = ReceiptVouchers.ForStep(cheque, 2, Bank, null, Template());
         Assert.Equal([(true, "9102", "200015"), (false, "9101", "200015")], Lines(v));
         Assert.Equal("اقدام حقوقی چک تضمینی", v!.Operation);
-        Assert.Equal([(true, "9102", "200015"), (false, "9101", "200015")], Lines(ReceiptVouchers.ForStep(note, 2, Bank, null, Template())));
+        // A guarantee note leaves its own account «سفته انتظامی به نفع شرکت» (#10, owner's answer to Q37 of the note questions).
+        Assert.Equal([(true, "9102", "200015"), (false, "9103", "200015")], Lines(ReceiptVouchers.ForStep(note, 2, Bank, null, Template())));
 
         // Cancelled in legal action: out of the account it is in now (answer to the owner's point 3).
         cheque.CancelReceived(D("1405/09/01"), User, "م-3", D("1405/08/30"), "پایان دعوی");

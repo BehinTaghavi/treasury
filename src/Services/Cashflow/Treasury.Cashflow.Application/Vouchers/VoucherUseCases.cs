@@ -146,7 +146,8 @@ public sealed class VoucherUseCases(
 
     private async Task<Voucher> ComputeReceiptAsync(Receipt receipt, CancellationToken ct)
     {
-        IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
+        IReadOnlyList<Instrument> lines = receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes
+            ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
         LedgerSide? side = null;
         if (receipt.AccountId is { } accountId)
         {

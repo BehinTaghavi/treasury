@@ -33,6 +33,8 @@ public sealed class ReceiptPostgresTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
+    private static readonly NoteChecks AllChecked = new(true, true, true, true, true);
+
     private static ReceiptHeaderInput Header() => new("1405/08/23", "200015", Group, "فروش محصولات", "ف-۱", null, null, true, "یادداشت");
 
     [Fact]
@@ -98,6 +100,43 @@ public sealed class ReceiptPostgresTests : IDisposable
         var deposited = (await useCases.GetAsync(cheque.Id, CancellationToken.None))!;
         Assert.Equal(("DepositedForCollection", (Guid?)EuroBank.Id), (deposited.State, deposited.CollectionAccountId));
         Assert.Contains(await useCases.ListReceivedAsync(InstrumentState.DepositedForCollection, CancellationToken.None), i => i.Id == cheque.Id);
+    }
+
+    [Fact]
+    public async Task A_note_receipt_round_trips_with_its_terms_notes_and_guarantors_db_033()
+    {
+        var number = Guid.NewGuid().ToString("N")[..8];
+        var terms = new NoteTermsInput(NoteReason.Guarantee, NoteForm.Electronic, NoteMaturity.Fixed, "0123456789", "021-88990011", "حسن انجام قرارداد ۴۵",
+            "پس از تأیید واحد فنی", "صندوق شرکت", true, "1405/08/24", "ندارد", new NoteAttachments(NoteImage: true, Contract: true), "علی رضایی");
+        var r = await _receipts.RecordNotesAsync(new(Key(), Header(), terms,
+            [new(number, "1405/08/20", "1405/11/30", 500_000_000, AllChecked), new("B" + number, null, "1405/12/25", 250_000_000, AllChecked)],
+            [new("رضا احمدی", "0123456789", "300045", "0912", number)], [Reference.Cfo.Id, Reference.Ceo.Id]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+
+        var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(("Notes", 2, 750_000_000m, (string?)null), (v.Kind, v.InstrumentCount, v.TotalRial, v.AccountKind));
+        var t = v.NoteTerms!;
+        Assert.Equal(("Guarantee", "Electronic", "Fixed", "0123456789", "021-88990011", "حسن انجام قرارداد ۴۵", "پس از تأیید واحد فنی", "صندوق شرکت", true, "1405/08/24", "ندارد"),
+            (t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived, t.OriginalReceivedOn, t.Discrepancy));
+        Assert.Equal((true, true, false, "علی رضایی"), (t.Attachments.NoteImage, t.Attachments.Contract, t.Attachments.Other, t.DeliveredBy));
+        Assert.Equal([("علی رضایی", "مدیر عامل"), ("بهرام کریمی", "مدیر مالی")], t.Signers.Select(s => (s.Name, s.Position!)));
+        var note = v.Instruments!.Single(i => i.Number == number);
+        Assert.Equal(("GuaranteeNote", "1405/08/20", "1405/11/30", true, true, false),
+            (note.Kind, note.NoteIssueDate, note.DueDate, note.Details!.Checks!.Signature, note.Details.Checks.PaymentDate, note.Details.OnDemand));
+        var guarantor = Assert.Single(note.Details.GuarantorList);
+        Assert.Equal(("رضا احمدی", "0123456789", "300045", "0912"), (guarantor.Name, guarantor.NationalCode, guarantor.DetailCode, guarantor.Phone));
+        var other = v.Instruments!.Single(i => i.Number == "B" + number);
+        Assert.Empty(other.Details!.GuarantorList);
+        Assert.Null(other.NoteIssueDate);
+
+        // Its own series: the next note receipt gets the next number; a cheque receipt does not move it.
+        var next = await _receipts.RecordNotesAsync(new(Key(), Header(), new NoteTermsInput(NoteReason.Debt, NoteForm.Paper, NoteMaturity.OnDemand),
+            [new("C" + number, null, null, 1_000_000, AllChecked with { PaymentDate = false })], SignerIds: [Reference.Ceo.Id]), CancellationToken.None);
+        Assert.True(next.IsSuccess, next.ErrorCode);
+        var nv = (await _receipts.GetAsync(next.Value, CancellationToken.None))!;
+        Assert.Equal(v.Number + 1, nv.Number);
+        Assert.True(Assert.Single(nv.Instruments!).Details!.OnDemand);
+        Assert.Contains(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None), x => x.Id == r.Value && x.NoteTerms!.Reason == "Guarantee");
     }
 
     [Fact]
@@ -263,6 +302,12 @@ public sealed class ReceiptPostgresTests : IDisposable
             Task.FromResult<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?>(new(code, "حساب " + code, true, true));
 
         public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public static readonly SignerFact Ceo = new(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
+        public static readonly SignerFact Cfo = new(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
+
+        public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) =>
+            Task.FromResult<SignatureRuleFact?>(new(1, [Ceo], [Cfo]));
     }
 
     private sealed class NoRequests : IPaymentRequestLookup

@@ -39,6 +39,12 @@ public enum FixedAccount
     /// the legal action, against «اسناد تضمینی به نفع شرکت» — <see cref="GuaranteeChequesForCompany"/>).
     /// </summary>
     GuaranteeChequesInLegal,
+
+    /// <summary>«سفته انتظامی به نفع شرکت»: guarantee notes received (owner's table «دریافت سفته انتظامی»).</summary>
+    GuaranteeNotesForCompany,
+
+    /// <summary>«سفته های در جریان وصول»: notes at the bank for collection, with the bank account's تفصیل (owner's table «واگذاری سفته به بانک»).</summary>
+    NotesInCollection,
 }
 
 /// <summary>A cheque receipt that replaces a cheque: the old cheque and where it was when replaced (owner's item 14 (d)).</summary>
@@ -116,7 +122,8 @@ public static class ReceiptVouchers
     /// <summary>
     /// Cash: Dr cash desk (its تفصیل) / Cr purpose group (payer). Bank deposit: Dr bank account (its تفصیل) / Cr purpose group (payer).
     /// Cheques: Dr «اسناد نزد صندوق» (payer) / Cr purpose group (payer); guarantee cheques: Dr «چک انتظامی به نفع شرکت» / Cr «طرف حساب
-    /// انتظامی» (payer on both sides).
+    /// انتظامی» (payer on both sides). Notes (owner's table «دریافت سفته عادی» and «دریافت سفته انتظامی»): the same, with «سفته انتظامی به
+    /// نفع شرکت» for guarantee notes.
     /// </summary>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
     /// <param name="replacement">A replacement (تعویض): Dr «اسناد نزد صندوق» for each new cheque / Cr the old cheque where it was («اسناد نزد
@@ -152,21 +159,21 @@ public static class ReceiptVouchers
             return new Voucher($"تعویض چک – رسید {receipt.Number}", receipt.Date, lines);
         }
 
-        if (receipt.Kind == ReceiptKind.Instruments)
+        if (receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes)
         {
             foreach (var i in instruments)
             {
-                var text = $"چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – {receipt.Payer.DisplayName}";
+                var text = $"{Name(i)} – {receipt.Payer.DisplayName}";
                 var (foreign, currency) = Foreign(i);
                 if (i.Kind.IsGuarantee())
                 {
-                    lines.Add(Fixed(true, template, FixedAccount.GuaranteeChequesForCompany, payer, i.Amount.ToRial(), text, foreign, currency));
+                    lines.Add(Fixed(true, template, GuaranteeAccount(i), payer, i.Amount.ToRial(), text, foreign, currency));
                     lines.Add(Fixed(false, template, FixedAccount.GuaranteeCounterpart, payer, i.Amount.ToRial(), text, foreign, currency));
                 }
                 else
                 {
                     lines.Add(Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, i.Amount.ToRial(), text, foreign, currency));
-                    lines.Add(new VoucherLine(false, purposeGroupAccount, payer, i.Amount.ToRial(), $"{title} – چک {i.Number}", null, foreign, currency));
+                    lines.Add(new VoucherLine(false, purposeGroupAccount, payer, i.Amount.ToRial(), $"{title} – {Word(i)} {i.Number}", null, foreign, currency));
                 }
             }
 
@@ -181,23 +188,26 @@ public static class ReceiptVouchers
         return new Voucher(Operation(receipt), receipt.Date, lines);
     }
 
-    /// <summary>«واگذاری چک به بانک»: Dr «چک های در جریان وصول» (bank account's تفصیل) / Cr «اسناد نزد صندوق» (payer).</summary>
+    /// <summary>
+    /// «واگذاری چک به بانک»: Dr «چک های در جریان وصول» (bank account's تفصیل) / Cr «اسناد نزد صندوق» (payer). «واگذاری سفته به بانک»: the
+    /// same with «سفته های در جریان وصول» (owner's table; steps of a note after receipt, owner, 16 Nov 2026).
+    /// </summary>
     public static Voucher ForDeposit(Instrument cheque, LedgerSide bank, FiscalDate date, VoucherTemplate template) =>
-        Pair("واگذاری چک به بانک", cheque, date,
-            Fixed(true, template, FixedAccount.ChequesInCollection, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "واگذاری")),
+        Pair($"واگذاری {Word(cheque)} به بانک", cheque, date,
+            Fixed(true, template, InCollection(cheque), bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "واگذاری")),
             Fixed(false, template, FixedAccount.ChequesInCashDesk, cheque.Counterparty.DetailCode, cheque.Amount.ToRial(), Text(cheque, "واگذاری")));
 
     /// <summary>«اعلام وصول چک واگذاری توسط بانک»: Dr bank account (its تفصیل) / Cr «چک های در جریان وصول» (bank account's تفصیل).</summary>
     public static Voucher ForCleared(Instrument cheque, LedgerSide bank, FiscalDate date, VoucherTemplate template) =>
-        Pair("اعلام وصول چک توسط بانک", cheque, date,
+        Pair($"اعلام وصول {Word(cheque)} توسط بانک", cheque, date,
             new VoucherLine(true, bank.AccountCode, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "وصول")),
-            Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "وصول")));
+            Fixed(false, template, InCollection(cheque), bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "وصول")));
 
     /// <summary>«برگشت چک واگذاری توسط بانک»: Dr «اسناد واخواست شده» (payer) / Cr «چک های در جریان وصول» (bank account's تفصیل).</summary>
     public static Voucher ForBounced(Instrument cheque, LedgerSide bank, FiscalDate date, VoucherTemplate template) =>
-        Pair("برگشت چک توسط بانک", cheque, date,
-            Fixed(true, template, FixedAccount.ProtestedCheques, cheque.Counterparty.DetailCode, cheque.Amount.ToRial(), Text(cheque, "برگشت")),
-            Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, "برگشت")));
+        Pair($"{Bounce(cheque)} {Word(cheque)} توسط بانک", cheque, date,
+            Fixed(true, template, FixedAccount.ProtestedCheques, cheque.Counterparty.DetailCode, cheque.Amount.ToRial(), Text(cheque, Bounce(cheque))),
+            Fixed(false, template, InCollection(cheque), bank.DetailCode, cheque.Amount.ToRial(), Text(cheque, Bounce(cheque))));
 
     /// <summary>
     /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
@@ -206,7 +216,8 @@ public static class ReceiptVouchers
     /// </summary>
     /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
     /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
-    /// <param name="receiptAccount">Return to the payer: the account the cheque's receipt credited (its purpose group's account).</param>
+    /// <param name="receiptAccount">The account the receipt credited (its purpose group's account): returning a cheque to its payer
+    /// (answer to Q41) and handing an ordinary note back to its obligor («بدهکاران», answer to Q50) both debit it.</param>
     public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template, string? receiptAccount = null)
     {
         ArgumentNullException.ThrowIfNull(cheque);
@@ -226,22 +237,35 @@ public static class ReceiptVouchers
             case InstrumentAction.RecordCleared:
                 return ForCleared(cheque, bank, e.Date, template);
             case InstrumentAction.RecordBounced when e.From == InstrumentState.ReturnedFromBank:
-                return Pair("برگشت چک (پس از عودت از بانک)", cheque, e.Date,
-                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت – گواهی عدم پرداخت {e.Reference}")),
-                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"برگشت – گواهی عدم پرداخت {e.Reference}")));
+                return Pair($"{Bounce(cheque)} {Word(cheque)} (پس از عودت از بانک)", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"{Bounce(cheque)} – {Paper(cheque)} {e.Reference}")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"{Bounce(cheque)} – {Paper(cheque)} {e.Reference}")));
             case InstrumentAction.RecordBounced:
-                return ForBounced(cheque, bank, e.Date, template) is { } b ? b with { Lines = [.. b.Lines.Select(l => l with { Description = $"{l.Description} – گواهی عدم پرداخت {e.Reference}" })] } : null;
+                return ForBounced(cheque, bank, e.Date, template) is { } b ? b with { Lines = [.. b.Lines.Select(l => l with { Description = $"{l.Description} – {Paper(cheque)} {e.Reference}" })] } : null;
             case InstrumentAction.ReturnFromBank:
-                return Pair("عودت چک واگذاری توسط بانک", cheque, e.Date,
+                return Pair($"عودت {Word(cheque)} واگذاری توسط بانک", cheque, e.Date,
                     Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, "عودت از بانک")),
-                    Fixed(false, template, FixedAccount.ChequesInCollection, bank.DetailCode, amount, Text(cheque, "عودت از بانک")));
+                    Fixed(false, template, InCollection(cheque), bank.DetailCode, amount, Text(cheque, "عودت از بانک")));
+            case InstrumentAction.ReturnToIssuer when cheque.Kind == InstrumentKind.GuaranteeNote:
+                // «استرداد» of a guarantee or trust note takes it out of the off-balance accounts, as its cancellation does
+                // (owner's table «ابطال چک / سفته انتظامی دریافتی نزد صندوق»; confirmed by the owner, 16 Nov 2026, answer to Q50).
+                return Pair("استرداد سفته انتظامی دریافتی", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, Text(cheque, "استرداد")),
+                    Fixed(false, template, FixedAccount.GuaranteeNotesForCompany, payer, amount, Text(cheque, "استرداد")));
+            case InstrumentAction.ReturnToIssuer when cheque.Kind == InstrumentKind.PromissoryNote:
+                // Owner, 16 Nov 2026 (answer to Q50): handing an ordinary note back debits «بدهکاران» — the account its receipt credited,
+                // with the obligor's تفصیل — and credits «اسناد نزد صندوق / اسناد دریافتنی», where the note is (a note at the bank comes
+                // back first: Dr «اسناد دریافتنی» / Cr «سفته های در جریان وصول»).
+                return Pair("استرداد سفته به متعهد", cheque, e.Date,
+                    new VoucherLine(true, receiptAccount, payer, amount, Text(cheque, "استرداد")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, "استرداد")));
             case InstrumentAction.Cancel:
                 var text = Text(cheque, $"ابطال – دستور {e.Reference} مورخ {e.Details?.DocumentDate?.ToJalaliString()}");
                 return cheque.Kind.IsGuarantee()
-                    ? Pair("ابطال چک انتظامی دریافتی", cheque, e.Date,
+                    ? Pair($"ابطال {Word(cheque)} انتظامی دریافتی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, text),
-                        Fixed(false, template, GuaranteeAccountOf(e.From), payer, amount, text))
-                    : Pair("ابطال چک دریافتنی", cheque, e.Date,
+                        Fixed(false, template, e.From == InstrumentState.InLegal ? FixedAccount.GuaranteeChequesInLegal : GuaranteeAccount(cheque), payer, amount, text))
+                    : Pair($"ابطال {Word(cheque)} دریافتنی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
                         Fixed(false, template, AccountOf(e.From), payer, amount, text));
             case InstrumentAction.SendToLegal:
@@ -250,9 +274,9 @@ public static class ReceiptVouchers
                 // A guarantee cheque or note (answer to Q42): Dr «اسناد تضمینی حقوقی شده به نفع شرکت» / Cr «اسناد تضمینی به نفع شرکت».
                 var legal = Text(cheque, "اقدام حقوقی");
                 return cheque.Kind.IsGuarantee()
-                    ? Pair("اقدام حقوقی چک تضمینی", cheque, e.Date,
+                    ? Pair($"اقدام حقوقی {Word(cheque)} تضمینی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, legal),
-                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, legal))
+                        Fixed(false, template, GuaranteeAccount(cheque), payer, amount, legal))
                     : Pair("اقدام حقوقی چک", cheque, e.Date,
                         Fixed(true, template, FixedAccount.ProtestedChequesInLegal, payer, amount, legal),
                         Fixed(false, template, AccountOf(e.From), payer, amount, legal));
@@ -262,8 +286,8 @@ public static class ReceiptVouchers
                 // Confirmed by the owner (answer to Q43, 18 Nov 2026).
                 var handed = Text(cheque, "تحویل به صندوق پس از اقدام حقوقی");
                 return cheque.Kind.IsGuarantee()
-                    ? Pair("تحویل چک تضمینی به صندوق پس از اقدام حقوقی", cheque, e.Date,
-                        Fixed(true, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, handed),
+                    ? Pair($"تحویل {Word(cheque)} تضمینی به صندوق پس از اقدام حقوقی", cheque, e.Date,
+                        Fixed(true, template, GuaranteeAccount(cheque), payer, amount, handed),
                         Fixed(false, template, FixedAccount.GuaranteeChequesInLegal, payer, amount, handed))
                     : Pair("تحویل چک به صندوق پس از اقدام حقوقی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, amount, handed),
@@ -276,18 +300,18 @@ public static class ReceiptVouchers
                 return cheque.Kind.IsGuarantee()
                     ? Pair("عودت چک انتظامی دریافتی به پرداخت‌کننده", cheque, e.Date,
                         Fixed(true, template, FixedAccount.GuaranteeCounterpart, payer, amount, back),
-                        Fixed(false, template, FixedAccount.GuaranteeChequesForCompany, payer, amount, back))
+                        Fixed(false, template, GuaranteeAccount(cheque), payer, amount, back))
                     : Pair("عودت چک نزد صندوق", cheque, e.Date,
                         new VoucherLine(true, receiptAccount, payer, amount, back),
                         Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, back));
             case InstrumentAction.Endorse:
-                return Pair("خرج چک", cheque, e.Date,
+                return Pair($"خرج {Word(cheque)}", cheque, e.Date,
                     new VoucherLine(true, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"خرج به {e.Details?.PartyName} – {e.Details?.Purpose}")),
                     Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"خرج به {e.Details?.PartyName}")));
             case InstrumentAction.RecordEndorsementReturned:
-                return Pair("برگشت چک خرج شده", cheque, e.Date,
-                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – گواهی عدم پرداخت {e.Reference}")),
-                    new VoucherLine(false, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"برگشت خرج – گواهی عدم پرداخت {e.Reference}")));
+                return Pair($"برگشت {Word(cheque)} خرج شده", cheque, e.Date,
+                    Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – {Paper(cheque)} {e.Reference}")),
+                    new VoucherLine(false, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"برگشت خرج – {Paper(cheque)} {e.Reference}")));
             default:
                 return null;
         }
@@ -323,13 +347,36 @@ public static class ReceiptVouchers
 
     private static (decimal? Amount, string? Currency) Foreign(Instrument i) => i.Amount.IsRial ? (null, null) : (i.Amount.Amount, i.Amount.Currency);
 
-    private static string Text(Instrument i, string step) => $"{step} چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – {i.Counterparty.DisplayName}";
+    private static string Text(Instrument i, string step) => $"{step} {Name(i)} – {i.Counterparty.DisplayName}";
+
+    private static string Word(Instrument i) => i.Kind.IsNote() ? "سفته" : "چک";
+
+    /// <summary>A cheque the bank does not pay is «برگشت»; a note is protested («واخواست»).</summary>
+    private static string Bounce(Instrument i) => i.Kind.IsNote() ? "واخواست" : "برگشت";
+
+    /// <summary>The bank's paper: «گواهی عدم پرداخت» for a cheque (owner, 18 Nov 2026), «اعلامیه» for a protested note (#10).</summary>
+    private static string Paper(Instrument i) => i.Kind.IsNote() ? "اعلامیه" : "گواهی عدم پرداخت";
+
+    /// <summary>Owner's table: «چک های در جریان وصول» for cheques at the bank, «سفته های در جریان وصول» for notes.</summary>
+    private static FixedAccount InCollection(Instrument i) => i.Kind.IsNote() ? FixedAccount.NotesInCollection : FixedAccount.ChequesInCollection;
+
+    /// <summary>«چک 123 بانک ملت سررسید 1405/09/30», «سفته 456 سررسید 1405/11/30», «سفته 789 عندالمطالبه».</summary>
+    private static string Name(Instrument i)
+    {
+        var due = i.Details.OnDemand ? "عندالمطالبه" : $"سررسید {i.DueDate?.ToJalaliString()}";
+        return i.Kind.IsNote() ? $"سفته {i.Number} {due}" : $"چک {i.Number} {i.BankName} {due}";
+    }
+
+    /// <summary>Owner's table: «چک انتظامی به نفع شرکت» for guarantee cheques, «سفته انتظامی به نفع شرکت» for guarantee notes.</summary>
+    private static FixedAccount GuaranteeAccount(Instrument i) =>
+        i.Kind.IsNote() ? FixedAccount.GuaranteeNotesForCompany : FixedAccount.GuaranteeChequesForCompany;
 
     /// <summary>The operation's name without the receipt number (the form's preview, before a number is taken).</summary>
     public static string OperationName(ReceiptKind kind) => kind switch
     {
         ReceiptKind.Cash => "دریافت نقدی",
         ReceiptKind.BankDeposit => "واریز به حساب",
+        ReceiptKind.Notes => "دریافت سفته",
         _ => "دریافت چک",
     };
 

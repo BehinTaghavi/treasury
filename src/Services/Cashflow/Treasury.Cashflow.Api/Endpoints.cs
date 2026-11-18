@@ -48,6 +48,10 @@ public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAcco
 
 public sealed record InstrumentReceiptRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
+/// <summary>The note receipt form (owner's form «فرم دریافت سفته», 16 Nov 2026).</summary>
+public sealed record NoteReceiptRequest(
+    ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null, IReadOnlyList<Guid>? SignerIds = null);
+
 public sealed record CancelReceiptRequest(string Date, string Reason, long Version);
 
 public static class Endpoints
@@ -141,6 +145,14 @@ public static class Endpoints
         api.MapPost("/receipts/instruments", async (InstrumentReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.RecordInstrumentsAsync(new RecordInstrumentReceiptCommand(Key(http), r.Header, r.Instruments), ct).ConfigureAwait(false),
                 id => $"/api/cashflow/receipts/{id}"));
+
+        // Promissory notes have a receipt of their own (owner's report no. 4, item 13; his form of 16 Nov 2026).
+        api.MapPost("/receipts/notes", async (NoteReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RecordNotesAsync(new RecordNoteReceiptCommand(Key(http), r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false),
+                id => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPost("/receipts/notes/voucher-preview", async (NoteReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewNotesAsync(new RecordNoteReceiptCommand("preview", r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/{id:guid}/cancel", async (Guid id, CancelReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),

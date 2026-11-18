@@ -224,6 +224,69 @@ public sealed class VoucherUseCaseTests : IDisposable
         Assert.Equal([(true, "1203", "200015"), (false, "2101", "300001")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
     }
 
+    private async Task<Guid> NoteOf(NoteReason reason = NoteReason.Debt, string number = "778899", decimal amount = 10_000_000)
+    {
+        var r = await _receipts.RecordNotesAsync(new(Key(), Header(), new NoteTermsInput(reason, NoteForm.Paper, NoteMaturity.OnDemand),
+            [new(number, null, null, amount, new NoteChecks(true, true, true, true))]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        return await ChequeOf(r.Value);
+    }
+
+    [Fact]
+    public async Task A_received_note_goes_to_the_bank_and_is_collected_with_notes_in_collection_owner_16_Nov()
+    {
+        await SetTemplate();
+        Assert.True((await _vouchers.SetTemplateAccountAsync(Key(), FixedAccount.NotesInCollection, "9101", CancellationToken.None)).IsSuccess);
+        var note = await NoteOf();
+        Assert.Contains("DepositForCollection", (await _instruments.GetAsync(note, CancellationToken.None))!.AllowedActions);
+
+        Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), note, LedgerBank.Id, "1405/08/25", "SLIP-7"), CancellationToken.None)).IsSuccess);
+        // Payable on demand: collected the next day (owner's answer to Q38).
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), note, InstrumentAction.RecordCleared, "1405/08/26", Reference: "ST-1"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Cleared", (await _instruments.GetAsync(note, CancellationToken.None))!.State);
+
+        var steps = await _vouchers.ChequeVouchersAsync(note, CancellationToken.None);
+        Assert.Equal(["واگذاری سفته به بانک", "اعلام وصول سفته توسط بانک"], steps.Select(v => v.Operation));
+        Assert.Equal([(true, "9101", "600009"), (false, "1201", "200015")], steps[0].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.Equal([(true, "1109", "600009"), (false, "9101", "600009")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), note, 2, CancellationToken.None)).IsSuccess);
+    }
+
+    [Fact]
+    public async Task A_note_is_endorsed_to_pay_an_approved_request_without_a_Sayad_transfer_and_a_guarantee_note_is_only_handed_back()
+    {
+        await SetTemplate();
+        var note = await NoteOf();
+        var r = await _receipts.EndorseAsync(new(Key(), note, "1405/08/24", FakePaymentRequests.Approved, string.Empty, "ظهرنویسی شد"), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.Equal(10_000_000m, _requests.Requests[FakePaymentRequests.Approved].PaidAmount);
+        var view = (await _instruments.GetAsync(note, CancellationToken.None))!;
+        Assert.Equal(("Endorsed", "پیمانکار الف"), (view.State, view.Destination));
+        var step = Assert.Single(await _vouchers.ChequeVouchersAsync(note, CancellationToken.None));
+        Assert.Equal(("خرج سفته", true), (step.Operation, step.IsComplete));
+        Assert.Equal([(true, "2101", "300001"), (false, "1201", "200015")], step.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+
+        // A guarantee note is neither deposited nor endorsed; handing it back («استرداد») clears the off-balance accounts.
+        // It may also get legal action (owner, 18 Nov 2026).
+        var guarantee = await NoteOf(NoteReason.Guarantee, "G-1", 5_000_000);
+        Assert.Equal(["ReturnToIssuer", "Cancel", "SendToLegal"], (await _instruments.GetAsync(guarantee, CancellationToken.None))!.AllowedActions);
+        Assert.Equal("Instrument.KindNotAllowedForAction",
+            (await _instruments.DepositForCollectionAsync(new(Key(), guarantee, LedgerBank.Id, "1405/08/25", null), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.KindNotAllowedForAction",
+            (await _receipts.EndorseAsync(new(Key(), guarantee, "1405/08/24", FakePaymentRequests.Approved, string.Empty), CancellationToken.None)).ErrorCode);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), guarantee, InstrumentAction.ReturnToIssuer, "1405/09/30", Note: "پایان قرارداد"), CancellationToken.None)).IsSuccess);
+        var back = Assert.Single(await _vouchers.ChequeVouchersAsync(guarantee, CancellationToken.None));
+        Assert.Equal("استرداد سفته انتظامی دریافتی", back.Operation);
+        Assert.Equal(["GuaranteeCounterpart", "GuaranteeNotesForCompany"], back.Lines.Select(l => l.Missing!));
+
+        // An ordinary note handed back debits the account its receipt credited (the purpose group's, «بدهکاران»), answer to Q50.
+        var ordinary = await NoteOf(number: "N-9", amount: 3_000_000);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), ordinary, InstrumentAction.ReturnToIssuer, "1405/08/24", Note: "توافق"), CancellationToken.None)).IsSuccess);
+        var returned = Assert.Single(await _vouchers.ChequeVouchersAsync(ordinary, CancellationToken.None));
+        Assert.Equal(("استرداد سفته به متعهد", true), (returned.Operation, returned.IsComplete));
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], returned.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+    }
+
     [Fact]
     public async Task A_bounce_needs_its_notice_and_a_cancellation_managements_order_Q30()
     {

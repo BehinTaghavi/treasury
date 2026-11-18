@@ -19,6 +19,7 @@ import CompanyProfile from './company/CompanyProfile.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
+import Signatories from './organization/Signatories.vue'
 import PurposeGroups from './purposes/PurposeGroups.vue'
 import type { ListSpec } from './types'
 
@@ -62,6 +63,8 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'departments', title: ['واحدهای سازمانی', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
   { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
+  // Owner, 16 Nov 2026: the holders of authorised signatures and the signature rule of each valuable document.
+  { id: 'signatories', title: ['دارندگان امضای مجاز', 'Authorised signatories'] },
   // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.
   { id: 'voucher-template', title: ['شابلون اسناد خزانه داری', 'Treasury voucher template'] },
 ]
@@ -97,6 +100,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <Departments v-else-if="selected === 'departments'" :key="'departments' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <Signatories v-else-if="selected === 'signatories'" :key="'signatories' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <VoucherTemplate v-else-if="selected === 'voucher-template'" :key="'voucher-template' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>
