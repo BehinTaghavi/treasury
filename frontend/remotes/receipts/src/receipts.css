@@ -16,6 +16,7 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-secondary { background: #fff; color: #1d4ed8; }
 .tr-link { background: transparent; color: #1d4ed8; border-color: transparent; padding: .2rem .4rem; }
 .tr-link.danger { color: #b42318; }
+.tr-secondary.danger { color: #b42318; border-color: #b42318; }
 .tr-buttons { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .tr-msg { padding: .5rem .75rem; border-radius: 6px; margin: .5rem 0; }
 .tr-msg.error { background: #fdecea; color: #8a1c1c; }

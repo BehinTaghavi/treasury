@@ -10,11 +10,14 @@
  * - item 9: a box «شماره رسید» finds exactly that number;
  * - item 10: «چاپ» first asks «از تاریخ» and «تا تاریخ», filled with the first and last date of the rows now listed and free to change,
  *   and prints the receipts of that range;
- * - items 2 and 6: «ویرایش» on a row opens the receipt in the form above while its voucher is not confirmed.
+ * - items 2 and 6: «ویرایش» on a row opens the receipt in the form above while its voucher is not confirmed;
+ * - owner's answer to Q59 (19 Nov 2026): «حذف» beside it deletes a receipt recorded by mistake, at the same stage.
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, dueMark, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { chequeStateName, createApi, dueMark, formatAmount, groupChequeStatuses, receiptNumber, searchKey, todayJalali, translate,
   type ChequeStatus, type Locale } from '@treasury/ui-kit'
+import PrintRange from './PrintRange.vue'
+import { listPage, printPage, rangeText } from './printing'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { depositMethodName, depositMethods } from './depositMethods'
@@ -31,7 +34,7 @@ const props = withDefaults(defineProps<{
   /** The receipt now open in the form above for «ویرایش». */
   editingId?: string
 }>(), { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined, refreshKey: 0, editingId: undefined })
-const emit = defineEmits<{ edit: [id: string] }>()
+const emit = defineEmits<{ edit: [id: string]; deleted: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -110,73 +113,46 @@ const total = computed(() => shown.value.filter(r => r.state !== 'Cancelled').re
 const where = (r: Receipt) => (r.kind === 'Instruments' || r.kind === 'Notes' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
 const whereTitle = computed(() => (props.kind === 'Instruments' || props.kind === 'Notes' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
 
-// ---- print: the rows now shown, within a range of dates, on a page of their own (a hidden frame, so no pop-up window is needed) ----
-/**
- * Item 10: after «چاپ» the user sees «از تاریخ» and «تا تاریخ», filled from the list (the earliest and latest receipt date of the rows now
- * shown), changes them if wanted, and prints the receipts of that range. Dates are Jalali text, which sorts as text.
- */
-const range = reactive({ open: false, from: '', to: '', error: '' })
-function askRange() {
-  const dates = shown.value.map(r => r.date).sort()
-  Object.assign(range, { open: true, from: dates[0] ?? '', to: dates[dates.length - 1] ?? '', error: '' })
-}
-/** The rows the report prints: the rows shown, between the two dates (an empty date leaves that side open). */
-const printed = computed(() => {
-  const from = normaliseJalali(range.from)
-  const to = normaliseJalali(range.to)
-  return shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
-})
-const printedTotal = computed(() => printed.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
-function printRange() {
-  const [from, to] = [range.from.trim(), range.to.trim()]
-  if ((from && !normaliseJalali(from)) || (to && !normaliseJalali(to))) return void (range.error = translate('FiscalDate.Invalid', props.locale))
-  if (from && to && normaliseJalali(from)! > normaliseJalali(to)!) return void (range.error = t('«از تاریخ» بعد از «تا تاریخ» است.', '"From" is after "to".'))
-  if (!printed.value.length) return void (range.error = t('در این بازه رسیدی نیست.', 'No receipt in this range.'))
-  range.error = ''
-  print()
-}
-const rangeText = () => {
-  const [from, to] = [normaliseJalali(range.from), normaliseJalali(range.to)]
-  return from && to ? t(`از تاریخ ${from} تا تاریخ ${to}`, `from ${from} to ${to}`) : from ? t(`از تاریخ ${from}`, `from ${from}`) : to ? t(`تا تاریخ ${to}`, `until ${to}`) : ''
-}
-const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
-function printHtml() {
+// ---- print: the rows now shown, within a range of dates (item 10), on a page of their own ----
+const inRange = (from: string | null, to: string | null) => shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
+function printHtml(from: string | null = null, to: string | null = null) {
+  const rows = inRange(from, to)
   const bank = props.kind === 'BankDeposit'
-  const head = [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), whereTitle.value,
-    ...(bank ? [t('نوع واریز', 'Kind of deposit'), t('پیگیری / شبا', 'Tracking / Sheba')] : []), t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')]
-  const body = printed.value.map((r, i) => [num(i + 1), num(r.number), r.date, `${r.payerName} (${r.payerDetailCode})`, r.purpose, where(r),
-    ...(bank ? [depositMethodName(r.method, fa.value), [r.trackingNumber, r.payerSheba].filter(Boolean).join(' – ')] : []), money(r.totalRial), statusText(r)])
-  const span = head.length - 2
-  return `<!doctype html><html lang="${fa.value ? 'fa' : 'en'}" dir="${fa.value ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>${esc(title.value)}</title><style>
-    @page { size: A4 landscape; margin: 12mm; }
-    body { font-family: Vazirmatn, Tahoma, sans-serif; font-size: 10pt; color: #000; }
-    h1 { font-size: 13pt; margin: 0 0 2mm; } p { margin: 0 0 3mm; color: #333; }
-    table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid #888; padding: 3px 6px; text-align: start; vertical-align: top; }
-    th { background: #eee; } tfoot td { font-weight: bold; } tr { break-inside: avoid; }
-  </style></head><body>
-    <h1>${esc(title.value)}</h1>
-    <p>${rangeText() ? esc(rangeText()) + ' – ' : ''}${esc(t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(printed.value.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${printed.value.length} receipts – newest first`))}${
-      search.value || method.value || numberSearch.value ? esc(t(' – با فیلتر', ' – filtered')) : ''}</p>
-    <table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
-    <tbody>${body.map(row => `<tr>${row.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="${span}">${esc(t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'))}</td><td>${esc(money(printedTotal.value))}</td><td></td></tr></tfoot></table>
-  </body></html>`
+  const range = rangeText(from, to, props.locale)
+  return listPage({
+    title: title.value,
+    subtitle: `${range ? range + ' – ' : ''}${t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(rows.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${rows.length} receipts – newest first`)}${
+      search.value || method.value || numberSearch.value ? t(' – با فیلتر', ' – filtered') : ''}`,
+    head: [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), whereTitle.value,
+      ...(bank ? [t('نوع واریز', 'Kind of deposit'), t('پیگیری / شبا', 'Tracking / Sheba')] : []), t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')],
+    rows: rows.map((r, i) => [num(i + 1), num(r.number), r.date, `${r.payerName} (${r.payerDetailCode})`, r.purpose, where(r),
+      ...(bank ? [depositMethodName(r.method, fa.value), [r.trackingNumber, r.payerSheba].filter(Boolean).join(' – ')] : []), money(r.totalRial), statusText(r)]),
+    total: { label: t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'), value: money(rows.filter(r => r.state !== 'Cancelled').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
+    locale: props.locale,
+  })
 }
-function print() {
-  const frame = document.createElement('iframe')
-  frame.setAttribute('aria-hidden', 'true')
-  frame.style.cssText = 'position:fixed;inset-inline-end:0;bottom:0;width:0;height:0;border:0'
-  document.body.appendChild(frame)
-  const doc = frame.contentDocument!
-  doc.open()
-  doc.write(printHtml())
-  doc.close()
-  const w = frame.contentWindow!
-  w.addEventListener('afterprint', () => frame.remove())
-  setTimeout(() => { w.focus(); w.print() }, 150)
-  setTimeout(() => frame.remove(), 60_000)
+
+// ---- «حذف» of a receipt recorded by mistake, before its voucher is confirmed (owner's answer to Q59) ----
+const busy = ref(false)
+async function remove(r: Receipt) {
+  if (busy.value) return
+  error.value = ''
+  busy.value = true
+  // The opened receipt says whether it can still be deleted, and carries the version the delete needs.
+  const full = await api.get<{ version: number; notDeletable: string | null }>(`/api/cashflow/receipts/${r.id}`)
+  busy.value = false
+  if (!full.ok) return void (error.value = translate(full.code, props.locale))
+  if (full.value.notDeletable) return void (error.value = `${t(`رسید شمارهٔ ${num(r.number)} حذف نمی‌شود:`, `Receipt no. ${r.number} is not deleted:`)} ${translate(full.value.notDeletable, props.locale)}`)
+  if (!window.confirm(t(`رسید شمارهٔ ${num(r.number)} (${r.payerName} – ${money(r.totalRial)} ریال) حذف شود؟ شمارهٔ این رسید دوباره استفاده نمی‌شود.`,
+    `Delete receipt no. ${r.number} (${r.payerName} – ${money(r.totalRial)} Rial)? Its number is not used again.`))) return
+  busy.value = true
+  const done = await api.post<string>(`/api/cashflow/receipts/${r.id}/delete`, { version: full.value.version })
+  busy.value = false
+  if (!done.ok) return void (error.value = translate(done.code, props.locale))
+  emit('deleted', r.id)
+  await load(true)
 }
-defineExpose({ printHtml, load, range, askRange, printRange })
+defineExpose({ printHtml, load, inRange })
 </script>
 
 <template>
@@ -198,22 +174,11 @@ defineExpose({ printHtml, load, range, askRange, printRange })
           <SearchSelect v-model="method" :options="methodChoices" :empty-label="t('همه', 'All')" :aria-label="t('نوع واریز', 'Kind of deposit')" />
         </label>
         <button type="button" class="tr-secondary" :disabled="loading" @click="load()">{{ t('به‌روزرسانی', 'Refresh') }}</button>
-        <button type="button" :disabled="!shown.length" :aria-expanded="range.open" @click="range.open ? (range.open = false) : askRange()">{{ t('چاپ', 'Print') }}</button>
+        <!-- item 10: «چاپ» asks for the range of the printed report -->
+        <PrintRange :dates="shown.map(r => r.date)" :count="(from, to) => inRange(from, to).length" :locale="locale" :disabled="!shown.length"
+                    @print="(from, to) => printPage(printHtml(from, to))" />
       </div>
       <p class="muted small" style="margin: .25rem 0 0">{{ t('وضعیت‌ها خودکار به‌روز می‌شوند (پس از هر ثبت و هر ۱۵ ثانیه).', 'Statuses refresh by themselves (after every save and every 15 seconds).') }}</p>
-      <!-- item 10: the range of the printed report -->
-      <fieldset v-if="range.open" class="tr-range">
-        <legend>{{ t('بازهٔ گزارش چاپی', 'Range of the printed report') }}</legend>
-        <label>{{ t('از تاریخ', 'From') }} <input v-model="range.from" dir="ltr" placeholder="1405/01/01" /></label>
-        <label>{{ t('تا تاریخ', 'To') }} <input v-model="range.to" dir="ltr" placeholder="1405/12/29" /></label>
-        <div class="tr-buttons">
-          <button type="button" @click="printRange">{{ t(`چاپ گزارش (${num(printed.length)} رسید)`, `Print the report (${printed.length} receipts)`) }}</button>
-          <button type="button" class="tr-secondary" @click="range.open = false">{{ t('انصراف', 'Back') }}</button>
-        </div>
-        <p class="muted small wide3">{{ t('تاریخ‌ها از روی فهرست پر شده‌اند (اولین و آخرین تاریخ ردیف‌های فهرست)؛ برای بازهٔ دلخواه آن‌ها را تغییر دهید.',
-          'The dates come from the list (the first and last date of its rows); change them for the range you want.') }}</p>
-        <p v-if="range.error" class="tr-msg error wide3" role="status">{{ range.error }}</p>
-      </fieldset>
       <p v-if="error" class="tr-msg error" role="status">{{ error }}</p>
       <div class="tr-box">
         <table class="tr-table">
@@ -247,7 +212,10 @@ defineExpose({ printHtml, load, range, askRange, printRange })
               </td>
               <td>
                 <!-- items 2 and 6: opens the receipt in the form above; the server says when it can no longer be corrected -->
-                <button v-if="r.state !== 'Cancelled'" type="button" class="tr-link" @click="emit('edit', r.id)">{{ t('ویرایش', 'Correct') }}</button>
+                <template v-if="r.state !== 'Cancelled'">
+                  <button type="button" class="tr-link" @click="emit('edit', r.id)">{{ t('ویرایش', 'Correct') }}</button>
+                  <button type="button" class="tr-link danger" :disabled="busy" @click="remove(r)">{{ t('حذف', 'Delete') }}</button>
+                </template>
               </td>
             </tr>
             <tr v-if="!shown.length"><td :colspan="kind === 'BankDeposit' ? 9 : 8" class="muted">{{ loading ? t('در حال خواندن…', 'Loading…')
@@ -266,7 +234,7 @@ defineExpose({ printHtml, load, range, askRange, printRange })
 <style scoped>
 .tr-panel { margin-top: 1.5rem; padding-top: .75rem; border-top: 1px dashed #cbd2d9; }
 .tr-filters { align-items: end; margin-top: .5rem; }
-.tr-range { margin-top: .5rem; background: #f8fafc; grid-template-columns: repeat(auto-fill, minmax(11rem, 14rem)); }
+.tr-table td:last-child { white-space: nowrap; }
 /* The list scrolls inside the free space under the form; the header and the total stay in view. */
 .tr-box { max-height: 26rem; overflow: auto; border: 1px solid #e4e7eb; border-radius: 8px; margin-top: .5rem; }
 .tr-box .tr-table { margin-top: 0; }

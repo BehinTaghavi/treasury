@@ -52,7 +52,8 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
   },
   BadDebts: {
     title: ['مطالبات سوخت شده', 'Bad debts written off'],
-    use: ['بدهکار هنگام ابطال چک دریافتی به دستور مدیریت؛ تفصیل: پرداخت کننده', "Debited when a received cheque is cancelled by management's order; detail: the payer"],
+    use: ['بدهکار هنگام ابطال چک دریافتی (به دستور مدیریت یا پیش از تعویض)، بستانکار هنگام دریافت چک تعویضی؛ تفصیل: پرداخت کننده',
+      "Debited when a received cheque is cancelled (by management's order, or before it is replaced), credited when its replacement is received; detail: the payer"],
   },
   GuaranteeNotesForCompany: {
     title: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],

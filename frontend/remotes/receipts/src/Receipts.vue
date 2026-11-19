@@ -50,7 +50,8 @@ const savedCount = ref(0)
 /**
  * «ویرایش» (owner's report no. 6, items 2 and 6): a saved receipt whose voucher is not confirmed is opened in the form of its kind,
  * from the receipts list or from the list under the form, and saved back under its number. The server says why a receipt can no
- * longer be corrected (voucher confirmed, cancelled, a cheque that left «نزد صندوق»).
+ * longer be corrected (voucher confirmed, cancelled). A cheque on which a step was recorded stays locked in the form; the other
+ * cheques of its receipt are corrected and removed (owner's answer to Q60). «حذف» of a receipt is offered beside «ویرایش» (Q59).
  */
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const editing = ref<SavedReceipt | null>(null)
@@ -67,6 +68,11 @@ async function startEdit(id: string) {
 }
 /** A step was recorded on a cheque screen: the list under it reads the statuses again, and an old message is cleared. */
 function stepRecorded() { notice.value = null; savedCount.value++ }
+/** A receipt was deleted from the list under the form: if it was open for «ویرایش», the form is closed. */
+function receiptDeleted(id: string) {
+  if (editing.value?.id === id) editing.value = null
+  notice.value = { kind: 'ok', text: t('رسید حذف شد.', 'The receipt was deleted.') }
+}
 function editSaved() {
   const r = editing.value
   editing.value = null
@@ -97,8 +103,8 @@ const hints: Record<string, [string, string]> = {
     <p v-if="hints[tab]" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
     <p v-if="notice" :class="['notice', notice.kind]" role="status">{{ notice.text }}</p>
     <p v-if="editing" class="notice editing">{{ t(
-      `در حال ویرایش رسید شمارهٔ ${editing.number.toLocaleString('fa-IR', { useGrouping: false })} هستید. تا زمانی که «تایید سند» این رسید زده نشده است می‌توانید آن را ویرایش کنید؛ شمارهٔ رسید تغییر نمی‌کند.`,
-      `You are correcting receipt no. ${editing.number}. It can be corrected until its voucher is confirmed; its number stays.`) }}</p>
+      `در حال ویرایش رسید شمارهٔ ${editing.number.toLocaleString('fa-IR', { useGrouping: false })} هستید. تا زمانی که «تایید سند» این رسید زده نشده است می‌توانید آن را ویرایش یا حذف کنید؛ شمارهٔ رسید تغییر نمی‌کند. چک یا سفته‌ای که مرحله‌ای (مانند ثبت صیادی) روی آن ثبت شده است قفل می‌ماند.`,
+      `You are correcting receipt no. ${editing.number}. It can be corrected or deleted until its voucher is confirmed; its number stays. A cheque or note with a step recorded on it stays locked.`) }}</p>
     <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
     <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
     <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" @changed="stepRecorded" />
@@ -108,7 +114,7 @@ const hints: Record<string, [string, string]> = {
     <ReceiptForm v-else :key="tab + locale + (editing?.id ?? '')" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
                  @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" />
     <ReceiptsPanel v-if="tab !== 'list'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
-                   :fiscal-year="fiscalYear" :refresh-key="savedCount" :editing-id="editing?.id" @edit="startEdit" />
+                   :fiscal-year="fiscalYear" :refresh-key="savedCount" :editing-id="editing?.id" @edit="startEdit" @deleted="receiptDeleted" />
   </section>
 </template>
 

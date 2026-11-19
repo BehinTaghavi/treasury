@@ -28,7 +28,7 @@ interface RuleSignatory { id: string; fullName: string; position: string }
 interface SignatureRule { required: number; compulsory: RuleSignatory[]; optional: RuleSignatory[] }
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
-interface Line { /** The saved note this line corrects. */ id?: string; key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
+interface Line { /** The saved note this line corrects. */ id?: string; /** A step was recorded on it: shown, not corrected or removed (answer to Q60). */ locked?: boolean; key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
 interface Guarantor { key: number; detailCode: string; name: string; nationalCode: string; phone: string; noteNumber: string }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; /** The saved receipt being corrected. */ edit?: SavedReceipt }>(),
@@ -145,7 +145,7 @@ function onGuarantor(g: Guarantor, code: string) {
 const noChecks = (): NoteChecks => ({ signature: false, date: false, amountInWords: false, payee: false, paymentDate: false })
 const blankLine = (): Line => ({ key: nextKey++, number: '', issueDate: '', dueDate: '', amount: '', checks: noChecks() })
 const lines = ref<Line[]>(e0?.instruments?.length
-  ? e0.instruments.map(i => ({ id: i.id, key: nextKey++, number: i.number ?? '', issueDate: i.noteIssueDate ?? '', dueDate: i.dueDate ?? '', amount: amountText(i.amount),
+  ? e0.instruments.map(i => ({ id: i.id, locked: i.asReceived === false, key: nextKey++, number: i.number ?? '', issueDate: i.noteIssueDate ?? '', dueDate: i.dueDate ?? '', amount: amountText(i.amount),
       checks: { ...noChecks(), ...(i.details?.checks ?? {}) } }))
   : [blankLine()])
 /** «ثبت سفتهٔ بعدی»: the next note starts as a copy of the last one (same dates and amount) with the next number. */
@@ -154,13 +154,15 @@ function nextLine() {
   if (!last) return void lines.value.push(blankLine())
   const digits = toLatinDigits(last.number)
   const next = /^\d+$/.test(digits) ? String(BigInt(digits) + 1n).padStart(digits.length, '0') : ''
-  lines.value.push({ ...last, id: undefined, key: nextKey++, number: next, checks: noChecks() })
+  lines.value.push({ ...last, id: undefined, locked: false, key: nextKey++, number: next, checks: noChecks() })
 }
 function removeLine(i: number) {
   lines.value.splice(i, 1)
   if (!lines.value.length) lines.value.push(blankLine())
 }
 function tickAll(l: Line) { for (const [k] of checkNames) l.checks[k] = true }
+/** A note with a step recorded on it carries the receipt's date and obligor, so they stay (answer to Q60). */
+const anyLocked = computed(() => lines.value.some(l => l.locked))
 const total = computed(() => lines.value.reduce((s, l) => s + (parseAmount(l.amount) ?? 0), 0))
 const noteChoices = computed<Choice[]>(() => lines.value.map(l => toLatinDigits(l.number.trim())).filter(Boolean).map(n => ({ value: n, label: n })))
 const lineTitle = (l: Line, i: number) => t(`ردیف ${num(i + 1)}`, `Line ${i + 1}`) + (l.number.trim() ? ` – ${l.number.trim()}` : '')
@@ -298,7 +300,7 @@ onMounted(async () => {
     <fieldset>
       <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
       <label>{{ t('شماره رسید دریافت', 'Receipt no.') }} <span class="tr-box">{{ edit ? num(edit.number) + t(' – در حال ویرایش', ' – being corrected') : t('خودکار – پس از ثبت', 'Given when saved') }}</span></label>
-      <label class="req">{{ t('تاریخ دریافت', 'Date received') }} <input v-model="header.date" placeholder="1405/08/25" dir="ltr" /></label>
+      <label class="req">{{ t('تاریخ دریافت', 'Date received') }} <input v-model="header.date" placeholder="1405/08/25" dir="ltr" :disabled="anyLocked" :class="{ ro: anyLocked }" /></label>
       <label v-if="departmentChoices.length">{{ t('شعبه / واحد سازمانی', 'Department') }}
         <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('شعبه / واحد سازمانی', 'Department')" />
       </label>
@@ -335,7 +337,7 @@ onMounted(async () => {
             <tr>
               <td>{{ t('صادرکننده و متعهد سفته', 'Issuer and obligor') }}</td>
               <td style="min-width: 15rem">
-                <SearchSelect v-model="header.issuer" :options="issuerChoices" required :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
+                <SearchSelect v-model="header.issuer" :options="issuerChoices" required :disabled="anyLocked" :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
                               :none-text="t('متعهدی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'No obligor found; define it in Basic Information first')" />
               </td>
               <td class="num">{{ header.issuer }}</td>
@@ -406,14 +408,16 @@ onMounted(async () => {
           <tbody>
             <tr v-for="(l, i) in lines" :key="l.key">
               <td class="num">{{ num(i + 1) }}</td>
-              <td class="req"><input v-model="l.number" dir="ltr" :aria-label="t(`شماره سفته ردیف ${num(i + 1)}`, `Number of note ${i + 1}`)" /></td>
-              <td><input v-model="l.issueDate" dir="ltr" placeholder="1405/08/25" :aria-label="t(`تاریخ صدور ردیف ${num(i + 1)}`, `Issue date of note ${i + 1}`)" /></td>
+              <td class="req"><input v-model="l.number" dir="ltr" :disabled="l.locked" :aria-label="t(`شماره سفته ردیف ${num(i + 1)}`, `Number of note ${i + 1}`)" /></td>
+              <td><input v-model="l.issueDate" dir="ltr" placeholder="1405/08/25" :disabled="l.locked" :aria-label="t(`تاریخ صدور ردیف ${num(i + 1)}`, `Issue date of note ${i + 1}`)" /></td>
               <td :class="{ req: !onDemand }">
-                <input v-if="!onDemand" v-model="l.dueDate" dir="ltr" placeholder="1405/11/30" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
+                <input v-if="!onDemand" v-model="l.dueDate" dir="ltr" placeholder="1405/11/30" :disabled="l.locked" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
                 <input v-else class="ro" disabled :value="t('عندالمطالبه', 'On demand')" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
               </td>
-              <td class="req"><AmountInput v-model="l.amount" :decimals="0" unit="ریال" :aria-label="t(`مبلغ تعهد ردیف ${num(i + 1)}`, `Amount of note ${i + 1}`)" /></td>
-              <td><button type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف', 'Remove') }}</button></td>
+              <td class="req"><AmountInput v-model="l.amount" :decimals="0" unit="ریال" :disabled="l.locked" :aria-label="t(`مبلغ تعهد ردیف ${num(i + 1)}`, `Amount of note ${i + 1}`)" /></td>
+              <!-- A note on which a step was recorded is not corrected or removed (owner's answer to Q60). -->
+              <td><span v-if="l.locked" class="tr-tag cancelled">{{ t('قفل: مرحله‌ای ثبت شده', 'Locked: a step was recorded') }}</span>
+                <button v-else type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف', 'Remove') }}</button></td>
             </tr>
           </tbody>
         </table>
@@ -472,9 +476,9 @@ onMounted(async () => {
               <td>{{ lineTitle(l, i) }}</td>
               <td v-for="[k, f, e] in checkNames" :key="k">
                 <span v-if="notAsked(k)" class="muted small">{{ t('ندارد (عندالمطالبه)', 'none (on demand)') }}</span>
-                <input v-else v-model="l.checks[k]" type="checkbox" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" />
+                <input v-else v-model="l.checks[k]" type="checkbox" :disabled="l.locked" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" />
               </td>
-              <td><button type="button" class="tr-link" @click="tickAll(l)">{{ t('همه کنترل شد', 'All checked') }}</button></td>
+              <td><button v-if="!l.locked" type="button" class="tr-link" @click="tickAll(l)">{{ t('همه کنترل شد', 'All checked') }}</button></td>
             </tr>
           </tbody>
         </table>

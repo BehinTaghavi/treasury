@@ -103,6 +103,9 @@ public sealed record CorrectNoteReceiptCommand(
     string IdempotencyKey, Guid Id, long ExpectedVersion, ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes,
     IReadOnlyList<NoteGuarantorInput>? Guarantors = null, IReadOnlyList<Guid>? SignerIds = null);
 
+/// <summary>Deletion («حذف») of a receipt recorded by mistake, before its voucher is confirmed (owner's answer to Q59, 19 Nov 2026).</summary>
+public sealed record DeleteReceiptCommand(string IdempotencyKey, Guid Id, long ExpectedVersion);
+
 public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string Date, string Reason, long ExpectedVersion);
 
 /// <summary>Replacement of a received cheque (تعویض, owner's item 14 (d)): a cheque receipt of the new cheques, from the same payer.</summary>
@@ -162,19 +165,21 @@ public sealed record ReceiptView(
     IReadOnlyList<ChequeStatusView>? ChequeStatuses = null,
     string? PayerSheba = null,
     NoteTermsView? NoteTerms = null,
-    string? NotCorrectable = null)
+    string? NotCorrectable = null,
+    string? NotDeletable = null)
 {
     /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
     /// <param name="notCorrectable">Why «ویرایش» is closed (a rule's code), or null when the receipt can still be corrected; only on one receipt, not in lists.</param>
+    /// <param name="notDeletable">The same for «حذف».</param>
     public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null, FiscalDate? today = null, IReadOnlyList<ChequeStatusView>? statuses = null,
-        string? notCorrectable = null) => new(
+        string? notCorrectable = null, string? notDeletable = null) => new(
         r.Id, r.Kind.ToString(), r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.Payer.DetailCode ?? string.Empty, r.Payer.DisplayName,
         r.PurposeGroupId, r.PurposeGroupName, r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note,
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
         instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
         statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba, NoteTermsView.From(r.NoteTerms),
-        notCorrectable);
+        notCorrectable, notDeletable);
 }
 
 /// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
@@ -279,15 +284,15 @@ public sealed class ReceiptUseCases(
         PreviewAsync(async ct =>
         {
             var (receipt, created) = await BuildNotesAsync(command, preview: true, ct).ConfigureAwait(false);
-            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null);
+            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null, (Replacement?)null);
         }, cancellationToken);
 
     /// <summary>
     /// Replacement («تعویض», owner's item 14 (d)): the new cheques come on a cheque receipt of their own (cheque receipt numbers) that names
     /// the old cheque, which becomes «تعویض شده». They may differ in amount and number (answer to Q31). The receipt, the new cheques and
     /// the old cheque are saved in one transaction (ADR 0002 amendment).
-    /// Owner's report no. 6, item 11: the old cheque is first cancelled — its step «تعویض» has a voucher of its own that takes its
-    /// receipt's entry back — and the new cheques are then received with the usual voucher of a cheque receipt (two vouchers).
+    /// Owner, 19 Nov 2026 (answer to Q62): only a cheque that was cancelled first («ابطال شده») is replaced; the cheque itself refuses
+    /// the step in any other state. Its cancellation debited «مطالبات سوخت شده», which the replacement's voucher credits.
     /// </summary>
     public Task<Result<Guid>> ReplaceAsync(ReplaceChequeCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -312,38 +317,16 @@ public sealed class ReceiptUseCases(
             return duplicate ? Result<Guid>.Ok(receipt.Id, InstrumentUseCases.PossibleDuplicateWarning) : Result<Guid>.Ok(receipt.Id);
         }, cancellationToken);
 
-    /// <summary>
-    /// The two vouchers a replacement will produce, shown before saving: the cancellation of the old cheque, then the receipt of the
-    /// new cheques (owner's report no. 6, item 11). Nothing is saved.
-    /// </summary>
-    public async Task<Result<IReadOnlyList<VoucherView>>> PreviewReplacementAsync(ReplaceChequeCommand command, CancellationToken cancellationToken)
-    {
-        try
+    public Task<Result<VoucherView>> PreviewReplacementAsync(ReplaceChequeCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
         {
-            return await unitOfWork.ExecuteAsync(async ct =>
-            {
-                var old = await ReceivedChequeAsync(command.InstrumentId, ct).ConfigureAwait(false);
-                var (receipt, created, _) = await BuildInstrumentsAsync(
-                    new RecordInstrumentReceiptCommand("preview", command.Header, command.Instruments), preview: true, ct, old).ConfigureAwait(false);
-                old.Replace(receipt.Id, receipt.Date, currentUser.UserId); // checks the step is allowed; nothing is saved
-                var template = await templates.GetAsync(ct).ConfigureAwait(false);
-                var oldReceipt = old.ReceiptId is { } oldReceiptId ? await receipts.GetAsync(oldReceiptId, ct).ConfigureAwait(false) : null;
-                var oldGroup = oldReceipt is null ? null : await reference.PurposeGroupAsync(oldReceipt.PurposeGroupId, ct).ConfigureAwait(false);
-                var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
-                var cancellation = ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, template, oldGroup?.LedgerAccountCode)!;
-                var received = ReceiptVouchers.ForReceipt(receipt, created, null, group?.LedgerAccountCode, template);
-                return Result<IReadOnlyList<VoucherView>>.Ok(
-                [
-                    VoucherView.From(cancellation, "ChequeStep", old.History.Count),
-                    VoucherView.From(received with { Operation = "دریافت چک جایگزین" }, "Receipt", 0),
-                ]);
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (DomainException ex)
-        {
-            return Result<IReadOnlyList<VoucherView>>.Fail(ex.Code, ex.Message);
-        }
-    }
+            var old = await ReceivedChequeAsync(command.InstrumentId, ct).ConfigureAwait(false);
+            var from = old.State;
+            var (receipt, created, _) = await BuildInstrumentsAsync(
+                new RecordInstrumentReceiptCommand("preview", command.Header, command.Instruments), preview: true, ct, old).ConfigureAwait(false);
+            old.Replace(receipt.Id, receipt.Date, currentUser.UserId); // checks the step is allowed; nothing is saved
+            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null, new Replacement(old, from));
+        }, cancellationToken);
 
     /// <summary>
     /// Endorsement («خرج چک», owner's item 14 (g)): the cheque pays an approved payment request (answer to Q36). The request's beneficiary
@@ -453,36 +436,37 @@ public sealed class ReceiptUseCases(
         PreviewAsync(async ct =>
         {
             var (receipt, desk) = await BuildCashAsync(command, preview: true, ct).ConfigureAwait(false);
-            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(desk.LedgerAccountCode, desk.DetailCode));
+            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(desk.LedgerAccountCode, desk.DetailCode), (Replacement?)null);
         }, cancellationToken);
 
     public Task<Result<VoucherView>> PreviewBankDepositAsync(RecordBankReceiptCommand command, CancellationToken cancellationToken) =>
         PreviewAsync(async ct =>
         {
             var (receipt, account) = await BuildBankDepositAsync(command, preview: true, ct).ConfigureAwait(false);
-            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(account.LedgerAccountCode, account.DetailCode));
+            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(account.LedgerAccountCode, account.DetailCode), (Replacement?)null);
         }, cancellationToken);
 
     public Task<Result<VoucherView>> PreviewInstrumentsAsync(RecordInstrumentReceiptCommand command, CancellationToken cancellationToken) =>
         PreviewAsync(async ct =>
         {
             var (receipt, created, _) = await BuildInstrumentsAsync(command, preview: true, ct).ConfigureAwait(false);
-            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null);
+            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null, (Replacement?)null);
         }, cancellationToken);
 
     private async Task<Result<VoucherView>> PreviewAsync(
-        Func<CancellationToken, Task<(Receipt Receipt, IReadOnlyList<Instrument> Instruments, LedgerSide? Account)>> build,
+        Func<CancellationToken, Task<(Receipt Receipt, IReadOnlyList<Instrument> Instruments, LedgerSide? Account, Replacement? Replacement)>> build,
         CancellationToken cancellationToken)
     {
         try
         {
             return await unitOfWork.ExecuteAsync(async ct =>
             {
-                var (receipt, created, account) = await build(ct).ConfigureAwait(false);
+                var (receipt, created, account, replacement) = await build(ct).ConfigureAwait(false);
                 var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
                 var template = await templates.GetAsync(ct).ConfigureAwait(false);
-                var voucher = ReceiptVouchers.ForReceipt(receipt, created, account, group?.LedgerAccountCode, template);
-                return Result<VoucherView>.Ok(VoucherView.From(voucher with { Operation = ReceiptVouchers.OperationName(receipt.Kind) }, "Receipt", 0));
+                var voucher = ReceiptVouchers.ForReceipt(receipt, created, account, group?.LedgerAccountCode, template, replacement);
+                var name = replacement is null ? ReceiptVouchers.OperationName(receipt.Kind) : "تعویض چک";
+                return Result<VoucherView>.Ok(VoucherView.From(voucher with { Operation = name }, "Receipt", 0));
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (DomainException ex)
@@ -545,8 +529,12 @@ public sealed class ReceiptUseCases(
             Instrument instrument;
             if (correcting is not null && line.Id is { } lineId)
             {
+                // A cheque on which a step was recorded keeps what is written on it (answer to Q60); the line is shown, not corrected.
                 instrument = correcting.Line(lineId);
-                instrument.CorrectReceived(line.Kind, line.Number, bankName, line.Amount.ToMoney(), date, due, payer, header.Purpose, user, details);
+                if (instrument.IsAsReceived)
+                {
+                    instrument.CorrectReceived(line.Kind, line.Number, bankName, line.Amount.ToMoney(), date, due, payer, header.Purpose, user, details);
+                }
             }
             else
             {
@@ -632,7 +620,10 @@ public sealed class ReceiptUseCases(
             if (correcting is not null && line.Id is { } lineId)
             {
                 note = correcting.Line(lineId);
-                note.CorrectReceived(kind, number, null, new MoneyInput(line.Amount).ToMoney(), date, due, payer, header.Purpose, user, details);
+                if (note.IsAsReceived)
+                {
+                    note.CorrectReceived(kind, number, null, new MoneyInput(line.Amount).ToMoney(), date, due, payer, header.Purpose, user, details);
+                }
             }
             else
             {
@@ -692,8 +683,9 @@ public sealed class ReceiptUseCases(
 
     /// <summary>
     /// Correction of a cheque receipt (owner's report no. 6, item 6: while the cheque is «نزد صندوق» and its voucher is not confirmed).
-    /// Every cheque of the receipt must still be as it was received; a line with an id corrects that cheque, a line without one adds a
-    /// cheque, and a cheque left out is taken off the receipt. The receipt and its cheques are saved in one transaction (ADR 0002).
+    /// A line with an id corrects that cheque, a line without one adds a cheque, and a cheque left out is taken off the receipt. A
+    /// cheque on which a step was recorded («ثبت صیادی» …) stays as it is and cannot be taken off; the other cheques of its receipt are
+    /// still corrected and removed (owner's answer to Q60). The receipt and its cheques are saved in one transaction (ADR 0002).
     /// </summary>
     public Task<Result<Guid>> CorrectInstrumentsAsync(CorrectInstrumentReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -751,7 +743,38 @@ public sealed class ReceiptUseCases(
         return (receipt, confirmed);
     }
 
-    /// <summary>Saves the lines of a corrected receipt: corrected ones, added ones, and removes the ones left out.</summary>
+    /// <summary>
+    /// Deletion («حذف») of a receipt recorded by mistake, with the cheques or notes on it, before its voucher is confirmed (owner's answer
+    /// to Q59, 19 Nov 2026). One transaction (ADR 0002): a receipt without its cheques, or cheques without their receipt, never stay.
+    /// </summary>
+    public Task<Result<Guid>> DeleteAsync(DeleteReceiptCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var receipt = await receipts.GetAsync(command.Id, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Receipt.NotFound", "The receipt was not found.");
+            if (receipt.Version != command.ExpectedVersion)
+            {
+                throw new ConcurrencyConflictException("The receipt was changed by someone else.");
+            }
+
+            await EnsureOpenAsync(receipt.Date, ct).ConfigureAwait(false);
+            var confirmed = await vouchers.FindAsync(VoucherSource.Receipt, receipt.Id, 0, ct).ConfigureAwait(false) is not null;
+            var lines = await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false);
+            receipt.Delete(currentUser.UserId, confirmed, lines);
+            foreach (var line in lines)
+            {
+                line.RemoveFromReceipt(currentUser.UserId);
+                await instruments.RemoveAsync(line, ct).ConfigureAwait(false);
+            }
+
+            await receipts.RemoveAsync(receipt, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(receipt.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// Saves the lines of a corrected receipt: corrected ones, added ones, and removes the ones left out. A line that was left as it
+    /// is (a cheque on which a step was recorded) has nothing to save.
+    /// </summary>
     private async Task SaveCorrectedLinesAsync(IReadOnlyList<Instrument> existing, IReadOnlyList<Instrument> lines, CancellationToken ct)
     {
         foreach (var removed in existing.Where(e => lines.All(l => l.Id != e.Id)))
@@ -764,7 +787,10 @@ public sealed class ReceiptUseCases(
         {
             if (existing.Any(e => e.Id == line.Id))
             {
-                await instruments.SaveCorrectionAsync(line, ct).ConfigureAwait(false);
+                if (line.PendingEvents.Count > 0)
+                {
+                    await instruments.SaveCorrectionAsync(line, ct).ConfigureAwait(false);
+                }
             }
             else
             {
@@ -816,7 +842,8 @@ public sealed class ReceiptUseCases(
             var order = receipt.InstrumentIds.Select((x, i) => (x, i)).ToDictionary(p => p.x, p => p.i);
             lines = [.. lines.OrderBy(l => order.GetValueOrDefault(l.Id, int.MaxValue))];
             var confirmed = await vouchers.FindAsync(VoucherSource.Receipt, receipt.Id, 0, ct).ConfigureAwait(false) is not null;
-            return ReceiptView.From(receipt, lines, IranClock.Today(clock), notCorrectable: receipt.WhyNotCorrectable(confirmed, lines));
+            return ReceiptView.From(receipt, lines, IranClock.Today(clock), notCorrectable: receipt.WhyNotCorrectable(confirmed),
+                notDeletable: receipt.WhyNotDeletable(confirmed, lines));
         }, cancellationToken);
 
     /// <summary>

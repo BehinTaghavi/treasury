@@ -398,12 +398,16 @@ public sealed class Receipt : AggregateRoot<Guid>
 
     /// <summary>
     /// Correction of a cheque receipt: <paramref name="instruments"/> are its cheques as they now are — corrected (which a cheque
-    /// allows only while it is in the cash desk and no step was recorded on it), added, or left out (removed by the caller).
+    /// allows only while it is in the cash desk and no step was recorded on it), added, left out (removed by the caller), or left as
+    /// they are because a step was recorded on them. Owner, 19 Nov 2026 (answer to Q60): "فقط آن رکوردی که صیادی شده قابل ویرایش
+    /// نخواهد ماند، بقیه چک‌های داخل آن رسید قابل ویرایش و حذف خواهند بود" — so a cheque that moved on fixes only itself, and with it
+    /// the receipt's date and payer, which are written on every cheque of the receipt.
     /// </summary>
     public void CorrectInstruments(ReceiptHeader header, IReadOnlyList<Instrument> instruments, string userId, bool voucherConfirmed)
     {
         ArgumentNullException.ThrowIfNull(instruments);
         RequireCorrectable(ReceiptKind.Instruments, header, userId, voucherConfirmed);
+        RequireHeaderKept(header, instruments);
         Require(ReplacedInstrumentId is null || header.Payer.DetailCode == Payer.DetailCode,
             "Receipt.ReplacementPayerDiffers", "The new cheques must come from the payer of the cheque they replace.");
         CheckCheques(instruments, replacement: ReplacedInstrumentId is not null);
@@ -419,6 +423,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(notes);
         RequireCorrectable(ReceiptKind.Notes, header, userId, voucherConfirmed);
+        RequireHeaderKept(header, notes);
         var checkedTerms = CheckNotes(terms, notes, rule, signerIds);
         ApplyHeader(header);
         NoteTerms = checkedTerms;
@@ -435,16 +440,52 @@ public sealed class Receipt : AggregateRoot<Guid>
     }
 
     /// <summary>
-    /// The code of the rule that closes «ویرایش» for this receipt, or null while it can be corrected: cancelled, voucher confirmed,
-    /// or one of its cheques or notes is no longer as it was received (<see cref="Instrument.IsAsReceived"/>).
+    /// The code of the rule that closes «ویرایش» for this receipt, or null while it can be corrected: cancelled, or voucher confirmed.
+    /// A cheque on which a step was recorded no longer closes the correction of its receipt, only its own (answer to Q60).
     /// </summary>
-    public string? WhyNotCorrectable(bool voucherConfirmed, IReadOnlyList<Instrument> instruments)
+    public string? WhyNotCorrectable(bool voucherConfirmed) =>
+        State != ReceiptState.Recorded ? "Receipt.AlreadyCancelled" : voucherConfirmed ? "Receipt.VoucherConfirmed" : null;
+
+    /// <summary>
+    /// The code of the rule that closes «حذف» for this receipt, or null while it can be deleted (see <see cref="Delete"/>).
+    /// </summary>
+    public string? WhyNotDeletable(bool voucherConfirmed, IReadOnlyList<Instrument> instruments)
     {
         ArgumentNullException.ThrowIfNull(instruments);
-        return State != ReceiptState.Recorded ? "Receipt.AlreadyCancelled"
-            : voucherConfirmed ? "Receipt.VoucherConfirmed"
+        return WhyNotCorrectable(voucherConfirmed)
+            ?? (ReplacedInstrumentId is not null ? "Receipt.ReplacementNotDeleted"
             : instruments.Any(i => !i.IsAsReceived) ? "Instrument.CorrectionAfterStep"
-            : null;
+            : null);
+    }
+
+    /// <summary>
+    /// Deletion («حذف») of a receipt recorded by mistake, before its voucher is confirmed (owner, 19 Nov 2026, answer to Q59: "امکان حذف
+    /// هم لازم است در این مرحله در کنار ویرایش پیش بینی شود"). The caller deletes the receipt and the cheques or notes on it; its number
+    /// is not given to another receipt. Not deleted: a cancelled receipt (it stays as the record of its cancellation), a receipt
+    /// with a cheque on which a step was recorded (take the other cheques off it with «ویرایش»), and a receipt that replaced a
+    /// cheque (the replaced cheque names it; its new cheques are corrected, returned or cancelled instead).
+    /// </summary>
+    /// <param name="instruments">The cheques or notes of the receipt as stored.</param>
+    public void Delete(string userId, bool voucherConfirmed, IReadOnlyList<Instrument> instruments)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
+        if (WhyNotDeletable(voucherConfirmed, instruments) is { } code)
+        {
+            throw new DomainException(code, "The receipt can no longer be deleted.");
+        }
+
+        Raise(new ReceiptDeleted(Id, Kind, FiscalYear, Number, Date, Payer.DetailCode, TotalRial, [.. _instrumentIds], userId));
+    }
+
+    /// <summary>
+    /// A cheque or note on which a step was recorded keeps what is written on it, so the receipt keeps the date and payer it shares
+    /// with it; everything else of the receipt, and its other cheques, can still be corrected (answer to Q60).
+    /// </summary>
+    private static void RequireHeaderKept(ReceiptHeader header, IReadOnlyList<Instrument> instruments)
+    {
+        ArgumentNullException.ThrowIfNull(header);
+        Require(instruments.Where(i => !i.IsAsReceived).All(i => i.IssueDate == header.Date && i.Counterparty.DetailCode == header.Payer?.DetailCode),
+            "Receipt.FixedByMovedCheque", "A cheque or note of this receipt has a step recorded on it; the receipt's date and payer can no longer change.");
     }
 
     private void RequireCorrectable(ReceiptKind kind, ReceiptHeader header, string userId, bool voucherConfirmed)
@@ -578,5 +619,10 @@ public sealed record ReceiptCorrected(
     Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string? PayerDetailCode, Guid PurposeGroupId,
     ReceiptAccountKind? AccountKind, Guid? AccountId, decimal? Amount, string? Currency, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
     bool SalesProceeds, string UserId) : DomainEvent;
+
+/// <summary>A receipt recorded by mistake was deleted, with the cheques or notes on it, before its voucher was confirmed.</summary>
+public sealed record ReceiptDeleted(
+    Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string? PayerDetailCode, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
+    string UserId) : DomainEvent;
 
 public sealed record ReceiptCancelled(Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string Reason, string UserId) : DomainEvent;

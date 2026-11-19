@@ -11,6 +11,8 @@
  * Owner's report no. 6 (18 Nov 2026): «ویرایش» on an opened receipt while its voucher is not confirmed (items 2 and 6; the parent opens
  * the form of its kind); a box of its own for the receipt number, which finds exactly that number (item 9: typed into the general
  * search box, a number also matched every date and code that contains it).
+ * Owner's answers of 19 Nov 2026: «حذف رسید» beside «ویرایش رسید», at the same stage (Q59); «چاپ» of the list with «از تاریخ / تا تاریخ»
+ * filled from the list (Q63).
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
@@ -20,6 +22,8 @@ import { useLookups } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import { depositMethodName } from './depositMethods'
 import NoteReceiptPrint from './NoteReceiptPrint.vue'
+import PrintRange from './PrintRange.vue'
+import { listPage, printPage, rangeText } from './printing'
 import { attachmentNames, checkNames, formNames, maturityNames, reasonNames, type NoteChecks, type NoteReceipt, type NoteTerms } from './notes'
 
 interface Instrument {
@@ -40,6 +44,8 @@ interface Receipt {
   noteTerms: NoteTerms | null; purposeGroupId: string
   /** The code of the rule that closes «ویرایش», or null while the receipt can be corrected (only on an opened receipt). */
   notCorrectable?: string | null
+  /** The same for «حذف» (owner's answer to Q59). */
+  notDeletable?: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
@@ -156,6 +162,43 @@ async function confirmStep(id: string, step: number) {
   await loadSteps(id)
 }
 
+// ---- «حذف» of a receipt recorded by mistake, before its voucher is confirmed (owner's answer to Q59, 19 Nov 2026) ----
+const deleting = ref(false)
+async function removeSelected() {
+  const r0 = selected.value
+  if (!r0 || deleting.value) return
+  if (!window.confirm(t(`رسید ${name(kindNames, r0.kind)} شمارهٔ ${num(r0.number)} (${r0.payerName} – ${money(r0.totalRial)} ریال)${hasInstruments(r0) ? ' با چک‌ها و سفته‌های آن' : ''} حذف شود؟ شمارهٔ این رسید دوباره استفاده نمی‌شود.`,
+    `Delete ${name(kindNames, r0.kind)} receipt no. ${r0.number} (${r0.payerName} – ${money(r0.totalRial)} Rial)? Its number is not used again.`))) return
+  deleting.value = true
+  const r = await api.post<string>(`/api/cashflow/receipts/${r0.id}/delete`, { version: r0.version })
+  deleting.value = false
+  if (!r.ok) return show('error', translate(r.code, props.locale))
+  selected.value = null
+  show('ok', t(`رسید شمارهٔ ${num(r0.number)} حذف شد.`, `Receipt no. ${r0.number} deleted.`))
+  await load()
+}
+
+// ---- «چاپ» of the list with a range of dates (owner's answer to Q63) ----
+const inRange = (from: string | null, to: string | null) => shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
+const statusText = (r: Receipt) => (r.state === 'Cancelled' ? t('ابطال شده', 'Cancelled')
+  : hasInstruments(r) ? statusGroups(r).map(g => `${r.instrumentCount > 1 ? t(`${num(g.count)} برگ: `, `${g.count} × `) : ''}${g.name}${g.due ? ` (${dueMark(props.locale)})` : ''}`).join(fa.value ? '، ' : ', ')
+  : t('ثبت شده', 'Recorded'))
+function printHtml(from: string | null = null, to: string | null = null) {
+  const rows = inRange(from, to)
+  const range = rangeText(from, to, props.locale)
+  return listPage({
+    title: t(`فهرست دریافت‌ها${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – سال مالی ${num(Number(year.value))}`, `Receipts${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – fiscal year ${year.value}`),
+    subtitle: `${range ? range + ' – ' : ''}${t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(rows.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${rows.length} receipts – newest first`)}${
+      search.value || numberSearch.value ? t(' – با فیلتر', ' – filtered') : ''}`,
+    head: [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('نوع', 'Kind'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), t('صندوق / حساب / تعداد برگ', 'Cash desk / account / items'),
+      t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')],
+    rows: rows.map((r, i) => [num(i + 1), num(r.number), name(kindNames, r.kind) + (r.method ? ` – ${depositMethodName(r.method, fa.value)}` : ''), r.date,
+      `${r.payerName} (${r.payerDetailCode})`, r.purpose, hasInstruments(r) ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r), money(r.totalRial), statusText(r)]),
+    total: { label: t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'), value: money(rows.filter(r => r.state !== 'Cancelled').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
+    locale: props.locale,
+  })
+}
+
 // ---- cancel a cash / bank receipt ----
 const cancel = reactive({ open: false, date: todayJalali(), reason: '' })
 async function confirmCancel() {
@@ -172,7 +215,7 @@ async function confirmCancel() {
 }
 
 
-defineExpose({ load })
+defineExpose({ load, printHtml })
 watch([year, kind], () => { selected.value = null; void load() })
 onMounted(async () => { await L.load(); await load() })
 </script>
@@ -192,6 +235,8 @@ onMounted(async () => { await L.load(); await load() })
       <label style="flex: 1; min-width: 14rem">{{ t('جستجو (پرداخت کننده، بابت، پیگیری، تاریخ، وضعیت)', 'Search (payer, purpose, tracking, date, status)') }}
         <input v-model="search" />
       </label>
+      <PrintRange :dates="shown.map(r => r.date)" :count="(from, to) => inRange(from, to).length" :locale="locale" :disabled="!shown.length"
+                  @print="(from, to) => printPage(printHtml(from, to))" />
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
 
@@ -255,6 +300,9 @@ onMounted(async () => { await L.load(); await load() })
       <div v-if="selected.state === 'Recorded'" class="tr-buttons">
         <button v-if="!selected.notCorrectable" type="button" @click="emit('edit', selected.id)">{{ t('ویرایش رسید', 'Correct the receipt') }}</button>
         <span v-else class="muted small">{{ t('ویرایش بسته است:', 'Correction is closed:') }} {{ translate(selected.notCorrectable, locale) }}</span>
+        <!-- Owner's answer to Q59: a receipt recorded by mistake is deleted at the same stage. -->
+        <button v-if="!selected.notDeletable" type="button" class="tr-secondary danger" :disabled="deleting" @click="removeSelected">{{ t('حذف رسید', 'Delete the receipt') }}</button>
+        <span v-else-if="selected.notDeletable !== selected.notCorrectable" class="muted small">{{ t('حذف بسته است:', 'Deletion is closed:') }} {{ translate(selected.notDeletable, locale) }}</span>
       </div>
       <p v-if="selected.state === 'Cancelled'" class="tr-msg error">{{ t(`ابطال شده در ${selected.cancelledOn}: ${selected.cancelReason}`, `Cancelled on ${selected.cancelledOn}: ${selected.cancelReason}`) }}</p>
 

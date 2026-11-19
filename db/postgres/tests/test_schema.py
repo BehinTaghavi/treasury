@@ -1040,3 +1040,17 @@ def test_the_cashflow_service_may_delete_a_cheque_taken_off_a_corrected_receipt(
         c.execute("DELETE FROM cashflow.instrument_event WHERE instrument_id = %s", (iid,))
         c.execute("DELETE FROM cashflow.instrument WHERE id = %s", (iid,))
         assert c.execute("SELECT count(*) FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0] == 0
+
+
+def test_the_cashflow_service_may_delete_a_receipt_recorded_by_mistake(db):
+    # 043_cashflow_receipt_corrections.sql: the owner's answer to Q59 (19 Nov 2026). Its number stays taken.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        rid = uuid.uuid4()
+        c.execute(
+            """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id,
+                   purpose_group_name, purpose, recorded_by, account_kind, account_id, amount, currency, total_rial, state)
+               VALUES (1405, %s, 'Cash', 990001, '2026-11-14', %s, 'الف', '200015', %s, 'فروش', 'فروش', 'test', 'CashDesk', %s, 1000, 'IRR', 1000, 'Recorded')""",
+            (rid, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
+        c.execute("DELETE FROM cashflow.receipt WHERE id = %s", (rid,))
+        assert c.execute("SELECT count(*) FROM cashflow.receipt WHERE id = %s", (rid,)).fetchone()[0] == 0

@@ -9,16 +9,16 @@
  * confirms it from the receipts list after saving.
  * With `replaces` the form is the replacement of a received cheque (owner's item 14 (d)): the payer is the old cheque's, the new cheques
  * may differ in amount and number (answer to Q31), and the receipt is saved with the old cheque marked «تعویض شده». Owner's report no. 6,
- * item 11: the form opens with the old cheque's purpose group, purpose, department, amount and currency, all of which can be changed;
- * the old cheque is first cancelled (its voucher takes its receipt's entry back) and the new cheques are then received, so two vouchers
- * are shown.
+ * item 11: the form opens with the old cheque's purpose group, purpose, department, amount and currency, all of which can be changed.
+ * The old cheque was cancelled first (owner's answer to Q62, 19 Nov 2026); the new cheques are received «نزد صندوق».
  * With `edit` the form is «ویرایش» of a saved receipt (report no. 6, items 2 and 6): it opens with the receipt as it was saved and saves
- * it back under the same number, while its voucher is not confirmed.
+ * it back under the same number, while its voucher is not confirmed. A cheque on which a step was recorded («ثبت صیادی» …) is shown
+ * locked; the other cheques are corrected, added and removed, and the date and payer written on the locked cheque stay (answer to Q60).
  * «بابت» is chosen from the purposes of its group, may be changed after it was chosen, or typed outside the list; a text that is not
  * in the list is added to it when the receipt is saved (report no. 6, item 4).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { chequeStateName, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
@@ -32,6 +32,9 @@ type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
 interface Line {
   /** The saved cheque this line corrects («ویرایش»); empty for a new line. */
   id?: string
+  /** A saved cheque on which a step was recorded: shown, not corrected or removed (answer to Q60); with the name of its latest status. */
+  locked?: boolean
+  state?: string
   key: number; kind: LineKind; number: string; dueDate: string; currency: string; amount: string; rate: string
   bankId: string; branchName: string; branchCode: string; accountNumber: string; accountHolder: string; city: string; outOfTown: boolean; sayadId: string
   g1Name: string; g1Code: string; g2Name: string; g2Code: string
@@ -105,8 +108,10 @@ watch(payerType, async type => {
   clearTimeout(searchTimer)
   payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles, type || undefined)
 })
+/** A cheque with a step recorded on it carries the receipt's date and payer, so they stay (answer to Q60). */
+const anyLocked = computed(() => lines.value.some(l => l.locked))
 /** A replacement, and the correction of a replacement receipt, keep the payer of the replaced cheque. */
-const payerFixed = computed(() => !!props.replaces || !!props.edit?.replacedInstrumentId)
+const payerFixed = computed(() => !!props.replaces || !!props.edit?.replacedInstrumentId || anyLocked.value)
 async function loadPurposes(id: string) {
   purposes.value = []
   if (!id) return
@@ -145,7 +150,7 @@ function savedLines(r: SavedReceipt): Line[] {
     const d = i.details
     const g = d?.guarantors ?? []
     return {
-      ...blankLine(), id: i.id, kind: (lineKinds.some(k => k.value === i.kind) ? i.kind : 'OrdinaryCheque') as LineKind, number: i.number ?? '', dueDate: i.dueDate ?? '',
+      ...blankLine(), id: i.id, locked: i.asReceived === false, state: i.state, kind: (lineKinds.some(k => k.value === i.kind) ? i.kind : 'OrdinaryCheque') as LineKind, number: i.number ?? '', dueDate: i.dueDate ?? '',
       currency: i.currency, amount: amountText(i.amount), rate: amountText(i.rateToRial), bankId: d?.bankId ?? '', branchName: d?.branchName ?? '', branchCode: d?.branchCode ?? '',
       accountNumber: d?.accountNumber ?? '', accountHolder: d?.accountHolder ?? '', city: d?.city ?? '', outOfTown: d?.outOfTown ?? false, sayadId: d?.sayadId ?? '',
       g1Name: g[0]?.name ?? '', g1Code: g[0]?.nationalCode ?? '', g2Name: g[1]?.name ?? '', g2Code: g[1]?.nationalCode ?? '',
@@ -174,7 +179,7 @@ function nextLine() {
   if (!last) return void lines.value.push(blankLine())
   const digits = toLatinDigits(last.number)
   const next = /^\d+$/.test(digits) ? String(Number(digits) + 1).padStart(digits.length, '0') : ''
-  lines.value.push({ ...last, id: undefined, key: nextKey++, number: next, sayadId: '' })
+  lines.value.push({ ...last, id: undefined, locked: false, state: undefined, key: nextKey++, number: next, sayadId: '' })
 }
 function removeLine(i: number) {
   lines.value.splice(i, 1)
@@ -270,9 +275,9 @@ function request(): { path: string; body: Record<string, unknown>; put?: string 
 
 // ---- the voucher at the bottom of the form (nothing is saved) ----
 const preview = ref<Voucher | null>(null)
-/** A replacement shows two vouchers: the cancellation of the old cheque, then the receipt of the new ones (report no. 6, item 11). */
-const cancellation = ref<Voucher | null>(null)
 const previewHint = ref('')
+/** The voucher of a replacement receipt names the replaced cheque; while such a receipt is corrected it is shown after saving, in the list. */
+const noPreview = computed(() => !!props.edit?.replacedInstrumentId)
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewRun = 0
 watch([header, money1, lines], () => {
@@ -281,13 +286,12 @@ watch([header, money1, lines], () => {
 }, { deep: true })
 async function refreshPreview() {
   const run = ++previewRun
+  if (noPreview.value) { preview.value = null; previewHint.value = ''; return }
   const req = request()
-  if ('error' in req) { preview.value = cancellation.value = null; previewHint.value = translate(req.error, props.locale); return }
-  const r = await api.post<Voucher | Voucher[]>(`${req.path}/voucher-preview`, req.body)
+  if ('error' in req) { preview.value = null; previewHint.value = translate(req.error, props.locale); return }
+  const r = await api.post<Voucher>(`${req.path}/voucher-preview`, req.body)
   if (run !== previewRun) return
-  const vouchers = r.ok ? (Array.isArray(r.value) ? r.value : [r.value]) : []
-  preview.value = vouchers[vouchers.length - 1] ?? null
-  cancellation.value = vouchers.length > 1 ? vouchers[0]! : null
+  preview.value = r.ok ? r.value : null
   previewHint.value = r.ok ? '' : translate(r.code, props.locale)
 }
 
@@ -350,7 +354,8 @@ onMounted(async () => {
   <form class="tr-form" @keydown="onKey" @submit.prevent="save">
     <fieldset>
       <legend>{{ edit ? t(`ویرایش رسید شمارهٔ ${edit.number.toLocaleString('fa-IR', { useGrouping: false })}`, `Correct receipt no. ${edit.number}`) : t('مشخصات دریافت', 'Receipt') }}</legend>
-      <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" /></label>
+      <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" :disabled="anyLocked" :class="{ ro: anyLocked }"
+        :title="anyLocked ? t('روی یکی از چک‌های این رسید مرحله‌ای ثبت شده است؛ تاریخ و پرداخت‌کنندهٔ رسید تغییر نمی‌کند.', 'A cheque of this receipt has a step recorded on it; the date and payer stay.') : undefined" /></label>
       <label v-if="payerTypeChoices.length && !payerFixed">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
         <SearchSelect v-model="payerType" :options="payerTypeChoices" :empty-label="t('— همه —', '— all —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')" />
       </label>
@@ -408,12 +413,14 @@ onMounted(async () => {
     </fieldset>
 
     <template v-else>
-      <fieldset v-for="(l, i) in lines" :key="l.key">
+      <!-- A cheque on which a step was recorded is shown locked: it is not corrected or removed (owner's answer to Q60). -->
+      <fieldset v-for="(l, i) in lines" :key="l.key" :disabled="l.locked" :class="{ locked: l.locked }">
         <legend>
           {{ t(`ردیف ${(i + 1).toLocaleString('fa-IR')}`, `Line ${i + 1}`) }}
           <span v-if="timing(l) === 'current'" class="tr-tag current">{{ t('روز', 'Current') }}</span>
           <span v-else-if="timing(l) === 'later'" class="tr-tag later">{{ t('مدت‌دار', 'Post-dated') }}</span>
-          <button type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف ردیف', 'Remove') }}</button>
+          <span v-if="l.locked" class="tr-tag cancelled">{{ t(`قفل – ${chequeStateName(l.state, locale)}: این چک ویرایش یا حذف نمی‌شود`, `Locked – ${chequeStateName(l.state, locale)}: not corrected or removed`) }}</span>
+          <button v-else type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف ردیف', 'Remove') }}</button>
         </legend>
         <label>{{ t('نوع', 'Kind') }}
           <SearchSelect v-model="l.kind" :options="kindChoices" required :aria-label="t('نوع', 'Kind')" />
@@ -464,15 +471,15 @@ onMounted(async () => {
       <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
-    <template v-if="replaces && cancellation">
-      <p class="muted small">{{ t('تعویض در دو مرحله ثبت می‌شود و دو سند دارد: ابتدا چک قبلی باطل و سند دریافت آن برگشت داده می‌شود (سند اول)، سپس چک جدید دریافت می‌شود (سند دوم).',
-        'A replacement is recorded in two steps with two vouchers: the old cheque is cancelled and its receipt entry taken back (first voucher), then the new cheque is received (second voucher).') }}</p>
-      <VoucherTable :voucher="cancellation" :locale="locale" :account-name="L.accountName" />
-    </template>
     <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
+    <p v-else-if="noPreview" class="muted small">{{ t('این رسید، رسید تعویض چک است؛ سند آن پس از ثبت ویرایش در «فهرست دریافت‌ها» دیده می‌شود.',
+      'This receipt replaced a cheque; its voucher is shown in the receipts list after the correction is saved.') }}</p>
     <p v-else class="muted small">{{ t('سند حسابداری این رسید پس از تکمیل فرم اینجا نمایش داده می‌شود.', 'The voucher of this receipt is shown here once the form is filled in.') }}
       <template v-if="previewHint"> ({{ previewHint }})</template></p>
   </form>
 </template>
 
 <style scoped src="./receipts.css"></style>
+<style scoped>
+fieldset.locked { background: #f5f7fa; }
+</style>

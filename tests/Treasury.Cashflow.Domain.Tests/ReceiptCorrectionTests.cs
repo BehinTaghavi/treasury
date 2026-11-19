@@ -53,13 +53,13 @@ public sealed class ReceiptCorrectionTests
     {
         var r = SavedCash();
         Assert.Equal("Receipt.VoucherConfirmed", Code(() => r.CorrectCash(Header(), Desk, Money.Rials(1), User, voucherConfirmed: true)));
-        Assert.Equal("Receipt.VoucherConfirmed", r.WhyNotCorrectable(voucherConfirmed: true, []));
-        Assert.Null(r.WhyNotCorrectable(voucherConfirmed: false, []));
+        Assert.Equal("Receipt.VoucherConfirmed", r.WhyNotCorrectable(voucherConfirmed: true));
+        Assert.Null(r.WhyNotCorrectable(voucherConfirmed: false));
         Assert.Equal(5_000_000m, r.TotalRial);
 
         r.Cancel(D("1405/08/24"), "اشتباه", User);
         Assert.Equal("Receipt.AlreadyCancelled", Code(() => r.CorrectCash(Header(), Desk, Money.Rials(1), User, voucherConfirmed: false)));
-        Assert.Equal("Receipt.AlreadyCancelled", r.WhyNotCorrectable(voucherConfirmed: false, []));
+        Assert.Equal("Receipt.AlreadyCancelled", r.WhyNotCorrectable(voucherConfirmed: false));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class ReceiptCorrectionTests
         var b = Cheque(id, "2");
         var r = Receipt.RecordInstruments(id, 3, Header(), [a, b], User);
         r.MarkSaved(1);
-        Assert.Null(r.WhyNotCorrectable(false, [a, b]));
+        Assert.Null(r.WhyNotCorrectable(false));
 
         var header = Header("1405/08/24");
         a.CorrectReceived(a.Kind, "1", a.BankName, Money.Rials(30_000_000), header.Date, a.DueDate, a.Counterparty, a.Purpose, User, a.Details);
@@ -145,8 +145,69 @@ public sealed class ReceiptCorrectionTests
         Assert.Equal("Receipt.NoInstruments", Code(() => r.CorrectInstruments(header, [], User, voucherConfirmed: false)));
         Assert.Equal("Receipt.VoucherConfirmed", Code(() => r.CorrectInstruments(header, [a, added], User, voucherConfirmed: true)));
 
+    }
+
+    [Fact]
+    public void A_cheque_with_a_step_fixes_only_itself_and_the_receipts_date_and_payer_owner_answer_Q60()
+    {
+        // «فقط آن رکوردی که صیادی شده قابل ویرایش نخواهد ماند، بقیه چک‌های داخل آن رسید قابل ویرایش و حذف خواهند بود».
+        var id = Guid.NewGuid();
+        var registered = Cheque(id, "1");
+        var free = Cheque(id, "2");
+        var r = Receipt.RecordInstruments(id, 3, Header(), [registered, free], User);
+        r.MarkSaved(1);
+        registered.RegisterSayad(D("1405/08/25"), User, null);
+        Assert.Null(r.WhyNotCorrectable(false));
+
+        // The other cheque is corrected, the purpose changed; the registered cheque stays as it is.
+        free.CorrectReceived(free.Kind, "22", free.BankName, Money.Rials(7_000_000), free.IssueDate, free.DueDate, free.Counterparty, "پیش دریافت", User, free.Details);
+        r.CorrectInstruments(Header(purpose: "پیش دریافت", group: Advance), [registered, free], User, voucherConfirmed: false);
+        Assert.Equal((17_000_000m, "پیش دریافت", Advance.Id), (r.TotalRial, r.Purpose, r.PurposeGroupId));
+        Assert.Equal(("1", 10_000_000m, "فروش محصولات"), (registered.Number, registered.Amount.Amount, registered.Purpose));
+
+        // The other cheque is taken off: the receipt keeps the registered one.
+        r.CorrectInstruments(Header(), [registered], User, voucherConfirmed: false);
+        Assert.Equal([registered.Id], r.InstrumentIds);
+
+        // The date and the payer are written on the registered cheque too, so they stay.
+        Assert.Equal("Receipt.FixedByMovedCheque", Code(() => r.CorrectInstruments(Header("1405/08/24"), [registered], User, voucherConfirmed: false)));
+        Assert.Equal("Receipt.FixedByMovedCheque", Code(() => r.CorrectInstruments(Header(payer: OtherPayer), [registered], User, voucherConfirmed: false)));
+    }
+
+    [Fact]
+    public void A_receipt_is_deleted_before_its_voucher_is_confirmed_owner_answer_Q59()
+    {
+        var r = SavedCash();
+        Assert.Null(r.WhyNotDeletable(false, []));
+        r.Delete("clerk-2", voucherConfirmed: false, []);
+        var e = Assert.IsType<ReceiptDeleted>(Assert.Single(r.PendingEvents));
+        Assert.Equal((4, 1405, "clerk-2", 5_000_000m), (e.Number, e.FiscalYear, e.UserId, e.TotalRial));
+
+        Assert.Equal("Receipt.VoucherConfirmed", Code(() => SavedCash().Delete(User, voucherConfirmed: true, [])));
+        var cancelled = SavedCash();
+        cancelled.Cancel(D("1405/08/24"), "اشتباه", User);
+        Assert.Equal("Receipt.AlreadyCancelled", Code(() => cancelled.Delete(User, voucherConfirmed: false, [])));
+    }
+
+    [Fact]
+    public void A_cheque_receipt_is_deleted_only_with_all_its_cheques_as_received_and_a_replacement_receipt_never()
+    {
+        var id = Guid.NewGuid();
+        var a = Cheque(id, "1");
+        var b = Cheque(id, "2");
+        var r = Receipt.RecordInstruments(id, 3, Header(), [a, b], User);
+        r.MarkSaved(1);
+        Assert.Null(r.WhyNotDeletable(false, [a, b]));
         b.RegisterSayad(D("1405/08/25"), User, null);
-        Assert.Equal("Instrument.CorrectionAfterStep", r.WhyNotCorrectable(false, [a, b]));
+        Assert.Equal("Instrument.CorrectionAfterStep", r.WhyNotDeletable(false, [a, b]));
+        Assert.Equal("Instrument.CorrectionAfterStep", Code(() => r.Delete(User, voucherConfirmed: false, [a, b])));
+        Assert.Empty(r.PendingEvents);
+
+        var old = Cheque(Guid.NewGuid(), "777");
+        var newId = Guid.NewGuid();
+        var fresh = Cheque(newId, "888");
+        var replacement = Receipt.RecordInstruments(newId, 5, Header(), [fresh], User, old);
+        Assert.Equal("Receipt.ReplacementNotDeleted", Code(() => replacement.Delete(User, voucherConfirmed: false, [fresh])));
     }
 
     [Fact]

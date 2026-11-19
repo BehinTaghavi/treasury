@@ -121,7 +121,7 @@ public sealed class ChequeStatusTests
         c.SendToLegal(D("1405/09/10"), User, " تحویل به وکیل شرکت جهت طرح دعوی ", Certificate);
         Assert.Equal((InstrumentState.InLegal, D("1405/09/10"), "تحویل به وکیل شرکت جهت طرح دعوی"), (c.State, c.History[^1].Date, c.History[^1].Note));
         Assert.Equal(5, c.LegalActionStep);
-        Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.ReturnFromLegal], c.AllowedActions());
+        Assert.Equal([InstrumentAction.Cancel, InstrumentAction.ReturnFromLegal], c.AllowedActions());
 
         // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده», the payer on both sides.
         var v = ReceiptVouchers.ForStep(c, 5, Bank, null, Template());
@@ -222,13 +222,18 @@ public sealed class ChequeStatusTests
                 CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User, new ReceivedInstrumentDetails(SayadId: "1234567890123456"), receiptId),
         };
         var receipt = Receipt.RecordInstruments(receiptId, 3, header, created, User, old);
+        // Owner, 19 Nov 2026 (answer to Q62): replaced only after it was cancelled. The legal action moved the cheque to «اسناد واخواست
+        // شده حقوقی شده» (answer to Q38), so its cancellation credits that account; the replacement then takes it out of «مطالبات سوخت شده».
+        Assert.DoesNotContain(InstrumentAction.Replace, old.AllowedActions());
+        old.CancelReceived(D("1405/10/01"), User, "م-9", D("1405/09/30"), "تعویض");
+        Assert.Equal([(true, "8101", "200015"), (false, "1204", "200015")], Lines(ReceiptVouchers.ForStep(old, old.History.Count, Bank, null, Template())));
         old.Replace(receipt.Id, receipt.Date, User);
-        Assert.Equal((InstrumentState.Replaced, (InstrumentState?)InstrumentState.InLegal), (old.State, old.History[^1].From));
-        // The legal action moved the cheque to «اسناد واخواست شده حقوقی شده» (answer to Q38), so its cancellation for the replacement
-        // credits that account (report no. 6, item 11); the new cheque is received as on any receipt.
-        Assert.Equal([(true, "4101", "200015"), (false, "1204", "200015")],
-            Lines(ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), "4101")!));
-        Assert.Equal([(true, "1201", "200015"), (false, "4101", "200015")], Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template())));
+        Assert.Equal((InstrumentState.Replaced, (InstrumentState?)InstrumentState.Cancelled), (old.State, old.History[^1].From));
+        Assert.Equal([(true, "1201", "200015"), (false, "8101", "200015")],
+            Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Cancelled))));
+        // A replacement recorded before that rule came straight from the legal action and credits its account.
+        Assert.Equal([(true, "1201", "200015"), (false, "1204", "200015")],
+            Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.InLegal))));
 
         var cancelled = Bounced();
         cancelled.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
@@ -351,11 +356,13 @@ public sealed class ChequeStatusTests
     }
 
     [Fact]
-    public void A_cheque_registered_in_Sayad_is_replaced_out_of_the_cash_desk_account()
+    public void A_cheque_registered_in_Sayad_is_cancelled_and_then_replaced_owner_answer_Q62()
     {
         var old = Cheque();
         old.RegisterSayad(D("1405/08/02"), User);
-        Assert.Contains(InstrumentAction.Replace, old.AllowedActions());
+        Assert.DoesNotContain(InstrumentAction.Replace, old.AllowedActions());
+        old.CancelReceived(D("1405/08/09"), User, "م-4", D("1405/08/08"), "تعویض");
+        Assert.Equal([(true, "8101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(old, old.History.Count, Bank, null, Template())));
         var header = new ReceiptHeader(D("1405/08/10"), new PayerFact("200015", "شرکت نمونه", true), new PurposeGroupFact(Guid.NewGuid(), "فروش", true, true, "4101"), "تعویض");
         var receiptId = Guid.NewGuid();
         var created = new[]
@@ -365,8 +372,8 @@ public sealed class ChequeStatusTests
         };
         var receipt = Receipt.RecordInstruments(receiptId, 4, header, created, User, old);
         old.Replace(receipt.Id, receipt.Date, User);
-        var v = ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), "4101")!;
-        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(v));
+        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Cancelled));
+        Assert.Equal([(true, "1201", "200015"), (false, "8101", "200015")], Lines(v));
     }
 
     [Fact]

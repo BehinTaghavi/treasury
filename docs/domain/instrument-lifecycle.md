@@ -21,7 +21,7 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
 | 14 | Bounced | RecordEndorsementReturned (bounce notice no.) | Endorsed | owner's item 14 (h) | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | manual | all |
-| — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (d), Q31; owner, 18 Nov 2026 | not guarantee |
+| — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | **Cancelled only** (owner's answer to Q62, 19 Nov 2026: cancelled first, for internal control; until then also InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal) | owner's item 14 (d), Q31; answer to Q62 | not guarantee |
 | — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (f), Q30 | all |
 | — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
 | 15 | ReturnedToIssuer | the other step of a cheque in the cash desk (ReturnToIssuer) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
@@ -34,7 +34,7 @@ The bank's paper called "bounce notice" in this file and in the code is «گوا
 (owner, 18 Nov 2026); the legal action keeps its number, date and tracking code.
 
 Latest status as the owner described it on 18 Nov 2026 (`received-cheque-steps.md`, section 5): a cheque registered in Sayad stays in
-the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be replaced or cancelled.
+the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be cancelled (and, once cancelled, replaced: answer to Q62).
 **«سررسید چک» is not a state**: it is a mark on a post-dated cheque (due after the day it was received) that is still in the cash
 desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDueDate`); no step is recorded for it.
 

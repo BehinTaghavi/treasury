@@ -95,7 +95,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         view = (await _instruments.GetAsync(cheques[0], CancellationToken.None))!;
         Assert.Equal(("InLegal", "1405/08/27", "تحویل به وکیل شرکت جهت طرح دعوی"), (view.State, view.History[^1].Date, view.History[^1].Note));
         Assert.Equal(("BN-9", "1405/08/26", "9988776655443322"), (view.History[^1].Reference, view.History[^1].Details!.DocumentDate, view.History[^1].Details!.TrackingCode));
-        Assert.Equal(["Replace", "Cancel", "ReturnFromLegal"], view.AllowedActions);
+        Assert.Equal(["Cancel", "ReturnFromLegal"], view.AllowedActions); // replaced only once cancelled (owner's answer to Q62)
 
         // Registering in Sayad has no voucher (answer to Q37); deposit, bounce and the legal action have theirs (answer to Q38).
         var steps = await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None);

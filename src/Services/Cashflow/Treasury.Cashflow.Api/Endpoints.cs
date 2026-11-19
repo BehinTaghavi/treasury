@@ -15,7 +15,9 @@ public sealed record ReceiveRequest(InstrumentKind Kind, string Number, string B
 /// <param name="Reference">Bounce notice no., management's order no. (cancellation) or bank reference.</param>
 /// <param name="DocumentDate">Cancellation of a received cheque: the date of management's order. Legal action: the date of the certificate of non-payment.</param>
 /// <param name="TrackingCode">Bounce and legal action: the tracking code of the certificate of non-payment.</param>
-public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null, string? TrackingCode = null);
+/// <param name="OriginalStamped">Cancellation of a received cheque: «اصل چک ممهور به مهر ابطال شد» was ticked (answer to Q62).</param>
+public sealed record ActionRequest(string Date, string? Destination, string? Note, string? Reference, string? DocumentDate = null, string? TrackingCode = null,
+    bool OriginalStamped = false);
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
@@ -53,6 +55,9 @@ public sealed record NoteReceiptRequest(
     ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null, IReadOnlyList<Guid>? SignerIds = null);
 
 public sealed record CancelReceiptRequest(string Date, string Reason, long Version);
+
+/// <summary>Deletion («حذف») of a receipt recorded by mistake, with the version the user saw (owner's answer to Q59).</summary>
+public sealed record DeleteReceiptRequest(long Version);
 
 /// <summary>
 /// Correction («ویرایش») of a saved receipt (owner's report no. 6, items 2 and 6): the receipt form as it now is, with the version the
@@ -102,7 +107,7 @@ public static class Endpoints
 
         api.MapPost("/instruments/{id:guid}/actions/{action}", async (Guid id, InstrumentAction action, ActionRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.ChangeStateAsync(
-                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate, r.TrackingCode), ct).ConfigureAwait(false),
+                new ChangeInstrumentStateCommand(Key(http), id, action, r.Date, r.Destination, r.Note, r.Reference, r.DocumentDate, r.TrackingCode, r.OriginalStamped), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/instruments/{id}"));
 
         // Owner's item 14: replacement (a cheque receipt of the new cheques) and endorsement of a received cheque.
@@ -111,10 +116,7 @@ public static class Endpoints
                 receiptId => $"/api/cashflow/receipts/{receiptId}"));
 
         api.MapPost("/instruments/{id:guid}/replace/voucher-preview", async (Guid id, ReplaceRequest r, ReceiptUseCases useCases, CancellationToken ct) =>
-            await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false) is var p && p.IsSuccess
-                ? Results.Ok(p.Value)
-                : Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: p.ErrorCode, detail: p.ErrorMessage,
-                    extensions: new Dictionary<string, object?> { ["code"] = p.ErrorCode }));
+            Preview(await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false)));
 
         api.MapPost("/instruments/{id:guid}/endorse", async (Guid id, EndorseRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.PaymentRequestId, r.SayadTracking, r.Note, r.SignerIds), ct)
@@ -193,6 +195,10 @@ public static class Endpoints
             ToHttp(await useCases.CorrectNotesAsync(
                 new CorrectNoteReceiptCommand(Key(http), id, r.Version, r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/receipts/{id}"));
+
+        // Deletion of a receipt recorded by mistake, while its voucher is not confirmed (owner's answer to Q59, 19 Nov 2026).
+        api.MapPost("/receipts/{id:guid}/delete", async (Guid id, DeleteReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.DeleteAsync(new DeleteReceiptCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), _ => "/api/cashflow/receipts"));
 
         api.MapPost("/receipts/{id:guid}/cancel", async (Guid id, CancelReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),

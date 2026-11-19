@@ -37,7 +37,8 @@ public sealed record ChangeInstrumentStateCommand(
     string? Note = null,
     string? Reference = null,
     string? DocumentDate = null,
-    string? TrackingCode = null);
+    string? TrackingCode = null,
+    bool OriginalStamped = false);
 
 
 public sealed record IssueChequeCommand(
@@ -62,11 +63,12 @@ public sealed record InstrumentHistoryView(string Action, string? From, string T
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
     Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
-    Guid? PaymentRequestId = null, string? TrackingCode = null, int? SheetNumber = null, IReadOnlyList<Treasury.Cashflow.Domain.Receipts.ReceiptSigner>? Signers = null)
+    Guid? PaymentRequestId = null, string? TrackingCode = null, int? SheetNumber = null, IReadOnlyList<Treasury.Cashflow.Domain.Receipts.ReceiptSigner>? Signers = null,
+    bool OriginalStamped = false, DateTimeOffset? RecordedAt = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
         : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId,
-            d.TrackingCode, d.SheetNumber, d.Signers);
+            d.TrackingCode, d.SheetNumber, d.Signers, d.OriginalStamped, d.RecordedAt);
 }
 
 public sealed record InstrumentView(
@@ -95,7 +97,8 @@ public sealed record InstrumentView(
     Guid? CollectionAccountId = null,
     string? CounterpartyDetailCode = null,
     bool ReachedDueDate = false,
-    string? NoteIssueDate = null)
+    string? NoteIssueDate = null,
+    bool AsReceived = false)
 {
     /// <param name="today">Today's date, to mark «سررسید چک» (owner, 18 Nov 2026); without it the mark stays off.</param>
     public static InstrumentView From(Instrument i, FiscalDate? today = null) => new(
@@ -126,7 +129,9 @@ public sealed record InstrumentView(
         i.Counterparty.DetailCode,
         today is { } t && i.HasReachedDueDate(t),
         // A note's «تاریخ صدور» as Jalali text (Details.WrittenOn is the stored ISO date).
-        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null);
+        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null,
+        // «ویرایش» of its receipt can still correct or remove it (answer to Q60): in the cash desk, no step recorded.
+        i.IsAsReceived);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -225,8 +230,9 @@ public sealed class InstrumentUseCases(
                     break;
                 case InstrumentAction.Cancel when instrument.Direction == InstrumentDirection.Received:
                     // Owner's item 14 (f), answer to Q30: the treasurer types the number and date of management's order.
+                    // Answer to Q62 (19 Nov 2026): the stamp tick, with the computer's date and time beside the user.
                     instrument.CancelReceived(date, user, command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate),
-                        command.Note);
+                        command.Note, command.OriginalStamped, (clock ?? TimeProvider.System).GetUtcNow());
                     break;
                 case InstrumentAction.Cancel:
                     instrument.Cancel(date, user, command.Note ?? string.Empty);

@@ -87,10 +87,19 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Equal((before[1].Id, 2_500_000m, "1406/01/20", "1405/08/26", "اصفهان", "1405/08/26"),
             (kept.Id, kept.Amount, kept.DueDate, kept.IssueDate, kept.Details!.BranchName, Assert.Single(kept.History).Date));
 
+        // Owner's answer to Q59: «حذف» of the receipt with its cheques; the row and the cheques are gone.
+        var deleted = await _receipts.DeleteAsync(new(Key(), receipt, 2), CancellationToken.None);
+        Assert.True(deleted.IsSuccess, deleted.ErrorCode);
+        Assert.Null(await _receipts.GetAsync(receipt, CancellationToken.None));
+        Assert.True((await _receipts.DeleteAsync(new(Key(), cash, 2), CancellationToken.None)).IsSuccess);
+        Assert.DoesNotContain(await _receipts.ListAsync(1405, ReceiptKind.Cash, CancellationToken.None), x => x.Id == cash);
+
         await using var conn = await _dataSource.OpenConnectionAsync(CancellationToken.None);
         await using var cmd = new NpgsqlCommand(
             "SELECT (SELECT count(*) FROM cashflow.instrument WHERE id = @id) + (SELECT count(*) FROM cashflow.instrument_event WHERE instrument_id = @id)", conn);
         cmd.Parameters.AddWithValue("id", before[0].Id);
+        Assert.Equal(0L, (long)(await cmd.ExecuteScalarAsync(CancellationToken.None))!);
+        cmd.Parameters["id"].Value = kept.Id; // deleted with its receipt
         Assert.Equal(0L, (long)(await cmd.ExecuteScalarAsync(CancellationToken.None))!);
     }
 
@@ -252,6 +261,12 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.ReturnFromBank, "1405/08/28"), CancellationToken.None)).IsSuccess);
         var view = (await useCases.GetAsync(cheque, CancellationToken.None))!;
         Assert.Equal(("ReturnedFromBank", (Guid?)account, (Guid?)account), (view.State, view.History[2].Details!.AccountId, view.History[3].Details!.AccountId));
+
+        // Owner, 19 Nov 2026 (answer to Q62): cancelled first, with the stamp tick and the time stored; then replaced.
+        Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.Cancel, "1405/08/29", Note: "تعویض", Reference: "م-5", DocumentDate: "1405/08/28",
+            OriginalStamped: true), CancellationToken.None)).IsSuccess);
+        view = (await useCases.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("Cancelled", true, true), (view.State, view.History[^1].Details!.OriginalStamped, view.History[^1].Details!.RecordedAt is not null));
 
         var replace = await _receipts.ReplaceAsync(new(Key(), cheque, Header() with { Date = "1405/08/29" },
             [new(InstrumentKind.OrdinaryCheque, "N" + number, "1405/10/01", new MoneyInput(9_500_000), Bank, SayadId: "6543210987654321")]), CancellationToken.None);

@@ -85,6 +85,9 @@ public interface IReceiptRepository
     /// <summary>Saves a cancellation or a correction (the receipt keeps its kind, number and fiscal year). Version-checked.</summary>
     Task SaveAsync(Receipt receipt, CancellationToken cancellationToken);
 
+    /// <summary>Deletes a receipt recorded by mistake (<see cref="Receipt.Delete"/>) and writes its pending events. Version-checked.</summary>
+    Task RemoveAsync(Receipt receipt, CancellationToken cancellationToken);
+
     /// <summary>Receipts of a year, newest first; of one kind or all.</summary>
     Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken);
 }

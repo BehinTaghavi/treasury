@@ -37,9 +37,6 @@ TRANSITIONS = {
     (RECEIVED, "ReturnedFromBank", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "ReturnedFromBank", "RecordBounced"): "Bounced",
     (RECEIVED, "ReturnedFromBank", "ReturnToIssuer"): "ReturnedToIssuer",
-    (RECEIVED, "InCashDesk", "Replace"): "Replaced",
-    (RECEIVED, "ReturnedFromBank", "Replace"): "Replaced",
-    (RECEIVED, "Bounced", "Replace"): "Replaced",
     (RECEIVED, "InCashDesk", "Cancel"): "Cancelled",
     (RECEIVED, "ReturnedFromBank", "Cancel"): "Cancelled",
     (RECEIVED, "Bounced", "Cancel"): "Cancelled",
@@ -49,11 +46,11 @@ TRANSITIONS = {
     (RECEIVED, "SayadRegistered", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "SayadRegistered", "ReturnToIssuer"): "ReturnedToIssuer",
     (RECEIVED, "SayadRegistered", "Endorse"): "Endorsed",
-    (RECEIVED, "SayadRegistered", "Replace"): "Replaced",
     (RECEIVED, "SayadRegistered", "Cancel"): "Cancelled",
     (RECEIVED, "Bounced", "SendToLegal"): "InLegal",
-    (RECEIVED, "InLegal", "Replace"): "Replaced",
     (RECEIVED, "InLegal", "Cancel"): "Cancelled",
+    # Owner, 19 Nov 2026 (answer to Q62): a cheque is replaced only after it was cancelled.
+    (RECEIVED, "Cancelled", "Replace"): "Replaced",
     # Owner's answer to Q38 (18 Nov 2026): legal action, unlikely as it is, on a cheque still in the cash desk.
     (RECEIVED, "InCashDesk", "SendToLegal"): "InLegal",
     (RECEIVED, "SayadRegistered", "SendToLegal"): "InLegal",

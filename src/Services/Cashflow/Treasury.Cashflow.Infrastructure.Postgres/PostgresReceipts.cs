@@ -84,6 +84,26 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         receipt.MarkSaved(receipt.Version + 1);
     }
 
+    /// <summary>A receipt deleted before its voucher was confirmed (owner's answer to Q59); its number is not given again.</summary>
+    public async Task RemoveAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        var tx = PostgresUnitOfWork.Current;
+        await using (var cmd = tx.Command("DELETE FROM cashflow.receipt WHERE fiscal_year = @year AND id = @id AND version = @expected"))
+        {
+            cmd.Parameters.AddWithValue("year", receipt.FiscalYear);
+            cmd.Parameters.AddWithValue("id", receipt.Id);
+            cmd.Parameters.AddWithValue("expected", receipt.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Receipt {receipt.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, receipt.PendingEvents, cancellationToken).ConfigureAwait(false);
+        receipt.MarkSaved(receipt.Version + 1);
+    }
+
     public async Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(

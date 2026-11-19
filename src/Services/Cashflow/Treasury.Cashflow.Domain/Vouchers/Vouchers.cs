@@ -47,6 +47,12 @@ public enum FixedAccount
     NotesInCollection,
 }
 
+/// <summary>
+/// A cheque receipt that replaces a cheque: the old cheque and where it was when replaced. Since the owner's answer to Q62 (19 Nov
+/// 2026) that is always «ابطال شده»; replacements recorded before it came straight from the cash desk, a bounce or the legal action.
+/// </summary>
+public sealed record Replacement(Instrument Old, InstrumentState From);
+
 /// <summary>What reference-svc says about a ledger account (copy of the accounting system's chart).</summary>
 public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive);
 
@@ -122,20 +128,42 @@ public static class ReceiptVouchers
     /// انتظامی» (payer on both sides). Notes (owner's table «دریافت سفته عادی» and «دریافت سفته انتظامی»): the same, with «سفته انتظامی به
     /// نفع شرکت» for guarantee notes.
     /// </summary>
-    /// <remarks>
-    /// A cheque receipt that replaces a cheque («تعویض») has the same voucher as any cheque receipt: the old cheque is first cancelled
-    /// with a voucher of its own that takes its receipt's entry back (<see cref="ForStep"/>, step Replace), then the new cheques are
-    /// received (owner's report no. 6, item 11; new-version manual, operations 6 «ابطال چک های دریافتنی» and 7 «تعویض»: "ابتدا چک قبلی
-    /// بشرح عملیات شماره 6 بالا باطل و سپس دریافت چک جدید بشرح عملیات شماره 1 ثبت میشود"). Until 18 Nov 2026 both were one voucher.
-    /// </remarks>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
-    public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template)
+    /// <param name="replacement">A replacement (تعویض). The old cheque was cancelled first (owner's answer to Q62, 19 Nov 2026), and its
+    /// cancellation moved it to «مطالبات سوخت شده» (his voucher table, «ابطال چک دریافتنی»), so the replacement takes it out of there:
+    /// Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده» for the old cheque; a difference in amount (answer to Q31) goes to
+    /// the purpose group, with the payer. To be confirmed by the owner (Q64). A replacement recorded before that rule credits the
+    /// account the old cheque was in («اسناد نزد صندوق», «اسناد واخواست شده», «اسناد واخواست شده حقوقی شده»).</param>
+    public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
+        Replacement? replacement = null)
     {
         ArgumentNullException.ThrowIfNull(receipt);
         ArgumentNullException.ThrowIfNull(template);
         var payer = receipt.Payer.DetailCode;
         var lines = new List<VoucherLine>();
         var title = $"{receipt.Purpose} – {receipt.Payer.DisplayName}";
+        if (replacement is not null)
+        {
+            var old = replacement.Old;
+            foreach (var i in instruments)
+            {
+                var (foreign, currency) = Foreign(i);
+                lines.Add(Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, i.Amount.ToRial(),
+                    $"{receipt.Purpose} – چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – تعویض چک {old.Number} – {receipt.Payer.DisplayName}", foreign, currency));
+            }
+
+            var (oldForeign, oldCurrency) = Foreign(old);
+            lines.Add(Fixed(false, template, AccountOf(replacement.From),
+                payer, old.Amount.ToRial(), Text(old, "تعویض"), oldForeign, oldCurrency));
+            var difference = instruments.Sum(i => i.Amount.ToRial()) - old.Amount.ToRial();
+            if (difference != 0)
+            {
+                lines.Add(new VoucherLine(difference < 0, purposeGroupAccount, payer, Math.Abs(difference), $"{title} – تفاوت مبلغ تعویض چک {old.Number}"));
+            }
+
+            return new Voucher($"تعویض چک – رسید {receipt.Number}", receipt.Date, lines);
+        }
+
         if (receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes)
         {
             foreach (var i in instruments)
@@ -189,14 +217,13 @@ public static class ReceiptVouchers
 
     /// <summary>
     /// The voucher of one step of a received cheque (owner's item 14 and his voucher table; one voucher per cheque, answer to Q35). Null for
-    /// steps without a voucher here: receiving (on its receipt); registering in Sayad, which only changes the latest status (owner's
-    /// answer to Q37, 18 Nov 2026).
+    /// steps without a voucher here: receiving and replacing (on their receipt); registering in Sayad, which only changes the latest
+    /// status (owner's answer to Q37, 18 Nov 2026).
     /// </summary>
     /// <param name="bank">The company bank account of the step (deposit, collected, returned, bounced from the bank).</param>
     /// <param name="endorsement">Endorsement and its return: the payment purpose group's account and the receiver's تفصیل.</param>
     /// <param name="receiptAccount">The account the receipt credited (its purpose group's account): returning a cheque to its payer
-    /// (answer to Q41), handing an ordinary note back to its obligor («بدهکاران», answer to Q50) and cancelling a cheque that is
-    /// replaced (report no. 6, item 11) all debit it.</param>
+    /// (answer to Q41) and handing an ordinary note back to its obligor («بدهکاران», answer to Q50) both debit it.</param>
     public static Voucher? ForStep(Instrument cheque, int step, LedgerSide bank, LedgerSide? endorsement, VoucherTemplate template, string? receiptAccount = null)
     {
         ArgumentNullException.ThrowIfNull(cheque);
@@ -247,15 +274,6 @@ public static class ReceiptVouchers
                     : Pair($"ابطال {Word(cheque)} دریافتنی", cheque, e.Date,
                         Fixed(true, template, FixedAccount.BadDebts, payer, amount, text),
                         Fixed(false, template, AccountOf(e.From), payer, amount, text));
-            case InstrumentAction.Replace:
-                // Owner's report no. 6, item 11: "شرط لازم برای تعویض چک در وهله اول ابطال آن است و سند حسابداری مربوط برگشت داده میشود بر اساس
-                // عمل ابطال". The cancellation takes the receipt's entry back — manual operation 6 «ابطال چک های دریافتنی»: Dr «بدهکاران» (the
-                // account the cheque's receipt credited) · payer / Cr where the cheque is: «اسناد نزد صندوق», once bounced «اسناد واخواست شده»,
-                // in legal action «اسناد واخواست شده حقوقی شده». The new cheques then come on their own receipt with its usual voucher.
-                var replaced = Text(cheque, "ابطال جهت تعویض");
-                return Pair("ابطال چک جهت تعویض", cheque, e.Date,
-                    new VoucherLine(true, receiptAccount, payer, amount, replaced),
-                    Fixed(false, template, AccountOf(e.From), payer, amount, replaced));
             case InstrumentAction.SendToLegal:
                 // Owner's answer to Q38 (18 Nov 2026): Dr «اسناد واخواست شده حقوقی شده» / Cr «اسناد واخواست شده»; for a cheque that was
                 // still in the cash desk, Cr «اسناد نزد صندوق». The payer's تفصیل on both sides.
@@ -311,12 +329,14 @@ public static class ReceiptVouchers
     /// <summary>
     /// The fixed account a received cheque is kept in while the company holds it: «اسناد واخواست شده حقوقی شده» in legal action,
     /// «اسناد واخواست شده» once bounced, otherwise «اسناد نزد صندوق» (in the cash desk, registered in Sayad or back from the bank). The
-    /// next step that takes the cheque out (replacement, cancellation, legal action) credits it.
+    /// next step that takes the cheque out (cancellation, legal action) credits it. A cancelled cheque sits in «مطالبات سوخت شده»
+    /// (its cancellation's debit), which its replacement credits (owner's answer to Q62).
     /// </summary>
     public static FixedAccount AccountOf(InstrumentState? state) => state switch
     {
         InstrumentState.InLegal => FixedAccount.ProtestedChequesInLegal,
         InstrumentState.Bounced => FixedAccount.ProtestedCheques,
+        InstrumentState.Cancelled => FixedAccount.BadDebts,
         _ => FixedAccount.ChequesInCashDesk,
     };
 

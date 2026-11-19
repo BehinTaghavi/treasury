@@ -44,7 +44,7 @@ public sealed class NoteStepTests
     [Fact]
     public void An_ordinary_note_in_the_cash_desk_goes_to_the_bank_is_returned_endorsed_replaced_or_cancelled()
     {
-        Assert.Equal([InstrumentAction.DepositForCollection, InstrumentAction.ReturnToIssuer, InstrumentAction.Endorse, InstrumentAction.Replace, InstrumentAction.Cancel],
+        Assert.Equal([InstrumentAction.DepositForCollection, InstrumentAction.ReturnToIssuer, InstrumentAction.Endorse, InstrumentAction.Cancel],
             Note().AllowedActions());
     }
 
@@ -106,7 +106,7 @@ public sealed class NoteStepTests
         Assert.Equal([(true, "1203", "200015"), (false, "1204", "600001")], Lines(v));
         Assert.Equal("واخواست سفته توسط بانک", v.Operation);
         // A protested note may get legal action (owner, 18 Nov 2026).
-        Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.SendToLegal], protested.AllowedActions());
+        Assert.Equal([InstrumentAction.Cancel, InstrumentAction.SendToLegal], protested.AllowedActions());
 
         var back = AtBank();
         back.ReturnFromBank(D("1405/09/03"), User, "مدارک ناقص");

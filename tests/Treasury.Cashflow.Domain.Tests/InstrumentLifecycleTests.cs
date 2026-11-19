@@ -322,7 +322,10 @@ public sealed class LifecycleTableTests
             InstrumentState.SayadRegistered, InstrumentState.InLegal];
 
         // «ابطال شده» ends both lives: an issued cheque before delivery, a received one by management's order (owner's item 14 (f)).
-        foreach (var t in InstrumentLifecycle.All)
+        // The one step out of it is the replacement of a cancelled received cheque (owner's answer to Q62, 19 Nov 2026).
+        var afterCancel = Assert.Single(InstrumentLifecycle.All, t => t.From == InstrumentState.Cancelled);
+        Assert.Equal((InstrumentDirection.Received, InstrumentAction.Replace, InstrumentState.Replaced), (afterCancel.Direction, afterCancel.Action, afterCancel.To));
+        foreach (var t in InstrumentLifecycle.All.Where(t => t != afterCancel))
         {
             Assert.Equal(t.Direction == InstrumentDirection.Received, received.Contains(t.From));
             if (t.To != InstrumentState.Cancelled)

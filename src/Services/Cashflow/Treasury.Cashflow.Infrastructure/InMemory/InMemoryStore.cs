@@ -51,6 +51,9 @@ internal sealed class PendingChanges
 
     public Dictionary<Guid, ReceiptSnapshot> Receipts { get; } = [];
 
+    /// <summary>Receipts deleted before their voucher was confirmed.</summary>
+    public HashSet<Guid> RemovedReceipts { get; } = [];
+
     public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
 
     public Dictionary<int, int> PaymentSheetNumbers { get; } = [];
@@ -98,6 +101,11 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var (id, s) in pending.Receipts)
                 {
                     db.Receipts[id] = s;
+                }
+
+                foreach (var id in pending.RemovedReceipts)
+                {
+                    db.Receipts.Remove(id);
                 }
 
                 foreach (var (key, n) in pending.ReceiptNumbers)
@@ -356,6 +364,28 @@ public sealed class InMemoryReceiptRepository(InMemoryDatabase db) : IReceiptRep
         }
 
         Stage(receipt, receipt.Version + 1);
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveAsync(Receipt receipt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        long stored;
+        lock (db.Gate)
+        {
+            stored = db.Receipts.TryGetValue(receipt.Id, out var s) ? s.Version : 0;
+        }
+
+        if (stored != receipt.Version)
+        {
+            throw new ConcurrencyConflictException($"Receipt {receipt.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        pending.Receipts.Remove(receipt.Id);
+        pending.RemovedReceipts.Add(receipt.Id);
+        pending.Outbox.AddRange(receipt.PendingEvents.Select(OutboxMessage.From));
+        receipt.MarkSaved(receipt.Version + 1);
         return Task.CompletedTask;
     }
 

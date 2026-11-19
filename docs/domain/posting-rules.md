@@ -32,6 +32,7 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | عودت چک واگذاری توسط بانک | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | چک های در جریان وصول | بانک مربوطه |
 | عملیات | عودت چک‌های نزد صندوق | بدهکاران یا ... | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
 | عملیات | ابطال چک دریافتنی نزد صندوق | مطالبات سوخت شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | دریافت چک تعویضی به جای چک ابطال شده – تعویض (افزودهٔ ۲۸ آبان ۱۴۰۵؛ طرف بستانکار: Q64) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | مطالبات سوخت شده (تفاوت مبلغ: گروه بابت) | ذینفع |
 | عملیات | ابطال چک / سفته انتظامی دریافتی نزد صندوق | طرف حساب انتظامی | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی دریافتی به عادی | (۱) اسناد نزد صندوق / اسناد دریافتنی، (۲) طرف حساب انتظامی | ذینفع | (۱) درآمد حاصل از تضمین استفاده شده، (۲) چک انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
@@ -69,14 +70,16 @@ bank with «سفته های در جریان وصول» (straight from the cash d
 endorsed, cancelled, legal action, and handing a note back («استرداد»): a guarantee note reverses the off-balance entry; an ordinary note debits
 «بدهکاران» (the معین of its receipt's purpose group, obligor) and credits «اسناد نزد صندوق / اسناد دریافتنی» (owner's answer to Q50).
 Since 19 Nov 2026 (owner's report no. 6):
-- **Replacement of a received cheque has two vouchers** (item 11): the old cheque is first cancelled — «ابطال چک جهت تعویض»: Dr the account
-  its receipt credited («بدهکاران», the معین of the receipt's purpose group) · payer / Cr where the cheque is («اسناد نزد صندوق», «اسناد واخواست
-  شده» or «اسناد واخواست شده حقوقی شده») · payer — then the new cheque is received with the voucher of a cheque receipt. This is the
-  new-version manual's operations 6 «ابطال چک های دریافتنی» and 7 «تعویض چک های دریافتنی». The row «ابطال چک دریافتنی نزد صندوق: مطالبات سوخت
-  شده» of the table stays the voucher of a cancellation by management's order (Q62 asks the owner to confirm the two).
+- **A cheque is cancelled before it is replaced** (item 11 and the owner's answer to Q62): the cancellation always makes the table's
+  voucher «ابطال چک دریافتنی»: Dr «مطالبات سوخت شده» · payer / Cr where the cheque is («اسناد نزد صندوق», «اسناد واخواست شده» or «اسناد واخواست
+  شده حقوقی شده») · payer — "حتی اگر بعدا چک تعویض گردد". The replacement cheque is then received on its own receipt: Dr «اسناد نزد صندوق» ·
+  payer / Cr «مطالبات سوخت شده» · payer for the old cheque's amount, a difference to the purpose group (row added to the table above;
+  the credit side is proposed and waits for the owner, Q64). «مطالبات سوخت شده» is one fixed account of the company, chosen on the
+  page «شابلون اسناد خزانه داری» (Q65).
 - **A receipt's voucher follows the receipt until it is confirmed** (items 2 and 6): the voucher of an unconfirmed receipt is worked out
   from the receipt each time it is shown, so a corrected receipt shows the corrected voucher; «تایید سند» keeps the lines and closes the
-  correction of the receipt.
+  correction and the deletion of the receipt (answer to Q59). A purpose group stays correctable after it was used (answer to Q61); a
+  voucher confirmed before the group was corrected keeps its lines and is put right by a correcting treasury voucher (Phase F).
 - **The purpose is the description** (item 4): both lines of a cheque's or note's receipt voucher start with the receipt's purpose as written.
 
 Next with their screens: payments, petty cash and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

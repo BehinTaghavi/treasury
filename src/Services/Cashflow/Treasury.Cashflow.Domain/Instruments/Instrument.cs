@@ -62,6 +62,8 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
 /// <param name="SheetNumber">Transfer of a cheque: the serial number of its payment sheet («برگ پرداخت», owner's answer to Q57, 19 Nov 2026).</param>
 /// <param name="Signers">Transfer of a cheque: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک» (Q57).</param>
+/// <param name="OriginalStamped">Cancellation: «اصل چک ممهور به مهر ابطال شد» was ticked (owner, 19 Nov 2026, answer to Q62).</param>
+/// <param name="RecordedAt">Cancellation: the computer's date and time when it was recorded, shown with the user beside that tick.</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -74,7 +76,9 @@ public sealed record StepDetails(
     Guid? PaymentRequestId = null,
     string? TrackingCode = null,
     int? SheetNumber = null,
-    IReadOnlyList<ReceiptSigner>? Signers = null);
+    IReadOnlyList<ReceiptSigner>? Signers = null,
+    bool OriginalStamped = false,
+    DateTimeOffset? RecordedAt = null);
 
 /// <summary>
 /// The bank's certificate of non-payment («گواهی عدم پرداخت», the owner's term of 18 Nov 2026 for what was called the bounce notice): its
@@ -516,7 +520,8 @@ public sealed class Instrument : AggregateRoot<Guid>
             changeDetails: () => Destination = null);
 
     /// <summary>
-    /// Replacement («تعویض», owner's item 14 (d)): the payer gives new cheques for this one; they may differ in amount and number (answer
+    /// Replacement («تعویض», owner's item 14 (d)), only of a cheque that was cancelled first («ابطال شده»; owner's answer to Q62, 19 Nov
+    /// 2026: "برای اصل رعایت کنترل داخلی در ابتدا بایستی باطل شود"): the payer gives new cheques for this one; they may differ in amount and number (answer
     /// to Q31) and come on their own cheque receipt.
     /// </summary>
     public void Replace(Guid replacementReceiptId, FiscalDate date, string userId)
@@ -528,15 +533,21 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// Cancellation of a received cheque («ابطال», owner's item 14 (f)): in the cash desk, back from the bank or bounced. The treasurer
     /// cancels it and types the number and date of management's order (answer to Q30), with the reason.
+    /// Owner, 19 Nov 2026 (answer to Q62): the cancellation records whether «اصل چک ممهور به مهر ابطال شد» was ticked, with the user
+    /// who cancelled and the computer's date and time. A cheque that is to be replaced is cancelled first (see <see cref="Replace"/>).
     /// </summary>
-    public void CancelReceived(FiscalDate date, string userId, string? orderNumber, FiscalDate? orderDate, string? reason)
+    /// <param name="originalStamped">The original cheque was stamped «ابطال».</param>
+    /// <param name="recordedAt">The computer's date and time, written beside that tick with the user.</param>
+    public void CancelReceived(FiscalDate date, string userId, string? orderNumber, FiscalDate? orderDate, string? reason, bool originalStamped = false,
+        DateTimeOffset? recordedAt = null)
     {
         Require(Direction == InstrumentDirection.Received, "Instrument.InvalidTransition", "Only a received cheque is cancelled this way.");
         Require(!string.IsNullOrWhiteSpace(orderNumber) && orderDate is not null, "Instrument.CancelOrderRequired",
             "Enter the number and date of management's order to cancel.");
         Require(orderDate is null || orderDate <= date, "Instrument.CancelOrderAfterCancel", "Management's order cannot be dated after the cancellation.");
         Require(!string.IsNullOrWhiteSpace(reason), "Instrument.CancelReasonRequired", "A reason is required to cancel.");
-        Apply(InstrumentAction.Cancel, date, userId, orderNumber!.Trim(), reason!.Trim(), details: new StepDetails(DocumentDate: orderDate));
+        Apply(InstrumentAction.Cancel, date, userId, orderNumber!.Trim(), reason!.Trim(),
+            details: new StepDetails(DocumentDate: orderDate, OriginalStamped: originalStamped, RecordedAt: recordedAt));
     }
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
