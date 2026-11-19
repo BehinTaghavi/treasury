@@ -226,7 +226,9 @@ public sealed class NoteReceiptTests
         Assert.Equal([(true, "1201", "200015", 500_000_000m), (false, "4101", "200015", 500_000_000m)],
             v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
         Assert.Equal("دریافت سفته – رسید 7", v.Operation);
-        Assert.Equal("سفته 123456 عندالمطالبه – شرکت نمونه بازرگانی", v.Lines[0].Description);
+        // Report no. 6, item 4: the receipt's purpose is written, as it is, in the description of each note or cheque.
+        Assert.Equal("بابت بدهی فاکتور ۱۲۳ – سفته 123456 عندالمطالبه – شرکت نمونه بازرگانی", v.Lines[0].Description);
+        Assert.StartsWith("بابت بدهی فاکتور ۱۲۳ – ", v.Lines[1].Description, StringComparison.Ordinal);
         Assert.True(v.IsComplete);
     }
 

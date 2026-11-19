@@ -100,6 +100,18 @@ Built as the owner described (`received-cheque-steps.md`, section 8; `docs/decis
 
 Also done from the same description: the type list «نوع حساب تفصیل» is before the تفصیل of this form too, with the person types only (part of Q47).
 
+## Owner's report no. 6 (18 Nov 2026)
+
+The eleven items are built (`docs/decisions.md`, 19 Nov 2026). These points were not settled by the report:
+
+| # | Question | Built for now | Why |
+|---|---|---|---|
+| Q59 | **Until when can a receipt be edited?** Item 2 says «تا زمانیکه سند **ارسال** نشده است», item 6 «تا زمانیکه … **تایید سند** حسابداری نشده است». Sending vouchers to the accounting system is not built yet (Phase F). When it is: may a voucher that is confirmed but **not yet sent** be opened again (the confirmation withdrawn) so the receipt can be edited? Who may withdraw it? | Editing closes at «تایید سند», for every kind of receipt. A confirmed voucher is not withdrawn. | Today «تایید سند» is the last step a voucher has. |
+| Q60 | **A cheque receipt whose cheque has moved on:** if one cheque of a receipt is already «ثبت صیادی شد» (or deposited, returned, …) while the receipt's voucher is still not confirmed, should the receipt (or its other cheques) still be editable? | No: the receipt is edited only while **all** its cheques are «نزد صندوق» with no step recorded (`Instrument.CorrectionAfterStep`). | The Sayad registration and every later step are recorded with what is written on the cheque; the date and payer of the receipt belong to all its cheques. |
+| Q61 | **When is a purpose group «used»?** A group is locked once a receipt or a payment request names it. A group that is only listed among the allowed purpose groups of a **petty cash holder**, with no receipt or payment yet, is locked too. Should that one stay editable? | Locked as well (the same mark that already stops its deletion). | Your words are «گردش» / «ترانزکشن»; a petty cash holder's list is not a transaction. Telling the two apart needs a second mark on the group. |
+| Q62 | **Cancellation before a replacement:** (1) «تعویض» is one action that first cancels the old cheque with the voucher Dr «بدهکاران» (the account its receipt credited) / Cr «اسناد نزد صندوق» (or «اسناد واخواست شده» …), then receives the new cheque — the manual's operations 6 and 7. It does **not** use «مطالبات سوخت شده» and does **not** ask for the number and date of management's order, which «ابطال» on its own does (Q30). Is that right, or must the user first press «ابطال» (with management's order) and replace the cancelled cheque afterwards? (2) The old cheque's latest status stays «تعویض چک»; should it read «ابطال شده» instead? | (1) One action, two vouchers, no order number. (2) «تعویض چک». | Your sentence and the manual agree on the two vouchers; the voucher table of 15 Nov has only the write-off row for «ابطال». |
+| Q63 | **«از تاریخ / تا تاریخ» on other printed lists:** the range is asked by «چاپ» of the list under each receipt form and cheque screen. Do you want the same (a) for a printed list in the tab «فهرست دریافت‌ها» (it has no print button yet), (b) for a printed list of the cheques themselves on «عملیات چک‌های دریافتی» (by due date)? | Only the list under the receipt screens. | Item 10 says «هنگام چاپ چک»; the only printed list today is that one. |
+
 ## Receipt of promissory notes (owner's form «فرم دریافت سفته», 16 Nov 2026)
 
 The form is built as the owner's sheet and the approved mock-up show it. These points were not settled by the sheet; each is built as proposed until he answers.

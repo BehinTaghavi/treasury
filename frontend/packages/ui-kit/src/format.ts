@@ -75,3 +75,13 @@ export function groupAmount(text: string, decimals = 2, allowNegative = false): 
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   return (negative ? '-' : '') + grouped + (frac === null ? '' : `.${frac}`)
 }
+
+/**
+ * A receipt number as typed into the «شماره رسید» box of the receipts lists (owner's report no. 6, item 9): Persian or Arabic digits and
+ * spaces allowed. Returns the number, null for an empty box (no filter), or NaN for text that is not a number (which matches nothing).
+ */
+export function receiptNumber(text: string): number | null {
+  const digits = toLatinDigits(text ?? '').replace(/[\s,٬]/g, '')
+  if (!digits) return null
+  return /^\d+$/.test(digits) ? Number(digits) : Number.NaN
+}

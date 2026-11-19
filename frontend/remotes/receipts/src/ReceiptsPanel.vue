@@ -3,9 +3,18 @@
  * The button «فهرست دریافت‌ها» at the bottom of every receipt screen (owner, 18 Nov 2026): on whichever form or cheque step the user is,
  * it opens the receipts of that kind — cheques, cash into a cash desk, deposits straight into a bank account — of the fiscal year in
  * use, newest first, with the latest status of each, in a scrolling box in the free space under the form; and prints them.
+ * Owner's report no. 6 (18 Nov 2026):
+ * - item 8: the statuses follow by themselves — the list is read again at once when a receipt is saved or a cheque step is recorded on
+ *   this screen, every 15 seconds while it is open (for what other users record), and when the user comes back to the window; the
+ *   button «به‌روزرسانی» stays for whoever wants it;
+ * - item 9: a box «شماره رسید» finds exactly that number;
+ * - item 10: «چاپ» first asks «از تاریخ» and «تا تاریخ», filled with the first and last date of the rows now listed and free to change,
+ *   and prints the receipts of that range;
+ * - items 2 and 6: «ویرایش» on a row opens the receipt in the form above while its voucher is not confirmed.
  */
-import { computed, ref, watch } from 'vue'
-import { chequeStateName, createApi, dueMark, formatAmount, groupChequeStatuses, searchKey, todayJalali, translate, type ChequeStatus, type Locale } from '@treasury/ui-kit'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { chequeStateName, createApi, dueMark, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
+  type ChequeStatus, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { depositMethodName, depositMethods } from './depositMethods'
@@ -17,8 +26,12 @@ interface Receipt {
   amount: number | null; currency: string | null; totalRial: number; instrumentCount: number; state: string; chequeStatuses: ChequeStatus[] | null
 }
 
-const props = withDefaults(defineProps<{ kind: Kind; apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number; refreshKey?: number }>(),
-  { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined, refreshKey: 0 })
+const props = withDefaults(defineProps<{
+  kind: Kind; apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number; refreshKey?: number
+  /** The receipt now open in the form above for «ویرایش». */
+  editingId?: string
+}>(), { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined, refreshKey: 0, editingId: undefined })
+const emit = defineEmits<{ edit: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -37,25 +50,42 @@ const loading = ref(false)
 const error = ref('')
 const receipts = ref<Receipt[]>([])
 const search = ref('')
+/** «شماره رسید»: exactly this number (item 9). */
+const numberSearch = ref('')
 const method = ref('')
 const methodChoices = computed<Choice[]>(() => depositMethods.map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 let lookupsLoaded = false
 
-async function load() {
-  loading.value = true
-  error.value = ''
+/** @param quiet A reading the user did not ask for: no «در حال خواندن», and a failure leaves the list as it is. */
+async function load(quiet = false) {
+  if (!quiet) { loading.value = true; error.value = '' }
   if (!lookupsLoaded) { await L.load(); lookupsLoaded = true }
   // The API answers newest first (date, then number).
   const r = await api.get<Receipt[]>(`/api/cashflow/receipts?year=${year.value}&kind=${props.kind}`)
-  loading.value = false
-  if (r.ok) receipts.value = r.value
-  else error.value = translate(r.code, props.locale)
+  if (!quiet) loading.value = false
+  if (r.ok) { receipts.value = r.value; error.value = '' }
+  else if (!quiet) error.value = translate(r.code, props.locale)
 }
 function toggle() {
   open.value = !open.value
   if (open.value) void load()
 }
-watch(() => [props.refreshKey, props.kind, year.value], () => { if (open.value) void load() })
+watch(() => [props.refreshKey, props.kind, year.value], () => { if (open.value) void load(true) })
+
+// ---- item 8: the statuses follow without the button ----
+const RefreshEveryMs = 15_000
+let timer: ReturnType<typeof setInterval> | undefined
+const refreshIfSeen = () => { if (open.value && document.visibilityState === 'visible') void load(true) }
+onMounted(() => {
+  timer = setInterval(refreshIfSeen, RefreshEveryMs)
+  document.addEventListener('visibilitychange', refreshIfSeen)
+  window.addEventListener('focus', refreshIfSeen)
+})
+onBeforeUnmount(() => {
+  clearInterval(timer)
+  document.removeEventListener('visibilitychange', refreshIfSeen)
+  window.removeEventListener('focus', refreshIfSeen)
+})
 
 function accountName(r: Receipt) {
   if (r.accountKind === 'CashDesk') return L.desks.value.find(d => d.id === r.accountId)?.name ?? ''
@@ -72,20 +102,49 @@ function statusText(r: Receipt) {
 }
 const shown = computed(() => {
   const key = searchKey(search.value)
-  return receipts.value.filter(r => (!method.value || r.method === method.value)
-    && (!key || searchKey(`${r.number} ${r.date} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.trackingNumber ?? ''} ${statusText(r)}`).includes(key)))
+  const wanted = receiptNumber(numberSearch.value)
+  return receipts.value.filter(r => (!method.value || r.method === method.value) && (wanted === null || r.number === wanted)
+    && (!key || searchKey(`${r.date} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.trackingNumber ?? ''} ${statusText(r)}`).includes(key)))
 })
 const total = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
 const where = (r: Receipt) => (r.kind === 'Instruments' || r.kind === 'Notes' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
 const whereTitle = computed(() => (props.kind === 'Instruments' || props.kind === 'Notes' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
 
-// ---- print: the rows now shown, on a page of their own (a hidden frame, so no pop-up window is needed) ----
+// ---- print: the rows now shown, within a range of dates, on a page of their own (a hidden frame, so no pop-up window is needed) ----
+/**
+ * Item 10: after «چاپ» the user sees «از تاریخ» and «تا تاریخ», filled from the list (the earliest and latest receipt date of the rows now
+ * shown), changes them if wanted, and prints the receipts of that range. Dates are Jalali text, which sorts as text.
+ */
+const range = reactive({ open: false, from: '', to: '', error: '' })
+function askRange() {
+  const dates = shown.value.map(r => r.date).sort()
+  Object.assign(range, { open: true, from: dates[0] ?? '', to: dates[dates.length - 1] ?? '', error: '' })
+}
+/** The rows the report prints: the rows shown, between the two dates (an empty date leaves that side open). */
+const printed = computed(() => {
+  const from = normaliseJalali(range.from)
+  const to = normaliseJalali(range.to)
+  return shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
+})
+const printedTotal = computed(() => printed.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
+function printRange() {
+  const [from, to] = [range.from.trim(), range.to.trim()]
+  if ((from && !normaliseJalali(from)) || (to && !normaliseJalali(to))) return void (range.error = translate('FiscalDate.Invalid', props.locale))
+  if (from && to && normaliseJalali(from)! > normaliseJalali(to)!) return void (range.error = t('«از تاریخ» بعد از «تا تاریخ» است.', '"From" is after "to".'))
+  if (!printed.value.length) return void (range.error = t('در این بازه رسیدی نیست.', 'No receipt in this range.'))
+  range.error = ''
+  print()
+}
+const rangeText = () => {
+  const [from, to] = [normaliseJalali(range.from), normaliseJalali(range.to)]
+  return from && to ? t(`از تاریخ ${from} تا تاریخ ${to}`, `from ${from} to ${to}`) : from ? t(`از تاریخ ${from}`, `from ${from}`) : to ? t(`تا تاریخ ${to}`, `until ${to}`) : ''
+}
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
 function printHtml() {
   const bank = props.kind === 'BankDeposit'
   const head = [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), whereTitle.value,
     ...(bank ? [t('نوع واریز', 'Kind of deposit'), t('پیگیری / شبا', 'Tracking / Sheba')] : []), t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')]
-  const body = shown.value.map((r, i) => [num(i + 1), num(r.number), r.date, `${r.payerName} (${r.payerDetailCode})`, r.purpose, where(r),
+  const body = printed.value.map((r, i) => [num(i + 1), num(r.number), r.date, `${r.payerName} (${r.payerDetailCode})`, r.purpose, where(r),
     ...(bank ? [depositMethodName(r.method, fa.value), [r.trackingNumber, r.payerSheba].filter(Boolean).join(' – ')] : []), money(r.totalRial), statusText(r)])
   const span = head.length - 2
   return `<!doctype html><html lang="${fa.value ? 'fa' : 'en'}" dir="${fa.value ? 'rtl' : 'ltr'}"><head><meta charset="utf-8"><title>${esc(title.value)}</title><style>
@@ -96,11 +155,11 @@ function printHtml() {
     th { background: #eee; } tfoot td { font-weight: bold; } tr { break-inside: avoid; }
   </style></head><body>
     <h1>${esc(title.value)}</h1>
-    <p>${esc(t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(shown.value.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${shown.value.length} receipts – newest first`))}${
-      search.value || method.value ? esc(t(' – با فیلتر', ' – filtered')) : ''}</p>
+    <p>${rangeText() ? esc(rangeText()) + ' – ' : ''}${esc(t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(printed.value.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${printed.value.length} receipts – newest first`))}${
+      search.value || method.value || numberSearch.value ? esc(t(' – با فیلتر', ' – filtered')) : ''}</p>
     <table><thead><tr>${head.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead>
     <tbody>${body.map(row => `<tr>${row.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
-    <tfoot><tr><td colspan="${span}">${esc(t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'))}</td><td>${esc(money(total.value))}</td><td></td></tr></tfoot></table>
+    <tfoot><tr><td colspan="${span}">${esc(t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'))}</td><td>${esc(money(printedTotal.value))}</td><td></td></tr></tfoot></table>
   </body></html>`
 }
 function print() {
@@ -117,7 +176,7 @@ function print() {
   setTimeout(() => { w.focus(); w.print() }, 150)
   setTimeout(() => frame.remove(), 60_000)
 }
-defineExpose({ printHtml, load })
+defineExpose({ printHtml, load, range, askRange, printRange })
 </script>
 
 <template>
@@ -133,13 +192,28 @@ defineExpose({ printHtml, load })
     </div>
     <template v-if="open">
       <div class="tr-buttons tr-filters">
-        <label style="flex: 1; min-width: 14rem">{{ t('جستجو (شماره، تاریخ، پرداخت کننده، بابت، وضعیت)', 'Search (number, date, payer, purpose, status)') }} <input v-model="search" /></label>
+        <label style="width: 9rem">{{ t('شماره رسید', 'Receipt no.') }} <input v-model="numberSearch" dir="ltr" inputmode="numeric" :aria-label="t('شماره رسید', 'Receipt no.')" /></label>
+        <label style="flex: 1; min-width: 14rem">{{ t('جستجو (تاریخ، پرداخت کننده، بابت، وضعیت)', 'Search (date, payer, purpose, status)') }} <input v-model="search" /></label>
         <label v-if="kind === 'BankDeposit'" style="width: 20rem">{{ t('نوع واریز', 'Kind of deposit') }}
           <SearchSelect v-model="method" :options="methodChoices" :empty-label="t('همه', 'All')" :aria-label="t('نوع واریز', 'Kind of deposit')" />
         </label>
-        <button type="button" class="tr-secondary" :disabled="loading" @click="load">{{ t('به‌روزرسانی', 'Refresh') }}</button>
-        <button type="button" :disabled="!shown.length" @click="print">{{ t('چاپ', 'Print') }}</button>
+        <button type="button" class="tr-secondary" :disabled="loading" @click="load()">{{ t('به‌روزرسانی', 'Refresh') }}</button>
+        <button type="button" :disabled="!shown.length" :aria-expanded="range.open" @click="range.open ? (range.open = false) : askRange()">{{ t('چاپ', 'Print') }}</button>
       </div>
+      <p class="muted small" style="margin: .25rem 0 0">{{ t('وضعیت‌ها خودکار به‌روز می‌شوند (پس از هر ثبت و هر ۱۵ ثانیه).', 'Statuses refresh by themselves (after every save and every 15 seconds).') }}</p>
+      <!-- item 10: the range of the printed report -->
+      <fieldset v-if="range.open" class="tr-range">
+        <legend>{{ t('بازهٔ گزارش چاپی', 'Range of the printed report') }}</legend>
+        <label>{{ t('از تاریخ', 'From') }} <input v-model="range.from" dir="ltr" placeholder="1405/01/01" /></label>
+        <label>{{ t('تا تاریخ', 'To') }} <input v-model="range.to" dir="ltr" placeholder="1405/12/29" /></label>
+        <div class="tr-buttons">
+          <button type="button" @click="printRange">{{ t(`چاپ گزارش (${num(printed.length)} رسید)`, `Print the report (${printed.length} receipts)`) }}</button>
+          <button type="button" class="tr-secondary" @click="range.open = false">{{ t('انصراف', 'Back') }}</button>
+        </div>
+        <p class="muted small wide3">{{ t('تاریخ‌ها از روی فهرست پر شده‌اند (اولین و آخرین تاریخ ردیف‌های فهرست)؛ برای بازهٔ دلخواه آن‌ها را تغییر دهید.',
+          'The dates come from the list (the first and last date of its rows); change them for the range you want.') }}</p>
+        <p v-if="range.error" class="tr-msg error wide3" role="status">{{ range.error }}</p>
+      </fieldset>
       <p v-if="error" class="tr-msg error" role="status">{{ error }}</p>
       <div class="tr-box">
         <table class="tr-table">
@@ -147,11 +221,11 @@ defineExpose({ printHtml, load })
             <tr>
               <th>{{ t('شماره', 'No.') }}</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th><th>{{ t('بابت', 'Purpose') }}</th>
               <th>{{ whereTitle }}</th><th v-if="kind === 'BankDeposit'">{{ t('نوع واریز', 'Kind of deposit') }}</th>
-              <th>{{ t('مبلغ (ریال)', 'Amount (Rial)') }}</th><th>{{ t('وضعیت', 'Latest status') }}</th>
+              <th>{{ t('مبلغ (ریال)', 'Amount (Rial)') }}</th><th>{{ t('وضعیت', 'Latest status') }}</th><th />
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in shown" :key="r.id" :class="{ cancelled: r.state === 'Cancelled' }">
+            <tr v-for="r in shown" :key="r.id" :class="{ cancelled: r.state === 'Cancelled', selected: r.id === editingId }">
               <td class="num">{{ num(r.number) }}</td>
               <td class="num">{{ r.date }}</td>
               <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
@@ -171,11 +245,16 @@ defineExpose({ printHtml, load })
                 </template>
                 <template v-else>{{ t('ثبت شده', 'Recorded') }}</template>
               </td>
+              <td>
+                <!-- items 2 and 6: opens the receipt in the form above; the server says when it can no longer be corrected -->
+                <button v-if="r.state !== 'Cancelled'" type="button" class="tr-link" @click="emit('edit', r.id)">{{ t('ویرایش', 'Correct') }}</button>
+              </td>
             </tr>
-            <tr v-if="!shown.length"><td :colspan="kind === 'BankDeposit' ? 8 : 7" class="muted">{{ loading ? t('در حال خواندن…', 'Loading…') : t('رسیدی در این سال مالی ثبت نشده است.', 'No receipts in this fiscal year.') }}</td></tr>
+            <tr v-if="!shown.length"><td :colspan="kind === 'BankDeposit' ? 9 : 8" class="muted">{{ loading ? t('در حال خواندن…', 'Loading…')
+              : receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی در این سال مالی ثبت نشده است.', 'No receipts in this fiscal year.') }}</td></tr>
           </tbody>
           <tfoot v-if="shown.length">
-            <tr><td :colspan="kind === 'BankDeposit' ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td /></tr>
+            <tr><td :colspan="kind === 'BankDeposit' ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td colspan="2" /></tr>
           </tfoot>
         </table>
       </div>
@@ -187,6 +266,7 @@ defineExpose({ printHtml, load })
 <style scoped>
 .tr-panel { margin-top: 1.5rem; padding-top: .75rem; border-top: 1px dashed #cbd2d9; }
 .tr-filters { align-items: end; margin-top: .5rem; }
+.tr-range { margin-top: .5rem; background: #f8fafc; grid-template-columns: repeat(auto-fill, minmax(11rem, 14rem)); }
 /* The list scrolls inside the free space under the form; the header and the total stay in view. */
 .tr-box { max-height: 26rem; overflow: auto; border: 1px solid #e4e7eb; border-radius: 8px; margin-top: .5rem; }
 .tr-box .tr-table { margin-top: 0; }

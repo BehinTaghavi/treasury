@@ -83,3 +83,14 @@ describe('company logo', () => {
     expect(hasTranslation('Company.LogoInvalid') && hasTranslation('Company.LogoTooLarge')).toBe(true)
   })
 })
+
+import { receiptNumber } from './index'
+
+describe('the receipt number box of the receipts lists (report no. 6, item 9)', () => {
+  it('reads Persian digits and spaces, and tells an empty box from text that is no number', () => {
+    expect(receiptNumber('۱۲')).toBe(12)
+    expect(receiptNumber(' 0012 ')).toBe(12)
+    expect(receiptNumber('')).toBeNull()
+    expect(receiptNumber('۱۲الف')).toBeNaN()
+  })
+})

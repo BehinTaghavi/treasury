@@ -119,13 +119,13 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     public InstrumentDirection Direction { get; }
 
-    public InstrumentKind Kind { get; }
+    public InstrumentKind Kind { get; private set; }
 
     /// <summary>Number printed on the instrument. Set at receipt, or when an issued cheque gets its sheet number.</summary>
     public string? Number { get; private set; }
 
     /// <summary>Drawer's bank for received cheques.</summary>
-    public string? BankName { get; }
+    public string? BankName { get; private set; }
 
     /// <summary>Received side: the receipt (رسید دریافت) that brought the instrument in; null for older single entries.</summary>
     public Guid? ReceiptId { get; private set; }
@@ -151,18 +151,18 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Payment (in the Disbursements context) this issued instrument settles.</summary>
     public Guid? PaymentId { get; private set; }
 
-    public Money Amount { get; }
+    public Money Amount { get; private set; }
 
     /// <summary>Date written on the instrument (received side: date received).</summary>
-    public FiscalDate IssueDate { get; }
+    public FiscalDate IssueDate { get; private set; }
 
     /// <summary>Maturity (سررسید). Null only for guarantee items and notes payable on demand («عندالمطالبه»).</summary>
-    public FiscalDate? DueDate { get; }
+    public FiscalDate? DueDate { get; private set; }
 
-    public CounterpartyRef Counterparty { get; }
+    public CounterpartyRef Counterparty { get; private set; }
 
     /// <summary>بابت — what the instrument is for.</summary>
-    public string Purpose { get; }
+    public string Purpose { get; private set; }
 
     /// <summary>Collection account (received cheques sent to a bank) or endorsee (received cheques given to others).</summary>
     public string? Destination { get; private set; }
@@ -219,6 +219,24 @@ public sealed class Instrument : AggregateRoot<Guid>
         ReceivedInstrumentDetails details,
         Guid? receiptId)
     {
+        var checkedDetails = CheckReceived(kind, number, bankName, dueDate, drawer, purpose, details);
+        var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
+            string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
+        {
+            Number = number.Trim(),
+            State = InstrumentState.InCashDesk,
+            OriginFiscalYear = receivedOn.JalaliYear,
+            ReceiptId = receiptId,
+            Details = checkedDetails,
+        };
+        instrument.Record(InstrumentAction.Receive, null, InstrumentState.InCashDesk, receivedOn, userId, null, null);
+        return instrument;
+    }
+
+    /// <summary>What is checked on a received cheque or note, when it is received and when it is corrected; returns its details as kept.</summary>
+    private static ReceivedInstrumentDetails CheckReceived(
+        InstrumentKind kind, string number, string? bankName, FiscalDate? dueDate, CounterpartyRef drawer, string purpose, ReceivedInstrumentDetails details)
+    {
         ArgumentNullException.ThrowIfNull(details);
         Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
         Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
@@ -231,18 +249,53 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(!checkedDetails.OnDemand || dueDate is null, "Instrument.OnDemandHasDueDate", "A note payable on demand has no due date.");
         Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
             "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
+        return checkedDetails;
+    }
 
-        var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
-            string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
-        {
-            Number = number.Trim(),
-            State = InstrumentState.InCashDesk,
-            OriginFiscalYear = receivedOn.JalaliYear,
-            ReceiptId = receiptId,
-            Details = checkedDetails,
-        };
-        instrument.Record(InstrumentAction.Receive, null, InstrumentState.InCashDesk, receivedOn, userId, null, null);
-        return instrument;
+    /// <summary>
+    /// A received cheque or note can be corrected or taken off its receipt only while it is as it was received: in the cash desk
+    /// («نزد صندوق»), with no step recorded on it (owner's report no. 6, items 2 and 6). After «ثبت صیادی», a deposit or any other
+    /// step, what is written on it stands.
+    /// </summary>
+    public bool IsAsReceived => Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && _history.Count == 1;
+
+    /// <summary>
+    /// Correction of a received cheque or note with its receipt (owner's report no. 6, items 2 and 6), with the rules it was received
+    /// with. It stays in the fiscal year it was received in. The receipt step keeps who received it and takes the corrected date.
+    /// </summary>
+    public void CorrectReceived(
+        InstrumentKind kind, string number, string? bankName, Money amount, FiscalDate receivedOn, FiscalDate? dueDate, CounterpartyRef drawer, string purpose,
+        string userId, ReceivedInstrumentDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(amount);
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(IsAsReceived, "Instrument.CorrectionAfterStep",
+            $"Cheque or note {Number} has left «نزد صندوق» or has a step recorded on it; it can no longer be corrected with its receipt.");
+        Require(receivedOn.JalaliYear == OriginFiscalYear, "Receipt.CorrectionOtherYear", $"The date stays in fiscal year {OriginFiscalYear}.");
+        var checkedDetails = CheckReceived(kind, number, bankName, dueDate, drawer, purpose, details);
+        Kind = kind;
+        Number = number.Trim();
+        BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim();
+        Amount = amount;
+        IssueDate = receivedOn;
+        DueDate = dueDate;
+        Counterparty = drawer;
+        Purpose = purpose.Trim();
+        Details = checkedDetails;
+        _history[0] = _history[0] with { Date = receivedOn };
+        Raise(new ReceivedInstrumentCorrected(Id, ReceiptId, Kind, Number, IssueDate, DueDate, Amount, Counterparty.Id, userId));
+    }
+
+    /// <summary>
+    /// Takes a cheque or note typed by mistake off its receipt while the receipt is corrected; the caller then deletes it. Only
+    /// while it is as it was received (see <see cref="IsAsReceived"/>); later a cheque leaves through its steps (عودت، ابطال).
+    /// </summary>
+    public void RemoveFromReceipt(string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(IsAsReceived, "Instrument.CorrectionAfterStep",
+            $"Cheque or note {Number} has left «نزد صندوق» or has a step recorded on it; it can no longer be corrected with its receipt.");
+        Raise(new ReceivedInstrumentRemoved(Id, ReceiptId, Kind, Number, userId));
     }
 
     /// <summary>
@@ -641,3 +694,11 @@ public sealed record InstrumentStateChanged(
     string? Number,
     string? Destination,
     string UserId) : DomainEvent;
+
+/// <summary>A received cheque or note was corrected with its receipt, before the receipt's voucher was confirmed.</summary>
+public sealed record ReceivedInstrumentCorrected(
+    Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, FiscalDate ReceivedOn, FiscalDate? DueDate, Money Amount, Guid CounterpartyId,
+    string UserId) : DomainEvent;
+
+/// <summary>A cheque or note typed by mistake was taken off its receipt and deleted, before the receipt's voucher was confirmed.</summary>
+public sealed record ReceivedInstrumentRemoved(Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, string UserId) : DomainEvent;

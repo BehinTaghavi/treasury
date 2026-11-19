@@ -37,6 +37,8 @@ interface Cheque {
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
   reachedDueDate: boolean
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
+  /** «بابت» of the cheque's receipt, shown as the cheque's description (report no. 6, item 4). */
+  purpose?: string | null
   details: { branchName: string | null; sayadId: string | null; onDemand?: boolean; accountNumber?: string | null; accountHolder?: string | null } | null
 }
 type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
@@ -44,7 +46,8 @@ type Tab = 'desk' | 'bank' | 'back' | 'endorsed'
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; notes?: boolean }>(),
   { apiBase: '', locale: 'fa', token: undefined, notes: false })
 /** «اقدام حقوقی» has its own screen: the parent opens it with the cheque. */
-const emit = defineEmits<{ legal: [chequeId: string] }>()
+/** `changed`: a step was recorded, so the receipts list under the screen reads the statuses again (report no. 6, item 8). */
+const emit = defineEmits<{ legal: [chequeId: string]; changed: [] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const fa = computed(() => props.locale === 'fa')
 /** The words of the cheque screen in the notes screen: سفته for چک, واخواست‌نامه for the bounce notice, متعهد for the payer. */
@@ -158,6 +161,7 @@ async function depositSelected() {
   }
   busy.value = false
   await load()
+  if (done) emit('changed')
   const ok = t(`${done.toLocaleString('fa-IR')} چک به بانک واگذار شد. سند هر چک در کارت آن چک (کلیک روی ردیف) تایید می‌شود.`,
     `${done} cheque(s) deposited. Each cheque's voucher is confirmed on its card (click the row).`)
   if (failed.length) show(done ? 'warning' : 'error', `${done ? ok + ' ' : ''}${t('واگذار نشد', 'Not deposited')} – ${failed.join('؛ ')}`)
@@ -229,6 +233,7 @@ async function confirmStep() {
   busy.value = false
   if (!r.ok) return show('error', translate(r.code, props.locale))
   pending.value = null
+  emit('changed')
   const noVoucher = p.action === 'RegisterSayad'
   show('ok', p.action === 'Endorse' && !props.notes
     ? t(`ثبت انتقال چک ${p.cheque.number} ثبت شد و آخرین وضعیت آن «${stateName('Endorsed')}» است. «برگ پرداخت (رسید واگذاری چک)» را از کارت چک چاپ و سند آن را تایید کنید.`,
@@ -243,9 +248,11 @@ async function confirmStep() {
 async function replaced() {
   const c = replacing.value
   replacing.value = null
-  show('ok', t(`چک ${c?.number} تعویض شد؛ چک‌های جدید نزد صندوق‌اند. سند تعویض در فهرست دریافت‌ها (رسید جدید) تایید می‌شود.`,
-    `Cheque ${c?.number} replaced; the new cheques are in the cash desk. Confirm the replacement voucher on the new receipt in the receipts list.`))
+  show('ok', t(`چک ${c?.number} باطل و تعویض شد؛ چک‌های جدید نزد صندوق‌اند. سند ابطال چک قبلی در کارت همان چک (زیر همین پیام) و سند دریافت چک جدید در فهرست دریافت‌ها (رسید جدید) تایید می‌شود.`,
+    `Cheque ${c?.number} cancelled and replaced; the new cheques are in the cash desk. Confirm the cancellation voucher on the old cheque's card (below) and the new receipt's voucher in the receipts list.`))
+  emit('changed')
   await load()
+  if (c) await openCard(c.id)
 }
 
 // ---- the cheque card: history and vouchers ----
@@ -410,13 +417,17 @@ onMounted(async () => { await L.load(); await load() })
       </div>
     </fieldset>
 
-    <!-- replacement: a cheque receipt of the new cheques (answer to Q31: they may differ in amount and number) -->
+    <!-- replacement: a cheque receipt of the new cheques (answer to Q31: they may differ in amount and number). Report no. 6, item 11: the
+         old cheque is cancelled first, and the form opens with its purpose group, purpose, department, amount and currency. -->
     <section v-if="replacing" class="tr-step">
       <div class="tr-buttons">
-        <strong>{{ t(`تعویض چک ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`, `Replace cheque ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`) }}</strong>
+        <strong>{{ t(`ابطال و تعویض چک ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`, `Cancel and replace cheque ${replacing.number} – ${replacing.counterparty} – ${money(replacing.amount)}`) }}</strong>
         <button type="button" class="tr-secondary" @click="replacing = null">{{ t('انصراف', 'Back') }}</button>
       </div>
-      <ReceiptForm :key="replacing.id" kind="Instruments" :replaces="{ id: replacing.id, number: replacing.number ?? '', amount: replacing.amountInRial, payerCode: replacing.counterpartyDetailCode ?? '' }"
+      <p class="muted small">{{ t('با ثبت این فرم ابتدا چک قبلی باطل می‌شود و سند دریافت آن برگشت داده می‌شود؛ سپس چک جدید با رسید تازه دریافت می‌شود. گروه بابت، بابت، واحد سازمانی، مبلغ و ارز از چک قبلی آمده‌اند و در صورت لزوم قابل تغییرند.',
+        'Saving this form first cancels the old cheque and takes its receipt entry back; then the new cheque is received on a new receipt. Purpose group, purpose, department, amount and currency come from the old cheque and can be changed.') }}</p>
+      <ReceiptForm :key="replacing.id" kind="Instruments" :replaces="{ id: replacing.id, number: replacing.number ?? '', amount: replacing.amountInRial, payerCode: replacing.counterpartyDetailCode ?? '',
+                     receiptId: replacing.receiptId, currency: replacing.currency, originalAmount: replacing.amount }"
                    :api-base="apiBase" :locale="locale" :token="token" @saved="replaced" />
     </section>
 
@@ -433,7 +444,7 @@ onMounted(async () => { await L.load(); await load() })
               <input type="checkbox" :checked="tickable.length > 0 && selected.length === tickable.length" :aria-label="t('همه', 'All')"
                      @change="toggleAll(($event.target as HTMLInputElement).checked)" />
             </th>
-            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ notes ? t('نوع', 'Kind') : t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
+            <th>{{ t('سررسید', 'Due') }}</th><th>{{ t('شماره چک', 'Cheque no.') }}</th><th>{{ notes ? t('نوع', 'Kind') : t('بانک', 'Bank') }}</th><th>{{ t('پرداخت کننده / شرح (بابت)', 'Payer / description (purpose)') }}</th>
             <th>{{ t('مبلغ', 'Amount') }}</th><th>{{ t('آخرین وضعیت', 'Latest status') }}</th><th>{{ t('عملیات', 'Steps') }}</th>
           </tr>
         </thead>
@@ -446,7 +457,7 @@ onMounted(async () => { await L.load(); await load() })
             <td class="num">{{ c.number }}</td>
             <td v-if="notes">{{ c.kind === 'GuaranteeNote' ? t('تضمینی / امانی', 'Guarantee / trust') : t('عادی', 'Ordinary') }}</td>
             <td v-else>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span></td>
-            <td>{{ c.counterparty }}</td>
+            <td>{{ c.counterparty }}<div v-if="c.purpose" class="muted small">{{ c.purpose }}</div></td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ stateName(c.state) }}
               <span v-if="c.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(c.state, locale)">{{ dueMark(locale) }}</span>
@@ -491,7 +502,7 @@ onMounted(async () => { await L.load(); await load() })
         <h3 style="margin: 0">{{ t(`کارت چک ${card.number}`, `Cheque ${card.number}`) }}</h3>
         <span class="tr-tag">{{ t('آخرین وضعیت', 'Latest status') }}: {{ stateName(card.state) }}</span>
         <span v-if="card.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(card.state, locale)">{{ dueMark(locale) }}</span>
-        <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}</span>
+        <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}<template v-if="card.purpose"> · {{ t('شرح', 'Description') }}: {{ card.purpose }}</template></span>
         <button v-if="hasTransfer(card)" type="button" class="tr-secondary" @click="printTransfer(card)">{{ t('چاپ برگ پرداخت (رسید واگذاری چک)', 'Print the payment sheet') }}</button>
         <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
       </div>

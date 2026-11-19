@@ -57,7 +57,7 @@ of the company bank account.
 | (b) collected | date (after checking the statement), reference | bank account's معین · bank | «چک‌های در جریان وصول» · bank | owner's table — built |
 | (c) returned to the company | date, bank's note | «اسناد نزد صندوق» · payer | «چک‌های در جریان وصول» · bank | owner's table «عودت چک واگذاری توسط بانک» |
 | (e) bounced | **bounce notice no. and date** (required; on screens «گواهی عدم پرداخت»), its tracking code (optional), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
-| (d) replaced | the new cheque(s) of the same payer (as on the cheque receipt form) | «اسناد نزد صندوق» · payer (new cheque) | where the old cheque is: «اسناد نزد صندوق», «اسناد واخواست شده» or, in legal action, «اسناد واخواست شده حقوقی شده» · payer | Q31 |
+| (d) replaced — **two vouchers since 19 Nov** (section 9) | the new cheque(s) of the same payer (as on the cheque receipt form, which opens with the old cheque's purpose group, purpose, department, amount and currency) | first voucher, on the old cheque («ابطال چک جهت تعویض»): the account the old cheque's receipt credited («بدهکاران») · payer. Second voucher, on the new receipt: «اسناد نزد صندوق» · payer | first voucher: where the old cheque is: «اسناد نزد صندوق», «اسناد واخواست شده» or, in legal action, «اسناد واخواست شده حقوقی شده» · payer. Second voucher: the new receipt's purpose group · payer | Q31; report no. 6, item 11; manual operations 6 and 7 (Q62) |
 | (f) cancelled | management's order no. and date, date, reason | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
 | (g) ثبت انتقال (خرج چک) | the approved payment request of the kind «ثبت انتقال (خرج چک)» written for the cheque (its beneficiary, payment purpose group and purpose), tracking code of the transfer in Sayad (required); section 8 | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
@@ -216,3 +216,28 @@ The owner described how the traditional «خرج چک» is done in the Sayad sys
 Code: `InstrumentLifecycle` (the cash-desk step for notes only), `Instrument.Endorse` and `Endorsement.RequestChequeId`;
 requests-svc `PaymentMethod.ChequeTransfer`, `TransferCheque`, `IReceivedChequeLookup` (asks cashflow-svc; `Services:Cashflow`),
 schema 041; screens `RequestForm.vue`, `ChequeOperations.vue`, `ChequeTransferSheet.vue`.
+
+## 9. Owner's report no. 6 (18 Nov 2026): corrections, replacement, lists
+
+**Correction of a receipt («ویرایش», items 2 and 6).** A saved receipt of any kind is opened again in its form — «ویرایش» on its row of the
+list under the form, or on the opened receipt in «فهرست دریافت‌ها» — and saved back under its number, while its voucher is not confirmed
+(«تایید سند») and it is not cancelled. A cheque or note receipt is corrected while every cheque on it is as it was received: «نزد صندوق»,
+no step recorded (`Instrument.IsAsReceived`); a cheque that was registered in Sayad, deposited, or came back to the cash desk after a
+legal action closes the correction of its receipt. In the form a cheque can be corrected, added («ثبت چک بعدی») or removed («حذف ردیف»).
+The receipt keeps its kind and its fiscal year (its number belongs to the year). Open points: Q59 (confirmed or sent), Q60.
+
+**Replacement (item 11).** «تعویض» first cancels the old cheque and then receives the new one, with two vouchers (table of section 3, row
+(d)): the cancellation takes the old receipt's entry back (manual operation 6 «ابطال چک های دریافتنی»), the new cheque is received as on
+any cheque receipt (operation 1). The old cheque's card shows the cancellation voucher for «تایید سند»; the new receipt's voucher is
+confirmed in the receipts list. The form shows both vouchers before saving. A replacement confirmed before this change kept its one
+combined voucher. Open point: Q62.
+
+**Purpose as the cheque's description (item 4).** The purpose of the receipt is written at the start of both lines of each cheque's
+voucher and shown under the payer in the cheque lists and on the cheque card.
+
+**Lists (items 8, 9, 10).** The list under the screens reads the statuses again after every save and step, every 15 seconds and when
+the window is seen again; «شماره رسید» finds one receipt; «چاپ» asks for «از تاریخ» and «تا تاریخ» (Q63).
+
+Code: `Receipt.Correct*`, `Receipt.WhyNotCorrectable`, `Instrument.CorrectReceived` / `RemoveFromReceipt`, `ReceiptUseCases.Correct*Async`,
+`IInstrumentRepository.SaveCorrectionAsync` / `RemoveAsync`, `ReceiptVouchers.ForStep` (step Replace), schema 042; screens
+`ReceiptForm.vue`, `NoteReceiptForm.vue` (prop `edit`), `ReceiptsPanel.vue`, `ReceiptList.vue`, ui-kit `AmountInput.vue`, `ComboInput.vue`.

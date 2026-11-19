@@ -69,13 +69,17 @@ public sealed class PurposeGroup : AggregateRoot<Guid>
         return group;
     }
 
-    /// <summary>Corrects the group. The direction can change only while no receipt or payment uses the group.</summary>
+    /// <summary>
+    /// Corrects the group, only while nothing uses it (owner's report no. 6, items 3 and 7: "گروه بابت‌های تعریف شده … اگر در یک
+    /// ترانزکشن استفاده شوند قابل ویرایش نخواهند بود"): the vouchers of what was recorded take their account from the group. A used
+    /// group can still be switched off, and its purposes can still be added, corrected or deleted.
+    /// </summary>
     public void Edit(
         PurposeDirection direction, string name, string ledgerAccountCode, PurposeLedgerFact? ledger, CatalogueItem? reference1, CatalogueItem? reference2)
     {
+        Require(!IsInUse, "PurposeGroup.EditInUse", "The group is already used by a receipt, payment or request and can no longer be changed; switch it off and define a new group instead.");
         var newName = ValidName(name);
         var newLedger = ValidLedger(ledgerAccountCode, ledger, keep: LedgerAccountCode);
-        Require(direction == Direction || !IsInUse, "PurposeGroup.DirectionInUse", "The group is already used; receipt or payment can no longer change.");
         var before = (Direction, Name, LedgerAccountCode, Reference1Id, Reference2Id);
         Direction = direction;
         Name = newName;

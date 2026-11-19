@@ -8,19 +8,30 @@
  * The voucher the receipt will produce is shown at the bottom while the form is filled (owner's report no. 4, item 8); the treasurer
  * confirms it from the receipts list after saving.
  * With `replaces` the form is the replacement of a received cheque (owner's item 14 (d)): the payer is the old cheque's, the new cheques
- * may differ in amount and number (answer to Q31), and the receipt is saved with the old cheque marked «تعویض شده».
+ * may differ in amount and number (answer to Q31), and the receipt is saved with the old cheque marked «تعویض شده». Owner's report no. 6,
+ * item 11: the form opens with the old cheque's purpose group, purpose, department, amount and currency, all of which can be changed;
+ * the old cheque is first cancelled (its voucher takes its receipt's entry back) and the new cheques are then received, so two vouchers
+ * are shown.
+ * With `edit` the form is «ویرایش» of a saved receipt (report no. 6, items 2 and 6): it opens with the receipt as it was saved and saves
+ * it back under the same number, while its voucher is not confirmed.
+ * «بابت» is chosen from the purposes of its group, may be changed after it was chosen, or typed outside the list; a text that is not
+ * in the list is added to it when the receipt is saved (report no. 6, item 4).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
+import ComboInput from '@treasury/ui-kit/ComboInput.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import { depositMethods, forForeignCurrency, needsSheba } from './depositMethods'
+import { amountText, type SavedReceipt } from './savedReceipt'
 
 type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
 type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
 interface Line {
+  /** The saved cheque this line corrects («ویرایش»); empty for a new line. */
+  id?: string
   key: number; kind: LineKind; number: string; dueDate: string; currency: string; amount: string; rate: string
   bankId: string; branchName: string; branchCode: string; accountNumber: string; accountHolder: string; city: string; outOfTown: boolean; sayadId: string
   g1Name: string; g1Code: string; g2Name: string; g2Code: string
@@ -28,9 +39,12 @@ interface Line {
 
 const props = withDefaults(defineProps<{
   kind: Kind; apiBase?: string; locale?: Locale; token?: () => string | undefined
-  replaces?: { id: string; number: string; amount: number; payerCode: string }
-}>(), { apiBase: '', locale: 'fa', token: undefined, replaces: undefined })
-const emit = defineEmits<{ saved: [id: string] }>()
+  /** The cheque being replaced; `receiptId` is its own receipt, which gives the new form its defaults. */
+  replaces?: { id: string; number: string; amount: number; payerCode: string; receiptId?: string | null; currency?: string; originalAmount?: number; state?: string }
+  /** The saved receipt being corrected. */
+  edit?: SavedReceipt
+}>(), { apiBase: '', locale: 'fa', token: undefined, replaces: undefined, edit: undefined })
+const emit = defineEmits<{ saved: [id: string]; cancelled: [] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -53,17 +67,23 @@ const methodChoices = computed<Choice[]>(() => depositMethods
   .filter(m => !m.retired && (accountCurrency.value === 'IRR' || forForeignCurrency(m.value)) && (m.value !== 'CardToCard' || accountHasCard.value))
   .map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
+/** The name of a currency for the words under an amount box: «ریال», or the currency's name from Basic Information. */
+const unitOf = (code: string) => (code === 'IRR' ? 'ریال' : L.currencies.value.find(c => c.code === code)?.name ?? code)
 
 // ---- header (every kind) ----
-const header = reactive({ date: todayJalali(), payer: props.replaces?.payerCode ?? '', groupId: '', purpose: props.replaces ? `تعویض چک ${props.replaces.number}` : '',
-  ref1: '', ref2: '', departmentId: '', salesProceeds: false, note: '' })
+const e0 = props.edit
+const header = reactive({
+  date: e0?.date ?? todayJalali(), payer: e0?.payerDetailCode ?? props.replaces?.payerCode ?? '', groupId: e0?.purposeGroupId ?? '',
+  purpose: e0?.purpose ?? (props.replaces ? `تعویض چک ${props.replaces.number}` : ''),
+  ref1: e0?.reference1 ?? '', ref2: e0?.reference2 ?? '', departmentId: e0?.departmentId ?? '', salesProceeds: e0?.salesProceeds ?? false, note: e0?.note ?? '' })
 const payers = ref<Detail[]>([])
 /** Owner, 14 Nov 2026 (answer to Q22): payers are customers and persons or companies. */
 const PayerRoles = 'Customer,PersonOrCompany'
 const purposes = ref<Purpose[]>([])
 const group = computed(() => L.groups.value.find(g => g.id === header.groupId))
 const refTitle = (id: string | null | undefined) => L.references.value.find(r => r.id === id)?.name
-const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
+const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && (g.isActive || g.id === header.groupId)).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
+const purposeNames = computed(() => purposes.value.filter(p => p.isActive).map(p => p.name))
 const payerChoices = computed<Choice[]>(() => payers.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
 const departmentChoices = computed<Choice[]>(() => L.departments.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name })))
 /**
@@ -81,19 +101,24 @@ function onPayerSearch(text: string) {
 }
 watch(payerType, async type => {
   // A payer of another type than the one now chosen is no longer the choice.
-  if (type && header.payer && !props.replaces && payers.value.find(d => d.code === header.payer)?.type !== type) header.payer = ''
+  if (type && header.payer && !payerFixed.value && payers.value.find(d => d.code === header.payer)?.type !== type) header.payer = ''
   clearTimeout(searchTimer)
   payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles, type || undefined)
 })
-watch(() => header.groupId, async id => {
+/** A replacement, and the correction of a replacement receipt, keep the payer of the replaced cheque. */
+const payerFixed = computed(() => !!props.replaces || !!props.edit?.replacedInstrumentId)
+async function loadPurposes(id: string) {
   purposes.value = []
   if (!id) return
   const r = await api.get<Purpose[]>(`/api/reference/purposes?groupId=${id}`)
-  if (r.ok) purposes.value = r.value
-})
+  if (r.ok && header.groupId === id) purposes.value = r.value
+}
+watch(() => header.groupId, id => void loadPurposes(id))
 
 // ---- cash and bank deposit ----
-const money1 = reactive({ accountId: '', method: '', tracking: '', amount: '', rate: '', sheba: '' })
+const money1 = reactive({
+  accountId: e0?.accountId ?? '', method: e0?.method ?? '', tracking: e0?.trackingNumber ?? '', amount: amountText(e0?.amount), rate: amountText(e0?.rateToRial),
+  sheba: e0?.payerSheba ?? '' })
 const deskChoices = computed<Choice[]>(() => L.desks.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name, hint: d.currencyCode })))
 const bankAccountChoices = computed<Choice[]>(() => L.bankAccounts.value.filter(a => a.isActive).map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
 const accountCurrency = computed(() =>
@@ -114,7 +139,20 @@ const blankLine = (): Line => ({
   key: nextKey++, kind: 'OrdinaryCheque', number: '', dueDate: '', currency: 'IRR', amount: '', rate: '', bankId: '', branchName: '', branchCode: '',
   accountNumber: '', accountHolder: '', city: '', outOfTown: false, sayadId: '', g1Name: '', g1Code: '', g2Name: '', g2Code: '',
 })
-const lines = ref<Line[]>([blankLine()])
+/** The lines of a saved cheque receipt, as the form shows them. */
+function savedLines(r: SavedReceipt): Line[] {
+  return (r.instruments ?? []).map(i => {
+    const d = i.details
+    const g = d?.guarantors ?? []
+    return {
+      ...blankLine(), id: i.id, kind: (lineKinds.some(k => k.value === i.kind) ? i.kind : 'OrdinaryCheque') as LineKind, number: i.number ?? '', dueDate: i.dueDate ?? '',
+      currency: i.currency, amount: amountText(i.amount), rate: amountText(i.rateToRial), bankId: d?.bankId ?? '', branchName: d?.branchName ?? '', branchCode: d?.branchCode ?? '',
+      accountNumber: d?.accountNumber ?? '', accountHolder: d?.accountHolder ?? '', city: d?.city ?? '', outOfTown: d?.outOfTown ?? false, sayadId: d?.sayadId ?? '',
+      g1Name: g[0]?.name ?? '', g1Code: g[0]?.nationalCode ?? '', g2Name: g[1]?.name ?? '', g2Code: g[1]?.nationalCode ?? '',
+    }
+  })
+}
+const lines = ref<Line[]>(e0?.kind === 'Instruments' && e0.instruments?.length ? savedLines(e0) : [blankLine()])
 const bankChoices = computed<Choice[]>(() => L.banks.value.filter(b => b.isActive !== false).map(b => ({ value: b.id, label: b.name })))
 const currencyChoices = computed<Choice[]>(() => L.currencies.value.filter(c => c.code).map(c => ({ value: c.code!, label: c.name, hint: c.code! })))
 const cityChoices = computed<Choice[]>(() => L.cities.value.map(c => ({ value: c.name, label: c.name })))
@@ -136,7 +174,7 @@ function nextLine() {
   if (!last) return void lines.value.push(blankLine())
   const digits = toLatinDigits(last.number)
   const next = /^\d+$/.test(digits) ? String(Number(digits) + 1).padStart(digits.length, '0') : ''
-  lines.value.push({ ...last, key: nextKey++, number: next, sayadId: '' })
+  lines.value.push({ ...last, id: undefined, key: nextKey++, number: next, sayadId: '' })
 }
 function removeLine(i: number) {
   lines.value.splice(i, 1)
@@ -159,11 +197,16 @@ const saving = ref(false)
 const message = ref<{ kind: 'error' | 'warning' | 'ok'; text: string } | null>(null)
 const show = (kind: 'error' | 'warning' | 'ok', text: string) => { message.value = { kind, text } }
 
-/** A purpose typed here that the group does not list yet is added to it (decision of 10 Nov 2026). */
+/**
+ * A purpose typed here, or chosen and then changed, that the group does not list yet is added to it (decision of 10 Nov 2026; owner's
+ * report no. 6, item 4), so the next receipt or payment finds it in the list. A purpose the list already has (also one switched off
+ * there) is simply used.
+ */
 async function addPurposeIfNew(): Promise<boolean> {
   const name = header.purpose.trim()
-  if (!name || !header.groupId || purposes.value.some(p => p.name === name)) return true
+  if (!name || !header.groupId || purposes.value.some(p => searchKey(p.name) === searchKey(name))) return true
   const r = await api.post<string>('/api/reference/purposes', { groupId: header.groupId, name })
+  if (!r.ok && r.code === 'Purpose.NameTaken') return true
   if (!r.ok) { show('error', translate(r.code, props.locale)); return false }
   purposes.value.push({ id: r.value, groupId: header.groupId, name, isActive: true })
   return true
@@ -185,12 +228,19 @@ function lineBody(l: Line) {
     amount: { amount: parseAmount(l.amount) ?? 0, currency: l.currency, rateToRial: l.currency === 'IRR' ? null : parseAmount(l.rate) },
     bankId: isCheque(l.kind) && l.bankId ? l.bankId : null, branchName: l.branchName || null, branchCode: l.branchCode || null,
     accountNumber: toLatinDigits(l.accountNumber) || null, accountHolder: l.accountHolder || null, city: l.city || null, outOfTown: l.outOfTown,
-    sayadId: toLatinDigits(l.sayadId.trim()) || null, guarantors: isCheque(l.kind) ? [] : guarantors,
+    sayadId: toLatinDigits(l.sayadId.trim()) || null, guarantors: isCheque(l.kind) ? [] : guarantors, id: l.id ?? null,
   }
 }
 
-/** The request the form makes, or the code of the first thing missing (checked again by the server). */
-function request(): { path: string; body: Record<string, unknown> } | { error: string } {
+/** The path of the request: a new receipt, the replacement of a cheque, or the saved receipt being corrected. */
+const kindPath = computed(() => (props.kind === 'Cash' ? 'cash' : props.kind === 'BankDeposit' ? 'bank' : 'instruments'))
+
+/**
+ * The request the form makes, or the code of the first thing missing (checked again by the server). `path` records a new receipt (or
+ * previews the voucher); a correction is sent to `put` with the version the user saw.
+ */
+function request(): { path: string; body: Record<string, unknown>; put?: string } | { error: string } {
+  const put = props.edit ? `/api/cashflow/receipts/${props.edit.id}/${kindPath.value}` : undefined
   if (!normaliseJalali(header.date)) return { error: 'FiscalDate.Invalid' }
   if (!header.payer) return { error: 'Receipt.PayerRequired' }
   if (!header.groupId) return { error: 'Receipt.PurposeGroupRequired' }
@@ -203,23 +253,25 @@ function request(): { path: string; body: Record<string, unknown> } | { error: s
       if (isCheque(l.kind) && !l.sayadId.trim()) return { error: 'Receipt.SayadIdRequired' }
     }
     const path = props.replaces ? `/api/cashflow/instruments/${props.replaces.id}/replace` : '/api/cashflow/receipts/instruments'
-    return { path, body: { header: headerBody(), instruments: lines.value.map(lineBody) } }
+    return { path, put, body: { header: headerBody(), instruments: lines.value.map(lineBody) } }
   }
   if (!money1.accountId) return { error: 'Receipt.AccountNotFound' }
   const amount = parseAmount(money1.amount)
   if (amount === null) return { error: 'Money.NotPositive' }
   const rate = accountCurrency.value === 'IRR' ? null : parseAmount(money1.rate)
   if (accountCurrency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
-  if (props.kind === 'Cash') return { path: '/api/cashflow/receipts/cash', body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
+  if (props.kind === 'Cash') return { path: '/api/cashflow/receipts/cash', put, body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
   if (!money1.method) return { error: 'Receipt.DepositMethodRequired' }
   if (needsSheba(money1.method) && !money1.sheba.trim()) return { error: 'Receipt.ShebaRequired' }
-  return { path: '/api/cashflow/receipts/bank', body: {
+  return { path: '/api/cashflow/receipts/bank', put, body: {
     header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate,
     payerSheba: needsSheba(money1.method) ? toLatinDigits(money1.sheba.trim()) : null } }
 }
 
 // ---- the voucher at the bottom of the form (nothing is saved) ----
 const preview = ref<Voucher | null>(null)
+/** A replacement shows two vouchers: the cancellation of the old cheque, then the receipt of the new ones (report no. 6, item 11). */
+const cancellation = ref<Voucher | null>(null)
 const previewHint = ref('')
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewRun = 0
@@ -230,10 +282,12 @@ watch([header, money1, lines], () => {
 async function refreshPreview() {
   const run = ++previewRun
   const req = request()
-  if ('error' in req) { preview.value = null; previewHint.value = translate(req.error, props.locale); return }
-  const r = await api.post<Voucher>(`${req.path}/voucher-preview`, req.body)
+  if ('error' in req) { preview.value = cancellation.value = null; previewHint.value = translate(req.error, props.locale); return }
+  const r = await api.post<Voucher | Voucher[]>(`${req.path}/voucher-preview`, req.body)
   if (run !== previewRun) return
-  preview.value = r.ok ? r.value : null
+  const vouchers = r.ok ? (Array.isArray(r.value) ? r.value : [r.value]) : []
+  preview.value = vouchers[vouchers.length - 1] ?? null
+  cancellation.value = vouchers.length > 1 ? vouchers[0]! : null
   previewHint.value = r.ok ? '' : translate(r.code, props.locale)
 }
 
@@ -241,16 +295,16 @@ async function save() {
   message.value = null
   const req = request()
   if ('error' in req) return show('error', translate(req.error, props.locale))
-  const { path, body } = req
+  const { path, body, put } = req
 
   saving.value = true
   try {
     if (!(await addPurposeIfNew())) return
-    const r = await api.post<string>(path, body)
+    const r = put ? await api.put<string>(put, { ...body, version: props.edit!.version }) : await api.post<string>(path, body)
     if (!r.ok) return show('error', translate(r.code, props.locale))
     const saved = await api.get<{ number: number; fiscalYear: number }>(`/api/cashflow/receipts/${r.value}`)
     const no = saved.ok ? (fa.value ? saved.value.number.toLocaleString('fa-IR') : String(saved.value.number)) : ''
-    const text = t(`رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} saved.`)
+    const text = put ? t(`ویرایش رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} corrected.`) : t(`رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} saved.`)
     if (r.warnings.length) show('warning', `${text} ${r.warnings.map(w => translate(w, props.locale)).join(' ')}`)
     else show('ok', text)
     Object.assign(money1, { amount: '', rate: '', tracking: '', sheba: '' })
@@ -266,28 +320,53 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await L.load(); payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles) })
+/**
+ * Report no. 6, item 11: the replacement opens with what the old cheque's receipt said — purpose group, purpose, department,
+ * references — and with the old cheque's amount and currency on the first line; the user changes what differs.
+ */
+async function fillFromReplacedCheque() {
+  const old = props.replaces
+  if (!old) return
+  const first = lines.value[0]
+  if (first && old.originalAmount !== undefined) Object.assign(first, { amount: amountText(old.originalAmount), currency: old.currency ?? 'IRR' })
+  if (!old.receiptId) return
+  const r = await api.get<SavedReceipt>(`/api/cashflow/receipts/${old.receiptId}`)
+  if (!r.ok) return
+  const o = r.value
+  const line = o.instruments?.find(i => i.id === old.id)
+  Object.assign(header, { groupId: o.purposeGroupId, purpose: o.purpose, departmentId: o.departmentId ?? '', ref1: o.reference1 ?? '', ref2: o.reference2 ?? '', salesProceeds: o.salesProceeds })
+  if (first && line?.rateToRial) first.rate = amountText(line.rateToRial)
+}
+
+onMounted(async () => {
+  await L.load()
+  payers.value = await L.searchDetails('', header.payer || undefined, PayerRoles)
+  if (header.groupId) void loadPurposes(header.groupId)
+  await fillFromReplacedCheque()
+})
 </script>
 
 <template>
   <form class="tr-form" @keydown="onKey" @submit.prevent="save">
     <fieldset>
-      <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
+      <legend>{{ edit ? t(`ویرایش رسید شمارهٔ ${edit.number.toLocaleString('fa-IR', { useGrouping: false })}`, `Correct receipt no. ${edit.number}`) : t('مشخصات دریافت', 'Receipt') }}</legend>
       <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" /></label>
-      <label v-if="payerTypeChoices.length && !replaces">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
+      <label v-if="payerTypeChoices.length && !payerFixed">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
         <SearchSelect v-model="payerType" :options="payerTypeChoices" :empty-label="t('— همه —', '— all —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')" />
       </label>
       <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
-        <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="!!replaces" :aria-label="t('پرداخت کننده', 'Payer')"
+        <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="payerFixed" :aria-label="t('پرداخت کننده', 'Payer')"
                       :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
       </label>
       <label>{{ t('گروه بابت', 'Purpose group') }}
         <SearchSelect v-model="header.groupId" :options="groupChoices" required :aria-label="t('گروه بابت', 'Purpose group')"
                       :none-text="t('گروه بابت دریافتی تعریف نشده است', 'No receipt purpose group')" />
       </label>
-      <label class="wide req">{{ t('بابت', 'Purpose') }}
-        <input v-model="header.purpose" list="tr-purposes" :placeholder="t('از فهرست انتخاب کنید یا بنویسید', 'Choose or type')" />
-        <datalist id="tr-purposes"><option v-for="p in purposes.filter(x => x.isActive)" :key="p.id" :value="p.name" /></datalist>
+      <label class="wide">{{ t('بابت', 'Purpose') }}
+        <ComboInput v-model="header.purpose" :options="purposeNames" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
+                    :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
+                    :none-text="header.groupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
+                    :new-hint="header.groupId ? t('بابت تازه: با ثبت رسید به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the receipt adds it to this group\'s list.') : ''" />
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="header.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="header.ref2" /></label>
@@ -323,8 +402,8 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
             'This account has no bank card; define one in Basic Information → Bank accounts to record card-to-card deposits.') }}
         </p>
       </template>
-      <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" /></label>
-      <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" /></label>
+      <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" :unit="unitOf(accountCurrency)" /></label>
+      <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" unit="ریال" /></label>
       <label v-if="accountCurrency !== 'IRR'">{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="money(total)" readonly /></label>
     </fieldset>
 
@@ -344,9 +423,9 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
         <label>{{ t('ارز', 'Currency') }}
           <SearchSelect v-model="l.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
         </label>
-        <label class="req">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <AmountInput v-model="l.amount" :decimals="l.currency === 'IRR' ? 0 : 2" /></label>
+        <label class="req">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <AmountInput v-model="l.amount" :decimals="l.currency === 'IRR' ? 0 : 2" :unit="unitOf(l.currency)" /></label>
         <template v-if="l.currency !== 'IRR'">
-          <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="l.rate" :decimals="4" /></label>
+          <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="l.rate" :decimals="4" unit="ریال" /></label>
           <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="linesRial[i] === null ? '' : money(linesRial[i]!)" readonly /></label>
         </template>
         <template v-if="isCheque(l.kind)">
@@ -381,9 +460,15 @@ onMounted(async () => { await L.load(); payers.value = await L.searchDetails('',
       <strong>{{ t('جمع (ریال):', 'Total (Rial):') }} <span class="num">{{ money(total) }}</span></strong>
       <span v-if="replaces" class="muted">{{ t(`چک قبلی: ${money(replaces.amount)} – تفاوت: ${money(total - replaces.amount)}`,
         `Old cheque: ${money(replaces.amount)} – difference: ${money(total - replaces.amount)}`) }}</span>
-      <button type="submit" :disabled="saving">{{ t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
+      <button type="submit" :disabled="saving">{{ edit ? t('ثبت ویرایش (Ctrl+Enter)', 'Save the correction (Ctrl+Enter)') : t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
+      <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
+    <template v-if="replaces && cancellation">
+      <p class="muted small">{{ t('تعویض در دو مرحله ثبت می‌شود و دو سند دارد: ابتدا چک قبلی باطل و سند دریافت آن برگشت داده می‌شود (سند اول)، سپس چک جدید دریافت می‌شود (سند دوم).',
+        'A replacement is recorded in two steps with two vouchers: the old cheque is cancelled and its receipt entry taken back (first voucher), then the new cheque is received (second voucher).') }}</p>
+      <VoucherTable :voucher="cancellation" :locale="locale" :account-name="L.accountName" />
+    </template>
     <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
     <p v-else class="muted small">{{ t('سند حسابداری این رسید پس از تکمیل فرم اینجا نمایش داده می‌شود.', 'The voucher of this receipt is shown here once the form is filled in.') }}
       <template v-if="previewHint"> ({{ previewHint }})</template></p>

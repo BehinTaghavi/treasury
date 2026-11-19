@@ -245,6 +245,70 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         instrument.MarkSaved(instrument.Version + 1);
     }
 
+    /// <summary>
+    /// A received cheque or note corrected with its receipt (owner's report no. 6, items 2 and 6): everything written on it, and the date
+    /// of its receipt step (its only step; the fiscal year stays, so the row stays in its partition).
+    /// </summary>
+    public async Task SaveCorrectionAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        var tx = PostgresUnitOfWork.Current;
+        var s = InstrumentSnapshot.From(instrument, instrument.Version + 1);
+        await using (var cmd = tx.Command(
+            "UPDATE cashflow.instrument SET kind = @kind, number = @number, bank_name = @bank, amount = @amount, currency = @currency, rate_to_rial = @rate, " +
+            "amount_rial = @rial, issue_date = @issue, due_date = @due, counterparty_id = @cp, counterparty_name = @cpname, counterparty_detail_code = @cpcode, " +
+            "purpose = @purpose, details = @details, version = version + 1, updated_at = now() " +
+            "WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
+        {
+            BindInstrument(cmd, s, instrument.Amount.ToRial());
+            cmd.Parameters.AddWithValue("expected", instrument.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Instrument {s.Id} was changed by someone else.");
+            }
+        }
+
+        await using (var cmd = tx.Command(
+            "UPDATE cashflow.instrument_event SET event_date = @date WHERE instrument_year = @year AND instrument_id = @id AND seq = 1"))
+        {
+            cmd.Parameters.AddWithValue("date", s.History[0].Date);
+            cmd.Parameters.AddWithValue("year", s.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", s.Id);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await PostgresOutbox.WriteAsync(tx, instrument.PendingEvents, cancellationToken).ConfigureAwait(false);
+        instrument.MarkSaved(instrument.Version + 1);
+    }
+
+    /// <summary>A cheque or note taken off its receipt while the receipt is corrected: its steps and the row itself are deleted.</summary>
+    public async Task RemoveAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        var tx = PostgresUnitOfWork.Current;
+        await using (var cmd = tx.Command("DELETE FROM cashflow.instrument_event WHERE instrument_year = @year AND instrument_id = @id"))
+        {
+            cmd.Parameters.AddWithValue("year", instrument.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", instrument.Id);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await using (var cmd = tx.Command("DELETE FROM cashflow.instrument WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
+        {
+            cmd.Parameters.AddWithValue("year", instrument.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", instrument.Id);
+            cmd.Parameters.AddWithValue("expected", instrument.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Instrument {instrument.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, instrument.PendingEvents, cancellationToken).ConfigureAwait(false);
+        tx.LoadedSteps.Remove(instrument.Id);
+        instrument.MarkSaved(instrument.Version + 1);
+    }
+
     private static async Task InsertStepsAsync(TransactionContext tx, InstrumentSnapshot s, int alreadyStored, CancellationToken ct)
     {
         for (var i = alreadyStored; i < s.History.Count; i++)

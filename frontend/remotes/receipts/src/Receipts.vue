@@ -4,7 +4,8 @@
  * currency, promissory notes, cash receipts etc." One tab per kind, as the old program had one form per kind, plus the list.
  */
 import { computed, ref } from 'vue'
-import type { Locale } from '@treasury/ui-kit'
+import { createApi, translate, type Locale } from '@treasury/ui-kit'
+import type { SavedReceipt } from './savedReceipt'
 import ReceiptForm from './ReceiptForm.vue'
 import NoteReceiptForm from './NoteReceiptForm.vue'
 import ReceiptList from './ReceiptList.vue'
@@ -35,7 +36,7 @@ type Tab = (typeof tabs)[number]['id']
 const tab = ref<Tab>('Instruments')
 /** The cheque the legal-action screen opens with, when the user comes from a cheque's row on the steps screen. */
 const legalCheque = ref<string | undefined>(undefined)
-function openTab(id: Tab) { legalCheque.value = undefined; tab.value = id }
+function openTab(id: Tab) { legalCheque.value = undefined; editing.value = null; notice.value = null; tab.value = id }
 function startLegal(chequeId: string) { legalCheque.value = chequeId; tab.value = 'legal' }
 /**
  * Owner, 18 Nov 2026: on every receipt screen a button «فهرست دریافت‌ها» shows the receipts of that screen's kind under the form. The
@@ -43,8 +44,35 @@ function startLegal(chequeId: string) { legalCheque.value = chequeId; tab.value 
  */
 const panelKind = computed(() => (tab.value === 'Cash' || tab.value === 'BankDeposit' ? tab.value
   : tab.value === 'Notes' || tab.value === 'noteSteps' ? 'Notes' : 'Instruments'))
-/** Counts saved receipts, so an open list shows the new one. */
+/** Counts saved receipts and recorded cheque steps, so an open list shows the new receipt or the cheque's new status at once. */
 const savedCount = ref(0)
+
+/**
+ * «ویرایش» (owner's report no. 6, items 2 and 6): a saved receipt whose voucher is not confirmed is opened in the form of its kind,
+ * from the receipts list or from the list under the form, and saved back under its number. The server says why a receipt can no
+ * longer be corrected (voucher confirmed, cancelled, a cheque that left «نزد صندوق»).
+ */
+const api = createApi({ baseUrl: props.apiBase, token: props.token })
+const editing = ref<SavedReceipt | null>(null)
+const notice = ref<{ kind: 'error' | 'ok'; text: string } | null>(null)
+async function startEdit(id: string) {
+  notice.value = null
+  const r = await api.get<SavedReceipt>(`/api/cashflow/receipts/${id}`)
+  if (!r.ok) return void (notice.value = { kind: 'error', text: translate(r.code, props.locale) })
+  if (r.value.notCorrectable) return void (notice.value = { kind: 'error', text: translate(r.value.notCorrectable, props.locale) })
+  legalCheque.value = undefined
+  editing.value = r.value
+  tab.value = r.value.kind
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+/** A step was recorded on a cheque screen: the list under it reads the statuses again, and an old message is cleared. */
+function stepRecorded() { notice.value = null; savedCount.value++ }
+function editSaved() {
+  const r = editing.value
+  editing.value = null
+  savedCount.value++
+  if (r) notice.value = { kind: 'ok', text: t(`ویرایش رسید شمارهٔ ${r.number.toLocaleString('fa-IR', { useGrouping: false })} ثبت شد.`, `Receipt no. ${r.number} corrected.`) }
+}
 const hints: Record<string, [string, string]> = {
   Instruments: ['چک‌های یک پرداخت‌کننده با یک شمارهٔ رسید ثبت می‌شوند (سفته‌ها در زبانهٔ «دریافت سفته» ثبت می‌شوند). چک روز یا مدت‌دار از روی سررسید تعیین می‌شود؛ برای چک ارزی ارز و نرخ را وارد کنید.',
     'Cheques of one payer are saved on one receipt (promissory notes have their own tab). Current or post-dated follows the due date; a foreign-currency cheque needs its currency and rate.'],
@@ -67,14 +95,20 @@ const hints: Record<string, [string, string]> = {
       </button>
     </nav>
     <p v-if="hints[tab]" class="hint">{{ fa ? hints[tab]![0] : hints[tab]![1] }}</p>
-    <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" />
-    <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" />
-    <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" />
-    <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
-    <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale" :api-base="apiBase" :locale="locale" :token="token" @saved="savedCount++" />
-    <ReceiptForm v-else :key="tab + locale" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" @saved="savedCount++" />
+    <p v-if="notice" :class="['notice', notice.kind]" role="status">{{ notice.text }}</p>
+    <p v-if="editing" class="notice editing">{{ t(
+      `در حال ویرایش رسید شمارهٔ ${editing.number.toLocaleString('fa-IR', { useGrouping: false })} هستید. تا زمانی که «تایید سند» این رسید زده نشده است می‌توانید آن را ویرایش کنید؛ شمارهٔ رسید تغییر نمی‌کند.`,
+      `You are correcting receipt no. ${editing.number}. It can be corrected until its voucher is confirmed; its number stays.`) }}</p>
+    <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
+    <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
+    <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" @changed="stepRecorded" />
+    <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" @edit="startEdit" />
+    <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale + (editing?.id ?? '')" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
+                     @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" />
+    <ReceiptForm v-else :key="tab + locale + (editing?.id ?? '')" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
+                 @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" />
     <ReceiptsPanel v-if="tab !== 'list'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
-                   :fiscal-year="fiscalYear" :refresh-key="savedCount" />
+                   :fiscal-year="fiscalYear" :refresh-key="savedCount" :editing-id="editing?.id" @edit="startEdit" />
   </section>
 </template>
 
@@ -84,4 +118,8 @@ const hints: Record<string, [string, string]> = {
 .tr-tabs button { padding: .55rem .9rem; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #1f2933; font: inherit; cursor: pointer; }
 .tr-tabs button.active { border-bottom-color: #2563eb; color: #1d4ed8; font-weight: 600; }
 .hint { color: #52606d; font-size: .85rem; margin: .25rem 0 0; }
+.notice { padding: .5rem .75rem; border-radius: 6px; margin: .5rem 0; }
+.notice.error { background: #fdecea; color: #8a1c1c; }
+.notice.ok { background: #e6f4ea; color: #1e5631; }
+.notice.editing { background: #fff7e0; color: #7a5200; }
 </style>

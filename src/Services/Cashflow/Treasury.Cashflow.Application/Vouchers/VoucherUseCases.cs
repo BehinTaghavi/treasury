@@ -157,21 +157,15 @@ public sealed class VoucherUseCases(
             side = new LedgerSide(fact?.LedgerAccountCode, fact?.DetailCode);
         }
 
-        Replacement? replacement = null;
-        if (receipt.ReplacedInstrumentId is { } oldId && await instruments.GetAsync(oldId, ct).ConfigureAwait(false) is { } old)
-        {
-            var step = old.History.LastOrDefault(h => h.Action == InstrumentAction.Replace && h.Details?.ReceiptId == receipt.Id);
-            replacement = new Replacement(old, step?.From ?? InstrumentState.InCashDesk);
-        }
-
         var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
         var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return ReceiptVouchers.ForReceipt(receipt, lines, side, group?.LedgerAccountCode, template, replacement);
+        return ReceiptVouchers.ForReceipt(receipt, lines, side, group?.LedgerAccountCode, template);
     }
 
     /// <summary>
-    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher; registering in Sayad only changes
-    /// the latest status, owner's answer to Q37). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
+    /// Null for steps without a voucher here (receiving is on its receipt's voucher; registering in Sayad only changes the latest
+    /// status, owner's answer to Q37). A replaced cheque is first cancelled: that step's voucher takes its receipt's entry back (owner's
+    /// report no. 6, item 11). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
     /// another); steps recorded before item 14 use the cheque's last account. A return to the payer debits the account the cheque's
     /// receipt credited (owner, 18 Nov 2026: every state has its voucher; his table «عودت چک‌های نزد صندوق»).
     /// </summary>
@@ -183,13 +177,22 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.RegisterSayad)
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.RegisterSayad)
+        {
+            return null;
+        }
+
+        // A replacement recorded before 18 Nov 2026 was one voucher on the new receipt («تعویض چک – رسید …»), which already took the old
+        // cheque out of its account; once that voucher is confirmed the old cheque gets no second one.
+        if (entry.Action == InstrumentAction.Replace && entry.Details?.ReceiptId is { } newReceiptId
+            && await vouchers.FindAsync(VoucherSource.Receipt, newReceiptId, 0, ct).ConfigureAwait(false) is { } combined
+            && combined.Voucher.Operation.StartsWith("تعویض چک", StringComparison.Ordinal))
         {
             return null;
         }
 
         string? receiptAccount = null;
-        if (entry.Action == InstrumentAction.ReturnToIssuer && cheque.ReceiptId is { } receiptId
+        if (entry.Action is InstrumentAction.ReturnToIssuer or InstrumentAction.Replace && cheque.ReceiptId is { } receiptId
             && await receipts.GetAsync(receiptId, ct).ConfigureAwait(false) is { } receipt)
         {
             receiptAccount = (await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false))?.LedgerAccountCode;

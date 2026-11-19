@@ -1008,3 +1008,17 @@ def test_a_cheque_transfer_request_names_its_cheque_and_the_scripts_run_again_ov
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("DELETE FROM requests.payment_request WHERE id = ANY(%s)", (ids,))
+
+
+def test_the_cashflow_service_may_delete_a_cheque_taken_off_a_corrected_receipt(db):
+    # 042_cashflow_receipt_corrections.sql: report no. 6, items 2 and 6. The step first (it points at the cheque), then the cheque.
+    with psycopg.connect(db) as c:
+        iid = insert_instrument(c, 1405)
+        insert_event(c, 1405, 1405, iid)
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.ForeignKeyViolation):
+            with c.transaction():
+                c.execute("DELETE FROM cashflow.instrument WHERE id = %s", (iid,))
+        c.execute("DELETE FROM cashflow.instrument_event WHERE instrument_id = %s", (iid,))
+        c.execute("DELETE FROM cashflow.instrument WHERE id = %s", (iid,))
+        assert c.execute("SELECT count(*) FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0] == 0

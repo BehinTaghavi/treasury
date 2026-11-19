@@ -68,4 +68,15 @@ way (owner's answer to Q37 of the note questions, 16 Nov 2026). The steps of a r
 bank with «سفته های در جریان وصول» (straight from the cash desk: a note has no Sayad registration), collected, returned by the bank, protested,
 endorsed, cancelled, legal action, and handing a note back («استرداد»): a guarantee note reverses the off-balance entry; an ordinary note debits
 «بدهکاران» (the معین of its receipt's purpose group, obligor) and credits «اسناد نزد صندوق / اسناد دریافتنی» (owner's answer to Q50).
+Since 19 Nov 2026 (owner's report no. 6):
+- **Replacement of a received cheque has two vouchers** (item 11): the old cheque is first cancelled — «ابطال چک جهت تعویض»: Dr the account
+  its receipt credited («بدهکاران», the معین of the receipt's purpose group) · payer / Cr where the cheque is («اسناد نزد صندوق», «اسناد واخواست
+  شده» or «اسناد واخواست شده حقوقی شده») · payer — then the new cheque is received with the voucher of a cheque receipt. This is the
+  new-version manual's operations 6 «ابطال چک های دریافتنی» and 7 «تعویض چک های دریافتنی». The row «ابطال چک دریافتنی نزد صندوق: مطالبات سوخت
+  شده» of the table stays the voucher of a cancellation by management's order (Q62 asks the owner to confirm the two).
+- **A receipt's voucher follows the receipt until it is confirmed** (items 2 and 6): the voucher of an unconfirmed receipt is worked out
+  from the receipt each time it is shown, so a corrected receipt shows the corrected voucher; «تایید سند» keeps the lines and closes the
+  correction of the receipt.
+- **The purpose is the description** (item 4): both lines of a cheque's or note's receipt voucher start with the receipt's purpose as written.
+
 Next with their screens: payments, petty cash and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

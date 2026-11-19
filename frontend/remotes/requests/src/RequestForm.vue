@@ -9,8 +9,9 @@
  * are shown; the amount of the request is the amount of the cheque.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
+import ComboInput from '@treasury/ui-kit/ComboInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { methods, useLookups, type Purpose, type TransferableCheque } from './lookups'
 import { ACCEPT, openFile, sizeText, uploadFile, type RequestFile } from './files'
@@ -155,8 +156,9 @@ async function load(id: string) {
 /** A purpose typed here that the group does not list yet is added to it (decision of 13 Nov 2026). */
 async function addPurposeIfNew(): Promise<boolean> {
   const name = form.purpose.trim()
-  if (!name || !form.purposeGroupId || purposes.value.some(p => p.name === name)) return true
+  if (!name || !form.purposeGroupId || purposes.value.some(p => searchKey(p.name) === searchKey(name))) return true
   const r = await api.post<string>('/api/reference/purposes', { groupId: form.purposeGroupId, name })
+  if (!r.ok && r.code === 'Purpose.NameTaken') return true
   if (!r.ok) { show('error', translate(r.code, props.locale)); return false }
   purposes.value.push({ id: r.value, groupId: form.purposeGroupId, name, isActive: true })
   return true
@@ -245,13 +247,13 @@ onMounted(async () => {
       <!-- «ثبت انتقال (خرج چک)»: the amount and currency are the cheque's (owner, 19 Nov 2026). -->
       <label v-if="isTransfer" class="req">{{ t('مبلغ (برابر مبلغ چک)', 'Amount (the cheque\'s)') }}
         <input class="ro" :value="amount ? formatAmount(amount, locale) : ''" readonly dir="ltr" :placeholder="t('چک را در «نحوهٔ پرداخت» انتخاب کنید', 'Choose the cheque below')" />
+        <small v-if="words" class="muted">{{ words }}</small>
       </label>
-      <label v-else class="req">{{ t('مبلغ', 'Amount') }} <AmountInput v-model="form.amount" :decimals="form.currency === 'IRR' ? 0 : 2" /></label>
+      <label v-else class="req">{{ t('مبلغ', 'Amount') }} <AmountInput v-model="form.amount" :decimals="form.currency === 'IRR' ? 0 : 2" :unit="currencyName" /></label>
       <label v-if="isTransfer">{{ t('ارز', 'Currency') }} <input class="ro" :value="currencyName" readonly /></label>
       <label v-else>{{ t('ارز', 'Currency') }}
         <SearchSelect v-model="form.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
       </label>
-      <label class="full">{{ t('مبلغ به حروف', 'Amount in words') }} <input class="ro" :value="words" readonly /></label>
     </fieldset>
 
     <fieldset>
@@ -261,8 +263,10 @@ onMounted(async () => {
                       :none-text="t('گروه بابت پرداختی تعریف نشده است', 'No payment purpose group')" />
       </label>
       <label class="wide req">{{ t('بابت', 'Purpose') }}
-        <input v-model="form.purpose" list="tr-req-purposes" maxlength="300" :placeholder="t('از فهرست انتخاب کنید یا بنویسید', 'Choose or type')" />
-        <datalist id="tr-req-purposes"><option v-for="p in purposes.filter(x => x.isActive)" :key="p.id" :value="p.name" /></datalist>
+        <ComboInput v-model="form.purpose" :options="purposes.filter(x => x.isActive).map(x => x.name)" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
+                    :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
+                    :none-text="form.purposeGroupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
+                    :new-hint="form.purposeGroupId ? t('بابت تازه: با ثبت درخواست به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the request adds it to this group\'s list.') : ''" />
       </label>
       <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="form.ref1" /></label>
       <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="form.ref2" /></label>

@@ -223,14 +223,29 @@ public sealed class ChequeStepTests
         old.Replace(receipt.Id, receipt.Date, User);
         Assert.Equal((InstrumentState.Replaced, (Guid?)old.Id, (Guid?)receiptId), (old.State, receipt.ReplacedInstrumentId, old.History[^1].Details!.ReceiptId));
 
-        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Bounced));
-        Assert.Equal([(true, "1201", "200015"), (true, "1201", "200015"), (false, "1203", "200015"), (false, "4101", "200015")], Lines(v));
-        Assert.Equal(1_000_000m, v.Lines[^1].AmountRial);
-        Assert.True(v.IsComplete);
+        // Owner's report no. 6, item 11 (manual operations 6 and 7): the old cheque is first cancelled — Dr the account its receipt
+        // credited («بدهکاران») / Cr where the cheque is, here «اسناد واخواست شده» — and the new cheques are received as on any receipt.
+        var cancellation = ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), receiptAccount: "4101")!;
+        Assert.Equal("ابطال چک جهت تعویض", cancellation.Operation);
+        Assert.Equal([(true, "4101", "200015"), (false, "1203", "200015")], Lines(cancellation));
+        Assert.Equal((10_000_000m, D("1405/09/10")), (cancellation.TotalDebit, cancellation.Date));
+        Assert.True(cancellation.IsComplete);
 
-        var less = Receipt.RecordInstruments(receiptId, 9, header, [New(8_000_000, "3")], User, Cheque());
-        var w = ReceiptVouchers.ForReceipt(less, [], null, "4101", Template(), new Replacement(Cheque(), InstrumentState.InCashDesk));
-        Assert.Equal((true, "4101", 10_000_000m), (w.Lines[^1].IsDebit, w.Lines[^1].AccountCode, w.Lines[^1].AmountRial));
+        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template());
+        Assert.Equal([(true, "1201", "200015"), (false, "4101", "200015"), (true, "1201", "200015"), (false, "4101", "200015")], Lines(v));
+        Assert.Equal(11_000_000m, v.TotalCredit); // the difference of 1,000,000 stays on the purpose group's account
+        Assert.True(v.IsComplete);
+    }
+
+    [Fact]
+    public void A_cheque_in_the_cash_desk_is_cancelled_for_its_replacement_out_of_the_cash_desk_account()
+    {
+        var old = Cheque();
+        old.Replace(Guid.NewGuid(), D("1405/08/10"), User);
+        var cancellation = ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), receiptAccount: "4101")!;
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(cancellation));
+        // Without the account of the cheque's receipt the voucher is shown but cannot be confirmed.
+        Assert.False(ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template())!.IsComplete);
     }
 
     [Fact]

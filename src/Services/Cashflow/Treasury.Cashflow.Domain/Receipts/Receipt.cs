@@ -146,8 +146,22 @@ public sealed class Receipt : AggregateRoot<Guid>
         Kind = kind;
         Number = number;
         FiscalYear = header.Date.JalaliYear;
-        Date = header.Date;
+        RecordedBy = userId;
         Payer = CounterpartyRef.ForDetail(header.Payer.DetailCode, header.Payer.Name);
+        PurposeGroupName = header.PurposeGroup.Name;
+        Purpose = header.Purpose.Trim();
+        ApplyHeader(header);
+    }
+
+    /// <summary>What the form's header says; the payer keeps its identity while its تفصیل stays the same.</summary>
+    private void ApplyHeader(ReceiptHeader header)
+    {
+        Date = header.Date;
+        if (Payer.DetailCode != header.Payer.DetailCode || Payer.DisplayName != header.Payer.Name)
+        {
+            Payer = CounterpartyRef.ForDetail(header.Payer.DetailCode, header.Payer.Name);
+        }
+
         PurposeGroupId = header.PurposeGroup.Id;
         PurposeGroupName = header.PurposeGroup.Name;
         Purpose = header.Purpose.Trim();
@@ -156,7 +170,6 @@ public sealed class Receipt : AggregateRoot<Guid>
         DepartmentId = header.DepartmentId;
         SalesProceeds = header.SalesProceeds;
         Note = Clean(header.Note);
-        RecordedBy = userId;
     }
 
     public ReceiptKind Kind { get; }
@@ -167,50 +180,50 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// <summary>Jalali year of <see cref="Date"/> (open question Q5: the fiscal year is the Jalali year).</summary>
     public int FiscalYear { get; }
 
-    public FiscalDate Date { get; }
+    public FiscalDate Date { get; private set; }
 
-    public CounterpartyRef Payer { get; }
+    public CounterpartyRef Payer { get; private set; }
 
-    public Guid PurposeGroupId { get; }
+    public Guid PurposeGroupId { get; private set; }
 
-    public string PurposeGroupName { get; }
+    public string PurposeGroupName { get; private set; }
 
     /// <summary>بابت, kept as typed even if the purpose list changes later (decision of 13 Nov 2026).</summary>
-    public string Purpose { get; }
+    public string Purpose { get; private set; }
 
-    public string? Reference1 { get; }
+    public string? Reference1 { get; private set; }
 
-    public string? Reference2 { get; }
+    public string? Reference2 { get; private set; }
 
-    public Guid? DepartmentId { get; }
+    public Guid? DepartmentId { get; private set; }
 
-    public bool SalesProceeds { get; }
+    public bool SalesProceeds { get; private set; }
 
-    public string? Note { get; }
+    public string? Note { get; private set; }
 
     public string RecordedBy { get; }
 
     /// <summary>Cash: the cash desk; bank deposit: our bank account. Null for cheques and notes (they wait in the cash desk as instruments).</summary>
-    public ReceiptAccountKind? AccountKind { get; private init; }
+    public ReceiptAccountKind? AccountKind { get; private set; }
 
-    public Guid? AccountId { get; private init; }
+    public Guid? AccountId { get; private set; }
 
-    public DepositMethod? Method { get; private init; }
+    public DepositMethod? Method { get; private set; }
 
     /// <summary>Deposit slip, transfer tracking or POS reference number.</summary>
-    public string? TrackingNumber { get; private init; }
+    public string? TrackingNumber { get; private set; }
 
     /// <summary>Paya and Satna transfers: the Sheba the money came from (owner, 18 Nov 2026: «حواله … با شماره شبا»).</summary>
-    public string? PayerSheba { get; private init; }
+    public string? PayerSheba { get; private set; }
 
     /// <summary>Cash and bank deposits: the amount, in the currency of the cash desk or bank account.</summary>
-    public Money? Amount { get; private init; }
+    public Money? Amount { get; private set; }
 
     /// <summary>Cheques and notes received on this receipt.</summary>
     public IReadOnlyList<Guid> InstrumentIds => _instrumentIds;
 
     /// <summary>A receipt of promissory notes: why and how they were received (owner's form «فرم دریافت سفته»); null for the other kinds.</summary>
-    public NoteReceiptTerms? NoteTerms { get; private init; }
+    public NoteReceiptTerms? NoteTerms { get; private set; }
 
     /// <summary>Rial total: the amount, or the sum of the cheques and notes (foreign currency at its rate).</summary>
     public decimal TotalRial { get; private set; }
@@ -238,6 +251,13 @@ public sealed class Receipt : AggregateRoot<Guid>
         Guid id, int number, ReceiptHeader header, ReceiptAccountFact bankAccount, DepositMethod method, string? trackingNumber, Money amount, string userId,
         string? payerSheba = null)
     {
+        var sheba = CheckDeposit(bankAccount, method, payerSheba);
+        return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId, sheba);
+    }
+
+    /// <summary>The rules of a deposit's kind; returns the Sheba as it is kept (Paya and Satna only).</summary>
+    private static string? CheckDeposit(ReceiptAccountFact bankAccount, DepositMethod method, string? payerSheba)
+    {
         ArgumentNullException.ThrowIfNull(bankAccount);
         Require(bankAccount.Kind == ReceiptAccountKind.BankAccount, "Receipt.AccountKindWrong", "A deposit is received into a bank account.");
 
@@ -256,7 +276,7 @@ public sealed class Receipt : AggregateRoot<Guid>
             sheba = DepositMethodRules.NormaliseSheba(payerSheba) ?? throw new DomainException("Receipt.ShebaInvalid", "The Sheba number is not valid.");
         }
 
-        return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId, sheba);
+        return sheba;
     }
 
     /// <summary>
@@ -273,27 +293,38 @@ public sealed class Receipt : AggregateRoot<Guid>
             // Owner's item 14 (d), answer to Q31: the new cheques may differ in amount and number; they come from the same payer.
             Require(replaces.Direction == InstrumentDirection.Received && replaces.Counterparty.DetailCode == header.Payer.DetailCode,
                 "Receipt.ReplacementPayerDiffers", "The new cheques must come from the payer of the cheque they replace.");
-            Require(instruments.All(i => i.Kind.IsCollectable()), "Receipt.ReplacementKind", "A cheque is replaced by ordinary or bank cheques.");
         }
 
+        CheckCheques(instruments, replacement: replaces is not null);
+        var receipt = new Receipt(id, ReceiptKind.Instruments, number, header, userId) { ReplacedInstrumentId = replaces?.Id };
+        receipt.SetInstruments(instruments);
+        receipt.Raise(receipt.Recorded());
+        return receipt;
+    }
+
+    private static void CheckCheques(IReadOnlyList<Instrument> instruments, bool replacement)
+    {
+        Require(!replacement || instruments.All(i => i.Kind.IsCollectable()), "Receipt.ReplacementKind", "A cheque is replaced by ordinary or bank cheques.");
         Require(instruments.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
         foreach (var i in instruments.Where(i => i.Kind.IsCheque() && i.Details.SayadId is null))
         {
             // Owner, 14 Nov 2026 (answer to Q21): every received cheque carries its 16-digit Sayad ID.
             throw new DomainException("Receipt.SayadIdRequired", $"Enter the Sayad ID of cheque {i.Number}.");
         }
+    }
 
-        var receipt = new Receipt(id, ReceiptKind.Instruments, number, header, userId) { ReplacedInstrumentId = replaces?.Id };
+    /// <summary>The cheques or notes of the receipt, each received from its payer on its date.</summary>
+    private void SetInstruments(IReadOnlyList<Instrument> instruments)
+    {
         foreach (var i in instruments)
         {
-            Require(i.Direction == InstrumentDirection.Received && i.ReceiptId == id && i.IssueDate == header.Date && i.Counterparty.Id == receipt.Payer.Id,
+            Require(i.Direction == InstrumentDirection.Received && i.ReceiptId == Id && i.IssueDate == Date && i.Counterparty.Id == Payer.Id,
                 "Receipt.InstrumentMismatch", "Every cheque and note must be received from this payer on this receipt's date.");
         }
 
-        receipt._instrumentIds.AddRange(instruments.Select(i => i.Id));
-        receipt.TotalRial = instruments.Sum(i => i.Amount.ToRial());
-        receipt.Raise(receipt.Recorded());
-        return receipt;
+        _instrumentIds.Clear();
+        _instrumentIds.AddRange(instruments.Select(i => i.Id));
+        TotalRial = instruments.Sum(i => i.Amount.ToRial());
     }
 
     /// <summary>
@@ -312,10 +343,18 @@ public sealed class Receipt : AggregateRoot<Guid>
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(notes);
         Validate(header, number, userId);
+        var checkedTerms = CheckNotes(terms, notes, rule, signerIds);
+        var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
+        receipt.SetInstruments(notes);
+        receipt.Raise(receipt.Recorded());
+        return receipt;
+    }
+
+    private static NoteReceiptTerms CheckNotes(NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, SignatureRuleFact? rule, IReadOnlyList<Guid>? signerIds)
+    {
         var checkedTerms = terms.Validated() with { Signers = (rule ?? SignatureRuleFact.None).Choose(signerIds) };
         Require(notes.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
         var onDemand = checkedTerms.Maturity == NoteMaturity.OnDemand;
-        var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
         foreach (var n in notes)
         {
             Require(n.Kind == checkedTerms.InstrumentKind && n.Details.OnDemand == onDemand, "Receipt.NoteKindMismatch",
@@ -323,14 +362,98 @@ public sealed class Receipt : AggregateRoot<Guid>
             Require(onDemand || n.DueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
             Require(n.Details.Checks?.IsComplete(onDemand) == true, "Receipt.NoteChecksIncomplete",
                 $"Note {n.Number} is received only when every item of article 308 is checked on it.");
-            Require(n.Direction == InstrumentDirection.Received && n.ReceiptId == id && n.IssueDate == header.Date && n.Counterparty.Id == receipt.Payer.Id,
-                "Receipt.InstrumentMismatch", "Every cheque and note must be received from this payer on this receipt's date.");
         }
 
-        receipt._instrumentIds.AddRange(notes.Select(n => n.Id));
-        receipt.TotalRial = notes.Sum(n => n.Amount.ToRial());
-        receipt.Raise(receipt.Recorded());
-        return receipt;
+        return checkedTerms;
+    }
+
+    /// <summary>
+    /// Correction («ویرایش») of a saved receipt (owner's report no. 6, items 2 and 6: "تا زمانیکه سند ارسال نشده است امکان ویرایش فرم دریافت",
+    /// "تا زمانیکه … «تایید سند» حسابداری نشده است بتوان آنرا ویرایش نمود"). A receipt is corrected with the rules it was recorded with,
+    /// while it is not cancelled and its voucher is not confirmed. It keeps its kind, its number and so its fiscal year (numbers are given
+    /// per year); a replacement receipt keeps its payer, who gave the replaced cheque.
+    /// </summary>
+    public void CorrectCash(ReceiptHeader header, ReceiptAccountFact cashDesk, Money amount, string userId, bool voucherConfirmed)
+    {
+        ArgumentNullException.ThrowIfNull(cashDesk);
+        RequireCorrectable(ReceiptKind.Cash, header, userId, voucherConfirmed);
+        Require(cashDesk.Kind == ReceiptAccountKind.CashDesk, "Receipt.AccountKindWrong", "Cash is received into a cash desk.");
+        CheckMoney(cashDesk, amount);
+        ApplyHeader(header);
+        SetMoney(cashDesk, null, null, amount, null);
+        Raise(Corrected(userId));
+    }
+
+    /// <inheritdoc cref="CorrectCash"/>
+    public void CorrectBankDeposit(ReceiptHeader header, ReceiptAccountFact bankAccount, DepositMethod method, string? trackingNumber, Money amount, string userId,
+        string? payerSheba, bool voucherConfirmed)
+    {
+        RequireCorrectable(ReceiptKind.BankDeposit, header, userId, voucherConfirmed);
+        var sheba = CheckDeposit(bankAccount, method, payerSheba);
+        CheckMoney(bankAccount, amount);
+        ApplyHeader(header);
+        SetMoney(bankAccount, method, trackingNumber, amount, sheba);
+        Raise(Corrected(userId));
+    }
+
+    /// <summary>
+    /// Correction of a cheque receipt: <paramref name="instruments"/> are its cheques as they now are — corrected (which a cheque
+    /// allows only while it is in the cash desk and no step was recorded on it), added, or left out (removed by the caller).
+    /// </summary>
+    public void CorrectInstruments(ReceiptHeader header, IReadOnlyList<Instrument> instruments, string userId, bool voucherConfirmed)
+    {
+        ArgumentNullException.ThrowIfNull(instruments);
+        RequireCorrectable(ReceiptKind.Instruments, header, userId, voucherConfirmed);
+        Require(ReplacedInstrumentId is null || header.Payer.DetailCode == Payer.DetailCode,
+            "Receipt.ReplacementPayerDiffers", "The new cheques must come from the payer of the cheque they replace.");
+        CheckCheques(instruments, replacement: ReplacedInstrumentId is not null);
+        ApplyHeader(header);
+        SetInstruments(instruments);
+        Raise(Corrected(userId));
+    }
+
+    /// <summary>Correction of a receipt of promissory notes, with the rules of <see cref="RecordNotes"/>.</summary>
+    public void CorrectNotes(ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId, bool voucherConfirmed,
+        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
+    {
+        ArgumentNullException.ThrowIfNull(terms);
+        ArgumentNullException.ThrowIfNull(notes);
+        RequireCorrectable(ReceiptKind.Notes, header, userId, voucherConfirmed);
+        var checkedTerms = CheckNotes(terms, notes, rule, signerIds);
+        ApplyHeader(header);
+        NoteTerms = checkedTerms;
+        SetInstruments(notes);
+        Raise(Corrected(userId));
+    }
+
+    /// <summary>A receipt is corrected while it is not cancelled and its voucher is not confirmed.</summary>
+    /// <param name="voucherConfirmed">The treasurer confirmed the receipt's voucher («تایید سند»).</param>
+    public void EnsureCorrectable(bool voucherConfirmed)
+    {
+        Require(State == ReceiptState.Recorded, "Receipt.AlreadyCancelled", "The receipt is already cancelled.");
+        Require(!voucherConfirmed, "Receipt.VoucherConfirmed", "The receipt's voucher is confirmed; it can no longer be changed.");
+    }
+
+    /// <summary>
+    /// The code of the rule that closes «ویرایش» for this receipt, or null while it can be corrected: cancelled, voucher confirmed,
+    /// or one of its cheques or notes is no longer as it was received (<see cref="Instrument.IsAsReceived"/>).
+    /// </summary>
+    public string? WhyNotCorrectable(bool voucherConfirmed, IReadOnlyList<Instrument> instruments)
+    {
+        ArgumentNullException.ThrowIfNull(instruments);
+        return State != ReceiptState.Recorded ? "Receipt.AlreadyCancelled"
+            : voucherConfirmed ? "Receipt.VoucherConfirmed"
+            : instruments.Any(i => !i.IsAsReceived) ? "Instrument.CorrectionAfterStep"
+            : null;
+    }
+
+    private void RequireCorrectable(ReceiptKind kind, ReceiptHeader header, string userId, bool voucherConfirmed)
+    {
+        Require(Kind == kind, "Receipt.CorrectionKindDiffers", "A receipt keeps its kind; cancel it and record a receipt of the other kind.");
+        EnsureCorrectable(voucherConfirmed);
+        Validate(header, Number, userId);
+        Require(header.Date.JalaliYear == FiscalYear, "Receipt.CorrectionOtherYear",
+            $"The receipt's number belongs to fiscal year {FiscalYear}; its date stays in that year.");
     }
 
     /// <summary>
@@ -384,24 +507,36 @@ public sealed class Receipt : AggregateRoot<Guid>
         Guid id, ReceiptKind kind, int number, ReceiptHeader header, ReceiptAccountFact account, DepositMethod? method, string? tracking, Money amount, string userId,
         string? payerSheba = null)
     {
-        ArgumentNullException.ThrowIfNull(amount);
         Validate(header, number, userId);
-        Require(account.IsActive, "Receipt.AccountInactive", "The cash desk or bank account is switched off.");
-        Require(string.Equals(account.CurrencyCode.Trim(), amount.Currency, StringComparison.OrdinalIgnoreCase), "Receipt.CurrencyMismatch",
-            $"The amount must be in the account's currency ({account.CurrencyCode}).");
-        var receipt = new Receipt(id, kind, number, header, userId)
-        {
-            AccountKind = account.Kind,
-            AccountId = account.Id,
-            Method = method,
-            TrackingNumber = Clean(tracking),
-            PayerSheba = payerSheba,
-            Amount = amount,
-            TotalRial = amount.ToRial(),
-        };
+        CheckMoney(account, amount);
+        var receipt = new Receipt(id, kind, number, header, userId);
+        receipt.SetMoney(account, method, tracking, amount, payerSheba);
         receipt.Raise(receipt.Recorded());
         return receipt;
     }
+
+    private static void CheckMoney(ReceiptAccountFact account, Money amount)
+    {
+        ArgumentNullException.ThrowIfNull(amount);
+        Require(account.IsActive, "Receipt.AccountInactive", "The cash desk or bank account is switched off.");
+        Require(string.Equals(account.CurrencyCode.Trim(), amount.Currency, StringComparison.OrdinalIgnoreCase), "Receipt.CurrencyMismatch",
+            $"The amount must be in the account's currency ({account.CurrencyCode}).");
+    }
+
+    private void SetMoney(ReceiptAccountFact account, DepositMethod? method, string? tracking, Money amount, string? payerSheba)
+    {
+        AccountKind = account.Kind;
+        AccountId = account.Id;
+        Method = method;
+        TrackingNumber = Clean(tracking);
+        PayerSheba = payerSheba;
+        Amount = amount;
+        TotalRial = amount.ToRial();
+    }
+
+    private ReceiptCorrected Corrected(string userId) => new(
+        Id, Kind, FiscalYear, Number, Date, Payer.DetailCode, PurposeGroupId, AccountKind, AccountId, Amount?.Amount, Amount?.Currency, TotalRial,
+        [.. _instrumentIds], SalesProceeds, userId);
 
     private ReceiptRecorded Recorded() => new(
         Id, Kind, FiscalYear, Number, Date, Payer.DetailCode, PurposeGroupId, AccountKind, AccountId, Amount?.Amount, Amount?.Currency, TotalRial,
@@ -434,6 +569,12 @@ public sealed class Receipt : AggregateRoot<Guid>
 }
 
 public sealed record ReceiptRecorded(
+    Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string? PayerDetailCode, Guid PurposeGroupId,
+    ReceiptAccountKind? AccountKind, Guid? AccountId, decimal? Amount, string? Currency, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
+    bool SalesProceeds, string UserId) : DomainEvent;
+
+/// <summary>A saved receipt was corrected before its voucher was confirmed; it carries the receipt as it now is.</summary>
+public sealed record ReceiptCorrected(
     Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string? PayerDetailCode, Guid PurposeGroupId,
     ReceiptAccountKind? AccountKind, Guid? AccountId, decimal? Amount, string? Currency, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
     bool SalesProceeds, string UserId) : DomainEvent;

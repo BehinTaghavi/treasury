@@ -174,7 +174,10 @@ public sealed class VoucherUseCaseTests : IDisposable
         var header = new ReceiptHeaderInput("1405/08/29", "200015", FakeReceiptReference.SalesGroup, "تعویض چک 445566");
         var preview = await _receipts.PreviewReplacementAsync(new("preview", cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None);
         Assert.True(preview.IsSuccess, preview.ErrorCode);
-        Assert.Equal(("تعویض چک", 4), (preview.Value!.Operation, preview.Value.Lines.Count));
+        // Report no. 6, item 11: first the cancellation of the old cheque, then the receipt of the new ones.
+        Assert.Equal(["ابطال چک جهت تعویض", "دریافت چک جایگزین"], preview.Value!.Select(x => x.Operation));
+        Assert.Equal([(true, "4101"), (false, "1201")], preview.Value![0].Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.Equal(4, preview.Value![1].Lines.Count);
 
         var other = new ReceiptHeaderInput("1405/08/29", "200016", FakeReceiptReference.SalesGroup, "تعویض");
         Assert.Equal("Receipt.ReplacementPayerDiffers", (await _receipts.ReplaceAsync(new(Key(), cheque, other, [Line("903", 1)]), CancellationToken.None)).ErrorCode);
@@ -186,9 +189,15 @@ public sealed class VoucherUseCaseTests : IDisposable
         Assert.Equal("Replaced", (await _instruments.GetAsync(cheque, CancellationToken.None))!.State);
 
         var v = (await _vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
-        Assert.Equal([(true, "1201"), (true, "1201"), (false, "1201"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.Equal([(true, "1201"), (false, "4101"), (true, "1201"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
         Assert.True(v.IsComplete);
-        Assert.Equal([3, 4], (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None)).Select(x => x.Step));
+        var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
+        Assert.Equal([3, 4, 5], steps.Select(x => x.Step));
+        // The old cheque's cancellation takes its receipt's entry back: Dr the receipt's purpose group / Cr «اسناد نزد صندوق».
+        Assert.Equal(("ابطال چک جهت تعویض", true), (steps[^1].Operation, steps[^1].IsComplete));
+        Assert.Equal([(true, "4101", "200015", 10_000_000m), (false, "1201", "200015", 10_000_000m)],
+            steps[^1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
+        Assert.True((await _vouchers.ConfirmChequeVoucherAsync(Key(), cheque, 5, CancellationToken.None)).IsSuccess);
         Assert.Equal("Instrument.InvalidTransition", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
     }
 

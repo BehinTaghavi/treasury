@@ -30,3 +30,24 @@ describe('amounts typed with separators (report no. 4, item 10)', () => {
     expect(parseAmount(groupAmount('12500000'))).toBe(12_500_000)
   })
 })
+
+import { amountTextInWords } from './index'
+
+describe('words under an amount box (report no. 6, items 1 and 5)', () => {
+  it('reads the text as typed, with separators and Persian digits', () => {
+    expect(amountTextInWords('12,500,000', 'ریال')).toBe('دوازده میلیون و پانصد هزار ریال')
+    expect(amountTextInWords('۱۲٬۵۰۰')).toBe('دوازده هزار و پانصد')
+    expect(amountTextInWords('0')).toBe('صفر')
+  })
+  it('gives nothing for an empty or unreadable box', () => {
+    expect(amountTextInWords('')).toBe('')
+    expect(amountTextInWords('-')).toBe('')
+    expect(amountTextInWords('abc', 'ریال')).toBe('')
+  })
+  it('reads decimals digit by digit after ممیز and a minus as منفی', () => {
+    expect(amountTextInWords('1,250.05', 'دلار')).toBe('یک هزار و دویست و پنجاه ممیز صفر پنج دلار')
+    expect(amountTextInWords('42.50')).toBe('چهل و دو ممیز پنج')
+    expect(amountTextInWords('12.')).toBe('دوازده')
+    expect(amountTextInWords('-3,000', 'ریال')).toBe('منفی سه هزار ریال')
+  })
+})

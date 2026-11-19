@@ -175,11 +175,11 @@ onMounted(async () => {
           <SearchSelect v-model="form.holderDetailCode" :options="holderChoices" remote required :aria-label="t('دارندهٔ تنخواه', 'Holder')"
                         :none-text="t('تفصیلی پیدا نشد؛ دارنده باید ابتدا در سیستم مالی تعریف شود', 'Not found; define the holder in the accounting system first')" @search="onSearch" />
         </label>
-        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.amount" :decimals="0" /></label>
-        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.settleLimit" :decimals="0" />
+        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.amount" :decimals="0" unit="ریال" /></label>
+        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.settleLimit" :decimals="0" unit="ریال" />
           <small class="muted">{{ t('کمتر از مبلغ تنخواه. وقتی جمع هزینه‌ها به این مبلغ رسید، تنخواه واریز و ترمیم می‌شود.', 'Below the amount. When expenses reach it, the petty cash is settled and topped up.') }}</small>
         </label>
-        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.payCeiling" :decimals="0" />
+        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.payCeiling" :decimals="0" unit="ریال" />
           <small class="muted">{{ t('بیشترین مبلغ یک پرداخت؛ حداکثر برابر حد واریز.', 'Largest single payment; at most the settlement limit.') }}</small>
         </label>
         <label class="req"><span>{{ t('تاریخ ایجاد', 'Created on') }} <span class="star">*</span></span><input v-model="form.createdOn" dir="ltr" placeholder="1405/08/22" /></label>

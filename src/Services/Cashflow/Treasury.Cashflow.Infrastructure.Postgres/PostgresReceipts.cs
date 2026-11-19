@@ -63,15 +63,16 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         ArgumentNullException.ThrowIfNull(receipt);
         var tx = PostgresUnitOfWork.Current;
         var s = ReceiptSnapshot.From(receipt, receipt.Version + 1);
+        // A cancellation changes the state; a correction (report no. 6, items 2 and 6) everything but the kind, number and fiscal year.
         await using (var cmd = tx.Command(
-            "UPDATE cashflow.receipt SET state = @state, cancelled_on = @cancelled_on, cancel_reason = @cancel_reason, version = version + 1, updated_at = now() " +
-            "WHERE fiscal_year = @year AND id = @id AND version = @expected"))
+            "UPDATE cashflow.receipt SET receipt_date = @date, payer_id = @payer, payer_name = @payer_name, payer_detail_code = @payer_code, " +
+            "purpose_group_id = @group, purpose_group_name = @group_name, purpose = @purpose, reference1 = @ref1, reference2 = @ref2, department_id = @department, " +
+            "sales_proceeds = @sales, note = @note, account_kind = @account_kind, account_id = @account, deposit_method = @method, tracking_number = @tracking, " +
+            "amount = @amount, currency = @currency, rate_to_rial = @rate, instrument_ids = @instruments, total_rial = @total, payer_sheba = @sheba, note_terms = @note_terms, " +
+            "state = @state, cancelled_on = @cancelled_on, cancel_reason = @cancel_reason, version = version + 1, updated_at = now() " +
+            "WHERE fiscal_year = @year AND id = @id AND kind = @kind AND number = @number AND version = @expected"))
         {
-            cmd.Parameters.AddWithValue("state", s.State.ToString());
-            cmd.Parameters.Add(new NpgsqlParameter("cancelled_on", NpgsqlDbType.Date) { Value = (object?)s.CancelledOn ?? DBNull.Value });
-            cmd.Parameters.AddWithValue("cancel_reason", (object?)s.CancelReason ?? DBNull.Value);
-            cmd.Parameters.AddWithValue("year", s.FiscalYear);
-            cmd.Parameters.AddWithValue("id", s.Id);
+            Bind(cmd, s);
             cmd.Parameters.AddWithValue("expected", receipt.Version);
             if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             {

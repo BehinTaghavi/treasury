@@ -114,6 +114,11 @@ public static class Assert
 
     public static T Single<T>(IEnumerable<T> collection, Predicate<T> filter) => Single(collection.Where(i => filter(i)));
 
+    public static void StartsWith(string expected, string? actual, StringComparison comparison)
+    {
+        if (actual is null || !actual.StartsWith(expected, comparison)) throw new AssertException($"'{actual}' does not start with '{expected}'.");
+    }
+
     public static void Contains(string expected, string? actual)
     {
         if (actual is null || !actual.Contains(expected, StringComparison.Ordinal)) throw new AssertException($"'{actual}' does not contain '{expected}'.");

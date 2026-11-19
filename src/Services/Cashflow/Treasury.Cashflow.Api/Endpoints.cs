@@ -54,6 +54,24 @@ public sealed record NoteReceiptRequest(
 
 public sealed record CancelReceiptRequest(string Date, string Reason, long Version);
 
+/// <summary>
+/// Correction («ویرایش») of a saved receipt (owner's report no. 6, items 2 and 6): the receipt form as it now is, with the version the
+/// user saw. One body per kind of receipt, as for recording.
+/// </summary>
+public sealed record CashReceiptCorrection(ReceiptHeaderInput Header, Guid CashDeskId, decimal Amount, decimal? RateToRial, long Version);
+
+/// <inheritdoc cref="CashReceiptCorrection"/>
+public sealed record BankReceiptCorrection(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial,
+    long Version, string? PayerSheba = null);
+
+/// <summary>A line with an id corrects that cheque, a line without one adds a cheque, a cheque left out is taken off the receipt.</summary>
+public sealed record InstrumentReceiptCorrection(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments, long Version);
+
+/// <inheritdoc cref="InstrumentReceiptCorrection"/>
+public sealed record NoteReceiptCorrection(
+    ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, long Version, IReadOnlyList<NoteGuarantorInput>? Guarantors = null,
+    IReadOnlyList<Guid>? SignerIds = null);
+
 public static class Endpoints
 {
     private const string IdempotencyHeader = "Idempotency-Key";
@@ -93,7 +111,10 @@ public static class Endpoints
                 receiptId => $"/api/cashflow/receipts/{receiptId}"));
 
         api.MapPost("/instruments/{id:guid}/replace/voucher-preview", async (Guid id, ReplaceRequest r, ReceiptUseCases useCases, CancellationToken ct) =>
-            Preview(await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false)));
+            await useCases.PreviewReplacementAsync(new ReplaceChequeCommand("preview", id, r.Header, r.Instruments), ct).ConfigureAwait(false) is var p && p.IsSuccess
+                ? Results.Ok(p.Value)
+                : Results.Problem(statusCode: StatusCodes.Status422UnprocessableEntity, title: p.ErrorCode, detail: p.ErrorMessage,
+                    extensions: new Dictionary<string, object?> { ["code"] = p.ErrorCode }));
 
         api.MapPost("/instruments/{id:guid}/endorse", async (Guid id, EndorseRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.PaymentRequestId, r.SayadTracking, r.Note), ct)
@@ -153,6 +174,25 @@ public static class Endpoints
 
         api.MapPost("/receipts/notes/voucher-preview", async (NoteReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
             Preview(await u.PreviewNotesAsync(new RecordNoteReceiptCommand("preview", r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false)));
+
+        // Correction of a saved receipt while its voucher is not confirmed (owner's report no. 6, items 2 and 6).
+        api.MapPut("/receipts/{id:guid}/cash", async (Guid id, CashReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectCashAsync(new CorrectCashReceiptCommand(Key(http), id, r.Version, r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPut("/receipts/{id:guid}/bank", async (Guid id, BankReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectBankDepositAsync(
+                new CorrectBankReceiptCommand(Key(http), id, r.Version, r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPut("/receipts/{id:guid}/instruments", async (Guid id, InstrumentReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectInstrumentsAsync(new CorrectInstrumentReceiptCommand(Key(http), id, r.Version, r.Header, r.Instruments), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPut("/receipts/{id:guid}/notes", async (Guid id, NoteReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectNotesAsync(
+                new CorrectNoteReceiptCommand(Key(http), id, r.Version, r.Header, r.Terms, r.Notes, r.Guarantors, r.SignerIds), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
 
         api.MapPost("/receipts/{id:guid}/cancel", async (Guid id, CancelReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.CancelAsync(new CancelReceiptCommand(Key(http), id, r.Date, r.Reason, r.Version), ct).ConfigureAwait(false),

@@ -8,9 +8,12 @@
  * Owner, 18 Nov 2026: the last column «وضعیت» is the latest status: of a cheque receipt, the latest status of its cheques (with the mark
  * «سررسید چک»); of a cash or bank receipt, recorded or cancelled. The names are the owner's, shared by every screen (ui-kit chequeStatus).
  * A receipt of promissory notes (owner's form «فرم دریافت سفته», 16 Nov 2026) shows its terms and can be printed for the signatures.
+ * Owner's report no. 6 (18 Nov 2026): «ویرایش» on an opened receipt while its voucher is not confirmed (items 2 and 6; the parent opens
+ * the form of its kind); a box of its own for the receipt number, which finds exactly that number (item 9: typed into the general
+ * search box, a number also matched every date and code that contains it).
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, searchKey, todayJalali, translate,
+import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
   type ChequeStatus, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
@@ -35,10 +38,13 @@ interface Receipt {
   chequeStatuses: ChequeStatus[] | null
   payerSheba: string | null
   noteTerms: NoteTerms | null; purposeGroupId: string
+  /** The code of the rule that closes «ویرایش», or null while the receipt can be corrected (only on an opened receipt). */
+  notCorrectable?: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
+const emit = defineEmits<{ edit: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -66,15 +72,18 @@ const name = (m: Record<string, [string, string]>, k: string | null | undefined)
 
 const receipts = ref<Receipt[]>([])
 const search = ref('')
+/** «شماره رسید»: exactly this number (report no. 6, item 9). */
+const numberSearch = ref('')
 const selected = ref<Receipt | null>(null)
 const message = ref<{ kind: 'error' | 'ok'; text: string } | null>(null)
 const show = (k: 'error' | 'ok', text: string) => { message.value = { kind: k, text } }
 
 const shown = computed(() => {
   const key = searchKey(search.value)
-  if (!key) return receipts.value
-  return receipts.value.filter(r => searchKey(`${r.number} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date} ${
-    statusGroups(r).map(g => g.name + (g.due ? ` ${dueMark(props.locale)}` : '')).join(' ')}`).includes(key))
+  const wanted = receiptNumber(numberSearch.value)
+  return receipts.value.filter(r => (wanted === null || r.number === wanted)
+    && (!key || searchKey(`${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date} ${
+      statusGroups(r).map(g => g.name + (g.due ? ` ${dueMark(props.locale)}` : '')).join(' ')}`).includes(key)))
 })
 const totalShown = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
 
@@ -177,7 +186,10 @@ onMounted(async () => { await L.load(); await load() })
       <label style="width: 12rem">{{ t('نوع دریافت', 'Kind') }}
         <SearchSelect v-model="kind" :options="kindChoices" :empty-label="t('همه', 'All')" :aria-label="t('نوع دریافت', 'Kind')" />
       </label>
-      <label style="flex: 1; min-width: 14rem">{{ t('جستجو (شماره، پرداخت کننده، بابت، پیگیری، وضعیت)', 'Search (number, payer, purpose, tracking, status)') }}
+      <label style="width: 9rem">{{ t('شماره رسید', 'Receipt no.') }}
+        <input v-model="numberSearch" dir="ltr" inputmode="numeric" :aria-label="t('شماره رسید', 'Receipt no.')" />
+      </label>
+      <label style="flex: 1; min-width: 14rem">{{ t('جستجو (پرداخت کننده، بابت، پیگیری، تاریخ، وضعیت)', 'Search (payer, purpose, tracking, date, status)') }}
         <input v-model="search" />
       </label>
     </div>
@@ -213,7 +225,7 @@ onMounted(async () => { await L.load(); await load() })
               <template v-else>{{ t('ثبت شده', 'Recorded') }}</template>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="9" class="muted">{{ t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="9" class="muted">{{ receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
         </tbody>
         <tfoot v-if="shown.length">
           <tr><td colspan="7"><strong>{{ t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)') }}</strong></td><td class="num"><strong>{{ money(totalShown) }}</strong></td><td /></tr>
@@ -239,6 +251,11 @@ onMounted(async () => { await L.load(); await load() })
         · {{ t('ثبت', 'By') }}: {{ selected.recordedBy }}
       </p>
       <p v-if="selected.note" class="small">{{ selected.note }}</p>
+      <!-- Owner's report no. 6, items 2 and 6: a receipt is corrected until its voucher is confirmed. -->
+      <div v-if="selected.state === 'Recorded'" class="tr-buttons">
+        <button v-if="!selected.notCorrectable" type="button" @click="emit('edit', selected.id)">{{ t('ویرایش رسید', 'Correct the receipt') }}</button>
+        <span v-else class="muted small">{{ t('ویرایش بسته است:', 'Correction is closed:') }} {{ translate(selected.notCorrectable, locale) }}</span>
+      </div>
       <p v-if="selected.state === 'Cancelled'" class="tr-msg error">{{ t(`ابطال شده در ${selected.cancelledOn}: ${selected.cancelReason}`, `Cancelled on ${selected.cancelledOn}: ${selected.cancelReason}`) }}</p>
 
       <template v-if="terms">

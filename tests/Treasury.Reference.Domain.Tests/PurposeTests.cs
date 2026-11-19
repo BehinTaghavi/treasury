@@ -64,11 +64,18 @@ public sealed class PurposeTests
     }
 
     [Fact]
-    public void A_group_in_use_keeps_its_direction_and_is_never_deleted()
+    public void A_group_in_use_is_never_changed_or_deleted_but_can_be_switched_off()
     {
+        // Owner's report no. 6, items 3 and 7.
         var g = Group();
         Assert.True(g.MarkInUse());
-        Assert.Equal("PurposeGroup.DirectionInUse", Code(() => g.Edit(PurposeDirection.Payment, g.Name, "2101", Postable, null, null)));
+        g.MarkSaved(1);
+        Assert.Equal("PurposeGroup.EditInUse", Code(() => g.Edit(PurposeDirection.Payment, g.Name, "2101", Postable, null, null)));
+        Assert.Equal("PurposeGroup.EditInUse", Code(() => g.Edit(g.Direction, "نام دیگر", "2101", Postable, null, null)));
+        Assert.Equal("PurposeGroup.EditInUse", Code(() => g.Edit(g.Direction, g.Name, "2102", Postable, null, null)));
+        Assert.Empty(g.PendingEvents);
+        g.Deactivate();
+        Assert.False(g.IsActive);
         Assert.Equal("PurposeGroup.InUse", Code(() => g.Delete(hasPurposes: false)));
         Assert.Equal("PurposeGroup.HasPurposes", Code(() => Group().Delete(hasPurposes: true)));
     }

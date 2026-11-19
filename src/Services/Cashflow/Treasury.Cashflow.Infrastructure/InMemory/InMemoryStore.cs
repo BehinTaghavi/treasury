@@ -45,6 +45,9 @@ internal sealed class PendingChanges
 {
     public Dictionary<Guid, InstrumentSnapshot> Instruments { get; } = [];
 
+    /// <summary>Cheques and notes taken off a corrected receipt.</summary>
+    public HashSet<Guid> RemovedInstruments { get; } = [];
+
     public Dictionary<Guid, ReceiptSnapshot> Receipts { get; } = [];
 
     public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
@@ -82,6 +85,11 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var (id, s) in pending.Instruments)
                 {
                     db.Instruments[id] = s;
+                }
+
+                foreach (var id in pending.RemovedInstruments)
+                {
+                    db.Instruments.Remove(id);
                 }
 
                 foreach (var (id, s) in pending.Receipts)
@@ -203,6 +211,31 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         return Task.CompletedTask;
     }
 
+    /// <summary>The whole instrument is kept as a snapshot, so a correction is saved like any other change.</summary>
+    public Task SaveCorrectionAsync(Instrument instrument, CancellationToken cancellationToken) => SaveAsync(instrument, cancellationToken);
+
+    public Task RemoveAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        long stored;
+        lock (db.Gate)
+        {
+            stored = db.Instruments.TryGetValue(instrument.Id, out var s) ? s.Version : 0;
+        }
+
+        if (stored != instrument.Version)
+        {
+            throw new ConcurrencyConflictException($"Instrument {instrument.Id} was changed by someone else (version {stored}, expected {instrument.Version}).");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        pending.Instruments.Remove(instrument.Id);
+        pending.RemovedInstruments.Add(instrument.Id);
+        pending.Outbox.AddRange(instrument.PendingEvents.Select(OutboxMessage.From));
+        instrument.MarkSaved(instrument.Version + 1);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
     {
         lock (db.Gate)
@@ -220,7 +253,8 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         lock (db.Gate)
         {
             var staged = InMemoryUnitOfWork.Pending?.Instruments ?? [];
-            IReadOnlyList<Instrument> list = db.Instruments.Values.Where(s => !staged.ContainsKey(s.Id)).Concat(staged.Values)
+            var removed = InMemoryUnitOfWork.Pending?.RemovedInstruments ?? [];
+            IReadOnlyList<Instrument> list = db.Instruments.Values.Where(s => !staged.ContainsKey(s.Id) && !removed.Contains(s.Id)).Concat(staged.Values)
                 .Where(s => s.ReceiptId == receiptId).Select(s => s.ToDomain()).ToList();
             return Task.FromResult(list);
         }

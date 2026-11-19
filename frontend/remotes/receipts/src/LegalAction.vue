@@ -27,6 +27,8 @@ interface Cheque {
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; chequeId?: string }>(),
   { apiBase: '', locale: 'fa', token: undefined, chequeId: undefined })
+/** A step was recorded: the receipts list under the screen reads the statuses again (owner's report no. 6, item 8). */
+const emit = defineEmits<{ changed: [] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -139,6 +141,7 @@ async function record() {
   form.description = ''
   form.date = todayJalali()
   queued.value = []
+  emit('changed')
   await load()
   await open(c.id)
 }
@@ -198,6 +201,7 @@ async function returnToDesk() {
   handBack.open = false
   handBack.note = ''
   openId.value = ''
+  emit('changed')
   show('ok', t(`${kindName(c)} ${c.number} به صندوق تحویل شد و آخرین وضعیت آن «${chequeStateName('InCashDesk', props.locale)}» است؛ از این پس مانند یک چک جدید در «عملیات چک‌های دریافتی» ادامه می‌یابد. سند آن در کارت چک تایید می‌شود.`,
     `${kindName(c)} ${c.number} is back in the cash desk; it goes on like a new cheque on the steps screen. Confirm its voucher on the cheque card.`))
   await load()

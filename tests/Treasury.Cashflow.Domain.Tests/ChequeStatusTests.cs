@@ -224,9 +224,11 @@ public sealed class ChequeStatusTests
         var receipt = Receipt.RecordInstruments(receiptId, 3, header, created, User, old);
         old.Replace(receipt.Id, receipt.Date, User);
         Assert.Equal((InstrumentState.Replaced, (InstrumentState?)InstrumentState.InLegal), (old.State, old.History[^1].From));
-        // The legal action moved the cheque to «اسناد واخواست شده حقوقی شده» (answer to Q38), so that account is credited now.
-        Assert.Equal([(true, "1201", "200015"), (false, "1204", "200015")],
-            Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.InLegal))));
+        // The legal action moved the cheque to «اسناد واخواست شده حقوقی شده» (answer to Q38), so its cancellation for the replacement
+        // credits that account (report no. 6, item 11); the new cheque is received as on any receipt.
+        Assert.Equal([(true, "4101", "200015"), (false, "1204", "200015")],
+            Lines(ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), "4101")!));
+        Assert.Equal([(true, "1201", "200015"), (false, "4101", "200015")], Lines(ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template())));
 
         var cancelled = Bounced();
         cancelled.SendToLegal(D("1405/09/10"), User, "تحویل به وکیل", Certificate);
@@ -363,8 +365,8 @@ public sealed class ChequeStatusTests
         };
         var receipt = Receipt.RecordInstruments(receiptId, 4, header, created, User, old);
         old.Replace(receipt.Id, receipt.Date, User);
-        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.SayadRegistered));
-        Assert.Equal([(true, "1201", "200015"), (false, "1201", "200015")], Lines(v));
+        var v = ReceiptVouchers.ForStep(old, old.History.Count, new LedgerSide(null, null), null, Template(), "4101")!;
+        Assert.Equal([(true, "4101", "200015"), (false, "1201", "200015")], Lines(v));
     }
 
     [Fact]

@@ -170,8 +170,8 @@ onMounted(loadAll)
               <td><span dir="auto">{{ r.title }}</span> <small v-if="r.hint" class="muted">{{ r.hint }}</small></td>
               <td dir="ltr">{{ r.currency }}</td>
               <td><input v-model="drafts[key(r)]!.date" dir="ltr" class="date" :aria-label="t('تاریخ', 'Date')" /></td>
-              <td><AmountInput v-model="drafts[key(r)]!.amount" :decimals="r.currency === 'IRR' ? 0 : 2" allow-negative class="amount" :aria-label="t('موجودی اول دوره', 'Balance')" /></td>
-              <td><AmountInput v-if="r.currency !== 'IRR'" v-model="drafts[key(r)]!.rial" :decimals="0" allow-negative class="amount" :aria-label="t('هم‌ارز ریالی', 'Rial equivalent')" /></td>
+              <td><AmountInput v-model="drafts[key(r)]!.amount" :decimals="r.currency === 'IRR' ? 0 : 2" allow-negative class="amount" :unit="r.currency === 'IRR' ? 'ریال' : r.currency" :aria-label="t('موجودی اول دوره', 'Balance')" /></td>
+              <td><AmountInput v-if="r.currency !== 'IRR'" v-model="drafts[key(r)]!.rial" :decimals="0" allow-negative class="amount" unit="ریال" :aria-label="t('هم‌ارز ریالی', 'Rial equivalent')" /></td>
               <td class="small">
                 <span v-if="balanceOf(r)?.entry" class="tr-tag ok">{{ t('ثبت‌شده', 'Entered') }}</span>
                 <span v-else-if="balanceOf(r)?.carried" class="tr-tag">{{ t(`منتقل‌شده از ${num(balanceOf(r)!.carried!.fromYear)}`, `Carried from ${balanceOf(r)!.carried!.fromYear}`) }}</span>
@@ -197,7 +197,9 @@ h4 { margin: 1.25rem 0 .25rem; color: #1f3a5c; }
 .year { width: 10rem !important; }
 .tr-scroll { overflow-x: auto; }
 input.date { width: 7.5rem; }
-input.amount { width: 11rem; text-align: left; }
+/* The amount box with its words underneath (report no. 6, item 5). */
+.amount { width: 13rem; }
+.amount :deep(input) { text-align: left; }
 .tr-tag.ok { background: #e6f4ea; color: #1e5631; }
 tfoot td { font-weight: 600; border-top: 2px solid #cbd2d9; }
 .total { text-align: left; direction: ltr; }

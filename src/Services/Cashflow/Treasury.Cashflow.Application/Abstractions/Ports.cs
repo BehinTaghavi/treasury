@@ -19,6 +19,15 @@ public interface IInstrumentRepository
     /// <summary>Saves changes and pending events. Throws <see cref="ConcurrencyConflictException"/> if someone else saved first.</summary>
     Task SaveAsync(Instrument instrument, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Saves a received cheque or note corrected with its receipt (<see cref="Instrument.CorrectReceived"/>): everything written on it and
+    /// the date of its receipt step, with its pending events. Version-checked like <see cref="SaveAsync"/>.
+    /// </summary>
+    Task SaveCorrectionAsync(Instrument instrument, CancellationToken cancellationToken);
+
+    /// <summary>Deletes a cheque or note taken off its receipt (<see cref="Instrument.RemoveFromReceipt"/>) and writes its pending events.</summary>
+    Task RemoveAsync(Instrument instrument, CancellationToken cancellationToken);
+
     /// <summary>Received instruments in a state (e.g. in the cash desk, at the bank), by due date.</summary>
     Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken);
 
@@ -67,7 +76,7 @@ public interface IReceiptRepository
 
     Task AddAsync(Receipt receipt, CancellationToken cancellationToken);
 
-    /// <summary>Saves a cancellation. Version-checked.</summary>
+    /// <summary>Saves a cancellation or a correction (the receipt keeps its kind, number and fiscal year). Version-checked.</summary>
     Task SaveAsync(Receipt receipt, CancellationToken cancellationToken);
 
     /// <summary>Receipts of a year, newest first; of one kind or all.</summary>

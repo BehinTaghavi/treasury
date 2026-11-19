@@ -192,8 +192,8 @@ onMounted(async () => {
         <legend>{{ editingGroup ? t(`ویرایش گروه ${num(editingGroup.number)}`, `Edit group ${editingGroup.number}`) : t('گروه بابت جدید', 'New purpose group') }}</legend>
         <div class="req tr-radio" role="radiogroup" :aria-label="t('نوع بابت', 'Kind')">
           <span>{{ t('نوع بابت', 'Kind') }} <span class="star">*</span></span>
-          <label><input v-model="form.direction" type="radio" value="Receipt" :disabled="editingGroup?.isInUse" /> {{ t('دریافت', 'Receipt') }}</label>
-          <label><input v-model="form.direction" type="radio" value="Payment" :disabled="editingGroup?.isInUse" /> {{ t('پرداخت', 'Payment') }}</label>
+          <label><input v-model="form.direction" type="radio" value="Receipt"  /> {{ t('دریافت', 'Receipt') }}</label>
+          <label><input v-model="form.direction" type="radio" value="Payment"  /> {{ t('پرداخت', 'Payment') }}</label>
         </div>
         <label class="req"><span>{{ t('شرح گروه بابت', 'Description') }} <span class="star">*</span></span>
           <input v-model="form.name" maxlength="100" autocomplete="off" :placeholder="t('مثلاً پیش دریافت', 'e.g. Advance received')" />
@@ -243,7 +243,9 @@ onMounted(async () => {
             </td>
             <td class="tr-actions">
               <button type="button" class="tr-link" @click="choose(g)">{{ t('بابت‌ها', 'Purposes') }}</button>
-              <button type="button" class="tr-link" @click="startEdit(g)">{{ t('ویرایش', 'Edit') }}</button>
+              <!-- Owner's report no. 6, items 3 and 7: a group that was used once is no longer edited. -->
+              <button v-if="!g.isInUse" type="button" class="tr-link" @click="startEdit(g)">{{ t('ویرایش', 'Edit') }}</button>
+              <span v-else class="muted small" :title="t('این گروه در دریافت، پرداخت یا درخواست وجهی استفاده شده است و ویرایش نمی‌شود.', 'Used by a receipt, payment or request: no longer edited.')">{{ t('ویرایش ندارد', 'Not editable') }}</span>
               <button type="button" class="tr-link" @click="changeGroup(g, g.isActive ? 'deactivate' : 'activate')">{{ g.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
               <button v-if="!g.isInUse" type="button" class="tr-link danger" @click="changeGroup(g, 'delete')">{{ t('حذف', 'Delete') }}</button>
             </td>

@@ -56,6 +56,43 @@ public sealed class ReceiptPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_corrected_receipt_and_its_cheques_are_stored_and_a_removed_cheque_is_deleted_db_042()
+    {
+        // Owner's report no. 6, items 2 and 6: correction before the voucher is confirmed.
+        var cash = (await _receipts.RecordCashAsync(new(Key(), Header(), _desk, 5_000_000), CancellationToken.None)).Value;
+        var corrected = await _receipts.CorrectCashAsync(
+            new(Key(), cash, 1, Header() with { Date = "1405/08/25", Purpose = "پیش دریافت", Note = null, SalesProceeds = false }, _desk, 7_500_000), CancellationToken.None);
+        Assert.True(corrected.IsSuccess, corrected.ErrorCode);
+        var c = (await _receipts.GetAsync(cash, CancellationToken.None))!;
+        Assert.Equal(("1405/08/25", "پیش دریافت", (string?)null, false, 7_500_000m, 7_500_000m, 2L, (string?)null),
+            (c.Date, c.Purpose, c.Note, c.SalesProceeds, c.Amount, c.TotalRial, c.Version, c.NotCorrectable));
+        Assert.Equal("Concurrency.Conflict", (await _receipts.CorrectCashAsync(new(Key(), cash, 1, Header(), _desk, 1), CancellationToken.None)).ErrorCode);
+
+        var number = Guid.NewGuid().ToString("N")[..8];
+        ReceivedInstrumentInput Cheque(string no, decimal amount, Guid? id = null) =>
+            new(InstrumentKind.OrdinaryCheque, no, "1405/12/01", new MoneyInput(amount), Bank, "کاشان", SayadId: "1234567890123456", Id: id);
+        var receipt = (await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("A" + number, 1_000_000), Cheque("B" + number, 2_000_000)]), CancellationToken.None)).Value;
+        var before = (await _receipts.GetAsync(receipt, CancellationToken.None))!.Instruments!;
+        Assert.Equal(["A" + number, "B" + number], before.Select(i => i.Number!));
+
+        var r = await _receipts.CorrectInstrumentsAsync(new(Key(), receipt, 1, Header() with { Date = "1405/08/26" },
+            [Cheque("B" + number, 2_500_000, before[1].Id) with { BranchName = "اصفهان", DueDate = "1406/01/20" }, Cheque("C" + number, 4_000_000)]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await _receipts.GetAsync(receipt, CancellationToken.None))!;
+        Assert.Equal((6_500_000m, 2, "1405/08/26", 2L), (v.TotalRial, v.InstrumentCount, v.Date, v.Version));
+        Assert.Equal(["B" + number, "C" + number], v.Instruments!.Select(i => i.Number!));
+        var kept = v.Instruments![0];
+        Assert.Equal((before[1].Id, 2_500_000m, "1406/01/20", "1405/08/26", "اصفهان", "1405/08/26"),
+            (kept.Id, kept.Amount, kept.DueDate, kept.IssueDate, kept.Details!.BranchName, Assert.Single(kept.History).Date));
+
+        await using var conn = await _dataSource.OpenConnectionAsync(CancellationToken.None);
+        await using var cmd = new NpgsqlCommand(
+            "SELECT (SELECT count(*) FROM cashflow.instrument WHERE id = @id) + (SELECT count(*) FROM cashflow.instrument_event WHERE instrument_id = @id)", conn);
+        cmd.Parameters.AddWithValue("id", before[0].Id);
+        Assert.Equal(0L, (long)(await cmd.ExecuteScalarAsync(CancellationToken.None))!);
+    }
+
+    [Fact]
     public async Task A_dollar_deposit_keeps_its_rate()
     {
         var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), Accounts.Dollar, DepositMethod.InternalTransfer, "SW-9", 100.5m, 600_000), CancellationToken.None);

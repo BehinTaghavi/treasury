@@ -34,3 +34,27 @@ export function amountInWords(value: number): string {
   }
   return (value < 0 ? 'منفی ' : '') + groups.join(' و ')
 }
+
+const digitNames = ['صفر', ...ones.slice(1)]
+
+/**
+ * The words of an amount as it is typed in an amount box ("12,500,000", Persian digits and separators allowed), for the line under
+ * the box (owner's report no. 6, items 1 and 5). Empty or unreadable text gives ''. Decimals of a foreign-currency amount or a rate
+ * are read digit by digit after «ممیز»: "1,250.05" → «یک هزار و دویست و پنجاه ممیز صفر پنج». The unit (ریال …) follows the words.
+ */
+export function amountTextInWords(text: string, unit = ''): string {
+  const latin = (text ?? '')
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 0x06f0))
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 0x0660))
+    .replace(/[,٬،\s‎‏]/g, '')
+    .replace(/[٫]/g, '.')
+    .replace(/−/g, '-')
+  const m = /^(-?)(\d+)(?:\.(\d*))?$/.exec(latin)
+  if (!m) return ''
+  const whole = amountInWords(Number(m[2]))
+  if (!whole) return ''
+  const fraction = (m[3] ?? '').replace(/0+$/, '')
+  const words = (m[1] && (Number(m[2]) > 0 || fraction) ? 'منفی ' : '') + whole
+    + (fraction ? ` ممیز ${[...fraction].map(d => digitNames[Number(d)]).join(' ')}` : '')
+  return unit ? `${words} ${unit}` : words
+}
