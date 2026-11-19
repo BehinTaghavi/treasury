@@ -53,8 +53,7 @@ const money = (n: number) => formatAmount(n, props.locale)
 const L = useLookups(api)
 
 const tabs: { id: Tab; title: [string, string]; states: string[] }[] = [
-  // Owner, 19 Nov 2026: the tab names both kinds it lists, so «ثبت صیادی شد» in the status column does not look like a contradiction.
-  { id: 'desk', title: ['نزد صندوق (ثبت صیادی شده و نشده)', 'In the cash desk (registered in Sayad or not)'], states: ['InCashDesk', 'SayadRegistered'] },
+  { id: 'desk', title: ['نزد صندوق', 'In the cash desk'], states: ['InCashDesk', 'SayadRegistered'] },
   { id: 'bank', title: ['نزد بانک (در جریان وصول)', 'At the bank'], states: ['DepositedForCollection'] },
   { id: 'back', title: ['عودت از بانک، برگشتی و اقدام حقوقی', 'Back from the bank, bounced and legal action'], states: ['ReturnedFromBank', 'Bounced', 'InLegal'] },
   { id: 'endorsed', title: ['خرج‌شده', 'Endorsed'], states: ['Endorsed'] },
@@ -70,11 +69,7 @@ const stateName = (k: string | null | undefined) =>
   props.notes && k && noteStateNames[k] ? (fa.value ? noteStateNames[k][0] : noteStateNames[k][1]) : words(chequeStateName(k, props.locale))
 const actionName = (k: string | null | undefined) =>
   props.notes && k && noteActionNames[k] ? (fa.value ? noteActionNames[k][0] : noteActionNames[k][1]) : words(chequeActionName(k, props.locale))
-if (props.notes) {
-  // A note has no Sayad registration, so its cash-desk tab keeps the plain name.
-  tabs[0]!.title = ['نزد صندوق', 'In the cash desk']
-  tabs[2]!.title = ['عودت‌شده از بانک، واخواستی و اقدام حقوقی', 'Back from the bank, protested and legal action']
-}
+if (props.notes) tabs[2]!.title = ['عودت‌شده از بانک، واخواستی و اقدام حقوقی', 'Back from the bank, protested and legal action']
 
 const tab = ref<Tab>('desk')
 const lists = reactive<Record<string, Cheque[]>>({})
