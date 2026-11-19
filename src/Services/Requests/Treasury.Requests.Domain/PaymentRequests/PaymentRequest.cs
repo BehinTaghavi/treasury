@@ -6,6 +6,7 @@ namespace Treasury.Requests.Domain.PaymentRequests;
 /// <summary>
 /// How the request is to be paid (new-version manual, «نوع پرداخت»: چک نقدی، چک انتظامی، چک مدّت دار، پرداخت نقدی، پرداخت سفته،
 /// سفته انتظامی، نقل و انتقال (بین بانکی)، کارت به کارت). One method per request: "جهت هر ذینفع فقط یک نوع پرداخت می تواند انتخاب گردد".
+/// Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» — a received cheque registered in Sayad is handed on to the beneficiary.
 /// </summary>
 public enum PaymentMethod
 {
@@ -17,7 +18,23 @@ public enum PaymentMethod
     GuaranteeNote,
     Transfer,
     CardToCard,
+    ChequeTransfer,
 }
+
+/// <summary>
+/// A received cheque as cashflow-svc describes it, for a request of the kind «ثبت انتقال (خرج چک)» (owner, 19 Nov 2026).
+/// </summary>
+/// <param name="PayerName">Who gave the cheque to the company («نام واگذارنده چک»).</param>
+/// <param name="CanBeTransferred">The cheque may be transferred now: an ordinary cheque in the cash desk whose latest status is
+/// «ثبت صیادی شد» (cashflow-svc's lifecycle table decides).</param>
+public sealed record ReceivedChequeFact(
+    Guid Id, string Number, string? BankName, FiscalDate? DueDate, string PayerName, decimal Amount, string Currency, bool CanBeTransferred, string? SayadId = null);
+
+/// <summary>
+/// The cheque a request of the kind «ثبت انتقال (خرج چک)» hands on, as it was when the request was written: its number, due date and the
+/// name of who gave it to the company are shown in place of «پرداخت از حساب بانکی» (owner, 19 Nov 2026).
+/// </summary>
+public sealed record TransferCheque(Guid InstrumentId, string Number, FiscalDate? DueDate, string PayerName, string? BankName = null, string? SayadId = null);
 
 /// <summary>A scanned supporting document of a request (owner's report no. 4, item 12: «تصویر اسکن شده ضمایم پرداخت»).</summary>
 /// <param name="ContentType">application/pdf, image/jpeg or image/png, read from the file itself.</param>
@@ -50,7 +67,9 @@ public enum PayFromKind
 public sealed record RequesterFact(Guid Id, string Name, Guid? DepartmentId, string? CostCenterCode, bool IsActive);
 
 /// <summary>A beneficiary (ذینفع) from Basic Information, with the تفصیل it is paid to.</summary>
-public sealed record BeneficiaryFact(Guid Id, string DetailCode, string Name, string? Sheba, bool IsActive);
+/// <param name="IsBeneficiary">In the group «ذینفعان» of «ذینفعان / متعهدین / ضامنین»: an entry that is only an obligor or a guarantor is
+/// not paid (owner, 19 Nov 2026).</param>
+public sealed record BeneficiaryFact(Guid Id, string DetailCode, string Name, string? Sheba, bool IsActive, bool IsBeneficiary = true);
 
 /// <summary>A purpose group (گروه بابت); for a payment it decides the debit account of the voucher (instruction 182-99).</summary>
 public sealed record PurposeGroupFact(Guid Id, string Name, bool IsForPayments, bool IsActive);
@@ -64,6 +83,7 @@ public sealed record PayFromFact(PayFromKind Kind, Guid Id, string Name, string 
 /// <param name="CardNumber">Card-to-card only: the beneficiary's card (manual: «انتقال به شماره کارت»).</param>
 /// <param name="HasMainBeneficiaries">«پرداخت جمعی دارد / ذینفعان اصلی دارد»: the beneficiary passes the money on to others.</param>
 /// <param name="Attachments">Number of supporting documents («تعداد ضمائم»).</param>
+/// <param name="Cheque">«ثبت انتقال (خرج چک)» only: the received cheque to hand on.</param>
 public sealed record PaymentRequestForm(
     FiscalDate Date,
     RequesterFact Requester,
@@ -83,7 +103,8 @@ public sealed record PaymentRequestForm(
     Guid? DepartmentId = null,
     bool HasMainBeneficiaries = false,
     int Attachments = 0,
-    string? Note = null);
+    string? Note = null,
+    ReceivedChequeFact? Cheque = null);
 
 /// <summary>
 /// A payment request (درخواست وجه). New-version manual, «ب-صدور درخواست وجه»: every payment starts with a request entered by a
@@ -162,6 +183,9 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public PayFromKind? PayFromKind { get; private set; }
 
     public Guid? PayFromId { get; private set; }
+
+    /// <summary>«ثبت انتقال (خرج چک)» only: the received cheque the request hands on to its beneficiary.</summary>
+    public TransferCheque? Cheque { get; private set; }
 
     public FiscalDate? DueDate { get; private set; }
 
@@ -326,7 +350,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             Reference1 = d.Reference1, Reference2 = d.Reference2, Amount = d.Amount, Currency = d.Currency, Method = d.Method, Priority = d.Priority,
             TransferAccount = d.TransferAccount, CardNumber = d.CardNumber, PayFromKind = d.PayFromKind, PayFromId = d.PayFromId, DueDate = d.DueDate,
             DepartmentId = d.DepartmentId, HasMainBeneficiaries = d.HasMainBeneficiaries, Attachments = d.Attachments, Note = d.Note,
-            State = d.State, ApprovedBy = d.ApprovedBy, ApprovedAt = d.ApprovedAt, CancelReason = d.CancelReason,
+            State = d.State, ApprovedBy = d.ApprovedBy, ApprovedAt = d.ApprovedAt, CancelReason = d.CancelReason, Cheque = d.Cheque,
         };
         r._files.AddRange(files ?? []);
         r._payments.AddRange(d.Payments ?? []);
@@ -337,7 +361,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public PaymentRequestSnapshotData Data() => new(
         Date, RequesterId, RequesterName, RequesterDepartmentId, CostCenterCode, BeneficiaryId, BeneficiaryDetailCode, BeneficiaryName,
         PurposeGroupId, PurposeGroupName, Purpose, Reference1, Reference2, Amount, Currency, Method, Priority, TransferAccount, CardNumber,
-        PayFromKind, PayFromId, DueDate, DepartmentId, HasMainBeneficiaries, Attachments, Note, State, ApprovedBy, ApprovedAt, CancelReason, [.. _payments]);
+        PayFromKind, PayFromId, DueDate, DepartmentId, HasMainBeneficiaries, Attachments, Note, State, ApprovedBy, ApprovedAt, CancelReason, [.. _payments], Cheque);
 
     private void Apply(PaymentRequestForm f)
     {
@@ -345,6 +369,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Require(f.Requester!.IsActive, "PaymentRequest.RequesterInactive", "The requester is switched off.");
         Require(f.Beneficiary is not null, "PaymentRequest.BeneficiaryRequired", "Choose the beneficiary (old: \"ذينفع نامشخص است\").");
         Require(f.Beneficiary!.IsActive, "PaymentRequest.BeneficiaryInactive", "The beneficiary is switched off.");
+        Require(f.Beneficiary.IsBeneficiary, "PaymentRequest.NotABeneficiary", "This entry is an obligor or guarantor, not a beneficiary.");
         Require(f.PurposeGroup is not null, "PaymentRequest.PurposeGroupRequired", "Choose the purpose group.");
         Require(f.PurposeGroup!.IsForPayments, "PaymentRequest.PurposeGroupNotForPayments", "This purpose group is for receipts.");
         Require(f.PurposeGroup.IsActive, "PaymentRequest.PurposeGroupInactive", "This purpose group is switched off.");
@@ -380,7 +405,21 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             Require(IsCardNumber(card!), "PaymentRequest.CardNumberInvalid", "The card number has 16 digits and a valid check digit.");
         }
 
-        if (f.PayFrom is { } from)
+        // Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» names the received cheque instead of the account paid from. The cheque must have been
+        // registered in Sayad («ثبت صیادی شد») and "the amount of the cheque is the amount of the request".
+        TransferCheque? cheque = null;
+        if (f.Method == PaymentMethod.ChequeTransfer)
+        {
+            Require(f.Cheque is not null, "PaymentRequest.ChequeRequired", "Choose the received cheque to transfer.");
+            var c = f.Cheque!;
+            Require(c.CanBeTransferred, "PaymentRequest.ChequeNotTransferable", "Only an ordinary cheque in the cash desk that is registered in Sayad can be transferred.");
+            Require(string.Equals(c.Currency.Trim(), currency, StringComparison.OrdinalIgnoreCase), "PaymentRequest.ChequeCurrency",
+                "The request must be in the cheque's currency.");
+            Require(f.Amount == c.Amount, "PaymentRequest.ChequeAmount", "The amount of the request is the amount of the cheque.");
+            cheque = new TransferCheque(c.Id, c.Number.Trim(), c.DueDate, c.PayerName.Trim(), Clean(c.BankName), Clean(c.SayadId));
+        }
+
+        if (f.Method != PaymentMethod.ChequeTransfer && f.PayFrom is { } from)
         {
             var wanted = f.Method == PaymentMethod.Cash ? Domain.PaymentRequests.PayFromKind.CashDesk : Domain.PaymentRequests.PayFromKind.BankAccount;
             Require(from.Kind == wanted, "PaymentRequest.PayFromWrongKind", "Cash is paid from a cash desk; everything else from a bank account.");
@@ -390,7 +429,9 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         }
 
         Require(f.Method != PaymentMethod.PostDatedCheque || f.DueDate is not null, "PaymentRequest.DueDateRequired", "A post-dated cheque needs its due date.");
-        Require(f.DueDate is null || f.DueDate >= f.Date, "PaymentRequest.DueBeforeRequest", "The due date cannot be before the request date.");
+        // A transferred cheque brings its own due date (it may already have passed), so the request has none.
+        var due = f.Method == PaymentMethod.ChequeTransfer ? null : f.DueDate;
+        Require(due is null || due >= f.Date, "PaymentRequest.DueBeforeRequest", "The due date cannot be before the request date.");
 
         Date = f.Date;
         (RequesterId, RequesterName, RequesterDepartmentId, CostCenterCode) = (f.Requester.Id, f.Requester.Name, f.Requester.DepartmentId, f.Requester.CostCenterCode);
@@ -399,8 +440,9 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         (Reference1, Reference2, Note) = (Clean(f.Reference1), Clean(f.Reference2), Clean(f.Note));
         (Amount, Currency, Method, Priority) = (f.Amount, currency, f.Method, f.Priority);
         (TransferAccount, CardNumber) = (transfer, card);
-        (PayFromKind, PayFromId) = (f.PayFrom?.Kind, f.PayFrom?.Id);
-        (DueDate, DepartmentId, HasMainBeneficiaries, Attachments) = (f.DueDate, f.DepartmentId, f.HasMainBeneficiaries, f.Attachments);
+        (PayFromKind, PayFromId) = (cheque is null ? f.PayFrom?.Kind : null, cheque is null ? f.PayFrom?.Id : null);
+        Cheque = cheque;
+        (DueDate, DepartmentId, HasMainBeneficiaries, Attachments) = (due, f.DepartmentId, f.HasMainBeneficiaries, f.Attachments);
     }
 
     /// <summary>Iranian Sheba (IBAN): IR + 24 digits, mod 97 = 1.</summary>
@@ -465,7 +507,8 @@ public sealed record PaymentRequestSnapshotData(
     string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1,
     string? Reference2, decimal Amount, string Currency, PaymentMethod Method, int Priority, string? TransferAccount, string? CardNumber,
     PayFromKind? PayFromKind, Guid? PayFromId, FiscalDate? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
-    PaymentRequestState State, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, IReadOnlyList<RequestPayment>? Payments = null);
+    PaymentRequestState State, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, IReadOnlyList<RequestPayment>? Payments = null,
+    TransferCheque? Cheque = null);
 
 public sealed record PaymentRequestRegistered(
     Guid PaymentRequestId, int Number, int FiscalYear, string BeneficiaryDetailCode, decimal Amount, string Currency, PaymentMethod Method, string UserId) : DomainEvent;

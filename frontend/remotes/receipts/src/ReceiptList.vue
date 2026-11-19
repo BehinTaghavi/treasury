@@ -61,7 +61,7 @@ const instrumentKinds: Record<string, [string, string]> = {
   PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
 }
 /** The «وضعیت» column: the cheques of a cheque receipt grouped by their latest status. */
-const statusGroups = (r: Receipt) => groupChequeStatuses(r.chequeStatuses, props.locale)
+const statusGroups = (r: Receipt) => groupChequeStatuses(r.chequeStatuses, props.locale, r.kind === 'Notes')
 const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
 
 const receipts = ref<Receipt[]>([])
@@ -308,7 +308,7 @@ onMounted(async () => { await L.load(); await load() })
                 <td class="num">{{ i.dueDate ?? (i.details?.onDemand ? t('عندالمطالبه', 'On demand') : '') }}</td>
                 <td class="num">{{ money(i.amount) }} <span v-if="i.currency !== 'IRR'">{{ i.currency }}</span></td>
                 <td class="num">{{ money(i.amountInRial) }}</td>
-                <td>{{ chequeStateName(i.state, locale) }}
+                <td>{{ chequeStateName(i.state, locale, selected.kind === 'Notes') }}
                   <span v-if="i.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(i.state, locale)">{{ dueMark(locale) }}</span>
                   <div v-if="i.reachedDueDate" class="muted small">{{ dueWaitsFor(i.state, locale) }}</div>
                 </td>

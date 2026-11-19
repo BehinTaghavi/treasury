@@ -13,14 +13,17 @@ public sealed class HttpPaymentRequestLookup(HttpClient http) : IPaymentRequestL
 {
     private const string Unavailable = "Requests.Unavailable";
 
+    private sealed record Cheque(Guid InstrumentId);
+
     private sealed record Request(Guid Id, int Number, string State, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string Purpose,
-        decimal Amount, string Currency, decimal PaidAmount);
+        decimal Amount, string Currency, decimal PaidAmount, string? Method = null, Cheque? Cheque = null);
 
     private sealed record Problem(string? Code, string? Title);
 
     public async Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Request>(http, $"api/requests/payment-requests/{id}", Unavailable, cancellationToken).ConfigureAwait(false) is { } r
-            ? new PaymentRequestFact(r.Id, r.Number, r.State, r.BeneficiaryDetailCode, r.BeneficiaryName, r.PurposeGroupId, r.Purpose, r.Amount, r.Currency, r.PaidAmount)
+            ? new PaymentRequestFact(r.Id, r.Number, r.State, r.BeneficiaryDetailCode, r.BeneficiaryName, r.PurposeGroupId, r.Purpose, r.Amount, r.Currency, r.PaidAmount,
+                r.Method == "ChequeTransfer" ? r.Cheque?.InstrumentId : null)
             : null;
 
     public Task RecordPaymentAsync(Guid requestId, RequestPaymentInput payment, CancellationToken cancellationToken)

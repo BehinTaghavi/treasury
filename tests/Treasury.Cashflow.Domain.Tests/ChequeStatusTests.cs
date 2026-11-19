@@ -75,12 +75,13 @@ public sealed class ChequeStatusTests
         var c = Cheque();
         var before = c.AllowedActions().Where(a => a != InstrumentAction.RegisterSayad).ToList();
         Assert.DoesNotContain(InstrumentAction.DepositForCollection, before); // rule N3: not before the registration
+        Assert.DoesNotContain(InstrumentAction.Endorse, before);              // nor is it transferred («ثبت انتقال», owner, 19 Nov 2026)
         c.RegisterSayad(D("1405/08/02"), User, " SY-100 ", "تایید شد");
         Assert.Equal((InstrumentState.SayadRegistered, "SY-100", "SY-100"), (c.State, c.History[^1].Reference, c.History[^1].Details!.SayadTracking));
         Assert.True(c.State.IsInCashDesk());
 
-        // Every step of «نزد صندوق» stays open and the deposit at the bank opens (rule N3); the registration itself is recorded once.
-        Assert.Equal([InstrumentAction.DepositForCollection, .. before], c.AllowedActions());
+        // Every step of «نزد صندوق» stays open, and the deposit at the bank (rule N3) and the transfer open; the registration itself is recorded once.
+        Assert.Equal(before.Concat([InstrumentAction.DepositForCollection, InstrumentAction.Endorse]).Order(), c.AllowedActions().Order());
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.RegisterSayad(D("1405/08/03"), User)).Code);
 
         // No voucher: only the latest status changes (owner's answer to Q37, 18 Nov 2026).

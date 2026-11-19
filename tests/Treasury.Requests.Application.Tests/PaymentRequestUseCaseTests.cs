@@ -16,7 +16,7 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
 
     public PaymentRequestUseCaseTests() =>
         _requests = new PaymentRequestUseCases(
-            new InMemoryUnitOfWork(_db), new InMemoryPaymentRequestRepository(_db), _reference, new FakeAccounts(), new InMemoryIdempotencyStore(_db), _user, TimeProvider.System);
+            new InMemoryUnitOfWork(_db), new InMemoryPaymentRequestRepository(_db), _reference, new FakeAccounts(), new FakeCheques(), new InMemoryIdempotencyStore(_db), _user, TimeProvider.System);
 
     public void Dispose() => _db.Dispose();
 
@@ -146,5 +146,46 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
         var b = await _requests.RegisterAsync(new(key, Input()), CancellationToken.None);
         Assert.Equal(a.Value, b.Value);
         Assert.Single(await _requests.ListAsync(1405, null, CancellationToken.None));
+    }
+
+    // ---- owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» ----
+
+    private static PaymentRequestInput Transfer(Guid cheque, decimal amount = FakeCheques.Amount) =>
+        Input(PaymentMethod.ChequeTransfer, amount: amount) with { ChequeId = cheque };
+
+    [Fact]
+    public async Task A_cheque_transfer_request_takes_the_cheque_from_cashflow_and_shows_its_number_due_date_and_giver()
+    {
+        var id = await Register(Transfer(FakeCheques.Registered) with { PayFromId = FakeAccounts.Bank }); // the account is not asked for this method
+        var v = await View(id);
+        Assert.Equal(("ChequeTransfer", FakeCheques.Amount, (Guid?)null), (v.Method, v.Amount, v.PayFromId));
+        Assert.Equal(new TransferChequeView(FakeCheques.Registered, "445566", "1405/10/15", "فروشگاه آفتاب", "بانک ملت", "1234567890123456"), v.Cheque);
+
+        Assert.Equal("PaymentRequest.ChequeRequired", (await _requests.RegisterAsync(new(Key(), Transfer(Guid.Empty)), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.ChequeNotFound", (await _requests.RegisterAsync(new(Key(), Transfer(Guid.NewGuid())), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.ChequeNotTransferable", (await _requests.RegisterAsync(new(Key(), Transfer(FakeCheques.InDesk)), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.ChequeCurrency", (await _requests.RegisterAsync(new(Key(), Transfer(FakeCheques.Dollar, 1_500m)), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.ChequeAmount",
+            (await _requests.RegisterAsync(new(Key(), Transfer(FakeCheques.Dollar, 1_400m) with { Currency = "USD" }), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_cheque_is_promised_to_one_open_request_at_a_time()
+    {
+        var first = await Register(Transfer(FakeCheques.Registered));
+        Assert.Equal("PaymentRequest.ChequeOnAnotherRequest", (await _requests.RegisterAsync(new(Key(), Transfer(FakeCheques.Registered)), CancellationToken.None)).ErrorCode);
+
+        // The request itself can be corrected with its cheque; once it is cancelled the cheque is free again.
+        Assert.True((await _requests.EditAsync(new(Key(), first, Transfer(FakeCheques.Registered) with { Purpose = "بابت بدهی" }, 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.ChangeAsync(new(Key(), first, "approve", 2), CancellationToken.None)).IsSuccess);
+        Assert.Equal("PaymentRequest.ChequeOnAnotherRequest", (await _requests.RegisterAsync(new(Key(), Transfer(FakeCheques.Registered)), CancellationToken.None)).ErrorCode);
+        Assert.True((await _requests.ChangeAsync(new(Key(), first, "cancel", 3, "اشتباه"), CancellationToken.None)).IsSuccess);
+        var second = await Register(Transfer(FakeCheques.Registered));
+
+        // Paying it with the cheque (the transfer recorded by cashflow-svc) makes it «پرداخت شده» at once: the amounts are equal.
+        Assert.True((await _requests.ChangeAsync(new(Key(), second, "approve", 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.RecordPaymentAsync(
+            new(Key(), second, "endorse:c:3", "EndorsedCheque", FakeCheques.Registered, "چک 445566 بانک ملت", FakeCheques.Amount, "IRR", "1405/08/25"), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Paid", (await View(second)).State);
     }
 }

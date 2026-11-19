@@ -131,8 +131,9 @@ public sealed class NoteStepTests
         // A cheque still needs its Sayad transfer (answer to Q32).
         var cheque = Instrument.Receive(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, "1", "بانک ملت", Money.Rials(1), D("1405/08/01"), D("1405/09/01"),
             CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User);
+        cheque.RegisterSayad(D("1405/08/02"), User);
         Assert.Equal("Instrument.SayadTrackingRequired",
-            Assert.Throws<DomainException>(() => cheque.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request), D("1405/08/10"), User)).Code);
+            Assert.Throws<DomainException>(() => cheque.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id), D("1405/08/10"), User)).Code);
 
         // The receiver brings the endorsed note back protested.
         note.RecordEndorsementReturned(D("1405/09/05"), User, "W-3", "عدم پرداخت");

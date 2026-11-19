@@ -79,6 +79,36 @@ const onDemand = computed(() => terms.maturity === 'OnDemand')
 const notAsked = (k: keyof NoteChecks) => k === 'paymentDate' && onDemand.value
 const guarantee = computed(() => terms.reason === 'Guarantee')
 
+// ---- obligors and guarantors kept in Basic Information → «ذینفعان / متعهدین / ضامنین» (owner, 19 Nov 2026) ----
+interface Party { id: string; detailCode: string; legalName: string; nationalId: string | null; phone: string | null; phoneAreaCode: string | null; mobile: string | null; isActive: boolean }
+const obligors = ref<Party[]>([])
+const knownGuarantors = ref<Party[]>([])
+const partyChoices = (list: Party[]): Choice[] => list.filter(x => x.isActive).map(x => ({ value: x.id, label: x.legalName, hint: x.detailCode }))
+const partyPhone = (x: Party) => x.mobile ?? [x.phoneAreaCode, x.phone].filter(Boolean).join('-')
+async function loadParties() {
+  const [o, g] = await Promise.all([api.get<Party[]>('/api/reference/beneficiaries?role=Obligor'), api.get<Party[]>('/api/reference/beneficiaries?role=Guarantor')])
+  if (o.ok) obligors.value = o.value
+  if (g.ok) knownGuarantors.value = g.value
+}
+/** A defined obligor becomes the issuer: its تفصیل, national code and phone are filled in. */
+function chooseObligor(id: string) {
+  const x = obligors.value.find(o => o.id === id)
+  if (!x) return
+  if (!issuers.value.some(d => d.code === x.detailCode)) issuers.value = [{ code: x.detailCode, name: x.legalName, type: null, isActive: true }, ...issuers.value]
+  header.issuer = x.detailCode
+  terms.issuerNationalCode = x.nationalId ?? ''
+  terms.issuerPhone = partyPhone(x)
+}
+/** A defined guarantor is added as a row of the persons table. */
+function chooseGuarantor(id: string) {
+  const x = knownGuarantors.value.find(g => g.id === id)
+  if (!x) return
+  guarantors.value.push({
+    key: nextKey++, detailCode: x.detailCode, name: x.legalName, nationalCode: x.nationalId ?? '', phone: partyPhone(x), noteNumber: '',
+    found: [{ code: x.detailCode, name: x.legalName, type: null, isActive: true }],
+  })
+}
+
 // ---- guarantors and endorsers ----
 let nextKey = 1
 const guarantors = ref<Guarantor[]>([])
@@ -235,7 +265,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await Promise.all([L.load(), loadRule()]); issuers.value = await L.searchDetails('', undefined, IssuerRoles) })
+onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()]); issuers.value = await L.searchDetails('', undefined, IssuerRoles) })
 </script>
 
 <template>
@@ -311,6 +341,17 @@ onMounted(async () => { await Promise.all([L.load(), loadRule()]); issuers.value
             </tr>
           </tbody>
         </table>
+      </div>
+      <!-- Owner, 19 Nov 2026: obligors and guarantors defined in Basic Information are offered here. -->
+      <div v-if="obligors.length || knownGuarantors.length" class="tr-buttons" style="margin-top: .6rem; align-items: end">
+        <label v-if="obligors.length" style="width: 18rem">{{ t('انتخاب متعهد از «متعهدین» اطلاعات پایه', 'Choose the obligor from Basic Information') }}
+          <SearchSelect model-value="" :options="partyChoices(obligors)" :empty-label="t('— انتخاب کنید —', '— choose —')" :aria-label="t('متعهدین تعریف‌شده', 'Defined obligors')"
+                        @update:model-value="chooseObligor" />
+        </label>
+        <label v-if="knownGuarantors.length" style="width: 18rem">{{ t('افزودن ضامن از «ضامنین» اطلاعات پایه', 'Add a guarantor from Basic Information') }}
+          <SearchSelect model-value="" :options="partyChoices(knownGuarantors)" :empty-label="t('— انتخاب کنید —', '— choose —')" :aria-label="t('ضامنین تعریف‌شده', 'Defined guarantors')"
+                        @update:model-value="chooseGuarantor" />
+        </label>
       </div>
       <div class="tr-buttons" style="margin-top: .6rem">
         <button type="button" class="tr-secondary" @click="addGuarantor">{{ t('+ افزودن ضامن / ظهرنویس', '+ Guarantor / endorser') }}</button>

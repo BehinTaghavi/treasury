@@ -17,11 +17,21 @@ public sealed record RequesterForm(int Number, string? PersonDetailCode, Guid? D
 
 /// <param name="LegalName">Empty: the title of the تفصیل.</param>
 /// <param name="Kind">Real or legal person; with <paramref name="NationalId"/> (کد ملی or شناسه ملی), address and postal code (report no. 2, item 7).</param>
+/// <param name="IsBeneficiary">The three groups of «ذینفعان / متعهدین / ضامنین» (owner, 19 Nov 2026); a form that names none is a beneficiary.</param>
+/// <param name="PhoneAreaCode">Area code of <paramref name="Phone"/>, in a box of its own (e.g. 021).</param>
 public sealed record BeneficiaryForm(
     string DetailCode, string? LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone,
-    BeneficiaryKind Kind = BeneficiaryKind.Natural, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null)
+    BeneficiaryKind Kind = BeneficiaryKind.Natural, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null,
+    bool? IsBeneficiary = null, bool IsObligor = false, bool IsGuarantor = false, string? Mobile = null, string? PhoneAreaCode = null)
 {
     public BeneficiaryIdentity Identity => new(Kind, NationalId, PostalAddress, PostalCode);
+
+    public PartyRoles Roles =>
+        (IsBeneficiary ?? (!IsObligor && !IsGuarantor) ? PartyRoles.Beneficiary : PartyRoles.None)
+        | (IsObligor ? PartyRoles.Obligor : PartyRoles.None)
+        | (IsGuarantor ? PartyRoles.Guarantor : PartyRoles.None);
+
+    public BeneficiaryContact Contact => new(PhoneAreaCode, Phone, Mobile);
 }
 
 /// <summary>Switch on/off or delete; <paramref name="Change"/> is "activate", "deactivate" or "delete".</summary>
@@ -41,7 +51,8 @@ public sealed record RequesterView(
 /// <param name="DetailName">Title of the تفصیل in the accounting system's list (may differ from the legal name).</param>
 public sealed record BeneficiaryView(
     Guid Id, string DetailCode, string? DetailName, string LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone,
-    bool IsActive, bool IsInUse, long Version, BeneficiaryKind? Kind = null, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null);
+    bool IsActive, bool IsInUse, long Version, BeneficiaryKind? Kind = null, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null,
+    bool IsBeneficiary = true, bool IsObligor = false, bool IsGuarantor = false, string? Mobile = null, string? PhoneAreaCode = null);
 
 /// <summary>
 /// Departments (manual item 12), requesters (13) and beneficiaries (14). Each write is one command in one transaction on one
@@ -183,7 +194,7 @@ public sealed class OrganizationUseCases(
         return await RunAsync(key, async ct =>
         {
             var (detail, bank, bankForm) = await BeneficiaryFactsAsync(form, ct).ConfigureAwait(false);
-            var beneficiary = Beneficiary.Register(Guid.NewGuid(), form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity);
+            var beneficiary = Beneficiary.Register(Guid.NewGuid(), form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity, form.Roles, form.Contact);
             if (await BeneficiaryTakenAsync(beneficiary, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Beneficiary.DetailTaken", $"تفصیل {beneficiary.DetailCode} is already a beneficiary.");
@@ -206,7 +217,7 @@ public sealed class OrganizationUseCases(
         {
             var beneficiary = Check(await organization.GetBeneficiaryAsync(id, ct).ConfigureAwait(false), expectedVersion, "Beneficiary.NotFound", id);
             var (detail, bank, bankForm) = await BeneficiaryFactsAsync(form, ct).ConfigureAwait(false);
-            beneficiary.Edit(form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity);
+            beneficiary.Edit(form.DetailCode, detail, form.LegalName, bankForm, bank, form.Phone, form.Identity, form.Roles, form.Contact);
             if (await BeneficiaryTakenAsync(beneficiary, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("Beneficiary.DetailTaken", $"تفصیل {beneficiary.DetailCode} is already a beneficiary.");
@@ -276,16 +287,21 @@ public sealed class OrganizationUseCases(
         unitOfWork.ExecuteAsync<IReadOnlyList<RequesterView>>(async ct =>
             (await organization.ListRequestersAsync(departmentId, includeInactive, ct).ConfigureAwait(false)).OrderBy(r => r.Number).Select(RequesterView.From).ToList(), cancellationToken);
 
-    /// <summary>Beneficiaries by legal name, each with the title of its تفصیل.</summary>
-    public Task<IReadOnlyList<BeneficiaryView>> ListBeneficiariesAsync(bool includeInactive, CancellationToken cancellationToken) =>
+    /// <summary>
+    /// Beneficiaries, obligors and guarantors by legal name, each with the title of its تفصیل; with <paramref name="role"/> only the
+    /// entries of that group (owner, 19 Nov 2026: each list box takes its own group).
+    /// </summary>
+    public Task<IReadOnlyList<BeneficiaryView>> ListBeneficiariesAsync(bool includeInactive, CancellationToken cancellationToken, PartyRoles? role = null) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<BeneficiaryView>>(async ct =>
         {
             var list = new List<BeneficiaryView>();
-            foreach (var b in (await organization.ListBeneficiariesAsync(includeInactive, ct).ConfigureAwait(false)).OrderBy(b => b.LegalName, PersianOrder))
+            foreach (var b in (await organization.ListBeneficiariesAsync(includeInactive, ct).ConfigureAwait(false))
+                .Where(b => role is not { } wanted || b.Is(wanted)).OrderBy(b => b.LegalName, PersianOrder))
             {
                 var detail = await ledger.DetailAsync(b.DetailCode, ct).ConfigureAwait(false);
                 list.Add(new(b.Id, b.DetailCode, detail?.Name, b.LegalName, b.Bank.BankId, b.Bank.BranchName, b.Bank.AccountNumber, b.Bank.Sheba, b.Phone, b.IsActive, b.IsInUse, b.Version,
-                    b.Identity?.Kind, b.Identity?.NationalId, b.Identity?.PostalAddress, b.Identity?.PostalCode));
+                    b.Identity?.Kind, b.Identity?.NationalId, b.Identity?.PostalAddress, b.Identity?.PostalCode,
+                    b.Is(PartyRoles.Beneficiary), b.Is(PartyRoles.Obligor), b.Is(PartyRoles.Guarantor), b.Mobile, b.PhoneAreaCode));
             }
 
             return list;

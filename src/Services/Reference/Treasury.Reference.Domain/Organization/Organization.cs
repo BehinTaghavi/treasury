@@ -283,9 +283,31 @@ public enum BeneficiaryKind
 public sealed record BeneficiaryIdentity(BeneficiaryKind Kind, string? NationalId, string? PostalAddress, string? PostalCode);
 
 /// <summary>
+/// The groups an entry of «ذینفعان / متعهدین / ضامنین» belongs to (owner, 19 Nov 2026: one form for the three groups, told apart at the
+/// top of the form; each list box takes its own group): a beneficiary is paid (payment requests), an obligor (متعهد) and a guarantor
+/// (ضامن) are named on promissory notes. One person may be in more than one group.
+/// </summary>
+[Flags]
+public enum PartyRoles
+{
+    None = 0,
+    Beneficiary = 1,
+    Obligor = 2,
+    Guarantor = 4,
+}
+
+/// <summary>
+/// How to reach the person (owner, 19 Nov 2026): the landline with its area code (پیش شماره, at most 4 digits, typed in a box of its
+/// own) and the mobile number.
+/// </summary>
+public sealed record BeneficiaryContact(string? AreaCode, string? Phone, string? Mobile);
+
+/// <summary>
 /// A beneficiary (ذینفع), new-version manual item 14: the تفصیل (the beneficiary must exist in the accounting system first), the
 /// registered legal title printed on cheques (by default the تفصیل title), bank, branch, account number, Sheba (شبا: needed when the
 /// paying bank differs from the beneficiary's) and a phone number. MVC: Beneficiaries, BeneficiariesDetailInfo, Beneficiaries_TELS.
+/// Owner, 19 Nov 2026: the same entry also serves obligors and guarantors (<see cref="PartyRoles"/>), carries a mobile number, and its
+/// تفصیل is a person: staff, a customer, or a person or company (<see cref="DetailRoles.Parties"/>).
 /// </summary>
 public sealed partial class Beneficiary : AggregateRoot<Guid>
 {
@@ -293,9 +315,11 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
 
     public const int MaxAddressLength = 300;
 
-    private Beneficiary(Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, BeneficiaryIdentity? identity)
+    private Beneficiary(Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, BeneficiaryIdentity? identity, PartyRoles roles,
+        string? mobile, string? areaCode)
         : base(id)
     {
+        (Roles, Mobile, PhoneAreaCode) = (roles, mobile, areaCode);
         Identity = identity;
         DetailCode = detailCode;
         LegalName = legalName;
@@ -313,6 +337,17 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
 
     public string? Phone { get; private set; }
 
+    /// <summary>Area code of <see cref="Phone"/> (پیش شماره, e.g. 021); empty on entries saved before 19 Nov 2026, whose phone may hold it.</summary>
+    public string? PhoneAreaCode { get; private set; }
+
+    /// <summary>Mobile number, kept as 09 and nine digits.</summary>
+    public string? Mobile { get; private set; }
+
+    /// <summary>Beneficiary, obligor and/or guarantor; entries saved before 19 Nov 2026 are beneficiaries.</summary>
+    public PartyRoles Roles { get; private set; }
+
+    public bool Is(PartyRoles role) => (Roles & role) == role;
+
     /// <summary>National code or ID, address and postal code; empty only on beneficiaries saved before report no. 2.</summary>
     public BeneficiaryIdentity? Identity { get; private set; }
 
@@ -322,26 +357,36 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
     public bool IsInUse { get; private set; }
 
     /// <param name="bank">The beneficiary's bank as loaded by the use case (a bank-name entry); null when none was chosen.</param>
+    /// <param name="roles">The groups of the entry; at least one (owner, 19 Nov 2026).</param>
+    /// <param name="contact">Area code and mobile number; <paramref name="phone"/> is the landline number.</param>
     public static Beneficiary Register(
-        Guid id, string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity)
+        Guid id, string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity,
+        PartyRoles roles = PartyRoles.Beneficiary, BeneficiaryContact? contact = null)
     {
         var v = Validate(detailCode, detail, legalName, form, bank, phone, null);
-        var b = new Beneficiary(id, v.Code, v.Name, v.Bank, v.Phone, CheckIdentity(identity));
+        var c = CheckContact(v.Phone, contact);
+        var b = new Beneficiary(id, v.Code, v.Name, v.Bank, v.Phone, CheckIdentity(identity), CheckRoles(roles), c.Mobile, c.AreaCode);
         b.Raise(BeneficiaryChanged.From(b));
         return b;
     }
 
-    public void Edit(string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity)
+    public void Edit(string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, BeneficiaryIdentity? identity,
+        PartyRoles? roles = null, BeneficiaryContact? contact = null)
     {
         var v = Validate(detailCode, detail, legalName, form, bank, phone, this);
         var id = CheckIdentity(identity);
-        if (v == (DetailCode, LegalName, Bank, Phone) && id == Identity)
+        var groups = CheckRoles(roles ?? Roles);
+        // A payment request names it as its beneficiary: it stays one (it may gain the other groups).
+        Rules.Require(!IsInUse || !Is(PartyRoles.Beneficiary) || (groups & PartyRoles.Beneficiary) != 0, "Beneficiary.RoleInUse",
+            "Payment requests name this entry as their beneficiary; it stays a beneficiary.");
+        var c = contact is null ? (AreaCode: v.Phone is null ? null : PhoneAreaCode, Mobile) : CheckContact(v.Phone, contact);
+        if (v == (DetailCode, LegalName, Bank, Phone) && id == Identity && groups == Roles && c == (PhoneAreaCode, Mobile))
         {
             return;
         }
 
         (DetailCode, LegalName, Bank, Phone) = v;
-        Identity = id;
+        (Identity, Roles, PhoneAreaCode, Mobile) = (id, groups, c.AreaCode, c.Mobile);
         Raise(BeneficiaryChanged.From(this));
     }
 
@@ -367,9 +412,10 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
     }
 
     public static Beneficiary Restore(
-        Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, bool isActive, bool isInUse, long version, BeneficiaryIdentity? identity = null)
+        Guid id, string detailCode, string legalName, BeneficiaryBank bank, string? phone, bool isActive, bool isInUse, long version, BeneficiaryIdentity? identity = null,
+        PartyRoles roles = PartyRoles.Beneficiary, string? mobile = null, string? areaCode = null)
     {
-        var b = new Beneficiary(id, detailCode, legalName, bank, phone, identity) { IsActive = isActive, IsInUse = isInUse };
+        var b = new Beneficiary(id, detailCode, legalName, bank, phone, identity, roles, mobile, areaCode) { IsActive = isActive, IsInUse = isInUse };
         b.SetLoadedVersion(version);
         return b;
     }
@@ -378,7 +424,10 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
     /// Iranian IBAN (شبا): "IR" and 24 digits, checked with the ISO 13616 mod-97 rule. Spaces, dashes and Persian digits are
     /// accepted and the "IR" may be left out. Returns the normalised form or null when the text is not a valid Sheba.
     /// </summary>
-    public static string? NormaliseSheba(string? text)
+    public static string? NormaliseSheba(string? text) => ShebaShape(text) is { } sheba && ShebaCheckDigitsFit(sheba) ? sheba : null;
+
+    /// <summary>"IR" and 24 digits, whatever the check digits; null when the text has another shape.</summary>
+    private static string? ShebaShape(string? text)
     {
         var digits = PersianText.Key(text).ToUpperInvariant().Replace("-", string.Empty, StringComparison.Ordinal);
         if (ShebaDigits().IsMatch(digits))
@@ -386,15 +435,12 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
             digits = "IR" + digits;
         }
 
-        if (!ShebaPattern().IsMatch(digits))
-        {
-            return null;
-        }
-
-        // Move "IR" and the check digits to the end, letters as numbers (I=18, R=27), remainder mod 97 must be 1.
-        var rearranged = digits[4..] + "1827" + digits[2..4];
-        return BigInteger.Parse(rearranged, System.Globalization.CultureInfo.InvariantCulture) % 97 == 1 ? digits : null;
+        return ShebaPattern().IsMatch(digits) ? digits : null;
     }
+
+    /// <summary>Move "IR" and the check digits to the end, letters as numbers (I=18, R=27): the remainder mod 97 must be 1.</summary>
+    private static bool ShebaCheckDigitsFit(string sheba) =>
+        BigInteger.Parse(sheba[4..] + "1827" + sheba[2..4], System.Globalization.CultureInfo.InvariantCulture) % 97 == 1;
 
     /// <summary>
     /// Iranian national code (کد ملی): 10 digits; the last is a check digit. s = Σ digit(i)·(10−i) for the first nine; with
@@ -462,12 +508,46 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
         return new BeneficiaryIdentity(kind, id, address, postal);
     }
 
+    private static PartyRoles CheckRoles(PartyRoles roles)
+    {
+        const PartyRoles all = PartyRoles.Beneficiary | PartyRoles.Obligor | PartyRoles.Guarantor;
+        Rules.Require(roles != PartyRoles.None && (roles & ~all) == 0, "Beneficiary.RoleRequired", "Tick at least one of: beneficiary, obligor, guarantor.");
+        return roles;
+    }
+
+    /// <summary>
+    /// Owner, 19 Nov 2026: the area code in a box of its own (at most 4 digits, e.g. 021) and the mobile number (09 and nine digits; +98
+    /// or 0098 in front and a missing 0 are accepted). An area code without a phone number is dropped.
+    /// </summary>
+    private static (string? AreaCode, string? Mobile) CheckContact(string? phone, BeneficiaryContact? contact)
+    {
+        string? Digits(string? text) => Rules.Optional(text) is { } t ? PersianText.Key(t).Replace("-", string.Empty, StringComparison.Ordinal) : null;
+        var area = Digits(contact?.AreaCode);
+        Rules.Require(area is null || AreaCodePattern().IsMatch(area), "Beneficiary.AreaCodeInvalid", "An area code starts with 0 and has at most 4 digits (e.g. 021).");
+        var mobile = Digits(contact?.Mobile);
+        if (mobile is not null)
+        {
+            mobile = mobile.TrimStart('+');
+            mobile = mobile.StartsWith("0098", StringComparison.Ordinal) ? "0" + mobile[4..]
+                : mobile.StartsWith("98", StringComparison.Ordinal) && mobile.Length == 12 ? "0" + mobile[2..]
+                : mobile.Length == 10 && mobile[0] == '9' ? "0" + mobile
+                : mobile;
+            Rules.Require(MobilePattern().IsMatch(mobile), "Beneficiary.MobileInvalid", "A mobile number is 09 and nine more digits.");
+        }
+
+        return (phone is null ? null : area, mobile);
+    }
+
     private static (string Code, string Name, BeneficiaryBank Bank, string? Phone) Validate(
         string detailCode, DetailFact? detail, string? legalName, BeneficiaryBank form, CatalogueItem? bank, string? phone, Beneficiary? before)
     {
         ArgumentNullException.ThrowIfNull(form);
         var code = Rules.Optional(detailCode) ?? throw new DomainException("Beneficiary.DetailRequired", "The تفصیل of the beneficiary is required.");
         var fact = Rules.Detail(code, detail, before?.DetailCode, "Beneficiary.DetailNotFound", "Beneficiary.DetailInactive");
+        // Owner, 19 Nov 2026: "the تفصیل of a beneficiary is a person: staff, customers and companies" — not a bank, a cost centre or
+        // another kind of تفصیل. One chosen before this rule is kept.
+        Rules.Require(code == before?.DetailCode || (fact.Role is { } role && DetailRoles.Parties.Contains(role)), "Beneficiary.DetailNotPerson",
+            $"تفصیل {code} is not of a person type (staff, customers, persons and companies).");
         var name = Rules.Name(Rules.Optional(legalName) ?? fact.Name, MaxNameLength, "Beneficiary.NameRequired", "Beneficiary.NameTooLong");
 
         var account = Rules.Optional(form.AccountNumber);
@@ -475,7 +555,10 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
         string? sheba = null;
         if (Rules.Optional(form.Sheba) is { } typed)
         {
-            sheba = NormaliseSheba(typed) ?? throw new DomainException("Beneficiary.ShebaInvalid", "The Sheba number is not valid (IR and 24 digits).");
+            // Two different mistakes, two messages (owner, 19 Nov 2026: a made-up number of the right length was refused with a text
+            // that asked for "IR and 24 digits").
+            sheba = ShebaShape(typed) ?? throw new DomainException("Beneficiary.ShebaInvalid", "A Sheba number is IR and 24 digits.");
+            Rules.Require(ShebaCheckDigitsFit(sheba), "Beneficiary.ShebaCheckDigits", "The check digits of the Sheba number do not fit: a digit is wrong.");
         }
 
         if (form.BankId is { } bankId && bankId != Guid.Empty)
@@ -512,11 +595,19 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
 
     [GeneratedRegex("^\\+?[0-9\\-]{6,20}$")]
     private static partial Regex PhonePattern();
+
+    [GeneratedRegex("^0[0-9]{1,3}$")]
+    private static partial Regex AreaCodePattern();
+
+    [GeneratedRegex("^09[0-9]{9}$")]
+    private static partial Regex MobilePattern();
 }
 
-public sealed record BeneficiaryChanged(Guid BeneficiaryId, string DetailCode, string LegalName, Guid? BankId, string? AccountNumber, string? Sheba, bool IsActive) : DomainEvent
+public sealed record BeneficiaryChanged(
+    Guid BeneficiaryId, string DetailCode, string LegalName, Guid? BankId, string? AccountNumber, string? Sheba, bool IsActive,
+    PartyRoles Roles = PartyRoles.Beneficiary) : DomainEvent
 {
-    public static BeneficiaryChanged From(Beneficiary b) => new(b.Id, b.DetailCode, b.LegalName, b.Bank.BankId, b.Bank.AccountNumber, b.Bank.Sheba, b.IsActive);
+    public static BeneficiaryChanged From(Beneficiary b) => new(b.Id, b.DetailCode, b.LegalName, b.Bank.BankId, b.Bank.AccountNumber, b.Bank.Sheba, b.IsActive, b.Roles);
 }
 
 public sealed record BeneficiaryDeleted(Guid BeneficiaryId) : DomainEvent;

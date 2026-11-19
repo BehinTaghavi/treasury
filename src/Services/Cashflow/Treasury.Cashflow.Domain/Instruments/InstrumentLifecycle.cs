@@ -28,7 +28,11 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordCleared, InstrumentState.Cleared, AnyKind, "D_Check_vos_m: 12 -> 13"),
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "D_Check_vos_m / Checkbacked: 12 -> 14"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "D_Check_Od_m: 11 -> 15"),
-        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsNegotiable(), "D_Check_Kh_m: 11 -> 16, Checktype 0/2 only; ordinary notes too: خرج سفته (owner, 16 Nov 2026)"),
+        // The old program's D_Check_Kh_m endorsed a cheque straight from the cash desk (11 -> 16, Checktype 0/2 only). Since the owner's
+        // rule of 19 Nov 2026 («ثبت انتقال»: the cheque "must first be ثبت صیادی and in the status «ثبت صیادی شد»") a cheque is
+        // transferred only from SayadRegistered (below); an ordinary note, which has no Sayad registration, is still endorsed from here
+        // (خرج سفته, owner, 16 Nov 2026). Old history is migrated as recorded.
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsNegotiable() && !k.IsCheque(), "D_Check_Kh_m: 11 -> 16 for ordinary notes (خرج سفته, owner, 16 Nov 2026); cheques go through ثبت صیادی (owner, 19 Nov 2026)"),
 
         // Received: the owner's item 14 (15 Nov 2026, answers Q30–Q35; docs/domain/received-cheque-steps.md). New-version manual
         // «ثبت وصول / برگشت / عودت چک‌های واگذاری» (return to the cash desk), «تعویض چک‌ها», «ابطال»; owner's voucher table.
@@ -50,7 +54,7 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.RegisterSayad, InstrumentState.SayadRegistered, k => k.IsCheque(), "Owner, 18 Nov 2026: ثبت صیادی; cheques only (notes have no Sayad ID)"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner, 18 Nov 2026: ثبت صیادی → واگذاری به بانک; D_Check_Vag_m, Checktype 0/2 only"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Owner, 18 Nov 2026: عودت از صندوق; D_Check_Od_m"),
-        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "Owner item 14 (g) for a cheque in the cash desk; D_Check_Kh_m, Checktype 0/2 only"),
+        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "Owner, 19 Nov 2026: ثبت انتقال (خرج چک) only after ثبت صیادی شد; item 14 (g); D_Check_Kh_m, Checktype 0/2 only"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک نزد صندوق"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f) for a cheque in the cash desk"),
         new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.SendToLegal, InstrumentState.InLegal, AnyKind, "Owner, 18 Nov 2026: اقدام حقوقی (تحویل چک برگشتی به وکیل شرکت); old flag GoInlaw"),

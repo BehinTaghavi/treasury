@@ -293,6 +293,8 @@ public sealed class ReceiptUseCases(
     /// in part, never more than remains; the Sayad transfer's tracking number is required (answer to Q32). The payment is recorded on the
     /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice. An ordinary promissory note
     /// is endorsed the same way («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026), without a Sayad transfer.
+    /// Owner, 19 Nov 2026 («ثبت انتقال»): a cheque is transferred only when it is «ثبت صیادی شد» and on the request of the kind «ثبت انتقال
+    /// (خرج چک)» that was written for it, whose amount is the cheque's (checked by the cheque and by requests-svc).
     /// </summary>
     public Task<Result<Guid>> EndorseAsync(EndorseChequeCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -328,7 +330,9 @@ public sealed class ReceiptUseCases(
                 throw new DomainException("Instrument.EndorsementGroupNotForPayments", "The request's purpose group is not an active payment group.");
             }
 
-            cheque.Endorse(new Endorsement(request.BeneficiaryDetailCode, request.BeneficiaryName, request.PurposeGroupId, request.Purpose, command.SayadTracking, request.Id),
+            cheque.Endorse(
+                new Endorsement(request.BeneficiaryDetailCode, request.BeneficiaryName, request.PurposeGroupId, request.Purpose, command.SayadTracking, request.Id,
+                    request.TransferChequeId),
                 date, currentUser.UserId, command.Note);
             var key = cheque.EndorsementPaymentKey(cheque.History.Count);
             await paymentRequests.RecordPaymentAsync(request.Id,

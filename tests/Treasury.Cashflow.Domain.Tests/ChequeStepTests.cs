@@ -123,39 +123,88 @@ public sealed class ChequeStepTests
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.CancelReceived(D("1405/09/02"), User, "م", D("1405/09/02"), "x")).Code);
     }
 
+    /// <summary>A cheque in the cash desk whose latest status is «ثبت صیادی شد» (step 2 of its history).</summary>
+    private static Instrument Registered()
+    {
+        var c = Cheque();
+        c.RegisterSayad(D("1405/08/02"), User, "SY-REG");
+        return c;
+    }
+
+    /// <summary>The endorsement of a request of the kind «ثبت انتقال (خرج چک)» written for <paramref name="c"/> (owner, 19 Nov 2026).</summary>
+    private static Endorsement TransferOf(Instrument c, string tracking = "SY-99", Guid? group = null, Guid? request = null, string code = "300200", string name = "پیمانکار ب") =>
+        new(code, name, group ?? Guid.NewGuid(), "خرید مواد", tracking, request ?? Request, c.Id);
+
     [Fact]
     public void Endorsement_pays_an_approved_request_and_needs_receiver_group_purpose_and_Sayad_tracking_g_Q32_Q36()
     {
         var group = Guid.NewGuid();
+        Instrument c;
         Assert.Equal("Instrument.SayadTrackingRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید", " ", Request), D("1405/08/02"), User)).Code);
+            (c = Registered()).Endorse(TransferOf(c, " "), D("1405/08/02"), User)).Code);
         Assert.Equal("Instrument.EndorseeRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("", "", group, "خرید", "SY", Request), D("1405/08/02"), User)).Code);
+            (c = Registered()).Endorse(TransferOf(c, code: "", name: ""), D("1405/08/02"), User)).Code);
         Assert.Equal("Instrument.PaymentRequestRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید", "SY", Guid.Empty), D("1405/08/02"), User)).Code);
+            (c = Registered()).Endorse(TransferOf(c, request: Guid.Empty), D("1405/08/02"), User)).Code);
         Assert.Equal("Instrument.EndorsementGroupRequired", Assert.Throws<DomainException>(() =>
-            Cheque().Endorse(new Endorsement("300200", "پیمانکار ب", Guid.Empty, "خرید", "SY", Request), D("1405/08/02"), User)).Code);
+            (c = Registered()).Endorse(TransferOf(c, group: Guid.Empty), D("1405/08/02"), User)).Code);
 
-        var c = Cheque();
-        c.Endorse(new Endorsement("300200", "پیمانکار ب", group, "خرید مواد", "SY-99", Request), D("1405/08/02"), User);
+        c = Registered();
+        c.Endorse(TransferOf(c, group: group), D("1405/08/02"), User);
         Assert.Equal((InstrumentState.Endorsed, "پیمانکار ب", "SY-99", (Guid?)Request), (c.State, c.Destination, c.History[^1].Details!.SayadTracking, c.History[^1].Details!.PaymentRequestId));
-        Assert.Equal($"endorse:{c.Id}:2", c.EndorsementPaymentKey(2));
-        Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.EndorsementPaymentKey(1)).Code);
+        Assert.Equal($"endorse:{c.Id}:3", c.EndorsementPaymentKey(3));
+        Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.EndorsementPaymentKey(2)).Code);
         var endorsementSide = new LedgerSide("2101", "300200");
-        Assert.Equal([(true, "2101", "300200"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 2, SideA, endorsementSide, Template())));
+        var voucher = ReceiptVouchers.ForStep(c, 3, SideA, endorsementSide, Template())!;
+        Assert.Equal([(true, "2101", "300200"), (false, "1201", "200015")], Lines(voucher));
+        Assert.Equal("ثبت انتقال چک (خرج چک)", voucher.Operation); // the owner's name of the step, 19 Nov 2026
         Assert.Equal([InstrumentAction.RecordEndorsementReturned], c.AllowedActions());
+    }
+
+    [Fact]
+    public void A_cheque_is_transferred_only_when_its_status_is_Sayad_registered_owner_19_nov()
+    {
+        // «چک دریافتی … میباید ابتدا ثبت صیادی شده باشد و … به وضعیت ثبت صیادی شد در آمده باشد». The old program's D_Check_Kh_m
+        // endorsed a cheque straight from the cash desk (11 -> 16).
+        var inDesk = Cheque();
+        Assert.DoesNotContain(InstrumentAction.Endorse, inDesk.AllowedActions());
+        Assert.Equal("Instrument.TransferNeedsSayadRegistration", Assert.Throws<DomainException>(() => inDesk.Endorse(TransferOf(inDesk), D("1405/08/02"), User)).Code);
+        Assert.Equal(InstrumentState.InCashDesk, inDesk.State);
+
+        inDesk.RegisterSayad(D("1405/08/02"), User);
+        Assert.Contains(InstrumentAction.Endorse, inDesk.AllowedActions());
+        inDesk.Endorse(TransferOf(inDesk), D("1405/08/03"), User);
+        Assert.Equal(InstrumentState.Endorsed, inDesk.State);
+
+        // A guarantee cheque is held, never transferred (rule R3), registered in Sayad or not.
+        var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
+        guarantee.RegisterSayad(D("1405/08/02"), User);
+        Assert.Equal("Instrument.KindNotAllowedForAction", Assert.Throws<DomainException>(() => guarantee.Endorse(TransferOf(guarantee), D("1405/08/03"), User)).Code);
+    }
+
+    [Fact]
+    public void A_cheque_is_transferred_only_on_the_payment_request_written_for_it_owner_19_nov()
+    {
+        // «درخواست وجه لازم برای ثبت انتقال چک مزبور به شخص یا شرکت مورد نظر صادر شده باشد»: a request of another kind (no cheque named) or
+        // one that names another cheque does not transfer this cheque.
+        var c = Registered();
+        var anyRequest = new Endorsement("300200", "پیمانکار ب", Guid.NewGuid(), "خرید", "SY-1", Request);
+        Assert.Equal("Instrument.PaymentRequestNotForThisCheque", Assert.Throws<DomainException>(() => c.Endorse(anyRequest, D("1405/08/03"), User)).Code);
+        Assert.Equal("Instrument.PaymentRequestNotForThisCheque",
+            Assert.Throws<DomainException>(() => c.Endorse(anyRequest with { RequestChequeId = Guid.NewGuid() }, D("1405/08/03"), User)).Code);
+        Assert.Equal(InstrumentState.SayadRegistered, c.State);
     }
 
     [Fact]
     public void An_endorsed_cheque_comes_back_bounced_h()
     {
-        var c = Cheque();
-        c.Endorse(new Endorsement("300200", "پیمانکار ب", Guid.NewGuid(), "خرید", "SY-1", Request), D("1405/08/02"), User);
+        var c = Registered();
+        c.Endorse(TransferOf(c, "SY-1"), D("1405/08/02"), User);
         Assert.Equal("Instrument.BounceNoticeRequired", Assert.Throws<DomainException>(() => c.RecordEndorsementReturned(D("1405/09/05"), User, null)).Code);
         Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => c.RecordEndorsementReturned(D("1405/08/20"), User, "BN-5")).Code);
         c.RecordEndorsementReturned(D("1405/09/05"), User, "BN-5");
         Assert.Equal((InstrumentState.Bounced, (string?)null), (c.State, c.Destination));
-        Assert.Equal([(true, "1203", "200015"), (false, "2101", "300200")], Lines(ReceiptVouchers.ForStep(c, 3, SideA, new LedgerSide("2101", "300200"), Template())));
+        Assert.Equal([(true, "1203", "200015"), (false, "2101", "300200")], Lines(ReceiptVouchers.ForStep(c, 4, SideA, new LedgerSide("2101", "300200"), Template())));
         Assert.Contains(InstrumentAction.Replace, c.AllowedActions());
     }
 

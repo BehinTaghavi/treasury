@@ -66,7 +66,7 @@ function accountName(r: Receipt) {
 function statusText(r: Receipt) {
   if (r.state === 'Cancelled') return t('ابطال شده', 'Cancelled')
   if (r.kind !== 'Instruments' && r.kind !== 'Notes') return t('ثبت شده', 'Recorded')
-  return groupChequeStatuses(r.chequeStatuses, props.locale)
+  return groupChequeStatuses(r.chequeStatuses, props.locale, r.kind === 'Notes')
     .map(g => `${r.instrumentCount > 1 ? t(`${num(g.count)} برگ: `, `${g.count} × `) : ''}${g.name}${g.due ? ` (${dueMark(props.locale)}${g.count > 1 ? ' ' + num(g.due) : ''})` : ''}`)
     .join(fa.value ? '، ' : ', ')
 }

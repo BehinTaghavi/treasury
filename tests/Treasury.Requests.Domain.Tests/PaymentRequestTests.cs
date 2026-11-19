@@ -209,4 +209,59 @@ public sealed class PaymentRequestTests
         var copy = PaymentRequest.Restore(r.Id, r.Number, r.FiscalYear, r.RecordedBy, r.Data(), 3);
         Assert.Empty(copy.Payments);
     }
+
+    // ---- owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» ----
+
+    private static readonly ReceivedChequeFact Cheque =
+        new(Guid.NewGuid(), "445566", "بانک ملت", D("1405/06/15"), "فروشگاه آفتاب", 80_000_000m, "IRR", CanBeTransferred: true, SayadId: "1234567890123456");
+
+    private static PaymentRequestForm TransferForm(ReceivedChequeFact? cheque, decimal amount = 80_000_000m, string currency = "IRR") =>
+        Form(PaymentMethod.ChequeTransfer, amount, currency) with { Cheque = cheque };
+
+    [Fact]
+    public void A_cheque_transfer_request_names_the_received_cheque_instead_of_the_account_paid_from_owner_19_nov()
+    {
+        // Item 5: «بجای فیلد پرداخت از حساب بانکی، شماره چک و تاریخ سررسید چک و نام واگذارنده چک قید شود».
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque) with { PayFrom = Bank, DueDate = D("1405/09/30") }, User);
+        Assert.Equal(PaymentMethod.ChequeTransfer, r.Method);
+        Assert.Equal(new TransferCheque(Cheque.Id, "445566", D("1405/06/15"), "فروشگاه آفتاب", "بانک ملت", "1234567890123456"), r.Cheque);
+        // The cheque brings its own due date (here already passed); the request has no account paid from and no due date of its own.
+        Assert.Equal((null, null, null), (r.PayFromKind, r.PayFromId, r.DueDate));
+        Assert.Equal("PaymentRequest.ChequeRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(null), User)));
+    }
+
+    [Fact]
+    public void The_amount_of_a_cheque_transfer_request_is_the_amount_of_the_cheque_owner_19_nov()
+    {
+        // Item 5: «مبلغ چک برابر مبلغ درخواست وجه خواهد بود».
+        Assert.Equal("PaymentRequest.ChequeAmount", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque, amount: 79_999_999m), User)));
+        Assert.Equal("PaymentRequest.ChequeAmount", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque, amount: 90_000_000m), User)));
+        Assert.Equal("PaymentRequest.ChequeCurrency", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque, currency: "USD"), User)));
+        Assert.Equal(80_000_000m, PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque), User).Amount);
+    }
+
+    [Fact]
+    public void Only_a_cheque_registered_in_Sayad_goes_on_a_cheque_transfer_request_owner_19_nov()
+    {
+        // Item 1: the cheque «میباید ابتدا ثبت صیادی شده باشد و … به وضعیت ثبت صیادی شد در آمده باشد».
+        var inDesk = Cheque with { CanBeTransferred = false };
+        Assert.Equal("PaymentRequest.ChequeNotTransferable", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(inDesk), User)));
+    }
+
+    [Fact]
+    public void Changing_the_payment_method_takes_the_cheque_off_the_request_and_any_other_method_has_none()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque), User);
+        r.Edit(Form(PaymentMethod.Cash, 80_000_000m) with { Cheque = Cheque }, User);
+        Assert.Null(r.Cheque);
+        Assert.Null(PaymentRequest.Register(Guid.NewGuid(), 2, Form() with { Cheque = Cheque }, User).Cheque);
+    }
+
+    [Fact]
+    public void Only_an_entry_of_the_group_beneficiaries_is_paid_owner_19_nov()
+    {
+        // «ذینفعان / متعهدین / ضامنین»: an entry that is only a guarantor is not offered on payment requests.
+        var guarantor = Beneficiary with { IsBeneficiary = false };
+        Assert.Equal("PaymentRequest.NotABeneficiary", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form() with { Beneficiary = guarantor }, User)));
+    }
 }

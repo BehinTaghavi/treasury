@@ -15,7 +15,8 @@ const stateNames: Record<string, [string, string]> = {
   Bounced: ['برگشت چک', 'Bounced'],
   InLegal: ['اقدام حقوقی', 'Legal action'],
   Replaced: ['تعویض چک', 'Replaced'],
-  Endorsed: ['خرج شده', 'Endorsed'],
+  // Owner, 19 Nov 2026: the transfer is registered in Sayad with its tracking code; the status is «ثبت انتقال شد (خرج چک شد)».
+  Endorsed: ['ثبت انتقال شد (خرج چک شد)', 'Transferred (endorsed)'],
   Cancelled: ['ابطال شده', 'Cancelled'],
 }
 
@@ -31,16 +32,23 @@ const actionNames: Record<string, [string, string]> = {
   ReturnFromLegal: ['تحویل به صندوق (قابل وصول)', 'Back to the cash desk'],
   Replace: ['تعویض چک', 'Replace'],
   Cancel: ['ابطال', 'Cancel'],
-  Endorse: ['خرج چک', 'Endorse'],
+  Endorse: ['ثبت انتقال (خرج چک)', 'Transfer (endorse)'],
   RecordEndorsementReturned: ['برگشت خرج', 'Endorsement returned'],
   ReturnToIssuer: ['عودت از صندوق', 'Return to the payer'],
 }
 
+/** A promissory note has no Sayad transfer: it is endorsed on its back («خرج سفته», owner, 16 Nov 2026). */
+const noteStateNames: Record<string, [string, string]> = { Endorsed: ['خرج شده', 'Endorsed'] }
+const noteActionNames: Record<string, [string, string]> = { Endorse: ['خرج سفته', 'Endorse'] }
+
 const pick = (m: Record<string, [string, string]>, key: string | null | undefined, locale: Locale) =>
   key && m[key] ? m[key][locale === 'fa' ? 0 : 1] : key ?? ''
 
-export const chequeStateName = (state: string | null | undefined, locale: Locale) => pick(stateNames, state, locale)
-export const chequeActionName = (action: string | null | undefined, locale: Locale) => pick(actionNames, action, locale)
+/** @param note The instrument is a promissory note, whose endorsement is not a Sayad transfer. */
+export const chequeStateName = (state: string | null | undefined, locale: Locale, note = false) =>
+  pick(note && state && noteStateNames[state] ? noteStateNames : stateNames, state, locale)
+export const chequeActionName = (action: string | null | undefined, locale: Locale, note = false) =>
+  pick(note && action && noteActionNames[action] ? noteActionNames : actionNames, action, locale)
 
 /** «سررسید چک»: the mark of a post-dated cheque that reached its due date while in the cash desk or at the bank. */
 export const dueMark = (locale: Locale) => (locale === 'fa' ? 'سررسید چک' : 'Due date reached')
@@ -58,11 +66,11 @@ export interface ChequeStatus { state: string; reachedDueDate: boolean }
 export interface ChequeStatusGroup { state: string; name: string; count: number; due: number }
 
 /** The cheques of one receipt grouped by status, in the order they appear: the «وضعیت» column of the receipts list. */
-export function groupChequeStatuses(statuses: ChequeStatus[] | null | undefined, locale: Locale): ChequeStatusGroup[] {
+export function groupChequeStatuses(statuses: ChequeStatus[] | null | undefined, locale: Locale, note = false): ChequeStatusGroup[] {
   const groups: ChequeStatusGroup[] = []
   for (const s of statuses ?? []) {
     let g = groups.find(x => x.state === s.state)
-    if (!g) groups.push(g = { state: s.state, name: chequeStateName(s.state, locale), count: 0, due: 0 })
+    if (!g) groups.push(g = { state: s.state, name: chequeStateName(s.state, locale, note), count: 0, due: 0 })
     g.count++
     if (s.reachedDueDate) g.due++
   }

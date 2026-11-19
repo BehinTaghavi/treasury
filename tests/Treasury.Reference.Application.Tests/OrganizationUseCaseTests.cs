@@ -33,6 +33,8 @@ public sealed class OrganizationUseCaseTests : IDisposable
             new(4, "111079", "شخص نمونه", "اشخاص وشركتها", true, false),
             new(5, "600046", "علی رضایی", "كاركنان كارخانه", true, false),
             new(6, "770300", "مرکز هزینه تبلیغات", "مراکز هزینه تبلیغات", true, false), // a cost-centre type, not marked
+            new(7, "101001", "بانک ملت جاری ۱۲۳", "بانكها", true, false),
+            new(8, "300010", "فروشگاه آفتاب", "مشتريان", true, false),
         ];
         Assert.True(ledgerUseCases.ImportDetailsAsync("fixture-details", details, CancellationToken.None).GetAwaiter().GetResult().IsSuccess);
     }
@@ -99,6 +101,37 @@ public sealed class OrganizationUseCaseTests : IDisposable
         Assert.Equal("Beneficiary.DetailTaken", (await _useCases.AddBeneficiaryAsync(Key(), form with { LegalName = "x" }, CancellationToken.None)).ErrorCode);
         Assert.True((await _useCases.MarkInUseAsync(Key(), b.Value, CancellationToken.None)).IsSuccess);
         Assert.Equal("Beneficiary.InUse", (await _useCases.ChangeBeneficiaryAsync(new(Key(), b.Value, "delete", 2), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task Beneficiaries_obligors_and_guarantors_share_one_list_and_each_list_box_takes_its_group_owner_19_nov()
+    {
+        // Three ticks at the top of the form; mobile and area code; the تفصیل is a person, not a bank account.
+        var supplier = await _useCases.AddBeneficiaryAsync(Key(), new("111078", null, null, null, null, "460120000000003123456789", "88888888",
+            BeneficiaryKind.Legal, "10101010103", Mobile: "۰۹۱۲۱۲۳۴۵۶۷", PhoneAreaCode: "021"), CancellationToken.None);
+        Assert.True(supplier.IsSuccess, supplier.ErrorCode);
+        var guarantor = await _useCases.AddBeneficiaryAsync(Key(), new("600046", null, null, null, null, null, null,
+            BeneficiaryKind.Natural, "0084575948", IsObligor: true, IsGuarantor: true), CancellationToken.None);
+        Assert.True(guarantor.IsSuccess, guarantor.ErrorCode);
+        Assert.Equal("Beneficiary.DetailNotPerson", (await _useCases.AddBeneficiaryAsync(Key(), new("101001", null, null, null, null, null, null,
+            BeneficiaryKind.Natural, "0084575948"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Beneficiary.RoleRequired", (await _useCases.AddBeneficiaryAsync(Key(), new("300010", null, null, null, null, null, null,
+            BeneficiaryKind.Natural, "0084575948", IsBeneficiary: false), CancellationToken.None)).ErrorCode);
+
+        var all = await _useCases.ListBeneficiariesAsync(true, CancellationToken.None);
+        Assert.Equal(2, all.Count);
+        var s = all.Single(x => x.Id == supplier.Value);
+        Assert.Equal((true, false, false, "09121234567", "021", "88888888", "IR460120000000003123456789"),
+            (s.IsBeneficiary, s.IsObligor, s.IsGuarantor, s.Mobile, s.PhoneAreaCode, s.Phone, s.Sheba));
+        Assert.Equal([supplier.Value], (await _useCases.ListBeneficiariesAsync(true, CancellationToken.None, PartyRoles.Beneficiary)).Select(x => x.Id));
+        Assert.Equal([guarantor.Value], (await _useCases.ListBeneficiariesAsync(true, CancellationToken.None, PartyRoles.Obligor)).Select(x => x.Id));
+        Assert.Equal([guarantor.Value], (await _useCases.ListBeneficiariesAsync(true, CancellationToken.None, PartyRoles.Guarantor)).Select(x => x.Id));
+
+        // The guarantor also becomes a beneficiary: one person, three groups.
+        var edit = await _useCases.EditBeneficiaryAsync(Key(), guarantor.Value, new("600046", null, null, null, null, null, null,
+            BeneficiaryKind.Natural, "0084575948", IsBeneficiary: true, IsObligor: true, IsGuarantor: true), 1, CancellationToken.None);
+        Assert.True(edit.IsSuccess, edit.ErrorCode);
+        Assert.Equal(2, (await _useCases.ListBeneficiariesAsync(true, CancellationToken.None, PartyRoles.Beneficiary)).Count);
     }
 
     [Fact]

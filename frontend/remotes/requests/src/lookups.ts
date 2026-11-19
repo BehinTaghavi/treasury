@@ -6,7 +6,13 @@ import type { TreasuryApi } from '@treasury/ui-kit'
 
 export interface Entry { id: string; name: string; code?: string | null; isActive?: boolean }
 export interface Requester { id: string; number: number; fullName: string; departmentId: string | null; costCenterCode: string; isActive: boolean }
-export interface Beneficiary { id: string; detailCode: string; legalName: string; sheba: string | null; isActive: boolean }
+/** An entry of «ذینفعان / متعهدین / ضامنین»; only the group «ذینفعان» is paid (owner, 19 Nov 2026). */
+export interface Beneficiary { id: string; detailCode: string; legalName: string; sheba: string | null; isActive: boolean; isBeneficiary?: boolean }
+/** A received cheque that may be transferred: in the cash desk with the status «ثبت صیادی شد» (cashflow-svc). */
+export interface TransferableCheque {
+  id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; dueDate: string | null; counterparty: string
+  allowedActions: string[]; details: { sayadId: string | null } | null
+}
 export interface PurposeGroup { id: string; number: number; direction: 'Receipt' | 'Payment'; name: string; reference1Id: string | null; reference2Id: string | null; isActive: boolean }
 export interface Purpose { id: string; groupId: string; name: string; isActive: boolean }
 export interface Department { id: string; number: number; name: string; isActive: boolean }
@@ -27,7 +33,7 @@ export function useLookups(api: TreasuryApi) {
   async function load() {
     const [rq, bf, g, rf, d, c, b, k, a] = await Promise.all([
       api.get<Requester[]>('/api/reference/requesters?includeInactive=true'),
-      api.get<Beneficiary[]>('/api/reference/beneficiaries?includeInactive=true'),
+      api.get<Beneficiary[]>('/api/reference/beneficiaries?includeInactive=true&role=Beneficiary'),
       api.get<PurposeGroup[]>('/api/reference/purpose-groups'),
       api.get<Entry[]>('/api/reference/references?includeInactive=true'),
       api.get<Department[]>('/api/reference/departments'),
@@ -63,6 +69,8 @@ export const methods: { value: string; fa: string; en: string }[] = [
   { value: 'GuaranteeNote', fa: 'سفته تضمینی (انتظامی)', en: 'Guarantee note' },
   { value: 'Transfer', fa: 'نقل و انتقال (بین بانکی)', en: 'Bank transfer' },
   { value: 'CardToCard', fa: 'کارت به کارت', en: 'Card to card' },
+  // Owner, 19 Nov 2026: a received cheque registered in Sayad is handed on to the beneficiary.
+  { value: 'ChequeTransfer', fa: 'ثبت انتقال (خرج چک)', en: 'Cheque transfer (endorsement)' },
 ]
 
 export const stateNames: Record<string, [string, string]> = {

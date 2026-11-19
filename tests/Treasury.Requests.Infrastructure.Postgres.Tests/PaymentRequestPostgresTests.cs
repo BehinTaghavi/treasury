@@ -21,7 +21,7 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         db.Require();
         _dataSource = NpgsqlDataSource.Create(db.ServiceAs("requests_svc"));
         _requests = new PaymentRequestUseCases(
-            new PostgresUnitOfWork(_dataSource), new PostgresPaymentRequestRepository(), new FakeReference(), new FakeAccounts(),
+            new PostgresUnitOfWork(_dataSource), new PostgresPaymentRequestRepository(), new FakeReference(), new FakeAccounts(), new FakeCheques(),
             new PostgresIdempotencyStore(_dataSource), _user, TimeProvider.System);
     }
 
@@ -69,6 +69,25 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         Assert.True((await _requests.ReversePaymentAsync(Key(), id, "endorse:x:2", CancellationToken.None)).IsSuccess);
         v = (await _requests.GetAsync(id, CancellationToken.None))!;
         Assert.Equal(("Approved", 5_000_000m), (v.State, v.PaidAmount));
+    }
+
+    [Fact]
+    public async Task A_cheque_transfer_request_keeps_its_cheque_and_the_cheque_is_on_one_open_request_db_041()
+    {
+        // Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)». Other tests of this class share the database, so the cheque is one of its own.
+        var input = Input(PaymentMethod.ChequeTransfer) with { Currency = "IRR", Amount = FakeCheques.Amount, ChequeId = FakeCheques.Registered };
+        var id = (await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).Value;
+        var v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(new TransferChequeView(FakeCheques.Registered, "445566", "1405/10/15", "فروشگاه آفتاب", "بانک ملت", "1234567890123456"), v.Cheque);
+        Assert.Equal(("ChequeTransfer", (Guid?)null), (v.Method, v.PayFromId));
+        Assert.Equal("PaymentRequest.ChequeOnAnotherRequest", (await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).ErrorCode);
+
+        // Another method: the cheque leaves the request (and the database's rule «cheque only with ChequeTransfer» holds).
+        Assert.True((await _requests.EditAsync(new(Key(), id, input with { Method = PaymentMethod.Cash, ChequeId = null }, 1), CancellationToken.None)).IsSuccess);
+        Assert.Null((await _requests.GetAsync(id, CancellationToken.None))!.Cheque);
+        Assert.True((await _requests.EditAsync(new(Key(), id, input, 2), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.ChangeAsync(new(Key(), id, "cancel", 3, "آزمایش"), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).IsSuccess); // free again after the cancellation
     }
 
     [Fact]

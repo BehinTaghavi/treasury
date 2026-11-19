@@ -7,6 +7,7 @@ namespace Treasury.Requests.Application.PaymentRequests;
 
 /// <summary>The request form as typed. Dates are Jalali text; requester, beneficiary and purpose group come from Basic Information.</summary>
 /// <param name="PayFromId">Optional: a cash desk for cash, otherwise a bank account.</param>
+/// <param name="ChequeId">«ثبت انتقال (خرج چک)»: the received cheque to hand on (owner, 19 Nov 2026).</param>
 public sealed record PaymentRequestInput(
     string Date,
     Guid RequesterId,
@@ -26,7 +27,8 @@ public sealed record PaymentRequestInput(
     Guid? DepartmentId = null,
     bool HasMainBeneficiaries = false,
     int Attachments = 0,
-    string? Note = null);
+    string? Note = null,
+    Guid? ChequeId = null);
 
 public sealed record RegisterPaymentRequestCommand(string IdempotencyKey, PaymentRequestInput Input);
 
@@ -41,13 +43,17 @@ public sealed record RecordRequestPaymentCommand(
 
 public sealed record RequestPaymentView(string Key, string Kind, Guid? InstrumentId, string? Reference, decimal Amount, string Date, string UserId);
 
+/// <summary>The cheque of a request of the kind «ثبت انتقال (خرج چک)»: number, due date and who gave it to the company.</summary>
+public sealed record TransferChequeView(Guid InstrumentId, string Number, string? DueDate, string PayerName, string? BankName, string? SayadId);
+
 public sealed record PaymentRequestView(
     Guid Id, int FiscalYear, int Number, string Date, Guid RequesterId, string RequesterName, Guid? RequesterDepartmentId, string? CostCenterCode,
     Guid BeneficiaryId, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string PurposeGroupName, string Purpose,
     string? Reference1, string? Reference2, decimal Amount, string Currency, string Method, int Priority, string? TransferAccount, string? CardNumber,
     string? PayFromKind, Guid? PayFromId, string? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
     string State, string RecordedBy, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, long Version,
-    IReadOnlyList<RequestAttachment>? Files = null, decimal PaidAmount = 0, IReadOnlyList<RequestPaymentView>? Payments = null)
+    IReadOnlyList<RequestAttachment>? Files = null, decimal PaidAmount = 0, IReadOnlyList<RequestPaymentView>? Payments = null,
+    TransferChequeView? Cheque = null)
 {
     public static PaymentRequestView From(PaymentRequest r) => new(
         r.Id, r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.RequesterId, r.RequesterName, r.RequesterDepartmentId, r.CostCenterCode,
@@ -55,7 +61,8 @@ public sealed record PaymentRequestView(
         r.Amount, r.Currency, r.Method.ToString(), r.Priority, r.TransferAccount, r.CardNumber, r.PayFromKind?.ToString(), r.PayFromId,
         r.DueDate?.ToJalaliString(), r.DepartmentId, r.HasMainBeneficiaries, r.Attachments, r.Note, r.State.ToString(), r.RecordedBy, r.ApprovedBy,
         r.ApprovedAt, r.CancelReason, r.Version, r.Files, r.PaidAmount,
-        r.Payments.Select(p => new RequestPaymentView(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, p.Date.ToJalaliString(), p.UserId)).ToList());
+        r.Payments.Select(p => new RequestPaymentView(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, p.Date.ToJalaliString(), p.UserId)).ToList(),
+        r.Cheque is { } c ? new TransferChequeView(c.InstrumentId, c.Number, c.DueDate?.ToJalaliString(), c.PayerName, c.BankName, c.SayadId) : null);
 }
 
 /// <summary>
@@ -68,6 +75,7 @@ public sealed class PaymentRequestUseCases(
     IPaymentRequestRepository requests,
     IRequestReferenceLookup reference,
     IPayFromLookup accounts,
+    IReceivedChequeLookup cheques,
     IIdempotencyStore idempotency,
     ICurrentUser currentUser,
     TimeProvider clock)
@@ -77,7 +85,7 @@ public sealed class PaymentRequestUseCases(
     public Task<Result<Guid>> RegisterAsync(RegisterPaymentRequestCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
-            var form = await FormAsync(command.Input, ct).ConfigureAwait(false);
+            var form = await FormAsync(command.Input, null, ct).ConfigureAwait(false);
             var number = await requests.NextNumberAsync(form.Date.JalaliYear, ct).ConfigureAwait(false);
             var request = PaymentRequest.Register(Guid.NewGuid(), number, form, currentUser.UserId);
             await MarkInUseAsync(form, ct).ConfigureAwait(false);
@@ -89,7 +97,7 @@ public sealed class PaymentRequestUseCases(
         Run(command.IdempotencyKey, async ct =>
         {
             var request = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
-            var form = await FormAsync(command.Input, ct).ConfigureAwait(false);
+            var form = await FormAsync(command.Input, request.Id, ct).ConfigureAwait(false);
             request.Edit(form, currentUser.UserId);
             await MarkInUseAsync(form, ct).ConfigureAwait(false);
             await requests.SaveAsync(request, ct).ConfigureAwait(false);
@@ -199,7 +207,8 @@ public sealed class PaymentRequestUseCases(
         return request;
     }
 
-    private async Task<PaymentRequestForm> FormAsync(PaymentRequestInput input, CancellationToken ct)
+    /// <param name="requestId">The request being corrected; null for a new one.</param>
+    private async Task<PaymentRequestForm> FormAsync(PaymentRequestInput input, Guid? requestId, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (string.IsNullOrWhiteSpace(input.Date))
@@ -213,8 +222,20 @@ public sealed class PaymentRequestUseCases(
             ?? throw new DomainException("PaymentRequest.BeneficiaryRequired", "Choose the beneficiary.");
         var group = await reference.PurposeGroupAsync(input.PurposeGroupId, ct).ConfigureAwait(false)
             ?? throw new DomainException("PaymentRequest.PurposeGroupRequired", "Choose the purpose group.");
+        // «ثبت انتقال (خرج چک)»: the cheque is asked from cashflow-svc; a cheque is promised to one open request only.
+        ReceivedChequeFact? cheque = null;
+        if (input.Method == PaymentMethod.ChequeTransfer && input.ChequeId is { } chequeId && chequeId != Guid.Empty)
+        {
+            cheque = await cheques.ChequeAsync(chequeId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.ChequeNotFound", "The received cheque was not found.");
+            if (await requests.OpenRequestOfChequeAsync(chequeId, ct).ConfigureAwait(false) is { } other && other.Id != requestId)
+            {
+                throw new DomainException("PaymentRequest.ChequeOnAnotherRequest", $"Cheque {cheque.Number} is already on payment request {other.Number}.");
+            }
+        }
+
         PayFromFact? payFrom = null;
-        if (input.PayFromId is { } fromId)
+        if (input.Method != PaymentMethod.ChequeTransfer && input.PayFromId is { } fromId)
         {
             payFrom = (input.Method == PaymentMethod.Cash
                     ? await accounts.CashDeskAsync(fromId, ct).ConfigureAwait(false)
@@ -226,7 +247,7 @@ public sealed class PaymentRequestUseCases(
             FiscalDate.ParseJalali(input.Date), requester, beneficiary, group, input.Purpose ?? string.Empty, input.Amount, input.Currency ?? string.Empty,
             input.Method, input.Priority, input.Reference1, input.Reference2, input.TransferAccount, input.CardNumber, payFrom,
             string.IsNullOrWhiteSpace(input.DueDate) ? null : FiscalDate.ParseJalali(input.DueDate), input.DepartmentId, input.HasMainBeneficiaries,
-            input.Attachments, input.Note);
+            input.Attachments, input.Note, cheque);
     }
 
     private async Task MarkInUseAsync(PaymentRequestForm form, CancellationToken ct)

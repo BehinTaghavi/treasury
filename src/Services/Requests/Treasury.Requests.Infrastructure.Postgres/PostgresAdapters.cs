@@ -9,7 +9,7 @@ using Treasury.Requests.Infrastructure.InMemory;
 
 namespace Treasury.Requests.Infrastructure.Postgres;
 
-// Written against Npgsql 10 and db/postgres/026_requests.sql.
+// Written against Npgsql 10 and db/postgres/026_requests.sql (cheque columns: 041_requests_cheque_transfer.sql).
 // Integration tests against PostgreSQL 17: tests/Treasury.Requests.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
@@ -72,7 +72,8 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         "fiscal_year, id, number, recorded_by, request_date, requester_id, requester_name, requester_department_id, cost_center_code, " +
         "beneficiary_id, beneficiary_detail_code, beneficiary_name, purpose_group_id, purpose_group_name, purpose, reference1, reference2, " +
         "amount, currency, method, priority, transfer_account, card_number, pay_from_kind, pay_from_id, due_date, department_id, " +
-        "has_main_beneficiaries, attachments, note, state, approved_by, approved_at, cancel_reason, version, payments";
+        "has_main_beneficiaries, attachments, note, state, approved_by, approved_at, cancel_reason, version, payments, " +
+        "cheque_id, cheque_number, cheque_due_date, cheque_payer, cheque_bank, cheque_sayad_id";
 
     public async Task<PaymentRequest?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -98,7 +99,8 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         await using (var cmd = tx.Command(
             $"INSERT INTO requests.payment_request ({Columns}) VALUES (@year, @id, @number, @by, @date, @requester, @requester_name, @requester_dept, @cost_center, " +
             "@beneficiary, @beneficiary_code, @beneficiary_name, @group, @group_name, @purpose, @ref1, @ref2, @amount, @currency, @method, @priority, " +
-            "@transfer, @card, @from_kind, @from_id, @due, @department, @main, @attachments, @note, @state, @approved_by, @approved_at, @cancel_reason, 1, @payments)"))
+            "@transfer, @card, @from_kind, @from_id, @due, @department, @main, @attachments, @note, @state, @approved_by, @approved_at, @cancel_reason, 1, @payments, " +
+            "@cheque_id, @cheque_number, @cheque_due, @cheque_payer, @cheque_bank, @cheque_sayad)"))
         {
             cmd.Parameters.AddWithValue("number", request.Number);
             cmd.Parameters.AddWithValue("by", request.RecordedBy);
@@ -121,7 +123,9 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             "reference2 = @ref2, amount = @amount, currency = @currency, method = @method, priority = @priority, transfer_account = @transfer, " +
             "card_number = @card, pay_from_kind = @from_kind, pay_from_id = @from_id, due_date = @due, department_id = @department, " +
             "has_main_beneficiaries = @main, attachments = @attachments, note = @note, state = @state, approved_by = @approved_by, approved_at = @approved_at, " +
-            "cancel_reason = @cancel_reason, payments = @payments, version = version + 1, updated_at = now() WHERE fiscal_year = @year AND id = @id AND version = @expected"))
+            "cancel_reason = @cancel_reason, payments = @payments, cheque_id = @cheque_id, cheque_number = @cheque_number, cheque_due_date = @cheque_due, " +
+            "cheque_payer = @cheque_payer, cheque_bank = @cheque_bank, cheque_sayad_id = @cheque_sayad, " +
+            "version = version + 1, updated_at = now() WHERE fiscal_year = @year AND id = @id AND version = @expected"))
         {
             Bind(cmd, request);
             cmd.Parameters.AddWithValue("expected", request.Version);
@@ -217,6 +221,15 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         return await WithFilesAsync(await ReadAsync(cmd, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<PaymentRequest?> OpenRequestOfChequeAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            $"SELECT {Columns} FROM requests.payment_request WHERE cheque_id = @cheque AND state IN ('Registered', 'Approved') ORDER BY fiscal_year, number LIMIT 1");
+        cmd.Parameters.AddWithValue("cheque", instrumentId);
+        var found = await ReadAsync(cmd, cancellationToken).ConfigureAwait(false);
+        return found.Count == 0 ? null : found[0];
+    }
+
     private static void Bind(NpgsqlCommand cmd, PaymentRequest r)
     {
         static object Db(object? value) => value ?? DBNull.Value;
@@ -253,6 +266,12 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         cmd.Parameters.AddWithValue("approved_by", Db(d.ApprovedBy));
         cmd.Parameters.Add(new NpgsqlParameter("approved_at", NpgsqlDbType.TimestampTz) { Value = Db(d.ApprovedAt) });
         cmd.Parameters.AddWithValue("cancel_reason", Db(d.CancelReason));
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_id", NpgsqlDbType.Uuid) { Value = Db(d.Cheque?.InstrumentId) });
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_number", NpgsqlDbType.Text) { Value = Db(d.Cheque?.Number) });
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_due", NpgsqlDbType.Date) { Value = Db(d.Cheque?.DueDate?.Value) });
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_payer", NpgsqlDbType.Text) { Value = Db(d.Cheque?.PayerName) });
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_bank", NpgsqlDbType.Text) { Value = Db(d.Cheque?.BankName) });
+        cmd.Parameters.Add(new NpgsqlParameter("cheque_sayad", NpgsqlDbType.Text) { Value = Db(d.Cheque?.SayadId) });
         cmd.Parameters.Add(new NpgsqlParameter("payments", NpgsqlDbType.Jsonb)
         {
             Value = System.Text.Json.JsonSerializer.Serialize(
@@ -306,7 +325,10 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
                 CancelReason: Text(33),
                 Payments: r.IsDBNull(35) ? null
                     : (System.Text.Json.JsonSerializer.Deserialize<List<PaymentRow>>(r.GetString(35), PaymentJson) ?? [])
-                        .Select(p => new RequestPayment(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, new FiscalDate(p.Date), p.UserId)).ToList());
+                        .Select(p => new RequestPayment(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, new FiscalDate(p.Date), p.UserId)).ToList(),
+                Cheque: Id(36) is { } chequeId
+                    ? new TransferCheque(chequeId, r.GetString(37), r.IsDBNull(38) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(38)), r.GetString(39), Text(40), Text(41))
+                    : null);
             list.Add(PaymentRequest.Restore(r.GetGuid(1), r.GetInt32(2), r.GetInt32(0), r.GetString(3), data, r.GetInt64(34)));
         }
 

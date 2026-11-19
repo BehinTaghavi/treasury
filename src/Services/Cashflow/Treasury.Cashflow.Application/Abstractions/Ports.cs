@@ -202,9 +202,10 @@ public interface ICurrentUser
 }
 
 /// <summary>What requests-svc says about a payment request (answer to Q36: an endorsed cheque pays an approved request).</summary>
+/// <param name="TransferChequeId">A request of the kind «ثبت انتقال (خرج چک)»: the received cheque it names (owner, 19 Nov 2026).</param>
 public sealed record PaymentRequestFact(
     Guid Id, int Number, string State, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string Purpose, decimal Amount,
-    string Currency, decimal PaidAmount);
+    string Currency, decimal PaidAmount, Guid? TransferChequeId = null);
 
 /// <summary>A payment made by a received cheque on a request; <see cref="Key"/> makes a repeated call harmless.</summary>
 public sealed record RequestPaymentInput(string Key, Guid InstrumentId, string Reference, decimal Amount, string Currency, string Date);

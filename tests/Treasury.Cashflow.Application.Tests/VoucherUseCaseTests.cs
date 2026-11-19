@@ -197,29 +197,42 @@ public sealed class VoucherUseCaseTests : IDisposable
     {
         await SetTemplate();
         var cheque = await ChequeOf(await ChequeReceipt());
+        // Owner, 19 Nov 2026 («ثبت انتقال (خرج چک)»): the request is of that kind, written for this cheque, with the cheque's amount.
+        var transfer = Guid.NewGuid();
+        _requests.Requests[transfer] = new(transfer, 9, "Approved", "300001", "پیمانکار الف", FakeReceiptReference.PaymentGroup, "بابت بدهی", 10_000_000, "IRR", 0, cheque);
+
         Assert.Equal("Instrument.ActionNotSupportedHere",
             (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.Endorse, "1405/08/24", "پیمانکار"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.PaymentRequestRequired", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", Guid.Empty, "SY-1"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.PaymentRequestNotApproved",
             (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Registered, "SY-1"), CancellationToken.None)).ErrorCode);
-        _requests.Requests[FakePaymentRequests.Approved] = _requests.Requests[FakePaymentRequests.Approved] with { PaidAmount = 20_000_000 };
-        Assert.Equal("Instrument.PaymentRequestOverpaid",
-            (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None)).ErrorCode);
-        _requests.Requests[FakePaymentRequests.Approved] = _requests.Requests[FakePaymentRequests.Approved] with { PaidAmount = 15_000_000 };
 
-        // The request's beneficiary receives the cheque; its payment group's account is debited.
-        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None);
+        // Item 1: the cheque is first registered in Sayad. Nothing is paid on the request by a refused transfer.
+        Assert.Equal("Instrument.TransferNeedsSayadRegistration", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal(0m, _requests.Requests[transfer].PaidAmount);
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess);
+
+        // Item 2: a request that was not written for the transfer of this cheque does not transfer it.
+        Assert.Equal("Instrument.PaymentRequestNotForThisCheque",
+            (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.SayadTrackingRequired", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, " "), CancellationToken.None)).ErrorCode);
+
+        // Item 3: with the Sayad tracking code the cheque is «ثبت انتقال شد»; the request's beneficiary receives it, the request is paid in
+        // full (its amount is the cheque's) and its payment group's account is debited.
+        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1"), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
-        Assert.Equal(("Paid", 25_000_000m), (_requests.Requests[FakePaymentRequests.Approved].State, _requests.Requests[FakePaymentRequests.Approved].PaidAmount));
+        Assert.Equal(("Paid", 10_000_000m), (_requests.Requests[transfer].State, _requests.Requests[transfer].PaidAmount));
         var view = (await _instruments.GetAsync(cheque, CancellationToken.None))!;
-        Assert.Equal(("پیمانکار الف", (Guid?)FakePaymentRequests.Approved), (view.Destination, view.History[^1].Details!.PaymentRequestId));
+        Assert.Equal(("Endorsed", "پیمانکار الف", (Guid?)transfer, "SY-1"),
+            (view.State, view.Destination, view.History[^1].Details!.PaymentRequestId, view.History[^1].Details!.SayadTracking));
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([(true, "2101", "300001"), (false, "1201", "200015")], steps.Single().Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.Equal("ثبت انتقال چک (خرج چک)", steps.Single().Operation);
 
         Assert.Equal("Instrument.ActionNotSupportedHere",
             (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RecordEndorsementReturned, "1405/10/02", Reference: "BN-9"), CancellationToken.None)).ErrorCode);
         Assert.True((await _receipts.EndorsementReturnedAsync(new(Key(), cheque, "1405/10/02", "BN-9"), CancellationToken.None)).IsSuccess);
-        Assert.Equal(("Approved", 15_000_000m), (_requests.Requests[FakePaymentRequests.Approved].State, _requests.Requests[FakePaymentRequests.Approved].PaidAmount));
+        Assert.Equal(("Approved", 0m), (_requests.Requests[transfer].State, _requests.Requests[transfer].PaidAmount));
         steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([(true, "1203", "200015"), (false, "2101", "300001")], steps[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
     }

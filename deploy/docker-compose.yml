@@ -102,7 +102,7 @@ services:
       Keycloak__Audience: treasury
 
   # Payment requests (requests-svc). Asks reference-svc about requesters, beneficiaries and purpose groups, accounts-svc about
-  # the account paid from, over their APIs.
+  # the account paid from and cashflow-svc about the received cheque of a «ثبت انتقال (خرج چک)» request, over their APIs.
   requests-api:
     build:
       context: ..
@@ -113,6 +113,7 @@ services:
       ConnectionStrings__Treasury: "Host=postgres;Database=treasury;Username=requests_svc;Password=${REQUESTS_DB_PASSWORD}"
       Services__Reference: http://reference-api:8080/
       Services__Accounts: http://accounts-api:8080/
+      Services__Cashflow: http://cashflow-api:8080/
       ASPNETCORE_ENVIRONMENT: ${API_ENVIRONMENT:-Development}
       Keycloak__Authority: ${KEYCLOAK_AUTHORITY:-}
       Keycloak__Audience: treasury

@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Application;
 using Treasury.Reference.Application.Organization;
+using Treasury.Reference.Domain.Organization;
 
 namespace Treasury.Reference.Api;
 
@@ -42,8 +43,9 @@ public static class OrganizationEndpoints
         api.MapPost("/requesters/{id:guid}/in-use", async (Guid id, HttpRequest http, OrganizationUseCases u, CancellationToken ct) =>
             ToHttp(await u.MarkInUseAsync(Key(http), id, ct).ConfigureAwait(false)));
 
-        api.MapGet("/beneficiaries", async (bool? includeInactive, OrganizationUseCases u, CancellationToken ct) =>
-            Results.Ok(await u.ListBeneficiariesAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+        // ?role=Beneficiary, Obligor or Guarantor: one group of «ذینفعان / متعهدین / ضامنین» (owner, 19 Nov 2026).
+        api.MapGet("/beneficiaries", async (bool? includeInactive, PartyRoles? role, OrganizationUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListBeneficiariesAsync(includeInactive ?? false, ct, role).ConfigureAwait(false)));
         api.MapPost("/beneficiaries", async (BeneficiaryForm form, HttpRequest http, OrganizationUseCases u, CancellationToken ct) =>
             ToHttp(await u.AddBeneficiaryAsync(Key(http), form, ct).ConfigureAwait(false)));
         api.MapPut("/beneficiaries/{id:guid}", async (Guid id, BeneficiaryEditRequest r, HttpRequest http, OrganizationUseCases u, CancellationToken ct) =>

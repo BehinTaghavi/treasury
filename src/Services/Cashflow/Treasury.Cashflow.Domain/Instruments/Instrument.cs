@@ -82,7 +82,10 @@ public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, str
 /// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32). An endorsed promissory
 /// note («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026) has no Sayad transfer.
 /// </summary>
-public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
+/// <param name="RequestChequeId">The received cheque the payment request names: a request of the kind «ثبت انتقال (خرج چک)» is written for
+/// one cheque (owner, 19 Nov 2026); null for a request of another kind.</param>
+public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId,
+    Guid? RequestChequeId = null);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -392,10 +395,21 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// Endorsement («خرج چک», owner's item 14 (g), kept by the owner): the cheque pays a debt of the company. The receiver is any تفصیل
     /// and the Sayad transfer's tracking number is recorded (answers to Q32).
+    /// Owner, 19 Nov 2026 («ثبت انتقال (خرج چک)»): the cheque must first be registered in Sayad and have the status «ثبت صیادی شد»; the
+    /// payment request must have been written for the transfer of this very cheque; with the Sayad tracking code of the transfer the
+    /// cheque gets the status «ثبت انتقال شد (خرج چک شد)». A promissory note has no Sayad system and is endorsed as before.
     /// </summary>
     public void Endorse(Endorsement endorsement, FiscalDate date, string userId, string? note = null)
     {
         ArgumentNullException.ThrowIfNull(endorsement);
+        if (Kind.IsCheque())
+        {
+            Require(Direction != InstrumentDirection.Received || State != InstrumentState.InCashDesk || !Kind.IsCollectable(),
+                "Instrument.TransferNeedsSayadRegistration", "Register the cheque in Sayad before transferring it.");
+            Require(endorsement.RequestChequeId == Id, "Instrument.PaymentRequestNotForThisCheque",
+                "The payment request was not written for the transfer of this cheque.");
+        }
+
         Require(!string.IsNullOrWhiteSpace(endorsement.ReceiverDetailCode) && !string.IsNullOrWhiteSpace(endorsement.ReceiverName),
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");

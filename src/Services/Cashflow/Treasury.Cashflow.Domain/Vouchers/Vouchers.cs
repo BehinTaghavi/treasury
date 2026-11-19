@@ -305,9 +305,12 @@ public static class ReceiptVouchers
                         new VoucherLine(true, receiptAccount, payer, amount, back),
                         Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, back));
             case InstrumentAction.Endorse:
-                return Pair($"خرج {Word(cheque)}", cheque, e.Date,
-                    new VoucherLine(true, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"خرج به {e.Details?.PartyName} – {e.Details?.Purpose}")),
-                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"خرج به {e.Details?.PartyName}")));
+                // Owner, 19 Nov 2026: the step is called «ثبت انتقال (خرج چک)» for a cheque (it is transferred in Sayad); a note is «خرج سفته».
+                // Dr the payment purpose group's account · receiver / Cr «اسناد نزد صندوق» · payer (manual «خرج چک»; template row added).
+                var spend = cheque.Kind.IsNote() ? "خرج" : "ثبت انتقال (خرج)";
+                return Pair(cheque.Kind.IsNote() ? "خرج سفته" : "ثبت انتقال چک (خرج چک)", cheque, e.Date,
+                    new VoucherLine(true, endorsement?.AccountCode, endorsement?.DetailCode, amount, Text(cheque, $"{spend} به {e.Details?.PartyName} – {e.Details?.Purpose}")),
+                    Fixed(false, template, FixedAccount.ChequesInCashDesk, payer, amount, Text(cheque, $"{spend} به {e.Details?.PartyName}")));
             case InstrumentAction.RecordEndorsementReturned:
                 return Pair($"برگشت {Word(cheque)} خرج شده", cheque, e.Date,
                     Fixed(true, template, FixedAccount.ProtestedCheques, payer, amount, Text(cheque, $"برگشت خرج – {Paper(cheque)} {e.Reference}")),

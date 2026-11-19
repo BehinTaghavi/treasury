@@ -228,6 +228,20 @@ public sealed class InMemoryPaymentRequestRepository(InMemoryRequestsDatabase db
         }
     }
 
+    public Task<PaymentRequest?> OpenRequestOfChequeAsync(Guid instrumentId, CancellationToken cancellationToken)
+    {
+        static bool Open(PaymentRequestSnapshot s, Guid cheque) =>
+            s.Data.Cheque?.InstrumentId == cheque && s.Data.State is PaymentRequestState.Registered or PaymentRequestState.Approved;
+
+        lock (db.Gate)
+        {
+            var staged = InMemoryUnitOfWork.PendingOrNull?.Requests ?? [];
+            var found = staged.Values.Concat(db.Requests.Values.Where(s => !staged.ContainsKey(s.Id)))
+                .Where(s => Open(s, instrumentId)).OrderBy(s => s.FiscalYear).ThenBy(s => s.Number).FirstOrDefault();
+            return Task.FromResult(found?.ToDomain());
+        }
+    }
+
     private static void Stage(PaymentRequest request, long newVersion)
     {
         var pending = InMemoryUnitOfWork.Pending;

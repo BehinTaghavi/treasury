@@ -4,12 +4,15 @@
  * The requester's department and cost centre come from Basic Information; the amount is also written in words; the receiving
  * account (transfer) or card number (card to card) appears only for its payment method. Opened with `editId`, it corrects a
  * request that is not yet approved. Ctrl+Enter saves.
+ * Owner, 19 Nov 2026: with the payment method «ثبت انتقال (خرج چک)» the received cheque is chosen in place of «پرداخت از حساب بانکی» —
+ * only cheques whose latest status is «ثبت صیادی شد» are offered — and its number, due date and the name of who gave it to the company
+ * are shown; the amount of the request is the amount of the cheque.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
-import { methods, useLookups, type Purpose } from './lookups'
+import { methods, useLookups, type Purpose, type TransferableCheque } from './lookups'
 import { ACCEPT, openFile, sizeText, uploadFile, type RequestFile } from './files'
 
 interface View {
@@ -17,6 +20,7 @@ interface View {
   reference1: string | null; reference2: string | null; amount: number; currency: string; method: string; priority: number
   transferAccount: string | null; cardNumber: string | null; payFromId: string | null; dueDate: string | null; departmentId: string | null
   hasMainBeneficiaries: boolean; attachments: number; note: string | null; version: number; files: RequestFile[] | null
+  cheque: { instrumentId: string; number: string; dueDate: string | null; payerName: string; bankName: string | null } | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; editId?: string | null }>(),
@@ -30,7 +34,7 @@ const L = useLookups(api)
 const empty = () => ({
   date: todayJalali(), requesterId: '', beneficiaryId: '', hasMainBeneficiaries: false, priority: '1', amount: '', currency: 'IRR',
   purposeGroupId: '', purpose: '', ref1: '', ref2: '', method: 'CurrentCheque', transferAccount: '', cardNumber: '', payFromId: '',
-  dueDate: '', departmentId: '', attachments: '0', note: '',
+  dueDate: '', departmentId: '', attachments: '0', note: '', chequeId: '',
 })
 const form = reactive(empty())
 const editing = ref<{ number: number; version: number } | null>(null)
@@ -94,6 +98,25 @@ const payFromChoices = computed<Choice[]>(() => form.method === 'Cash'
   ? L.desks.value.filter(d => d.isActive && d.currencyCode === form.currency).map(d => ({ value: d.id, label: d.name }))
   : L.bankAccounts.value.filter(a => a.isActive && a.currencyCode === form.currency).map(a => ({ value: a.id, label: L.accountTitle(a) })))
 
+// ---- «ثبت انتقال (خرج چک)»: the received cheques that are «ثبت صیادی شد» ----
+const isTransfer = computed(() => form.method === 'ChequeTransfer')
+const cheques = ref<TransferableCheque[]>([])
+const chequesLoaded = ref(false)
+async function loadCheques() {
+  const r = await api.get<TransferableCheque[]>('/api/cashflow/instruments/received?state=SayadRegistered')
+  if (r.ok) cheques.value = r.value.filter(c => c.kind.endsWith('Cheque') && c.allowedActions.includes('Endorse'))
+  else show('error', translate(r.code, props.locale))
+  chequesLoaded.value = true
+}
+const cheque = computed(() => cheques.value.find(c => c.id === form.chequeId))
+const chequeChoices = computed<Choice[]>(() => cheques.value.map(c => ({
+  value: c.id, label: `${t('چک', 'Cheque')} ${c.number ?? ''} – ${c.bankName ?? ''} – ${c.counterparty}`,
+  hint: `${formatAmount(c.amount, props.locale)}${c.currency === 'IRR' ? '' : ' ' + c.currency} · ${t('سررسید', 'due')} ${c.dueDate ?? ''}`,
+})))
+watch(isTransfer, on => { if (on && !chequesLoaded.value) void loadCheques() }, { immediate: true })
+// "The amount of the cheque is the amount of the request": the amount and currency follow the chosen cheque.
+watch(cheque, c => { if (c && isTransfer.value) Object.assign(form, { amount: String(c.amount), currency: c.currency }) })
+
 const amount = computed(() => parseAmount(form.amount))
 const currencyName = computed(() => L.currencies.value.find(c => c.code === form.currency)?.name ?? form.currency)
 const words = computed(() => (amount.value ? `${amountInWords(amount.value)} ${currencyName.value}` : ''))
@@ -122,7 +145,7 @@ async function load(id: string) {
     date: v.date, requesterId: v.requesterId, beneficiaryId: v.beneficiaryId, hasMainBeneficiaries: v.hasMainBeneficiaries, priority: String(v.priority),
     amount: String(v.amount), currency: v.currency, purposeGroupId: v.purposeGroupId, purpose: v.purpose, ref1: v.reference1 ?? '', ref2: v.reference2 ?? '',
     method: v.method, transferAccount: v.transferAccount ?? '', cardNumber: v.cardNumber ?? '', payFromId: v.payFromId ?? '', dueDate: v.dueDate ?? '',
-    departmentId: v.departmentId ?? '', attachments: String(v.attachments), note: v.note ?? '',
+    departmentId: v.departmentId ?? '', attachments: String(v.attachments), note: v.note ?? '', chequeId: v.cheque?.instrumentId ?? '',
   })
   editing.value = { number: v.number, version: v.version }
   storedFiles.value = v.files ?? []
@@ -147,11 +170,13 @@ async function save() {
   if (!amount.value) return show('error', translate('PaymentRequest.AmountRequired', props.locale))
   if (!form.purposeGroupId) return show('error', translate('PaymentRequest.PurposeGroupRequired', props.locale))
   if (!form.purpose.trim()) return show('error', translate('PaymentRequest.PurposeRequired', props.locale))
+  if (isTransfer.value && !form.chequeId) return show('error', translate('PaymentRequest.ChequeRequired', props.locale))
   const input = {
     date, requesterId: form.requesterId, beneficiaryId: form.beneficiaryId, purposeGroupId: form.purposeGroupId, purpose: form.purpose.trim(),
     amount: amount.value, method: form.method, currency: form.currency, priority: Number(form.priority), reference1: form.ref1 || null,
     reference2: form.ref2 || null, transferAccount: toLatinDigits(form.transferAccount.trim()) || null, cardNumber: toLatinDigits(form.cardNumber.trim()) || null,
-    payFromId: form.payFromId || null, dueDate: form.dueDate ? normaliseJalali(form.dueDate) : null, departmentId: form.departmentId || null,
+    payFromId: isTransfer.value ? null : form.payFromId || null, dueDate: !isTransfer.value && form.dueDate ? normaliseJalali(form.dueDate) : null,
+    chequeId: isTransfer.value ? form.chequeId : null, departmentId: form.departmentId || null,
     hasMainBeneficiaries: form.hasMainBeneficiaries, attachments: Number(toLatinDigits(form.attachments) || 0), note: form.note || null,
   }
   saving.value = true
@@ -174,6 +199,7 @@ async function save() {
       else show('ok', saved + (v.ok && v.value.files?.length ? t(` ${v.value.files.length.toLocaleString('fa-IR')} تصویر ضمیمه الصاق شد.`, ` ${v.value.files.length} scan(s) attached.`) : ''))
       queued.value = []
       Object.assign(form, { ...empty(), requesterId: form.requesterId, date: form.date })
+      chequesLoaded.value = false
     }
     emit('saved', r.value)
   } finally {
@@ -215,8 +241,13 @@ onMounted(async () => {
                       :none-text="t('ذینفعی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'Not found; define it in Basic Information first')" />
       </label>
       <label class="tr-check"><input v-model="form.hasMainBeneficiaries" type="checkbox" /> {{ t('پرداخت جمعی دارد (ذینفعان اصلی دارد)', 'Paid on to main beneficiaries') }}</label>
-      <label class="req">{{ t('مبلغ', 'Amount') }} <AmountInput v-model="form.amount" :decimals="form.currency === 'IRR' ? 0 : 2" /></label>
-      <label>{{ t('ارز', 'Currency') }}
+      <!-- «ثبت انتقال (خرج چک)»: the amount and currency are the cheque's (owner, 19 Nov 2026). -->
+      <label v-if="isTransfer" class="req">{{ t('مبلغ (برابر مبلغ چک)', 'Amount (the cheque\'s)') }}
+        <input class="ro" :value="amount ? formatAmount(amount, locale) : ''" readonly dir="ltr" :placeholder="t('چک را در «نحوهٔ پرداخت» انتخاب کنید', 'Choose the cheque below')" />
+      </label>
+      <label v-else class="req">{{ t('مبلغ', 'Amount') }} <AmountInput v-model="form.amount" :decimals="form.currency === 'IRR' ? 0 : 2" /></label>
+      <label v-if="isTransfer">{{ t('ارز', 'Currency') }} <input class="ro" :value="currencyName" readonly /></label>
+      <label v-else>{{ t('ارز', 'Currency') }}
         <SearchSelect v-model="form.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
       </label>
       <label class="full">{{ t('مبلغ به حروف', 'Amount in words') }} <input class="ro" :value="words" readonly /></label>
@@ -251,11 +282,25 @@ onMounted(async () => {
       <label v-if="form.method === 'CardToCard'" class="req">{{ t('انتقال به شماره کارت', 'To card number') }}
         <input v-model="form.cardNumber" dir="ltr" maxlength="19" inputmode="numeric" />
       </label>
-      <label class="wide">{{ form.method === 'Cash' ? t('پرداخت از صندوق', 'Pay from cash desk') : t('پرداخت از حساب بانکی', 'Pay from bank account') }}
-        <SearchSelect v-model="form.payFromId" :options="payFromChoices" :empty-label="t('— خزانه تعیین می‌کند —', '— treasury decides —')"
-                      :aria-label="t('پرداخت از', 'Pay from')" />
-      </label>
-      <label :class="{ req: form.method === 'PostDatedCheque' }">{{ t('سررسید', 'Due date') }} <input v-model="form.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
+      <!-- Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» shows the cheque's number, due date and who gave it, in place of «پرداخت از حساب بانکی». -->
+      <template v-if="isTransfer">
+        <label class="wide">{{ t('چک دریافتی (فقط چک‌های «ثبت صیادی شد»)', 'Received cheque (only «ثبت صیادی شد»)') }}
+          <SearchSelect v-model="form.chequeId" :options="chequeChoices" required :aria-label="t('چک دریافتی', 'Received cheque')"
+                        :none-text="t('چکی با وضعیت «ثبت صیادی شد» نزد صندوق نیست؛ ابتدا در «دریافت‌ها ← عملیات چک‌های دریافتی» چک را ثبت صیادی کنید',
+                          'No cheque with the status «ثبت صیادی شد»; register the cheque in Sayad on the cheque operations screen first')" />
+        </label>
+        <label>{{ t('شماره چک', 'Cheque no.') }} <input class="ro" :value="cheque?.number ?? ''" readonly dir="ltr" /></label>
+        <label>{{ t('تاریخ سررسید چک', 'Cheque due date') }} <input class="ro" :value="cheque?.dueDate ?? ''" readonly dir="ltr" /></label>
+        <label class="wide">{{ t('نام واگذارنده چک', 'Cheque given by') }} <input class="ro" :value="cheque?.counterparty ?? ''" readonly /></label>
+        <label v-if="cheque?.details?.sayadId">{{ t('شماره صیادی چک', 'Sayad number') }} <input class="ro" :value="cheque.details.sayadId" readonly dir="ltr" /></label>
+      </template>
+      <template v-else>
+        <label class="wide">{{ form.method === 'Cash' ? t('پرداخت از صندوق', 'Pay from cash desk') : t('پرداخت از حساب بانکی', 'Pay from bank account') }}
+          <SearchSelect v-model="form.payFromId" :options="payFromChoices" :empty-label="t('— خزانه تعیین می‌کند —', '— treasury decides —')"
+                        :aria-label="t('پرداخت از', 'Pay from')" />
+        </label>
+        <label :class="{ req: form.method === 'PostDatedCheque' }">{{ t('سررسید', 'Due date') }} <input v-model="form.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
+      </template>
       <label>{{ t('تعداد ضمائم', 'Attachments') }} <input v-model="form.attachments" inputmode="numeric" dir="ltr" /></label>
       <label class="full">{{ t('توضیحات', 'Note') }} <input v-model="form.note" maxlength="500" /></label>
     </fieldset>

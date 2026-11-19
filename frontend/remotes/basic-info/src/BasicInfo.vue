@@ -64,7 +64,8 @@ const sections: { id: string; title: [string, string] }[] = [
   // Opening balances are an item of the main menu (owner, 14 Nov 2026), exposed as ./OpeningBalances.
   { id: 'departments', title: ['واحدهای سازمانی', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
-  { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
+  // Owner, 19 Nov 2026: one form for the three groups.
+  { id: 'beneficiaries', title: ['ذینفعان / متعهدین / ضامنین', 'Beneficiaries / obligors / guarantors'] },
   // Owner, 16 Nov 2026: the holders of authorised signatures and the signature rule of each valuable document.
   { id: 'signatories', title: ['دارندگان امضای مجاز', 'Authorised signatories'] },
   // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.
