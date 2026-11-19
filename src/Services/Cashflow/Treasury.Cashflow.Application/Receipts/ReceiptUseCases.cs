@@ -53,7 +53,8 @@ public sealed record RecordInstrumentReceiptCommand(string IdempotencyKey, Recei
 public sealed record NoteLineInput(string Number, string? IssueDate, string? DueDate, decimal Amount, NoteChecks? Checks = null);
 
 /// <summary>A guarantor or endorser («ضامن / ظهرنویس») on the note receipt form.</summary>
-/// <param name="DetailCode">Its تفصیل, when it has one; the name is then taken from it unless typed.</param>
+/// <param name="DetailCode">Its تفصیل: the guarantor is one of the «ضامنین» of Basic Information (owner's answer to Q54, 19 Nov 2026); the
+/// name is the one kept there, whatever <paramref name="Name"/> says.</param>
 /// <param name="NoteNumber">The note it guarantees («شماره سفته مرتبط»); empty: every note on the receipt.</param>
 public sealed record NoteGuarantorInput(string? Name, string? NationalCode = null, string? DetailCode = null, string? Phone = null, string? NoteNumber = null);
 
@@ -84,7 +85,9 @@ public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string
 public sealed record ReplaceChequeCommand(string IdempotencyKey, Guid InstrumentId, ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
 /// <summary>Endorsement of a received cheque (خرج چک, owner's item 14 (g)): it pays an approved payment request (answer to Q36).</summary>
-public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null);
+/// <param name="SignerIds">A cheque: the authorised signatories of its payment sheet, chosen by the rule «برگ پرداخت چک» (answer to Q57).</param>
+public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null,
+    IReadOnlyList<Guid>? SignerIds = null);
 
 /// <summary>The receiver brings an endorsed cheque back bounced (owner's item 14 (h)), with the bank's bounce notice.</summary>
 public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null, string? TrackingCode = null);
@@ -172,6 +175,9 @@ public sealed class ReceiptUseCases(
 {
     /// <summary>The name reference-svc gives the note receipt among the documents with a signature rule.</summary>
     public const string NoteReceiptDocument = "NoteReceipt";
+
+    /// <summary>The payment sheet of a cheque («برگ پرداخت چک») among the documents with a signature rule (owner's answer to Q57).</summary>
+    public const string ChequePaymentSheetDocument = "ChequePaymentSheet";
 
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -330,9 +336,20 @@ public sealed class ReceiptUseCases(
                 throw new DomainException("Instrument.EndorsementGroupNotForPayments", "The request's purpose group is not an active payment group.");
             }
 
+            // Owner's answers to Q57 (19 Nov 2026): the transfer of a cheque gets a payment sheet with a serial number of its own, signed
+            // also by the authorised signatories of the rule «برگ پرداخت چک». The number is taken in this transaction: a refused transfer
+            // gives it back.
+            int? sheet = null;
+            IReadOnlyList<ReceiptSigner> signers = [];
+            if (cheque.Kind.IsCheque())
+            {
+                signers = (await reference.SignatureRuleAsync(ChequePaymentSheetDocument, ct).ConfigureAwait(false) ?? SignatureRuleFact.None).Choose(command.SignerIds);
+                sheet = await instruments.NextPaymentSheetNumberAsync(date.JalaliYear, ct).ConfigureAwait(false);
+            }
+
             cheque.Endorse(
                 new Endorsement(request.BeneficiaryDetailCode, request.BeneficiaryName, request.PurposeGroupId, request.Purpose, command.SayadTracking, request.Id,
-                    request.TransferChequeId),
+                    request.TransferChequeId, sheet, signers),
                 date, currentUser.UserId, command.Note);
             var key = cheque.EndorsementPaymentKey(cheque.History.Count);
             await paymentRequests.RecordPaymentAsync(request.Id,
@@ -502,34 +519,29 @@ public sealed class ReceiptUseCases(
             throw new DomainException("Receipt.TooManyInstruments", $"At most {MaxInstruments} cheques and notes on one receipt.");
         }
 
-        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var (header, date) = await HeaderAsync(command.Header, ct, noteReceipt: true).ConfigureAwait(false);
         var t = command.Terms;
         var terms = new NoteReceiptTerms(
             t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
             string.IsNullOrWhiteSpace(t.OriginalReceivedOn) ? null : FiscalDate.ParseJalali(t.OriginalReceivedOn), t.Discrepancy, t.Attachments, t.DeliveredBy);
         var rule = await reference.SignatureRuleAsync(NoteReceiptDocument, ct).ConfigureAwait(false);
 
-        // Guarantors come from the تفصیل list or are typed; each guarantees one note («شماره سفته مرتبط») or all of them.
+        // Guarantors are chosen from the «ضامنین» of Basic Information only (owner's answer to Q54, 19 Nov 2026; before, a تفصیل or a typed
+        // name); each guarantees one note («شماره سفته مرتبط») or all of them.
         var numbers = command.Notes.Select(n => n.Number?.Trim() ?? string.Empty).ToList();
         var guarantors = new List<(NoteGuarantor Guarantor, string? NoteNumber)>();
         foreach (var g in command.Guarantors ?? [])
         {
-            var name = g.Name;
             var code = string.IsNullOrWhiteSpace(g.DetailCode) ? null : g.DetailCode.Trim();
-            if (code is not null)
-            {
-                var detail = await reference.PayerAsync(code, ct).ConfigureAwait(false)
-                    ?? throw new DomainException("Receipt.GuarantorDetailNotFound", "The guarantor's تفصیل was not found.");
-                name = string.IsNullOrWhiteSpace(name) ? detail.Name : name;
-            }
-
+            var party = code is null ? null : await reference.NotePartyAsync(code, ct).ConfigureAwait(false);
+            var guarantor = NoteParties.Guarantor(party, g.NationalCode, g.Phone);
             var noteNumber = string.IsNullOrWhiteSpace(g.NoteNumber) ? null : g.NoteNumber.Trim();
             if (noteNumber is not null && !numbers.Contains(noteNumber))
             {
                 throw new DomainException("Receipt.GuarantorNoteNotFound", $"Note {noteNumber} named for a guarantor is not on this receipt.");
             }
 
-            guarantors.Add((new NoteGuarantor(name ?? string.Empty, g.NationalCode, code, g.Phone), noteNumber));
+            guarantors.Add((guarantor, noteNumber));
         }
 
         var receiptId = Guid.NewGuid();
@@ -620,7 +632,7 @@ public sealed class ReceiptUseCases(
         }, cancellationToken);
 
     /// <summary>Old D_Naghd / D_variz: date, payer and purpose are required; the date must be in an open fiscal period (rule R2).</summary>
-    private async Task<(ReceiptHeader Header, FiscalDate Date)> HeaderAsync(ReceiptHeaderInput input, CancellationToken ct)
+    private async Task<(ReceiptHeader Header, FiscalDate Date)> HeaderAsync(ReceiptHeaderInput input, CancellationToken ct, bool noteReceipt = false)
     {
         ArgumentNullException.ThrowIfNull(input);
         if (string.IsNullOrWhiteSpace(input.Date))
@@ -637,6 +649,14 @@ public sealed class ReceiptUseCases(
 
         var payer = await reference.PayerAsync(input.PayerDetailCode.Trim(), ct).ConfigureAwait(false)
             ?? throw new DomainException("Receipt.PayerNotFound", "The payer's تفصیل was not found.");
+        if (noteReceipt)
+        {
+            // Owner's answer to Q54 (19 Nov 2026): the obligor of a note is one of the «متعهدین» of Basic Information. That list, not the
+            // type of the تفصیل (answer to Q22), now says who may hand a note over: staff and suppliers defined as obligors too.
+            NoteParties.Obligor(await reference.NotePartyAsync(payer.DetailCode, ct).ConfigureAwait(false));
+            payer = payer with { MayPay = true };
+        }
+
         var group = await reference.PurposeGroupAsync(input.PurposeGroupId, ct).ConfigureAwait(false)
             ?? throw new DomainException("Receipt.PurposeGroupRequired", "Choose the purpose group (گروه بابت).");
         return (new ReceiptHeader(date, payer, group, input.Purpose ?? string.Empty, input.Reference1, input.Reference2, input.DepartmentId, input.SalesProceeds, input.Note), date);

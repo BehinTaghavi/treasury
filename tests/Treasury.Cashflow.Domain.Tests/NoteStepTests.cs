@@ -137,7 +137,7 @@ public sealed class NoteStepTests
             otherNote.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id), D("1405/08/10"), User)).Code);
         cheque.RegisterSayad(D("1405/08/02"), User);
         Assert.Equal("Instrument.SayadTrackingRequired",
-            Assert.Throws<DomainException>(() => cheque.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id), D("1405/08/10"), User)).Code);
+            Assert.Throws<DomainException>(() => cheque.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id, SheetNumber: 1), D("1405/08/10"), User)).Code);
 
         // The receiver brings the endorsed note back protested.
         note.RecordEndorsementReturned(D("1405/09/05"), User, "W-3", "عدم پرداخت");

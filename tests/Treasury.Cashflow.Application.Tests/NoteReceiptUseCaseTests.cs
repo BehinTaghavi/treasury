@@ -81,18 +81,20 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task A_guarantor_guarantees_one_note_or_all_and_may_come_from_the_details_list()
+    public async Task A_guarantor_guarantees_one_note_or_all_and_comes_from_the_list_of_guarantors_owner_answer_Q54()
     {
         var r = await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("1"), Note("2")],
         [
-            new(null, "0123456789", "200016", "021-88990011"),                // from the تفصیل list: every note
-            new("شرکت ضامن", "10101010103", NoteNumber: "2"),                  // typed: note 2 only
+            new(null, null, "200016"),                                        // every note; national code and phone as kept in Basic Information
+            new("نام تایپ‌شده", "10101010103", "300001", "021-88990011", "2"),  // note 2 only; what is typed for code and phone wins, the name does not
         ]), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         var notes = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments!;
         var one = Assert.Single(notes.Single(n => n.Number == "1").Details!.GuarantorList);
-        Assert.Equal(("مشتری دیگر", "200016", "021-88990011"), (one.Name, one.DetailCode, one.Phone));
-        Assert.Equal(["مشتری دیگر", "شرکت ضامن"], notes.Single(n => n.Number == "2").Details!.GuarantorList.Select(g => g.Name));
+        Assert.Equal(("مشتری دیگر", "200016", "0123456789", "09121112233"), (one.Name, one.DetailCode, one.NationalCode, one.Phone));
+        var two = notes.Single(n => n.Number == "2").Details!.GuarantorList;
+        Assert.Equal(["مشتری دیگر", "کارمند"], two.Select(g => g.Name));
+        Assert.Equal(("10101010103", "021-88990011"), (two[1].NationalCode, two[1].Phone));
     }
 
     [Fact]
@@ -100,12 +102,36 @@ public sealed class NoteReceiptUseCaseTests : IDisposable
     {
         async Task<string?> Code(params NoteGuarantorInput[] guarantors) =>
             (await _receipts.RecordNotesAsync(new(Key(), Header(), Terms(), [Note("1")], guarantors), CancellationToken.None)).ErrorCode;
-        Assert.Equal("Receipt.GuarantorDetailNotFound", await Code(new NoteGuarantorInput("الف", DetailCode: "999999")));
-        Assert.Equal("Receipt.GuarantorNoteNotFound", await Code(new NoteGuarantorInput("الف", NoteNumber: "77")));
-        Assert.Equal("Instrument.GuarantorNameRequired", await Code(new NoteGuarantorInput(" ")));
-        Assert.Equal("Instrument.TooManyGuarantors", await Code(new NoteGuarantorInput("الف"), new NoteGuarantorInput("ب"), new NoteGuarantorInput("ج"), new NoteGuarantorInput("د")));
-        Assert.Null(await Code(new NoteGuarantorInput("الف"), new NoteGuarantorInput("ب"), new NoteGuarantorInput("ج"))); // three are allowed (answer to Q39)
+        var ok = new NoteGuarantorInput(null, DetailCode: "200016");
+        // Owner's answer to Q54 (19 Nov 2026): «متعهد و ضامن فقط از این فهرست انتخاب شوند».
+        Assert.Equal("Receipt.GuarantorNotRegistered", await Code(new NoteGuarantorInput("الف", DetailCode: "999999")));  // a تفصیل that is not in the list
+        Assert.Equal("Receipt.GuarantorNotRegistered", await Code(new NoteGuarantorInput("شرکت ضامن", "10101010103"))); // a typed name
+        Assert.Equal("Receipt.GuarantorNotRegistered", await Code(new NoteGuarantorInput(null, DetailCode: "200015")));  // in the list, but an obligor only
+        Assert.Equal("Receipt.NotePartyInactive", await Code(new NoteGuarantorInput(null, DetailCode: "200017")));
+        Assert.Equal("Receipt.GuarantorNoteNotFound", await Code(ok with { NoteNumber = "77" }));
+        Assert.Equal("Instrument.TooManyGuarantors", await Code(ok, ok, ok, ok));
+        Assert.Null(await Code(ok, ok, ok)); // three are allowed (answer to Q39)
         Assert.Single(await _receipts.ListAsync(1405, ReceiptKind.Notes, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_obligor_of_a_note_receipt_is_one_of_the_obligors_of_basic_information_owner_answer_Q54()
+    {
+        async Task<Treasury.BuildingBlocks.Application.Result<Guid>> Save(string issuer, string number) =>
+            await _receipts.RecordNotesAsync(new(Key(), Header() with { PayerDetailCode = issuer }, Terms(), [Note(number)]), CancellationToken.None);
+        Assert.Equal("Receipt.IssuerNotObligor", (await Save("200016", "1")).ErrorCode); // a guarantor only
+        _reference.Parties.Remove("200015");
+        Assert.Equal("Receipt.IssuerNotObligor", (await Save("200015", "1")).ErrorCode); // a customer that is not in the list
+        _reference.Parties["200015"] = new("200015", "شرکت نمونه بازرگانی", false, IsObligor: true, IsGuarantor: false);
+        Assert.Equal("Receipt.NotePartyInactive", (await Save("200015", "1")).ErrorCode);
+        Assert.Equal("Receipt.PayerNotFound", (await Save("999999", "1")).ErrorCode);
+
+        // The list, not the type of the تفصیل (Q22), decides: a member of staff defined as an obligor hands a note over…
+        var staff = await Save("300001", "1");
+        Assert.True(staff.IsSuccess, staff.ErrorCode);
+        // …while the other receipts keep the rule of Q22.
+        Assert.Equal("Receipt.PayerTypeNotAllowed",
+            (await _receipts.RecordCashAsync(new(Key(), Header() with { PayerDetailCode = "300001" }, FakeReceiptAccounts.Desk, 1_000), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]

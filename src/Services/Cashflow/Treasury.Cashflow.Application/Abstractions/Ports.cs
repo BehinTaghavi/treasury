@@ -27,6 +27,12 @@ public interface IInstrumentRepository
 
     /// <summary>The latest state of the cheques and notes of several receipts (the «وضعیت» column of the receipts list).</summary>
     Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The next serial number of a payment sheet («برگ پرداخت») in <paramref name="fiscalYear"/>, from 1 each year; a taken number is never
+    /// given again (owner's answer to Q57, 19 Nov 2026). One series for every payment sheet: the payment screens of Phase E share it.
+    /// </summary>
+    Task<int> NextPaymentSheetNumberAsync(int fiscalYear, CancellationToken cancellationToken);
 }
 
 /// <summary>Scans attached to a cheque's legal action (owner, 18 Nov 2026), with the files themselves.</summary>
@@ -113,6 +119,12 @@ public interface IReceiptReferenceLookup
 
     /// <summary>A ledger account of the chart (copy of the accounting system); null when unknown.</summary>
     Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The entry of «ذینفعان / متعهدین / ضامنین» with this تفصیل, for the obligor and guarantors of a note receipt (owner's answer to Q54);
+    /// null when there is none.
+    /// </summary>
+    Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken);
 
     /// <summary>The signature rule of a kind of document ("NoteReceipt"…) with its signatories; null when reference-svc knows none.</summary>
     Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken);

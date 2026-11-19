@@ -18,6 +18,7 @@ public sealed class OrganizationTests
         ["600046"] = new("600046", "علی رضایی", false, true, DetailRole.Staff),
         ["300010"] = new("300010", "فروشگاه آفتاب", false, true, DetailRole.Customer),
         ["101001"] = new("101001", "بانک ملت جاری ۱۲۳", false, true), // a bank account's تفصیل: no person
+        ["450001"] = new("450001", "فروشنده قطعات", false, true, DetailRole.Supplier),
     };
 
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
@@ -175,7 +176,10 @@ public sealed class OrganizationTests
         // «شماره تفصیل ذینفعان اساسا از نوع اشخاص است شامل کارکنان، مشتریان و شرکتها»
         Assert.Equal("Beneficiary.DetailNotPerson", Code(() => Party("101001")));
         Assert.Equal("Beneficiary.DetailNotPerson", Code(() => Party("770100"))); // a cost centre
-        foreach (var code in new[] { "111078", "600046", "300010" })
+        // Suppliers too (his answer to Q56 the same day: «بله فروشندگان هم مجاز است»).
+        Assert.Equal(DetailRole.Supplier, DetailRoles.Of("فروشندگان"));
+        Assert.Equal(DetailRole.Supplier, DetailRoles.Of("فروشنده داخلي"));
+        foreach (var code in new[] { "111078", "600046", "300010", "450001" })
         {
             Assert.Equal(code, Party(code).DetailCode);
         }

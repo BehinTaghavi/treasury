@@ -69,7 +69,25 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     /// <summary>The signature rule of the note receipt set in Basic Information; null: none set.</summary>
     public SignatureRuleFact? NoteReceiptRule { get; set; }
 
-    public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) => Check(document == "NoteReceipt" ? NoteReceiptRule : null);
+    /// <summary>The signature rule of the cheque payment sheet («برگ پرداخت چک»); null: none set.</summary>
+    public SignatureRuleFact? ChequeSheetRule { get; set; }
+
+    public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) =>
+        Check(document == "NoteReceipt" ? NoteReceiptRule : document == "ChequePaymentSheet" ? ChequeSheetRule : null);
+
+    /// <summary>
+    /// «ذینفعان / متعهدین / ضامنین» of Basic Information by تفصیل: 200015 an obligor, 200016 a guarantor, 300001 (staff) both, 200017 a
+    /// guarantor that is switched off.
+    /// </summary>
+    public Dictionary<string, NotePartyFact> Parties { get; } = new()
+    {
+        ["200015"] = new("200015", "شرکت نمونه بازرگانی", true, IsObligor: true, IsGuarantor: false),
+        ["200016"] = new("200016", "مشتری دیگر", true, IsObligor: false, IsGuarantor: true, NationalId: "0123456789", Phone: "09121112233"),
+        ["300001"] = new("300001", "کارمند", true, IsObligor: true, IsGuarantor: true),
+        ["200017"] = new("200017", "ضامن قدیمی", false, IsObligor: false, IsGuarantor: true),
+    };
+
+    public Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken) => Check(Parties.GetValueOrDefault(detailCode));
 
     public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {
