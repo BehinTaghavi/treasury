@@ -164,6 +164,29 @@ def test_the_scripts_can_run_again_after_years_were_opened_by_an_administrator(d
     assert owners == {"treasury_owner"}
 
 
+def test_the_scripts_run_again_over_rows_saved_with_the_newest_values(db):
+    # 19 Nov 2026: after a cheque was registered in Sayad, the next start stopped in 031 ("instrument_state_known ... is violated"):
+    # 031 rewrote the list of states without SayadRegistered, which 033 added. Every list a script rewrites is now the whole list.
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"))
+    ids = [uuid.uuid4(), uuid.uuid4()]
+    with psycopg.connect(db, autocommit=True) as c:
+        for i, state in zip(ids, ("SayadRegistered", "InLegal")):
+            c.execute("""INSERT INTO cashflow.instrument (origin_fiscal_year, id, direction, kind, number, bank_name, amount, amount_rial,
+                         issue_date, counterparty_id, counterparty_name, purpose, state)
+                         VALUES (1405, %s, 'Received', 'OrdinaryCheque', 'R-1', 'b', 10, 10, '2026-04-01', %s, 'x', 'y', %s)""",
+                      (i, uuid.uuid4(), state))
+        keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection")
+        for k in keys:
+            c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '9999') ON CONFLICT DO NOTHING", (k,))
+        try:
+            result = subprocess.run([str(HERE / "apply.sh"), params["dbname"]], env=env, capture_output=True, text=True)
+            assert result.returncode == 0, result.stderr[-2000:]
+        finally:
+            c.execute("DELETE FROM cashflow.instrument WHERE id = ANY(%s)", (ids,))
+            c.execute("DELETE FROM cashflow.voucher_account WHERE ledger_account_code = '9999'")
+
+
 def test_a_name_is_unique_per_list_and_parent_and_a_currency_code_once(db):
     with psycopg.connect(db) as c:
         c.execute("SET ROLE reference_svc")
