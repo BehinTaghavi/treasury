@@ -409,6 +409,11 @@ public sealed class Instrument : AggregateRoot<Guid>
             Require(endorsement.RequestChequeId == Id, "Instrument.PaymentRequestNotForThisCheque",
                 "The payment request was not written for the transfer of this cheque.");
         }
+        else
+        {
+            // A request of the kind «ثبت انتقال (خرج چک)» is paid by its own cheque, never by a note.
+            Require(endorsement.RequestChequeId is null, "Instrument.PaymentRequestNotForThisCheque", "That payment request is for the transfer of a cheque.");
+        }
 
         Require(!string.IsNullOrWhiteSpace(endorsement.ReceiverDetailCode) && !string.IsNullOrWhiteSpace(endorsement.ReceiverName),
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");

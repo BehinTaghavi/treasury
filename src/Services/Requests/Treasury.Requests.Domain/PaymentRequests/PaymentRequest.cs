@@ -292,6 +292,9 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Require(State == PaymentRequestState.Approved, "PaymentRequest.NotApproved", "Only an approved request is paid.");
         Require(string.Equals((currency ?? string.Empty).Trim(), Currency, StringComparison.OrdinalIgnoreCase), "PaymentRequest.PaymentCurrency",
             "The payment must be in the request's currency.");
+        // Owner, 19 Nov 2026: a request of the kind «ثبت انتقال (خرج چک)» is paid by the transfer of the cheque it names.
+        Require(Cheque is null || payment.InstrumentId == Cheque.InstrumentId, "PaymentRequest.PaymentNotByItsCheque",
+            "This request is paid by the transfer of the cheque it names.");
         Require(payment.Amount > 0, "PaymentRequest.PaymentAmountInvalid", "The payment amount must be positive.");
         Require(payment.Amount <= RemainingAmount, "PaymentRequest.Overpaid", "The payment is more than what remains to be paid on the request.");
         _payments.Add(payment);

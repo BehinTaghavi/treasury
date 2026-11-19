@@ -131,6 +131,10 @@ public sealed class NoteStepTests
         // A cheque still needs its Sayad transfer (answer to Q32).
         var cheque = Instrument.Receive(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, "1", "بانک ملت", Money.Rials(1), D("1405/08/01"), D("1405/09/01"),
             CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User);
+        // A request of the kind «ثبت انتقال (خرج چک)» is for its cheque, not for a note (owner, 19 Nov 2026).
+        var otherNote = Note();
+        Assert.Equal("Instrument.PaymentRequestNotForThisCheque", Assert.Throws<DomainException>(() =>
+            otherNote.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id), D("1405/08/10"), User)).Code);
         cheque.RegisterSayad(D("1405/08/02"), User);
         Assert.Equal("Instrument.SayadTrackingRequired",
             Assert.Throws<DomainException>(() => cheque.Endorse(new Endorsement("300200", "ب", Guid.NewGuid(), "خرید", " ", request, cheque.Id), D("1405/08/10"), User)).Code);

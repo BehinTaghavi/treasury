@@ -945,3 +945,66 @@ def test_one_company_profile_with_a_small_logo(db):
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("SELECT name FROM reference.company")
 
+
+
+def test_beneficiaries_obligors_and_guarantors_share_a_table_with_groups_mobile_and_area_code(db):
+    # 040_reference_parties.sql (owner, 19 Nov 2026: «ذینفعان / متعهدین / ضامنین» on one form, mobile number, area code in its own box).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        old = uuid.uuid4()
+        c.execute("INSERT INTO reference.beneficiary (id, detail_code, legal_name) VALUES (%s, '883001', 'ذینفع قدیمی')", (old,))
+        # An entry saved without the new columns is a beneficiary.
+        assert c.execute("SELECT is_beneficiary, is_obligor, is_guarantor, mobile, phone_area_code FROM reference.beneficiary WHERE id = %s",
+                         (old,)).fetchone() == (True, False, False, None, None)
+        add = """INSERT INTO reference.beneficiary (id, detail_code, legal_name, is_beneficiary, is_obligor, is_guarantor, mobile, phone_area_code)
+                 VALUES (%s, %s, 'ضامن', %s, %s, %s, %s, %s)"""
+        c.execute(add, (uuid.uuid4(), "883002", False, True, True, "09121234567", "021"))
+        for detail, groups, mobile, area in [
+            ("883003", (False, False, False), None, None),          # in no group
+            ("883004", (True, False, False), "9121234567", None),   # a mobile number is 09 and nine digits
+            ("883005", (True, False, False), None, "21"),           # an area code starts with 0
+            ("883006", (True, False, False), None, "02155"),        # and has at most 4 digits
+        ]:
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), detail, *groups, mobile, area))
+        c.rollback()
+
+
+def test_a_cheque_transfer_request_names_its_cheque_and_the_scripts_run_again_over_it(db):
+    # 041_requests_cheque_transfer.sql (owner, 19 Nov 2026: payment method «ثبت انتقال (خرج چک)»).
+    add = """INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id,
+                 beneficiary_detail_code, beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority,
+                 state, recorded_by, cheque_id, cheque_number, cheque_due_date, cheque_payer, pay_from_kind, pay_from_id)
+             VALUES (1405, %s, %s, '2026-11-19', %s, 'الف', %s, '300200', 'ب', %s, 'خرید', 'بابت بدهی', 1000, 'IRR', %s, 1, 'Registered', 'test',
+                     %s, %s, %s, %s, %s, %s)"""
+    ids = [uuid.uuid4() for _ in range(5)]
+    cheque = uuid.uuid4()
+
+    def request(c, i, number, method, cheque_id=None, number_on_cheque=None, payer=None, pay_from=None):
+        c.execute(add, (ids[i], number, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), method, cheque_id, number_on_cheque,
+                        date(2026, 12, 20) if cheque_id else None, payer, "BankAccount" if pay_from else None, pay_from))
+
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE requests_svc")
+        request(c, 0, 9001, "ChequeTransfer", cheque, "445566", "فروشگاه آفتاب")
+        for bad in (
+            lambda: request(c, 1, 9002, "ChequeTransfer"),                                               # the method names its cheque
+            lambda: request(c, 2, 9003, "Cash", cheque, "445566", "فروشگاه آفتاب"),                       # a cheque only with that method
+            lambda: request(c, 3, 9004, "ChequeTransfer", cheque, None, "فروشگاه آفتاب"),                 # with its number
+            lambda: request(c, 4, 9005, "ChequeTransfer", cheque, "445566", "فروشگاه آفتاب", uuid.uuid4()),  # and no account paid from
+        ):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    bad()
+        c.commit()
+
+    # Every start re-runs every script: 041 rewrites the list of methods and must keep the row saved with the newest one.
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"))
+    try:
+        result = subprocess.run([str(HERE / "apply.sh"), params["dbname"]], env=env, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr[-2000:]
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("DELETE FROM requests.payment_request WHERE id = ANY(%s)", (ids,))

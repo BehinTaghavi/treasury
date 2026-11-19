@@ -326,6 +326,8 @@ async function printTransfer(c: Cheque) {
   window.print()
 }
 
+const printAgain = () => printTransfer({ id: sheetChequeId.value } as Cheque)
+
 const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
 /** Steps offered on each row, the usual next step first; deposit is done with the tick boxes. A note is not replaced here (replacement is a cheque receipt). */
 const stepOrder = ['RegisterSayad', 'RecordCleared', 'ReturnFromBank', 'RecordBounced', 'SendToLegal', 'ReturnFromLegal', 'Replace', 'ReturnToIssuer', 'Endorse', 'RecordEndorsementReturned', 'Cancel']
@@ -403,7 +405,7 @@ onMounted(async () => { await L.load(); await load() })
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>
       <div class="tr-buttons wide">
-        <button type="button" :disabled="busy" @click="confirmStep">{{ t('ثبت', 'Record') }}</button>
+        <button type="button" :disabled="busy || (pending.action === 'Endorse' && !notes && !requestChoices.length)" @click="confirmStep">{{ t('ثبت', 'Record') }}</button>
         <button type="button" class="tr-secondary" @click="pending = null">{{ t('انصراف', 'Back') }}</button>
       </div>
     </fieldset>
@@ -516,7 +518,7 @@ onMounted(async () => { await L.load(); await load() })
     <section v-if="sheet" class="tr-card">
       <div class="tr-buttons">
         <strong>{{ t('برگ پرداخت – رسید واگذاری چک', 'Payment sheet – handover receipt of the cheque') }}</strong>
-        <button type="button" @click="printTransfer({ id: sheetChequeId } as Cheque)">{{ t('چاپ', 'Print') }}</button>
+        <button type="button" @click="printAgain">{{ t('چاپ', 'Print') }}</button>
         <button type="button" class="tr-link" @click="sheet = null">{{ t('بستن', 'Close') }}</button>
       </div>
       <ChequeTransferPrint :sheet="sheet" :locale="locale" />

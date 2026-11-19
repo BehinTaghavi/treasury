@@ -23,7 +23,7 @@ const sayad = computed(() => digits((c.value.sayadId ?? '').replace(/(\d{4})(?=\
 </script>
 
 <template>
-  <div class="tr-print-sheet" :dir="fa ? 'rtl' : 'ltr'">
+  <div class="tr-print-sheet tr-transfer-sheet" :dir="fa ? 'rtl' : 'ltr'">
     <div class="head">
       <div class="side brand">
         <img v-if="sheet.company.logoUrl" class="logo" :src="sheet.company.logoUrl" alt="" />

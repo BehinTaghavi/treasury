@@ -281,8 +281,8 @@ onMounted(load)
             <td dir="ltr">{{ b.nationalId }}</td>
             <td>{{ bankName(b.bankId) }} <small v-if="b.branchName" class="muted">{{ b.branchName }}</small></td>
             <td dir="ltr">{{ b.accountNumber }}</td>
-            <td dir="ltr" class="small">{{ shebaText(b.sheba) }}</td>
-            <td dir="ltr">{{ phoneText(b) }}<br v-if="phoneText(b) && b.mobile" />{{ b.mobile }}</td>
+            <td dir="ltr" class="small nowrap">{{ shebaText(b.sheba) }}</td>
+            <td dir="ltr" class="nowrap">{{ phoneText(b) }}<br v-if="phoneText(b) && b.mobile" />{{ b.mobile }}</td>
             <td>{{ b.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }} <span v-if="b.isInUse" class="tr-tag">{{ t('در حال استفاده', 'in use') }}</span></td>
             <td class="tr-actions">
               <button type="button" class="tr-link" @click="open(b)">{{ t('ویرایش', 'Edit') }}</button>
@@ -300,6 +300,7 @@ onMounted(load)
 <style scoped src="./organization.css"></style>
 <style scoped>
 .kind { display: flex; gap: 1.25rem; align-items: center; align-self: end; }
+.nowrap { white-space: nowrap; }
 .full { grid-column: 1 / -1; }
 h4 { margin: 1.25rem 0 0; }
 .groups { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; padding: .5rem .75rem; border-radius: 6px; background: #f5f8ff; border: 1px solid #d9e2ec; }

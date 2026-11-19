@@ -19,6 +19,16 @@ describe('latest status of a received cheque (owner, 18 Nov 2026)', () => {
     expect(dueMark('fa')).toBe('سررسید چک')
   })
 
+  it('calls a transferred cheque by the owner\'s words of 19 Nov 2026, and an endorsed note as before', () => {
+    expect(chequeStateName('Endorsed', 'fa')).toBe('ثبت انتقال شد (خرج چک شد)')
+    expect(chequeActionName('Endorse', 'fa')).toBe('ثبت انتقال (خرج چک)')
+    // A promissory note has no Sayad transfer: «خرج سفته» (owner, 16 Nov 2026).
+    expect(chequeStateName('Endorsed', 'fa', true)).toBe('خرج شده')
+    expect(chequeActionName('Endorse', 'fa', true)).toBe('خرج سفته')
+    expect(chequeStateName('Bounced', 'fa', true)).toBe(chequeStateName('Bounced', 'fa'))
+    expect(groupChequeStatuses([{ state: 'Endorsed', reachedDueDate: false }], 'fa', true)[0]!.name).toBe('خرج شده')
+  })
+
   it('names every received state and every step of the domain in both languages', () => {
     const states = enumNames('// Received side', '// Issued side').concat('Cancelled')
     const actions = enumNames('public enum InstrumentAction', '}')

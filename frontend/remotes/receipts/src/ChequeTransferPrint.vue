@@ -26,6 +26,8 @@ withDefaults(defineProps<{ sheet: TransferSheet; locale?: Locale }>(), { locale:
   body > *:not(.tr-print-root) { display: none !important; }
   .tr-print-root { display: block; }
   .tr-print-root .tr-print-sheet { width: auto; max-width: none; min-height: 0; margin: 0; padding: 0; border: 0; }
+  /* A hair of room at the sides, so the tables' outer lines are not cut at the edge of the printable area. */
+  .tr-print-root .tr-transfer-sheet { padding: 0 .4mm; }
   @page { size: A4; margin: 11mm 12mm; }
 }
 </style>

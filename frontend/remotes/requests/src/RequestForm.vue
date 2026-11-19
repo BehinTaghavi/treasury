@@ -109,9 +109,10 @@ async function loadCheques() {
   chequesLoaded.value = true
 }
 const cheque = computed(() => cheques.value.find(c => c.id === form.chequeId))
+/** The cheque number first (it is what the list box shows once chosen), then bank, giver, amount and due date. */
 const chequeChoices = computed<Choice[]>(() => cheques.value.map(c => ({
-  value: c.id, label: `${t('چک', 'Cheque')} ${c.number ?? ''} – ${c.bankName ?? ''} – ${c.counterparty}`,
-  hint: `${formatAmount(c.amount, props.locale)}${c.currency === 'IRR' ? '' : ' ' + c.currency} · ${t('سررسید', 'due')} ${c.dueDate ?? ''}`,
+  value: c.id, hint: c.number ?? '',
+  label: `${c.bankName ?? ''} – ${c.counterparty} – ${formatAmount(c.amount, props.locale)}${c.currency === 'IRR' ? '' : ' ' + c.currency} – ${t('سررسید', 'due')} ${c.dueDate ?? ''}`,
 })))
 watch(isTransfer, on => { if (on && !chequesLoaded.value) void loadCheques() }, { immediate: true })
 // "The amount of the cheque is the amount of the request": the amount and currency follow the chosen cheque.

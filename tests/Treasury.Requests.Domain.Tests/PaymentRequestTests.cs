@@ -249,6 +249,18 @@ public sealed class PaymentRequestTests
     }
 
     [Fact]
+    public void A_cheque_transfer_request_is_paid_only_by_the_transfer_of_its_own_cheque_owner_19_nov()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque), User);
+        r.Approve("manager", DateTimeOffset.UnixEpoch);
+        RequestPayment By(Guid? instrument) => new("endorse:x:3", "EndorsedCheque", instrument, "چک", 80_000_000m, D("1405/08/25"), User);
+        Assert.Equal("PaymentRequest.PaymentNotByItsCheque", Code(() => r.RecordPayment(By(Guid.NewGuid()), "IRR")));
+        Assert.Equal("PaymentRequest.PaymentNotByItsCheque", Code(() => r.RecordPayment(By(null), "IRR")));
+        r.RecordPayment(By(Cheque.Id), "IRR");
+        Assert.Equal(PaymentRequestState.Paid, r.State); // the amounts are equal, so one transfer pays it in full
+    }
+
+    [Fact]
     public void Changing_the_payment_method_takes_the_cheque_off_the_request_and_any_other_method_has_none()
     {
         var r = PaymentRequest.Register(Guid.NewGuid(), 1, TransferForm(Cheque), User);

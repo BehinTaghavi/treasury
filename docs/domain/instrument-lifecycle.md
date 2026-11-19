@@ -14,7 +14,8 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 13 | Cleared | RecordCleared | DepositedForCollection | D_Check_vos_m | all |
 | 14 | Bounced | RecordBounced | DepositedForCollection | D_Check_vos_m, Checkbacked | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | InCashDesk | D_Check_Od_m | all |
-| 16 | Endorsed | Endorse (receiver تفصیل, payment purpose group, purpose, Sayad tracking no.) | InCashDesk | D_Check_Kh_m | ordinary and bank cheque; ordinary promissory note (owner, 16 Nov 2026) |
+| 16 | Endorsed | Endorse («خرج سفته»: receiver تفصیل, payment purpose group, purpose) | InCashDesk | D_Check_Kh_m (in the old data also cheques) | ordinary promissory note only (owner, 16 Nov 2026); **a cheque is transferred from SayadRegistered** (owner, 19 Nov 2026) |
+| 16 | Endorsed (ثبت انتقال شد / خرج چک شد) | Endorse («ثبت انتقال (خرج چک)»: the approved payment request written for the cheque, tracking code of the transfer in Sayad) | SayadRegistered | owner, 19 Nov 2026; D_Check_Kh_m | ordinary and bank cheque |
 | — | ReturnedFromBank (عودت شده از بانک) | ReturnFromBank | DepositedForCollection | owner's item 14 (c) | all |
 | 12 | DepositedForCollection | DepositForCollection again | ReturnedFromBank | owner's item 14, Q33 | ordinary and bank cheque; ordinary promissory note (owner, 16 Nov 2026) |
 | 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
@@ -23,7 +24,7 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (d), Q31; owner, 18 Nov 2026 | not guarantee |
 | — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (f), Q30 | all |
 | — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
-| 15, 16 | ReturnedToIssuer, Endorsed | the other steps of a cheque in the cash desk (ReturnToIssuer, Endorse) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
+| 15 | ReturnedToIssuer | the other step of a cheque in the cash desk (ReturnToIssuer) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
 | 14 + GoInlaw | InLegal (اقدام حقوقی) | SendToLegal (date and description of the action, on the screen «اقدام حقوقی»; scans attached afterwards) | Bounced | owner, 18 Nov 2026 | all |
 | — | InLegal (اقدام حقوقی) | SendToLegal: guarantee cheques and guarantee notes; ordinary cheques as the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38 and 18 Nov 2026 | cheques and guarantee notes (not an ordinary note that has not bounced) |
 | — | InCashDesk (نزد صندوق) | ReturnFromLegal (the cheque became collectable: back to the cash desk, then like a new cheque) | InLegal | owner's answer to Q38 (2), 18 Nov 2026 | all |
