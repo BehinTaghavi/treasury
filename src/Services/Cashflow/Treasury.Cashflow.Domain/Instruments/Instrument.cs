@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Domain.Common;
+using Treasury.Cashflow.Domain.Receipts;
 
 namespace Treasury.Cashflow.Domain.Instruments;
 
@@ -59,6 +60,8 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
 /// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
 /// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
+/// <param name="SheetNumber">Transfer of a cheque: the serial number of its payment sheet («برگ پرداخت», owner's answer to Q57, 19 Nov 2026).</param>
+/// <param name="Signers">Transfer of a cheque: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک» (Q57).</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -69,7 +72,9 @@ public sealed record StepDetails(
     string? SayadTracking = null,
     Guid? ReceiptId = null,
     Guid? PaymentRequestId = null,
-    string? TrackingCode = null);
+    string? TrackingCode = null,
+    int? SheetNumber = null,
+    IReadOnlyList<ReceiptSigner>? Signers = null);
 
 /// <summary>
 /// The bank's certificate of non-payment («گواهی عدم پرداخت», the owner's term of 18 Nov 2026 for what was called the bounce notice): its
@@ -84,8 +89,12 @@ public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, str
 /// </summary>
 /// <param name="RequestChequeId">The received cheque the payment request names: a request of the kind «ثبت انتقال (خرج چک)» is written for
 /// one cheque (owner, 19 Nov 2026); null for a request of another kind.</param>
+/// <param name="SheetNumber">A cheque: the serial number of the payment sheet («برگ پرداخت») the transfer gets, from 1 each fiscal year
+/// (owner's answer to Q57, 19 Nov 2026).</param>
+/// <param name="Signers">A cheque: the authorised signatories who sign the payment sheet besides who hands the cheque over and who receives
+/// it, chosen by the signature rule «برگ پرداخت چک» of Basic Information (owner's answer to Q57).</param>
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId,
-    Guid? RequestChequeId = null);
+    Guid? RequestChequeId = null, int? SheetNumber = null, IReadOnlyList<ReceiptSigner>? Signers = null);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -461,6 +470,8 @@ public sealed class Instrument : AggregateRoot<Guid>
                 "Instrument.TransferNeedsSayadRegistration", "Register the cheque in Sayad before transferring it.");
             Require(endorsement.RequestChequeId == Id, "Instrument.PaymentRequestNotForThisCheque",
                 "The payment request was not written for the transfer of this cheque.");
+            // Owner's answer to Q57: like every payment the transfer has its payment sheet, with a serial number of its own.
+            Require(endorsement.SheetNumber is > 0, "Instrument.PaymentSheetNumberRequired", "The transfer needs the number of its payment sheet.");
         }
         else
         {
@@ -479,7 +490,8 @@ public sealed class Instrument : AggregateRoot<Guid>
         Apply(InstrumentAction.Endorse, date, userId, sayad, note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
                 PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: sayad,
-                PaymentRequestId: endorsement.PaymentRequestId));
+                PaymentRequestId: endorsement.PaymentRequestId, SheetNumber: Kind.IsCheque() ? endorsement.SheetNumber : null,
+                Signers: Kind.IsCheque() && endorsement.Signers is { Count: > 0 } signers ? signers : null));
     }
 
     /// <summary>The key of the payment an endorsement made on its request: the cheque and the endorsement's step (answer to Q36).</summary>

@@ -26,8 +26,10 @@ public sealed class ReceiptPostgresTests : IDisposable
         _receipts = new ReceiptUseCases(
             new PostgresUnitOfWork(_dataSource), new PostgresReceiptRepository(), new PostgresInstrumentRepository(), new Accounts(), new BankAccounts(),
             new Reference(), new DevelopmentPolicies().OpenYear(1405), new PostgresIdempotencyStore(_dataSource), new User(),
-            new PostgresVoucherTemplateRepository(), new PostgresConfirmedVoucherRepository(), new NoRequests());
+            new PostgresVoucherTemplateRepository(), new PostgresConfirmedVoucherRepository(), _requests);
     }
+
+    private readonly Requests _requests = new();
 
     public void Dispose() => _dataSource.Dispose();
 
@@ -56,7 +58,7 @@ public sealed class ReceiptPostgresTests : IDisposable
     }
 
     [Fact]
-    public async Task A_corrected_receipt_and_its_cheques_are_stored_and_a_removed_cheque_is_deleted_db_042()
+    public async Task A_corrected_receipt_and_its_cheques_are_stored_and_a_removed_cheque_is_deleted_db_043()
     {
         // Owner's report no. 6, items 2 and 6: correction before the voucher is confirmed.
         var cash = (await _receipts.RecordCashAsync(new(Key(), Header(), _desk, 5_000_000), CancellationToken.None)).Value;
@@ -205,6 +207,36 @@ public sealed class ReceiptPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cheque_transfer_keeps_the_number_and_signatories_of_its_payment_sheet_db_042()
+    {
+        // Owner's answers to Q57 (19 Nov 2026): the payment sheet has a serial number of its own and is signed by the authorised signatories.
+        var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
+            new PostgresIdempotencyStore(_dataSource), new DevelopmentPolicies().OpenYear(1405), new DevelopmentPolicies(), new DevelopmentPolicies(), new User(), new BankAccounts());
+        async Task<(int Sheet, IReadOnlyList<ReceiptSigner> Signers)> Transfer(string number, params Guid[] signers)
+        {
+            var receipt = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
+                [new(InstrumentKind.OrdinaryCheque, number, "1405/10/01", new MoneyInput(7_000_000), Guid.NewGuid(), SayadId: "1234567890123456")]), CancellationToken.None);
+            Assert.True(receipt.IsSuccess, receipt.ErrorCode);
+            var cheque = (await _receipts.GetAsync(receipt.Value, CancellationToken.None))!.Instruments![0].Id;
+            Assert.True((await useCases.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess);
+            var request = Guid.NewGuid();
+            _requests.Known[request] = new(request, 3, "Approved", "300001", "پیمانکار الف", Reference.PaymentGroup, "بابت بدهی", 7_000_000, "IRR", 0, cheque);
+            var done = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/25", request, "SY-" + number, SignerIds: signers), CancellationToken.None);
+            Assert.True(done.IsSuccess, done.ErrorCode);
+            var step = (await useCases.GetAsync(cheque, CancellationToken.None))!.History[^1];
+            Assert.Equal(("Endorse", "Endorsed", "SY-" + number), (step.Action, step.To, step.Details!.SayadTracking));
+            return (step.Details!.SheetNumber!.Value, step.Details.Signers ?? []);
+        }
+
+        var n = Guid.NewGuid().ToString("N")[..6];
+        var first = await Transfer("T1" + n, Reference.Ceo.Id);
+        var second = await Transfer("T2" + n, Reference.Cfo.Id, Reference.Ceo.Id);
+        Assert.Equal(first.Sheet + 1, second.Sheet); // one series a year; other tests of this class take no sheet number
+        Assert.Equal([("علی رضایی", "مدیر عامل")], first.Signers.Select(s => (s.Name, s.Position!)));
+        Assert.Equal(2, second.Signers.Count);
+    }
+
+    [Fact]
     public async Task Steps_of_item_14_keep_their_details_and_a_replacement_names_the_old_cheque()
     {
         var useCases = new InstrumentUseCases(new PostgresUnitOfWork(_dataSource), new PostgresInstrumentRepository(), new PostgresChequeBookRepository(),
@@ -329,7 +361,14 @@ public sealed class ReceiptPostgresTests : IDisposable
     {
         public Task<PayerFact?> PayerAsync(string detailCode, CancellationToken cancellationToken) => Task.FromResult<PayerFact?>(new(detailCode, "شرکت نمونه", true));
 
-        public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PurposeGroupFact?>(new(id, "وجوه حاصل فروش", true, true, "4101"));
+        /// <summary>Every تفصیل is an obligor and a guarantor of Basic Information here; 300045 is «رضا احمدی».</summary>
+        public Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken) =>
+            Task.FromResult<NotePartyFact?>(new(detailCode, detailCode == "300045" ? "رضا احمدی" : "شرکت نمونه", true, true, true));
+
+        public static readonly Guid PaymentGroup = Guid.NewGuid();
+
+        public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PurposeGroupFact?>(
+            id == PaymentGroup ? new(id, "پرداخت به بستانکاران", false, true, "2101") : new(id, "وجوه حاصل فروش", true, true, "4101"));
 
         public Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<string?>("بانک ملت");
 
@@ -347,9 +386,12 @@ public sealed class ReceiptPostgresTests : IDisposable
             Task.FromResult<SignatureRuleFact?>(new(1, [Ceo], [Cfo]));
     }
 
-    private sealed class NoRequests : IPaymentRequestLookup
+    /// <summary>requests-svc stand-in: the approved requests a test puts in.</summary>
+    private sealed class Requests : IPaymentRequestLookup
     {
-        public Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PaymentRequestFact?>(null);
+        public Dictionary<Guid, PaymentRequestFact> Known { get; } = [];
+
+        public Task<PaymentRequestFact?> GetAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Known.GetValueOrDefault(id));
 
         public Task RecordPaymentAsync(Guid requestId, RequestPaymentInput payment, CancellationToken cancellationToken) => Task.CompletedTask;
 

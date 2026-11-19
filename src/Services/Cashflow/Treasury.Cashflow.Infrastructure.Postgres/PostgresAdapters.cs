@@ -102,6 +102,16 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
 
 public sealed class PostgresInstrumentRepository : IInstrumentRepository
 {
+    public async Task<int> NextPaymentSheetNumberAsync(int fiscalYear, CancellationToken cancellationToken)
+    {
+        // The row stays locked until the transaction ends: a second sheet of the year waits and gets the next number (db/postgres/042).
+        await using var cmd = PostgresUnitOfWork.Current.Command(
+            "INSERT INTO cashflow.payment_sheet_number (fiscal_year, last_number) VALUES (@year, 1) " +
+            "ON CONFLICT (fiscal_year) DO UPDATE SET last_number = cashflow.payment_sheet_number.last_number + 1 RETURNING last_number");
+        cmd.Parameters.AddWithValue("year", fiscalYear);
+        return (int)(await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false))!;
+    }
+
     private static readonly System.Text.Json.JsonSerializerOptions StepJson = new(System.Text.Json.JsonSerializerDefaults.Web);
 
     private const string Columns =

@@ -133,7 +133,7 @@ public sealed class ChequeStepTests
 
     /// <summary>The endorsement of a request of the kind «ثبت انتقال (خرج چک)» written for <paramref name="c"/> (owner, 19 Nov 2026).</summary>
     private static Endorsement TransferOf(Instrument c, string tracking = "SY-99", Guid? group = null, Guid? request = null, string code = "300200", string name = "پیمانکار ب") =>
-        new(code, name, group ?? Guid.NewGuid(), "خرید مواد", tracking, request ?? Request, c.Id);
+        new(code, name, group ?? Guid.NewGuid(), "خرید مواد", tracking, request ?? Request, c.Id, SheetNumber: 12);
 
     [Fact]
     public void Endorsement_pays_an_approved_request_and_needs_receiver_group_purpose_and_Sayad_tracking_g_Q32_Q36()
@@ -193,6 +193,24 @@ public sealed class ChequeStepTests
         Assert.Equal("Instrument.PaymentRequestNotForThisCheque",
             Assert.Throws<DomainException>(() => c.Endorse(anyRequest with { RequestChequeId = Guid.NewGuid() }, D("1405/08/03"), User)).Code);
         Assert.Equal(InstrumentState.SayadRegistered, c.State);
+    }
+
+    [Fact]
+    public void The_transfer_of_a_cheque_has_a_payment_sheet_with_its_own_number_and_its_authorised_signatories_owner_answer_Q57()
+    {
+        // «برگ پرداخت» (19 Nov 2026): a serial number of its own, and the signatories of the rule «برگ پرداخت چک» besides the two parties.
+        var c = Registered();
+        Assert.Equal("Instrument.PaymentSheetNumberRequired",
+            Assert.Throws<DomainException>(() => c.Endorse(TransferOf(c) with { SheetNumber = null }, D("1405/08/03"), User)).Code);
+        var ceo = new ReceiptSigner(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
+        c.Endorse(TransferOf(c) with { SheetNumber = 7, Signers = [ceo] }, D("1405/08/03"), User);
+        Assert.Equal((7, ceo), (c.History[^1].Details!.SheetNumber, Assert.Single(c.History[^1].Details!.Signers!)));
+
+        // «خرج سفته» has no Sayad transfer and, so far, no payment sheet.
+        var note = Instrument.Receive(Guid.NewGuid(), InstrumentKind.PromissoryNote, "N-1", null, Money.Rials(1_000), D("1405/08/01"), D("1405/09/01"),
+            CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User, ReceivedInstrumentDetails.None, Guid.NewGuid());
+        note.Endorse(new Endorsement("300200", "پیمانکار ب", Guid.NewGuid(), "خرید", " ", Request, SheetNumber: 9, Signers: [ceo]), D("1405/08/03"), User);
+        Assert.Equal((null, null), (note.History[^1].Details!.SheetNumber, note.History[^1].Details!.Signers));
     }
 
     [Fact]

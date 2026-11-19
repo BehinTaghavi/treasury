@@ -31,7 +31,8 @@ import type { TransferSheet } from './transferSheet'
 
 interface Step { action: string; from: string | null; to: string; date: string; userId: string; reference: string | null; note: string | null
   details: { accountId: string | null; partyName: string | null; documentDate: string | null; purpose: string | null; sayadTracking: string | null; receiptId: string | null
-    trackingCode: string | null; partyDetailCode?: string | null; paymentRequestId?: string | null } | null }
+    trackingCode: string | null; partyDetailCode?: string | null; paymentRequestId?: string | null
+    sheetNumber?: number | null; signers?: { id: string; name: string; position: string | null }[] | null } | null }
 interface Cheque {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
   dueDate: string | null; counterparty: string; state: string; collectionAccountId: string | null; destination: string | null; isPostDated: boolean
@@ -203,6 +204,19 @@ async function loadApproved() {
 }
 const replacing = ref<Cheque | null>(null)
 
+// ---- authorised signatories of the payment sheet: the signature rule «برگ پرداخت چک» of Basic Information (owner's answer to Q57) ----
+interface RuleSignatory { id: string; fullName: string; position: string }
+interface SignatureRule { required: number; compulsory: RuleSignatory[]; optional: RuleSignatory[] }
+const rule = ref<SignatureRule>({ required: 0, compulsory: [], optional: [] })
+const optionalSigners = reactive<Record<string, boolean>>({})
+const signerIds = computed(() => [...rule.value.compulsory.map(s => s.id), ...rule.value.optional.filter(s => optionalSigners[s.id]).map(s => s.id)])
+const hasRule = computed(() => rule.value.required > 0 || rule.value.compulsory.length + rule.value.optional.length > 0)
+async function loadRule() {
+  const r = await api.get<SignatureRule>('/api/reference/signature-rules/ChequePaymentSheet')
+  rule.value = r.ok ? r.value : { required: 0, compulsory: [], optional: [] }
+  for (const k of Object.keys(optionalSigners)) delete optionalSigners[k]
+}
+
 async function start(c: Cheque, action: string) {
   message.value = null
   if (action === 'SendToLegal') { emit('legal', c.id); return }
@@ -210,7 +224,7 @@ async function start(c: Cheque, action: string) {
   replacing.value = null
   pending.value = { cheque: c, action, date: todayJalali(), reference: '', documentDate: todayJalali(), note: '', requestId: '', sayad: '', tracking: '' }
   if (action === 'Endorse') {
-    await loadApproved()
+    await Promise.all([loadApproved(), props.notes ? Promise.resolve() : loadRule()])
     // The request written for this cheque is chosen for the user.
     if (pending.value && requestChoices.value.length === 1) pending.value.requestId = requestChoices.value[0]!.value
   }
@@ -221,10 +235,12 @@ async function confirmStep() {
   if (!p || busy.value) return
   const date = normaliseJalali(p.date)
   if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
+  if (p.action === 'Endorse' && !props.notes && signerIds.value.length < rule.value.required) return show('error', translate('Receipt.SignersTooFew', props.locale))
   busy.value = true
   const r = p.action === 'Endorse'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
-        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: props.notes ? '' : p.sayad, note: p.note || null })
+        { date, paymentRequestId: p.requestId || '00000000-0000-0000-0000-000000000000', sayadTracking: props.notes ? '' : p.sayad, note: p.note || null,
+          signerIds: props.notes ? [] : signerIds.value })
     : p.action === 'RecordEndorsementReturned'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorsement-returned`, { date, noticeNumber: p.reference || null, reason: p.note || null, trackingCode: p.tracking || null })
     : await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/actions/${p.action}`,
@@ -277,10 +293,11 @@ function stepText(s: Step) {
   const d = s.details
   const parts = [s.reference && (s.action === 'RecordBounced' || s.action === 'RecordEndorsementReturned' ? t(`گواهی عدم پرداخت ${s.reference}`, `certificate ${s.reference}`)
     : s.action === 'Cancel' ? t(`دستور ${s.reference} مورخ ${d?.documentDate ?? ''}`, `order ${s.reference} of ${d?.documentDate ?? ''}`)
-    : s.action === 'Endorse' ? t(`کد رهگیری ثبت انتقال در صیاد ${s.reference}`, `Sayad transfer ${s.reference}`)
+    : s.action === 'Endorse' && s.reference ? t(`کد رهگیری ثبت انتقال در صیاد ${s.reference}`, `Sayad transfer ${s.reference}`)
     : s.action === 'RegisterSayad' ? t(`پیگیری صیاد ${s.reference}`, `Sayad ${s.reference}`)
     : s.action === 'SendToLegal' ? t(`گواهی عدم پرداخت ${s.reference}${d?.documentDate ? ' مورخ ' + d.documentDate : ''}`, `certificate ${s.reference}${d?.documentDate ? ' of ' + d.documentDate : ''}`)
     : s.reference),
+  d?.sheetNumber && t(`برگ پرداخت شمارهٔ ${d.sheetNumber.toLocaleString('fa-IR', { useGrouping: false })}`, `payment sheet no. ${d.sheetNumber}`),
   d?.trackingCode && t(`کد رهگیری ${d.trackingCode}`, `tracking ${d.trackingCode}`),
   d?.accountId && accountName(d.accountId), d?.partyName, d?.purpose, s.note]
   return parts.filter(Boolean).join(' · ')
@@ -316,6 +333,7 @@ async function printTransfer(c: Cheque) {
   sheetChequeId.value = c.id
   sheet.value = {
     company: { name: company.ok ? company.value.name : '', logoUrl: company.ok && company.value.hasLogo ? await logoUrl() : null },
+    sheetNumber: step.details?.sheetNumber ?? null, signers: step.details?.signers ?? [],
     requestNumber: request?.ok ? request.value.number : null,
     date: step.date, sayadTracking: step.details?.sayadTracking ?? step.reference ?? '',
     receiverName: step.details?.partyName ?? full.value.destination ?? '', receiverDetailCode: step.details?.partyDetailCode ?? null,
@@ -405,6 +423,17 @@ onMounted(async () => { await L.load(); await load() })
           {{ t('پس از این چک مانده', 'left after this cheque') }} {{ money(chosenRequest.amount - chosenRequest.paidAmount - pending.cheque.amount) }}
         </p>
         <label v-if="!notes" class="req">{{ t('کد رهگیری ثبت انتقال در سامانهٔ صیاد', 'Sayad tracking code of the transfer') }} <input v-model="pending.sayad" dir="ltr" /></label>
+        <!-- Owner's answer to Q57: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک». -->
+        <div v-if="!notes" class="tr-group wide3">
+          <span>{{ t('امضاکنندگان مجاز برگ پرداخت', 'Authorised signatories of the payment sheet') }}
+            <span v-if="hasRule" class="muted">{{ t(`– ${rule.required.toLocaleString('fa-IR')} امضا لازم است؛ ${signerIds.length.toLocaleString('fa-IR')} نفر انتخاب شده`, `– ${rule.required} needed; ${signerIds.length} chosen`) }}</span></span>
+          <div v-if="hasRule" class="tr-ticks">
+            <label v-for="s in rule.compulsory" :key="s.id"><input type="checkbox" checked disabled /> {{ s.fullName }} <span class="muted small">({{ s.position }} – {{ t('اجباری', 'compulsory') }})</span></label>
+            <label v-for="s in rule.optional" :key="s.id"><input v-model="optionalSigners[s.id]" type="checkbox" /> {{ s.fullName }} <span class="muted small">({{ s.position }})</span></label>
+          </div>
+          <span v-else class="muted small">{{ t('قاعدهٔ امضای «برگ پرداخت چک» در اطلاعات پایه ← «دارندگان امضای مجاز» تعیین نشده است؛ برگ پرداخت فقط با امضای تحویل‌دهنده و تحویل‌گیرنده چاپ می‌شود.',
+            'No signature rule is set for the cheque payment sheet (Basic Information → Authorised signatories); the sheet is printed with the two parties\' signatures only.') }}</span>
+        </div>
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>
       <template v-else>

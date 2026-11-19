@@ -23,5 +23,5 @@ Amendment (19 Nov 2026, correction of a receipt, owner's report no. 6, items 2 a
 off — in one transaction, for the reason of the first amendment: the receipt's total, date and payer and its cheques must never
 disagree. Every aggregate touched is version-checked, and a cheque is touched only while it is as it was received (no step on it), so
 no other command can be working on it with a different intent. A cheque taken off the receipt is deleted (it had no life yet; schema
-042 grants the delete), and the events `ReceiptCorrected`, `ReceivedInstrumentCorrected` and `ReceivedInstrumentRemoved` go to the outbox
+043 grants the delete), and the events `ReceiptCorrected`, `ReceivedInstrumentCorrected` and `ReceivedInstrumentRemoved` go to the outbox
 in the same transaction, so a consumer of the earlier `ReceiptRecorded` / `InstrumentStateChanged` events can follow the correction.

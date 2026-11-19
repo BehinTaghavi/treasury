@@ -197,11 +197,11 @@ public sealed class ReceiptCorrectionUseCaseTests : IDisposable
         var lines = (await Receipt(recorded.Value)).Instruments!;
 
         var r = await _receipts.CorrectNotesAsync(new(Key(), recorded.Value, 1, Header(date: "1405/08/25"), terms with { CustodyPlace = "صندوق شرکت" },
-            [Note("N-1", 300_000_000, lines[0].Id)], [new("ضامن تازه", "0123456789")]), CancellationToken.None);
+            [Note("N-1", 300_000_000, lines[0].Id)], [new(null, DetailCode: "200016")]), CancellationToken.None); // a guarantor of the list (answer to Q54)
         Assert.True(r.IsSuccess, r.ErrorCode);
         var v = await Receipt(recorded.Value);
         Assert.Equal((1, 1, 300_000_000m, "صندوق شرکت"), (v.Number, v.InstrumentCount, v.TotalRial, v.NoteTerms!.CustodyPlace));
-        Assert.Equal("ضامن تازه", Assert.Single(Assert.Single(v.Instruments!).Details!.GuarantorList).Name);
+        Assert.Equal("مشتری دیگر", Assert.Single(Assert.Single(v.Instruments!).Details!.GuarantorList).Name);
     }
 
     private sealed class Clerk : ICurrentUser

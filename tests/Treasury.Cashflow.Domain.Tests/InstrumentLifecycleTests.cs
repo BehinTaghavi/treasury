@@ -113,7 +113,7 @@ public sealed class ReceivedInstrumentTests
 
         // Owner, 19 Nov 2026: a cheque is transferred from the cash desk once it is «ثبت صیادی شد», on the request written for it.
         var endorsed = RegisteredCheque();
-        endorsed.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1", Guid.NewGuid(), endorsed.Id), D("1405/08/02"), User);
+        endorsed.Endorse(new Endorsement("300200", "شرکت پیمانکار ب", Guid.NewGuid(), "خرید مواد", "SY-1", Guid.NewGuid(), endorsed.Id, SheetNumber: 1), D("1405/08/02"), User);
         Assert.Equal(InstrumentState.Endorsed, endorsed.State);
         Assert.Equal("شرکت پیمانکار ب", endorsed.Destination);
 

@@ -88,6 +88,17 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
     public async Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Entry>(http, $"api/reference/banks/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false))?.Name;
 
+    private sealed record Party(string DetailCode, string LegalName, bool IsActive, bool IsObligor, bool IsGuarantor, string? NationalId, string? Phone,
+        string? PhoneAreaCode, string? Mobile);
+
+    /// <summary>reference-svc lists the entries of «ذینفعان / متعهدین / ضامنین» (a few hundred) without a route for one.</summary>
+    public async Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken) =>
+        (await ServiceHttp.GetAsync<Party[]>(http, "api/reference/beneficiaries?includeInactive=true", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) ?? [])
+            .Where(p => p.DetailCode == detailCode)
+            .Select(p => new NotePartyFact(p.DetailCode, p.LegalName, p.IsActive, p.IsObligor, p.IsGuarantor, p.NationalId,
+                p.Mobile ?? (p.Phone is null ? null : string.Join('-', new[] { p.PhoneAreaCode, p.Phone }.Where(x => !string.IsNullOrWhiteSpace(x))))))
+            .FirstOrDefault();
+
     private sealed record RuleSignatory(Guid Id, string FullName, string? Position);
 
     private sealed record Rule(int Required, RuleSignatory[]? Compulsory, RuleSignatory[]? Optional);

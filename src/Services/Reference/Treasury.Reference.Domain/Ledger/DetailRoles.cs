@@ -19,6 +19,9 @@ public enum DetailRole
 
     /// <summary>A person or company (اشخاص و شرکت‌ها): may pay the company (owner, 14 Nov 2026, answer to Q22).</summary>
     PersonOrCompany,
+
+    /// <summary>A supplier (فروشندگان): may be a beneficiary, obligor or guarantor (owner, 19 Nov 2026, answer to Q56).</summary>
+    Supplier,
 }
 
 /// <summary>
@@ -36,6 +39,7 @@ public static class DetailRoles
         ("مراکزهزینه", DetailRole.CostCentre), ("مرکزهزینه", DetailRole.CostCentre),
         ("واحدهایسازمانی", DetailRole.OrgUnit), ("واحدسازمانی", DetailRole.OrgUnit),
         ("مشتری", DetailRole.Customer), ("اشخاص", DetailRole.PersonOrCompany), ("شخص", DetailRole.PersonOrCompany),
+        ("فروشندگان", DetailRole.Supplier), ("فروشنده", DetailRole.Supplier),
     ];
 
     public static DetailRole? Of(string? type, bool markedCostCentre = false)
@@ -65,7 +69,9 @@ public static class DetailRoles
 
     /// <summary>
     /// Whose تفصیل a beneficiary, obligor or guarantor may have (owner, 19 Nov 2026: «شماره تفصیل ذینفعان اساسا از نوع اشخاص است شامل
-    /// کارکنان، مشتریان و شرکتها»): staff, customers, persons and companies — not banks or cost centres.
+    /// کارکنان، مشتریان و شرکتها»): staff, customers, persons and companies — not banks or cost centres — and suppliers (his answer to
+    /// Q56 the same day: «بله فروشندگان هم مجاز است»).
     /// </summary>
-    public static readonly IReadOnlySet<DetailRole> Parties = new HashSet<DetailRole> { DetailRole.Staff, DetailRole.Customer, DetailRole.PersonOrCompany };
+    public static readonly IReadOnlySet<DetailRole> Parties =
+        new HashSet<DetailRole> { DetailRole.Staff, DetailRole.Customer, DetailRole.PersonOrCompany, DetailRole.Supplier };
 }

@@ -19,7 +19,7 @@ public sealed record ActionRequest(string Date, string? Destination, string? Not
 
 public sealed record ReplaceRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
-public sealed record EndorseRequest(string Date, Guid PaymentRequestId, string SayadTracking, string? Note);
+public sealed record EndorseRequest(string Date, Guid PaymentRequestId, string SayadTracking, string? Note, IReadOnlyList<Guid>? SignerIds = null);
 
 public sealed record EndorsementReturnedRequest(string Date, string? NoticeNumber, string? Reason, string? TrackingCode = null);
 
@@ -117,7 +117,7 @@ public static class Endpoints
                     extensions: new Dictionary<string, object?> { ["code"] = p.ErrorCode }));
 
         api.MapPost("/instruments/{id:guid}/endorse", async (Guid id, EndorseRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
-            ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.PaymentRequestId, r.SayadTracking, r.Note), ct)
+            ToHttp(await useCases.EndorseAsync(new EndorseChequeCommand(Key(http), id, r.Date, r.PaymentRequestId, r.SayadTracking, r.Note, r.SignerIds), ct)
                 .ConfigureAwait(false), _ => $"/api/cashflow/instruments/{id}"));
 
         api.MapPost("/instruments/{id:guid}/endorsement-returned", async (Guid id, EndorsementReturnedRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>

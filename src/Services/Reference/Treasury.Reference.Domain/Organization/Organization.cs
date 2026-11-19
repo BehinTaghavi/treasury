@@ -544,10 +544,10 @@ public sealed partial class Beneficiary : AggregateRoot<Guid>
         ArgumentNullException.ThrowIfNull(form);
         var code = Rules.Optional(detailCode) ?? throw new DomainException("Beneficiary.DetailRequired", "The تفصیل of the beneficiary is required.");
         var fact = Rules.Detail(code, detail, before?.DetailCode, "Beneficiary.DetailNotFound", "Beneficiary.DetailInactive");
-        // Owner, 19 Nov 2026: "the تفصیل of a beneficiary is a person: staff, customers and companies" — not a bank, a cost centre or
-        // another kind of تفصیل. One chosen before this rule is kept.
+        // Owner, 19 Nov 2026: "the تفصیل of a beneficiary is a person: staff, customers and companies" — and suppliers (answer to Q56) —
+        // not a bank, a cost centre or another kind of تفصیل. One chosen before this rule is kept.
         Rules.Require(code == before?.DetailCode || (fact.Role is { } role && DetailRoles.Parties.Contains(role)), "Beneficiary.DetailNotPerson",
-            $"تفصیل {code} is not of a person type (staff, customers, persons and companies).");
+            $"تفصیل {code} is not of a person type (staff, customers, persons and companies, suppliers).");
         var name = Rules.Name(Rules.Optional(legalName) ?? fact.Name, MaxNameLength, "Beneficiary.NameRequired", "Beneficiary.NameTooLong");
 
         var account = Rules.Optional(form.AccountNumber);

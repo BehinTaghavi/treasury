@@ -20,6 +20,7 @@ public sealed class InMemoryDatabase : IDisposable
     internal readonly Dictionary<Guid, InstrumentSnapshot> Instruments = [];
     internal readonly Dictionary<Guid, ReceiptSnapshot> Receipts = [];
     internal readonly Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers = [];
+    internal readonly Dictionary<int, int> PaymentSheetNumbers = [];
     internal readonly Dictionary<Guid, ChequeBookSnapshot> ChequeBooks = [];
     internal readonly Dictionary<Guid, ChequeFormatSnapshot> ChequeFormats = [];
     internal readonly Dictionary<Guid, (string Type, byte[] Data)> ChequeImages = [];
@@ -51,6 +52,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, ReceiptSnapshot> Receipts { get; } = [];
 
     public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
+
+    public Dictionary<int, int> PaymentSheetNumbers { get; } = [];
 
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
 
@@ -102,6 +105,11 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                     db.ReceiptNumbers[key] = n;
                 }
 
+                foreach (var (year, n) in pending.PaymentSheetNumbers)
+                {
+                    db.PaymentSheetNumbers[year] = n;
+                }
+
                 foreach (var (id, s) in pending.ChequeBooks)
                 {
                     db.ChequeBooks[id] = s;
@@ -150,6 +158,21 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
 
 public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrumentRepository
 {
+    public Task<int> NextPaymentSheetNumberAsync(int fiscalYear, CancellationToken cancellationToken)
+    {
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        if (!pending.PaymentSheetNumbers.TryGetValue(fiscalYear, out var last))
+        {
+            lock (db.Gate)
+            {
+                last = db.PaymentSheetNumbers.TryGetValue(fiscalYear, out var n) ? n : 0;
+            }
+        }
+
+        pending.PaymentSheetNumbers[fiscalYear] = last + 1;
+        return Task.FromResult(last + 1);
+    }
+
     public Task<Instrument?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var pending = InMemoryUnitOfWork.Pending;

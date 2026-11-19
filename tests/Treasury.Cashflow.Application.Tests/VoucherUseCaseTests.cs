@@ -51,10 +51,10 @@ public sealed class VoucherUseCaseTests : IDisposable
         }
     }
 
-    private async Task<Guid> ChequeReceipt()
+    private async Task<Guid> ChequeReceipt(string number = "445566", string sayadId = "1234567890123456")
     {
         var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
-            [new(InstrumentKind.OrdinaryCheque, "445566", "1405/10/01", new MoneyInput(10_000_000), FakeReceiptReference.Mellat, SayadId: "1234567890123456")]),
+            [new(InstrumentKind.OrdinaryCheque, number, "1405/10/01", new MoneyInput(10_000_000), FakeReceiptReference.Mellat, SayadId: sayadId)]),
             CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         return r.Value;
@@ -226,14 +226,32 @@ public sealed class VoucherUseCaseTests : IDisposable
             (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.SayadTrackingRequired", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, " "), CancellationToken.None)).ErrorCode);
 
+        // Answer to Q57: the authorised signatories of the rule «برگ پرداخت چک» sign the payment sheet too.
+        var ceo = new SignerFact(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
+        var cfo = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
+        _reference.ChequeSheetRule = new SignatureRuleFact(1, [ceo], [cfo]);
+        Assert.Equal("Receipt.CompulsorySignerMissing", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.SignerNotAuthorised",
+            (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1", SignerIds: [ceo.Id, Guid.NewGuid()]), CancellationToken.None)).ErrorCode);
+
         // Item 3: with the Sayad tracking code the cheque is «ثبت انتقال شد»; the request's beneficiary receives it, the request is paid in
         // full (its amount is the cheque's) and its payment group's account is debited.
-        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1"), CancellationToken.None);
+        var r = await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1", SignerIds: [ceo.Id]), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         Assert.Equal(("Paid", 10_000_000m), (_requests.Requests[transfer].State, _requests.Requests[transfer].PaidAmount));
         var view = (await _instruments.GetAsync(cheque, CancellationToken.None))!;
         Assert.Equal(("Endorsed", "پیمانکار الف", (Guid?)transfer, "SY-1"),
             (view.State, view.Destination, view.History[^1].Details!.PaymentRequestId, view.History[^1].Details!.SayadTracking));
+        // The payment sheet's own number: the refused tries above took none, so this is sheet 1 of the year; the next transfer gets 2.
+        Assert.Equal((1, "علی رضایی", "مدیر عامل"),
+            (view.History[^1].Details!.SheetNumber, view.History[^1].Details!.Signers!.Single().Name, view.History[^1].Details!.Signers!.Single().Position));
+        var second = await ChequeOf(await ChequeReceipt("445567", "1234567890123457"));
+        var transfer2 = Guid.NewGuid();
+        _requests.Requests[transfer2] = _requests.Requests[transfer] with { Id = transfer2, Number = 10, State = "Approved", PaidAmount = 0, TransferChequeId = second };
+        Assert.True((await _instruments.ChangeStateAsync(new(Key(), second, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess);
+        Assert.True((await _receipts.EndorseAsync(new(Key(), second, "1405/08/25", transfer2, "SY-2", SignerIds: [cfo.Id, ceo.Id]), CancellationToken.None)).IsSuccess);
+        var view2 = (await _instruments.GetAsync(second, CancellationToken.None))!;
+        Assert.Equal((2, 2), (view2.History[^1].Details!.SheetNumber, view2.History[^1].Details!.Signers!.Count));
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([(true, "2101", "300001"), (false, "1201", "200015")], steps.Single().Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.Equal("ثبت انتقال چک (خرج چک)", steps.Single().Operation);

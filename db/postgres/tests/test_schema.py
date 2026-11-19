@@ -1010,8 +1010,26 @@ def test_a_cheque_transfer_request_names_its_cheque_and_the_scripts_run_again_ov
             c.execute("DELETE FROM requests.payment_request WHERE id = ANY(%s)", (ids,))
 
 
+def test_payment_sheets_are_numbered_from_one_each_fiscal_year(db):
+    # 042_cashflow_payment_sheets.sql (owner's answer to Q57, 19 Nov 2026: «برگ پرداخت» has a serial number of its own).
+    take = """INSERT INTO cashflow.payment_sheet_number (fiscal_year, last_number) VALUES (%s, 1)
+              ON CONFLICT (fiscal_year) DO UPDATE SET last_number = cashflow.payment_sheet_number.last_number + 1 RETURNING last_number"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        assert [c.execute(take, (y,)).fetchone()[0] for y in (1405, 1405, 1406, 1405)] == [1, 2, 1, 3]
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.payment_sheet_number SET last_number = -1 WHERE fiscal_year = 1405")
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE requests_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not number the sheets
+            with c.transaction():
+                c.execute("SELECT last_number FROM cashflow.payment_sheet_number")
+        c.rollback()
+
+
 def test_the_cashflow_service_may_delete_a_cheque_taken_off_a_corrected_receipt(db):
-    # 042_cashflow_receipt_corrections.sql: report no. 6, items 2 and 6. The step first (it points at the cheque), then the cheque.
+    # 043_cashflow_receipt_corrections.sql: report no. 6, items 2 and 6. The step first (it points at the cheque), then the cheque.
     with psycopg.connect(db) as c:
         iid = insert_instrument(c, 1405)
         insert_event(c, 1405, 1405, iid)
