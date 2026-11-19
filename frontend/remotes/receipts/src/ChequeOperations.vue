@@ -16,7 +16,7 @@
  * و انتقال به غیر): it lists promissory notes instead of cheques, a note the bank does not pay is protested («واخواست»), returning it to
  * the obligor is «استرداد», and an endorsement has no Sayad transfer. Guarantee and trust notes are only handed back or cancelled.
  */
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { chequeActionName, chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
@@ -126,6 +126,12 @@ const accountChoices = computed<Choice[]>(() => L.bankAccounts.value
   .filter(a => a.isActive && a.currencyCode === selectedCurrency.value)
   .map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
 function toggleAll(on: boolean) { for (const c of tickable.value) chosen[c.id] = on }
+// Owner, 19 Nov 2026: the deposit seemed not to work because the account box was left empty. With one suitable account it is
+// chosen for the user; a choice that no longer fits the ticked cheques' currency is cleared.
+watch(accountChoices, choices => {
+  if (deposit.accountId && !choices.some(c => c.value === deposit.accountId)) deposit.accountId = ''
+  if (!deposit.accountId && choices.length === 1) deposit.accountId = choices[0]!.value
+}, { immediate: true })
 
 async function depositSelected() {
   message.value = null
@@ -389,6 +395,11 @@ onMounted(async () => { await L.load(); await load() })
                       :none-text="t('حساب بانکی فعالی با ارز این چک‌ها نیست', 'No active account in this currency')" />
       </label>
       <label>{{ t('شماره فیش واگذاری', 'Deposit slip no.') }} <input v-model="deposit.slip" dir="ltr" /></label>
+      <p v-if="selected.length && !accountChoices.length" class="wide tr-msg warning">{{ t(
+        'برای ارز این چک‌ها حساب بانکی فعالی تعریف نشده است. ابتدا در «اطلاعات پایه ← حساب‌های بانکی» حساب شرکت را تعریف یا فعال کنید.',
+        'There is no active company bank account in this currency. Add or switch one on in Basic Information → Bank accounts first.') }}</p>
+      <p v-else-if="selected.length && !deposit.accountId" class="wide muted small">{{ t('حساب بانکی شرکت را که چک‌ها به آن واگذار می‌شوند انتخاب کنید.',
+        'Choose the company bank account the cheques are deposited into.') }}</p>
       <div class="tr-buttons wide">
         <strong>{{ t(`${selected.length.toLocaleString('fa-IR')} چک`, `${selected.length} cheques`) }} – <span class="num">{{ money(selectedTotal) }}</span> {{ selectedCurrency === 'IRR' ? t('ریال', 'Rial') : selectedCurrency }}</strong>
         <button type="button" :disabled="busy || !selected.length" @click="depositSelected">{{ t('واگذاری به بانک', 'Deposit at the bank') }}</button>
