@@ -1,6 +1,6 @@
 # ADR 0006 — The system works on phones and tablets
 
-Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meaning devices — for example a manager approving a payment request from a phone). Q42–Q43 answered the same day. Not built yet.
+Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meaning devices — for example a manager approving a payment request from a phone). QM1–QM2 answered the same day. Not built yet.
 
 ## Decision
 
@@ -10,7 +10,7 @@ Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meani
 4. **Designed first for the phone:** the task inbox and approving or rejecting payment requests, the dashboard (bank and cash balances, cheques due), and looking up a cheque, a receipt or a request. **Designed first for keyboard and large screen, but still working on a tablet or phone:** fast data entry (receipts, payments, Basic Information) and cheque printing (which needs the printer's PC).
 5. **Safety before reach:** phones mean access from outside the office, so the system is opened to the internet only with login in place, HTTPS only, and a second step (one-time code) for approvers and administrators, as the design document 8.2 already asks.
 
-## Confirmed by the owner (Q42–Q43, 19 Nov 2026)
+## Confirmed by the owner (QM1–QM2, 19 Nov 2026)
 
 - The phone-first jobs are those of point 4.
 - **No app store.** Users open the address in the browser and add it to the home screen. If a store app is ever needed, the same web application can be wrapped (for example with Capacitor) rather than rewritten.
