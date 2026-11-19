@@ -36,7 +36,7 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | تبدیل چک / سفته انتظامی دریافتی به عادی | (۱) اسناد نزد صندوق / اسناد دریافتنی، (۲) طرف حساب انتظامی | ذینفع | (۱) درآمد حاصل از تضمین استفاده شده، (۲) چک انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
 | عملیات | عودت چک پرداختنی صادره نزد ذینفع و ابطال آن | اسناد پرداختنی | ذینفع | بستانکاران یا ... | ذینفع |
-| عملیات | ثبت انتقال چک دریافتی به شخص ثالث – خرج چک (افزودهٔ مدیرعامل، ۲۸ آبان ۱۴۰۵؛ حساب‌ها: Q53) | گروه بابت | ذینفع (گیرندهٔ چک) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع (واگذارندهٔ چک) |
+| عملیات | ثبت انتقال چک دریافتی به شخص ثالث – خرج چک (افزوده و تایید مدیرعامل، ۲۸ آبان ۱۴۰۵) | گروه بابت | ذینفع (گیرندهٔ چک) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع (واگذارندهٔ چک) |
 | عملیات | عودت چک‌های خرج شده توسط ما به دیگران (پس از برگشت) | اسناد واخواست شده | ذینفع | بستانکاران یا ... | ذینفع |
 | عملیات | اقدام حقوقی چک برگشتی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد واخواست شده | ذینفع |
 | عملیات | اقدام حقوقی چک نزد صندوق، به فرض محال (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
@@ -55,8 +55,8 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 
 Since 19 Nov 2026 the endorsement of a cheque is called «ثبت انتقال (خرج چک)» (the transfer registered in Sayad) and has its row in the
 table above: Dr the payment purpose group's معین with the receiver's تفصیل / Cr «اسناد نزد صندوق / اسناد دریافتنی» with the تفصیل of who
-gave the cheque — the voucher built on 15 Nov from the old manual («خرج چک: بد بستانکاران / حساب‌های پرداختنی»); the owner is asked to
-confirm the accounts (Q53).
+gave the cheque — the voucher built on 15 Nov from the old manual («خرج چک: بد بستانکاران / حساب‌های پرداختنی»); the owner confirmed
+the accounts on 19 Nov 2026 (answer to Q53: «صحیح است»).
 
 Built so far: receipts (cash, bank, cheques, guarantee cheques, ordinary and guarantee promissory notes) and the steps of a received cheque:
 deposit at the bank, collected, returned by the bank, bounced, replaced, cancelled, endorsed and its return (`received-cheque-steps.md`), and since

@@ -3,7 +3,8 @@
  * «برگ پرداخت – رسید واگذاری چک» (owner, 19 Nov 2026, item 6 of «ثبت انتقال (خرج چک)»): like every kind of payment the transfer of a
  * received cheque gets its payment sheet. It names the cheque's Sayad number, its series and number, its due date and its owner, the
  * sentence «چک جهت وصول بابت بدهی تحویل می‌شود» and, at the foot, the owner's text on what the handover settles. It is printed, signed
- * by who hands the cheque over and who receives it, and the cheque is handed over.
+ * by who hands the cheque over and who receives it, and the cheque is handed over. Owner's answers to Q57 (19 Nov 2026): the sheet has
+ * a serial number of its own, and the authorised signatories of the rule «برگ پرداخت چک» sign it too.
  * The company's name and logo come from «مشخصات شرکت» (owner's answer of 16 Nov 2026: every printed form starts with them).
  * ChequeTransferPrint shows the sheet on the screen and hands a copy to the printer.
  */
@@ -34,6 +35,7 @@ const sayad = computed(() => digits((c.value.sayadId ?? '').replace(/(\d{4})(?=\
         <span>{{ t('رسید واگذاری چک – ثبت انتقال (خرج چک)', 'Handover receipt of a cheque – transfer (endorsement)') }}</span>
       </div>
       <div class="side end">
+        <span>{{ t('شماره برگ پرداخت:', 'Payment sheet no.:') }} <strong>{{ digits(sheet.sheetNumber) }}</strong></span>
         <span>{{ t('شماره درخواست وجه:', 'Payment request no.:') }} <strong>{{ digits(sheet.requestNumber) }}</strong></span>
         <span>{{ t('تاریخ ثبت انتقال:', 'Date of transfer:') }} <strong>{{ digits(sheet.date) }}</strong></span>
       </div>
@@ -66,13 +68,15 @@ const sayad = computed(() => digits((c.value.sayadId ?? '').replace(/(\d{4})(?=\
 
     <table class="signatures">
       <thead>
-        <tr><th>{{ t('تحویل‌دهنده چک', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرنده چک', 'Received by') }}</th></tr>
+        <tr><th>{{ t('تحویل‌دهنده چک', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرنده چک', 'Received by') }}</th>
+          <th v-for="s in sheet.signers" :key="s.id">{{ t('امضای مجاز', 'Authorised signatory') }}<template v-if="s.position"> – {{ s.position }}</template></th></tr>
       </thead>
       <tbody>
         <tr>
           <td><span>{{ t('نام:', 'Name:') }} {{ sheet.company.name }}<template v-if="sheet.company.name"> – </template>{{ t('خزانه‌داری', 'Treasury') }} ({{ sheet.recordedBy }})</span>
             <span>{{ t('تاریخ:', 'Date:') }}</span><span>{{ t('امضا:', 'Signature:') }}</span></td>
           <td><span>{{ t('نام:', 'Name:') }} {{ sheet.receiverName }}</span><span>{{ t('تاریخ:', 'Date:') }}</span><span>{{ t('امضا:', 'Signature:') }}</span></td>
+          <td v-for="s in sheet.signers" :key="s.id"><span>{{ t('نام:', 'Name:') }} {{ s.name }}</span><span>{{ t('تاریخ:', 'Date:') }}</span><span>{{ t('امضا:', 'Signature:') }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -101,7 +105,7 @@ th { background: #eef1f5; font-weight: 600; width: 22%; }
 .small { font-size: 9pt; }
 .sentence { margin: 0; padding: 2mm 2.5mm; border: 1px solid #333; font-weight: 600; text-align: center; }
 .signatures { table-layout: fixed; }
-.signatures th { width: 50%; text-align: center; }
+.signatures th { width: auto; text-align: center; }
 .signatures td { height: 30mm; vertical-align: top; }
 .signatures td span { display: block; margin-top: 1.6mm; }
 .remarks { min-height: 12mm; border: 1px solid #333; padding: 1.6mm 2mm; }

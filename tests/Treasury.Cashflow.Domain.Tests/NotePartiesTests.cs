@@ -18,7 +18,7 @@ public sealed class NotePartiesTests
     [Fact]
     public void The_obligor_is_defined_among_the_obligors_and_switched_on()
     {
-        Assert.Same(Obligor, NoteParties.Obligor(Obligor));
+        Assert.Equal(Obligor, NoteParties.Obligor(Obligor));
         Assert.Equal("Receipt.IssuerNotObligor", Code(() => NoteParties.Obligor(null)));       // not in the list at all
         Assert.Equal("Receipt.IssuerNotObligor", Code(() => NoteParties.Obligor(Guarantor))); // in the list, but in another group
         Assert.Equal("Receipt.NotePartyInactive", Code(() => NoteParties.Obligor(Obligor with { IsActive = false })));

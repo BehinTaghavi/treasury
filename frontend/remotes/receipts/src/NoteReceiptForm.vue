@@ -3,6 +3,7 @@
  * The receipt of promissory notes (owner's form «فرم دریافت سفته», 16 Nov 2026; report no. 4, item 13: notes have a form of their
  * own). Notes of one issuer are saved on one receipt, numbered in their own series. The form follows the owner's sheet: the receipt,
  * the persons (issuer and guarantors with their تفصیل), the notes, the supplementary information, and the checks of each note.
+ * Owner's answer to Q54 (19 Nov 2026): the obligor and the guarantors are chosen only from «متعهدین» and «ضامنین» of Basic Information.
  * «عندالمطالبه» switches the due-date column off; «دریافت شد» asks for the date the original was received; «موضوع تعهد» is for a
  * guarantee only. Owner's answers of 16 Nov 2026: up to three guarantors for a note (Q39); every item of article 308 is ticked for
  * each note before the receipt is saved (Q40), except the payment date of a note payable on demand, which has none. The authorised
@@ -14,7 +15,7 @@ import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
-import { useLookups, type Detail, type Purpose } from './lookups'
+import { useLookups, type Purpose } from './lookups'
 import NoteReceiptPrint from './NoteReceiptPrint.vue'
 import { attachmentNames, checkNames, confirmationText, formNames, maturityNames, reasonNames, type NoteAttachments, type NoteChecks, type NoteReceipt } from './notes'
 
@@ -23,7 +24,7 @@ interface SignatureRule { required: number; compulsory: RuleSignatory[]; optiona
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
 interface Line { key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
-interface Guarantor { key: number; detailCode: string; name: string; nationalCode: string; phone: string; noteNumber: string; found: Detail[] }
+interface Guarantor { key: number; detailCode: string; name: string; nationalCode: string; phone: string; noteNumber: string }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
 const emit = defineEmits<{ saved: [id: string] }>()
@@ -52,22 +53,13 @@ async function loadRule() {
   const r = await api.get<SignatureRule>('/api/reference/signature-rules/NoteReceipt')
   if (r.ok) rule.value = r.value
 }
-const issuers = ref<Detail[]>([])
-/** As on the other receipts (answer to Q22): customers and persons or companies. */
-const IssuerRoles = 'Customer,PersonOrCompany'
 const purposes = ref<Purpose[]>([])
 const group = computed(() => L.groups.value.find(g => g.id === header.groupId))
 const refTitle = (id: string | null | undefined) => L.references.value.find(r => r.id === id)?.name
 const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
-const issuerChoices = computed<Choice[]>(() => issuers.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
 const departmentChoices = computed<Choice[]>(() => L.departments.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name })))
 /** The group's معین is the other side of the voucher of a note that pays a debt (owner's table «دریافت سفته عادی»). */
 const groupAccount = computed(() => accountOf(group.value?.ledgerAccountCode))
-let issuerTimer: ReturnType<typeof setTimeout> | undefined
-function onIssuerSearch(text: string) {
-  clearTimeout(issuerTimer)
-  issuerTimer = setTimeout(async () => { issuers.value = await L.searchDetails(text, header.issuer, IssuerRoles) }, 250)
-}
 watch(() => header.groupId, async id => {
   purposes.value = []
   if (!id) return
@@ -79,51 +71,40 @@ const onDemand = computed(() => terms.maturity === 'OnDemand')
 const notAsked = (k: keyof NoteChecks) => k === 'paymentDate' && onDemand.value
 const guarantee = computed(() => terms.reason === 'Guarantee')
 
-// ---- obligors and guarantors kept in Basic Information → «ذینفعان / متعهدین / ضامنین» (owner, 19 Nov 2026) ----
+// ---- the persons: only from Basic Information → «ذینفعان / متعهدین / ضامنین» (owner's answer to Q54, 19 Nov 2026) ----
+// «متعهد و ضامن فقط از این فهرست انتخاب شوند»: the obligor is one of the «متعهدین», each guarantor one of the «ضامنین»; a تفصیل outside the
+// lists or a typed name is no longer accepted (the server refuses it too).
 interface Party { id: string; detailCode: string; legalName: string; nationalId: string | null; phone: string | null; phoneAreaCode: string | null; mobile: string | null; isActive: boolean }
 const obligors = ref<Party[]>([])
 const knownGuarantors = ref<Party[]>([])
-const partyChoices = (list: Party[]): Choice[] => list.filter(x => x.isActive).map(x => ({ value: x.id, label: x.legalName, hint: x.detailCode }))
+const partiesLoaded = ref(false)
+const partyChoices = (list: Party[], chosen?: string): Choice[] =>
+  list.filter(x => x.isActive || x.detailCode === chosen).map(x => ({ value: x.detailCode, label: x.legalName, hint: x.detailCode }))
 const partyPhone = (x: Party) => x.mobile ?? [x.phoneAreaCode, x.phone].filter(Boolean).join('-')
+const issuerChoices = computed<Choice[]>(() => partyChoices(obligors.value, header.issuer))
 async function loadParties() {
   const [o, g] = await Promise.all([api.get<Party[]>('/api/reference/beneficiaries?role=Obligor'), api.get<Party[]>('/api/reference/beneficiaries?role=Guarantor')])
   if (o.ok) obligors.value = o.value
   if (g.ok) knownGuarantors.value = g.value
+  partiesLoaded.value = true
 }
-/** A defined obligor becomes the issuer: its تفصیل, national code and phone are filled in. */
-function chooseObligor(id: string) {
-  const x = obligors.value.find(o => o.id === id)
+/** Choosing the obligor fills its national code and phone from Basic Information; both can still be corrected for this receipt. */
+watch(() => header.issuer, code => {
+  const x = obligors.value.find(o => o.detailCode === code)
   if (!x) return
-  if (!issuers.value.some(d => d.code === x.detailCode)) issuers.value = [{ code: x.detailCode, name: x.legalName, type: null, isActive: true }, ...issuers.value]
-  header.issuer = x.detailCode
   terms.issuerNationalCode = x.nationalId ?? ''
   terms.issuerPhone = partyPhone(x)
-}
-/** A defined guarantor is added as a row of the persons table. */
-function chooseGuarantor(id: string) {
-  const x = knownGuarantors.value.find(g => g.id === id)
-  if (!x) return
-  guarantors.value.push({
-    key: nextKey++, detailCode: x.detailCode, name: x.legalName, nationalCode: x.nationalId ?? '', phone: partyPhone(x), noteNumber: '',
-    found: [{ code: x.detailCode, name: x.legalName, type: null, isActive: true }],
-  })
-}
+})
 
 // ---- guarantors and endorsers ----
 let nextKey = 1
 const guarantors = ref<Guarantor[]>([])
-const addGuarantor = () => guarantors.value.push({ key: nextKey++, detailCode: '', name: '', nationalCode: '', phone: '', noteNumber: '', found: [] })
-const guarantorChoices = (g: Guarantor): Choice[] => g.found.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive }))
-const guarantorTimers: Record<number, ReturnType<typeof setTimeout>> = {}
-function onGuarantorSearch(g: Guarantor, text: string) {
-  clearTimeout(guarantorTimers[g.key])
-  guarantorTimers[g.key] = setTimeout(async () => { g.found = await L.searchDetails(text, g.detailCode || undefined) }, 250)
-}
-/** Choosing a تفصیل fills the name. */
-function onGuarantorDetail(g: Guarantor, code: string) {
+const addGuarantor = () => guarantors.value.push({ key: nextKey++, detailCode: '', name: '', nationalCode: '', phone: '', noteNumber: '' })
+/** Choosing a guarantor fills the row from Basic Information. */
+function onGuarantor(g: Guarantor, code: string) {
   g.detailCode = code
-  const d = g.found.find(x => x.code === code)
-  if (d) g.name = d.name
+  const x = knownGuarantors.value.find(k => k.detailCode === code)
+  Object.assign(g, { name: x?.legalName ?? '', nationalCode: x?.nationalId ?? '', phone: x ? partyPhone(x) : '' })
 }
 
 // ---- the notes ----
@@ -185,7 +166,7 @@ function request(): { body: Record<string, unknown> } | { error: string } {
   if (lines.value.some(l => !checkNames.every(([k]) => l.checks[k] || notAsked(k)))) return { error: 'Receipt.NoteChecksIncomplete' }
   if (terms.originalReceived && !terms.originalReceivedOn.trim()) return { error: 'Receipt.OriginalDateRequired' }
   if (terms.originalReceived && !normaliseJalali(terms.originalReceivedOn)) return { error: 'FiscalDate.Invalid' }
-  if (guarantors.value.some(g => !g.name.trim() && !g.detailCode)) return { error: 'Instrument.GuarantorNameRequired' }
+  if (guarantors.value.some(g => !g.detailCode)) return { error: 'Receipt.GuarantorNotRegistered' }
   if (signerIds.value.length < rule.value.required) return { error: 'Receipt.SignersTooFew' }
   return {
     body: {
@@ -265,7 +246,7 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()]); issuers.value = await L.searchDetails('', undefined, IssuerRoles) })
+onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()]) })
 </script>
 
 <template>
@@ -308,8 +289,8 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
             <tr>
               <td>{{ t('صادرکننده و متعهد سفته', 'Issuer and obligor') }}</td>
               <td style="min-width: 15rem">
-                <SearchSelect v-model="header.issuer" :options="issuerChoices" remote required :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
-                              :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onIssuerSearch" />
+                <SearchSelect v-model="header.issuer" :options="issuerChoices" required :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
+                              :none-text="t('متعهدی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'No obligor found; define it in Basic Information first')" />
               </td>
               <td class="num">{{ header.issuer }}</td>
               <td><input v-model="terms.issuerNationalCode" dir="ltr" inputmode="numeric" maxlength="11" :aria-label="t('کد ملی یا شناسه ملی متعهد', 'National code of the obligor')" /></td>
@@ -318,12 +299,12 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
             </tr>
             <tr v-for="(g, i) in guarantors" :key="g.key">
               <td>{{ t('ضامن / ظهرنویس', 'Guarantor / endorser') }}</td>
-              <td class="req"><input v-model="g.name" :aria-label="t('نام ضامن', 'Name of the guarantor')" /></td>
-              <td style="min-width: 13rem">
-                <SearchSelect :model-value="g.detailCode" :options="guarantorChoices(g)" remote :empty-label="t('— بدون تفصیلی —', '— none —')"
-                              :aria-label="t('حساب تفصیلی ضامن', 'Detail account of the guarantor')" :none-text="t('تفصیلی پیدا نشد', 'No detail account found')"
-                              @update:model-value="onGuarantorDetail(g, $event)" @search="onGuarantorSearch(g, $event)" />
+              <td style="min-width: 15rem">
+                <SearchSelect :model-value="g.detailCode" :options="partyChoices(knownGuarantors, g.detailCode)" required :aria-label="t('ضامن', 'Guarantor')"
+                              :none-text="t('ضامنی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'No guarantor found; define it in Basic Information first')"
+                              @update:model-value="onGuarantor(g, $event)" />
               </td>
+              <td class="num">{{ g.detailCode }}</td>
               <td><input v-model="g.nationalCode" dir="ltr" inputmode="numeric" maxlength="11" :aria-label="t('کد ملی یا شناسه ملی ضامن', 'National code of the guarantor')" /></td>
               <td><input v-model="g.phone" dir="ltr" maxlength="30" :aria-label="t('شماره تماس ضامن', 'Phone of the guarantor')" /></td>
               <td style="min-width: 9rem">
@@ -342,21 +323,14 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
           </tbody>
         </table>
       </div>
-      <!-- Owner, 19 Nov 2026: obligors and guarantors defined in Basic Information are offered here. -->
-      <div v-if="obligors.length || knownGuarantors.length" class="tr-buttons" style="margin-top: .6rem; align-items: end">
-        <label v-if="obligors.length" style="width: 18rem">{{ t('انتخاب متعهد از «متعهدین» اطلاعات پایه', 'Choose the obligor from Basic Information') }}
-          <SearchSelect model-value="" :options="partyChoices(obligors)" :empty-label="t('— انتخاب کنید —', '— choose —')" :aria-label="t('متعهدین تعریف‌شده', 'Defined obligors')"
-                        @update:model-value="chooseObligor" />
-        </label>
-        <label v-if="knownGuarantors.length" style="width: 18rem">{{ t('افزودن ضامن از «ضامنین» اطلاعات پایه', 'Add a guarantor from Basic Information') }}
-          <SearchSelect model-value="" :options="partyChoices(knownGuarantors)" :empty-label="t('— انتخاب کنید —', '— choose —')" :aria-label="t('ضامنین تعریف‌شده', 'Defined guarantors')"
-                        @update:model-value="chooseGuarantor" />
-        </label>
-      </div>
+      <!-- Owner's answer to Q54 (19 Nov 2026): the obligor and the guarantors are chosen from Basic Information only. -->
+      <p v-if="partiesLoaded && !obligors.length" class="tr-msg warning" style="margin-top: .6rem">{{ t(
+        'هنوز متعهدی تعریف نشده است. ابتدا در «اطلاعات پایه ← ذینفعان / متعهدین / ضامنین» شخص را با تیک «متعهد» (و ضامن‌ها را با تیک «ضامن») تعریف کنید.',
+        'No obligor is defined yet. Define the person in Basic Information → «ذینفعان / متعهدین / ضامنین» with the tick «متعهد» (and the guarantors with «ضامن») first.') }}</p>
       <div class="tr-buttons" style="margin-top: .6rem">
         <button type="button" class="tr-secondary" @click="addGuarantor">{{ t('+ افزودن ضامن / ظهرنویس', '+ Guarantor / endorser') }}</button>
-        <span class="muted small">{{ t('هر سفته حداکثر سه ضامن دارد. ضامن از فهرست حساب‌های تفصیلی انتخاب یا نام او نوشته می‌شود.',
-          'A note has at most three guarantors, chosen from the detail accounts or typed.') }}</span>
+        <span class="muted small">{{ t('هر سفته حداکثر سه ضامن دارد. متعهد و ضامن فقط از فهرست «متعهدین» و «ضامنین» اطلاعات پایه انتخاب می‌شوند.',
+          'A note has at most three guarantors. The obligor and the guarantors are chosen from the lists of Basic Information only.') }}</span>
       </div>
     </fieldset>
 

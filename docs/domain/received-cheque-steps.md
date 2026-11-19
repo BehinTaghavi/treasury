@@ -203,14 +203,17 @@ The owner described how the traditional «خرج چک» is done in the Sayad sys
    back bounced, the step «برگشت خرج» is as before: the cheque is «برگشت چک» again and the request is to be paid again.
 4. **Voucher**, added to the template table (`posting-rules.md`): Dr the payment purpose group's account · receiver / Cr «اسناد
    نزد صندوق / اسناد دریافتنی» · who gave the cheque; named «ثبت انتقال چک (خرج چک)»; confirmed by the treasurer on the cheque card
-   (accounts asked back as Q53).
+   (accounts confirmed by the owner the same day, answer to Q53).
 5. **Payment sheet «برگ پرداخت – رسید واگذاری چک»**: printed from the cheque card or the row of the tab «ثبت انتقال شده (خرج‌شده)».
    It starts with the company's name and logo and shows the request's number, the date of the transfer, the cheque's **Sayad number,
    series and number, bank, account number, due date, amount (figures and words), owner** (the account holder when the cheque is
    someone else's, otherwise who gave it) and who gave it to the company, the receiver, the purpose and the Sayad tracking code, the
    sentence **«چک جهت وصول بابت بدهی تحویل می‌شود.»**, two signature boxes (who hands the cheque over, who receives it) and, at the
    foot, the owner's text: «چک با مشخصات بالا پس از ثبت و تایید انتقال در سامانه صیاد بابت بدهی شرکت واگذار شد. تسویه بدهی به میزان وجه
-   وصول شده از چک خواهد بود و صرف تحویل و انتقال چک به معنای برائت ذمه از شرکت نیست.» Its number and the authorised signatories: Q57.
+   وصول شده از چک خواهد بود و صرف تحویل و انتقال چک به معنای برائت ذمه از شرکت نیست.» The owner's answers to Q57 the same day: the sheet has **a serial number of its own** (from 1 each fiscal year, taken when the
+   transfer is recorded; `Instrument.PaymentSheetNumberRequired`, schema 042) and is signed also by **the authorised signatories** of
+   the rule «برگ پرداخت چک» — the transfer step lists them (compulsory ones ticked, optional ones to choose) and the sheet prints a
+   signature box for each.
 6. A **promissory note** has no Sayad system: «خرج سفته» stays as decided on 16 Nov 2026 (any approved request, no tracking code).
 
 Code: `InstrumentLifecycle` (the cash-desk step for notes only), `Instrument.Endorse` and `Endorsement.RequestChequeId`;

@@ -35,8 +35,8 @@ const fa = computed(() => props.locale === 'fa')
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const num = (n: number) => n.toLocaleString(fa.value ? 'fa-IR' : 'en-US')
 const base = '/api/reference/beneficiaries'
-/** Owner, 19 Nov 2026: the تفصیل of these persons is of a person type — staff, customers, persons and companies. */
-const PersonRoles = 'Staff,Customer,PersonOrCompany'
+/** Owner, 19 Nov 2026: the تفصیل of these persons is of a person type — staff, customers, persons and companies, and suppliers (Q56). */
+const PersonRoles = 'Staff,Customer,PersonOrCompany,Supplier'
 const groups: { key: Group; one: [string, string]; many: [string, string] }[] = [
   { key: 'isBeneficiary', one: ['ذینفع', 'Beneficiary'], many: ['ذینفعان', 'Beneficiaries'] },
   { key: 'isObligor', one: ['متعهد', 'Obligor'], many: ['متعهدین', 'Obligors'] },
@@ -215,7 +215,7 @@ onMounted(load)
           <SearchSelect :model-value="detailType" :options="typeChoices" :empty-label="t('— همهٔ اشخاص —', '— all persons —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')"
                         @update:model-value="onType" />
         </label>
-        <label :class="['req', 'wide', { bad: wrong === 'detail' }]"><span>{{ t('حساب تفصیل (کارکنان، مشتریان، اشخاص و شرکت‌ها)', 'Detail account (staff, customers, persons and companies)') }} <span class="star">*</span></span>
+        <label :class="['req', 'wide', { bad: wrong === 'detail' }]"><span>{{ t('حساب تفصیل (کارکنان، مشتریان، اشخاص و شرکت‌ها، فروشندگان)', 'Detail account (staff, customers, persons and companies, suppliers)') }} <span class="star">*</span></span>
           <SearchSelect :model-value="form.detailCode" :options="detailChoices" remote required :aria-label="t('حساب تفصیل', 'Detail account')"
                         :none-text="t('تفصیلی از نوع اشخاص پیدا نشد؛ شخص جدید ابتدا در سیستم مالی تعریف شود', 'No person found; define the person in the accounting system first')"
                         @search="onDetailSearch" @update:model-value="onDetail" />

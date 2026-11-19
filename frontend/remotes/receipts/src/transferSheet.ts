@@ -4,6 +4,10 @@
  */
 export interface TransferSheet {
   company: { name: string; logoUrl: string | null }
+  /** Serial number of the payment sheet, from 1 each fiscal year (owner's answer to Q57); null on a transfer recorded before 19 Nov 2026. */
+  sheetNumber: number | null
+  /** The authorised signatories chosen by the signature rule «برگ پرداخت چک» (owner's answer to Q57). */
+  signers: { id: string; name: string; position: string | null }[]
   /** Number of the approved payment request the transfer pays; null when it could not be read. */
   requestNumber: number | null
   /** Date of the transfer in Sayad. */
