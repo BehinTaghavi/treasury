@@ -166,7 +166,9 @@ public sealed record ReceiptView(
     string? PayerSheba = null,
     NoteTermsView? NoteTerms = null,
     string? NotCorrectable = null,
-    string? NotDeletable = null)
+    string? NotDeletable = null,
+    string? DeletedBy = null,
+    DateTimeOffset? DeletedAt = null)
 {
     /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
     /// <param name="notCorrectable">Why «ویرایش» is closed (a rule's code), or null when the receipt can still be corrected; only on one receipt, not in lists.</param>
@@ -179,7 +181,7 @@ public sealed record ReceiptView(
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
         instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
         statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba, NoteTermsView.From(r.NoteTerms),
-        notCorrectable, notDeletable);
+        notCorrectable, notDeletable, r.DeletedBy, r.DeletedAt);
 }
 
 /// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
@@ -744,8 +746,9 @@ public sealed class ReceiptUseCases(
     }
 
     /// <summary>
-    /// Deletion («حذف») of a receipt recorded by mistake, with the cheques or notes on it, before its voucher is confirmed (owner's answer
-    /// to Q59, 19 Nov 2026). One transaction (ADR 0002): a receipt without its cheques, or cheques without their receipt, never stay.
+    /// Deletion («حذف») of a receipt recorded by mistake, before its voucher is confirmed (owner's answer to Q59, 19 Nov 2026). The
+    /// receipt stays in the list as «حذف شده» with who deleted it and when (answer to Q67, 20 Nov 2026); the cheques or notes on it are
+    /// deleted. One transaction (ADR 0002): a deleted receipt whose cheques are still in the cash desk never stays.
     /// </summary>
     public Task<Result<Guid>> DeleteAsync(DeleteReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -760,14 +763,14 @@ public sealed class ReceiptUseCases(
             await EnsureOpenAsync(receipt.Date, ct).ConfigureAwait(false);
             var confirmed = await vouchers.FindAsync(VoucherSource.Receipt, receipt.Id, 0, ct).ConfigureAwait(false) is not null;
             var lines = await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false);
-            receipt.Delete(currentUser.UserId, confirmed, lines);
+            receipt.Delete(currentUser.UserId, confirmed, lines, (clock ?? TimeProvider.System).GetUtcNow());
             foreach (var line in lines)
             {
                 line.RemoveFromReceipt(currentUser.UserId);
                 await instruments.RemoveAsync(line, ct).ConfigureAwait(false);
             }
 
-            await receipts.RemoveAsync(receipt, ct).ConfigureAwait(false);
+            await receipts.SaveAsync(receipt, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(receipt.Id);
         }, cancellationToken);
 

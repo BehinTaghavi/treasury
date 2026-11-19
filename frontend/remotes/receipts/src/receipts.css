@@ -25,9 +25,13 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
 .tr-table th, .tr-table td { padding: .4rem .5rem; border-bottom: 1px solid #e4e7eb; text-align: start; vertical-align: middle; }
 .tr-table tr.cancelled td { color: #9aa5b1; text-decoration: line-through; }
+/* A deleted receipt stays in the list on a light red ground with «حذف شده» written large (owner, 20 Nov 2026, answer to Q67). */
+.tr-table tr.deleted td { background: #fde8e6; color: #7b8794; }
+.tr-deleted { font-size: 1.2rem; font-weight: 700; color: #b42318; white-space: nowrap; }
 .tr-table tr.clickable { cursor: pointer; }
 .tr-table tr.clickable:hover td { background: #f5f8ff; }
 .tr-table tr.selected td { background: #e8effc; }
+.tr-table tr.deleted.selected td { background: #f9d3cf; }
 .tr-tag { display: inline-block; margin: .1rem; padding: 0 .45rem; border-radius: 4px; background: #eef2f7; color: #52606d; font-size: .8rem; white-space: nowrap; }
 .tr-tag.current { background: #e6f4ea; color: #1e5631; }
 .tr-tag.later { background: #fff1d6; color: #7a5200; }

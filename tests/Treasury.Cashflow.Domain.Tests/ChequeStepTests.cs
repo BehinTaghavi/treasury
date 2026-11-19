@@ -241,7 +241,8 @@ public sealed class ChequeStepTests
         var created = new[] { New(6_000_000, "1"), New(5_000_000, "2") };
         var receipt = Receipt.RecordInstruments(receiptId, 9, header, created, User, old);
         // Owner, 19 Nov 2026 (answer to Q62): a cheque is replaced only after it was cancelled.
-        Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => old.Replace(receipt.Id, receipt.Date, User)).Code);
+        // The check the owner asked for (answer to Q66, 20 Nov 2026): the old cheque's cancellation must have been recorded.
+        Assert.Equal("Instrument.ReplaceNeedsCancellation", Assert.Throws<DomainException>(() => old.Replace(receipt.Id, receipt.Date, User)).Code);
         old.CancelReceived(D("1405/09/09"), User, "م-12", D("1405/09/08"), "تعویض با دو چک", originalStamped: true, recordedAt: Stamp);
         Assert.Equal([InstrumentAction.Replace], old.AllowedActions());
         old.Replace(receipt.Id, receipt.Date, User);
@@ -249,7 +250,7 @@ public sealed class ChequeStepTests
         Assert.Equal((InstrumentState?)InstrumentState.Cancelled, old.History[^1].From);
 
         // The cancellation wrote the cheque off (Dr «مطالبات سوخت شده» / Cr «اسناد واخواست شده»); the replacement takes it out of there:
-        // Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده», the difference to the purpose group (to confirm: Q64).
+        // Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده», the difference to the purpose group (owner's answer to Q64, 20 Nov 2026).
         Assert.Equal([(true, "8101", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(old, old.History.Count - 1, SideA, null, Template())));
         Assert.Null(ReceiptVouchers.ForStep(old, old.History.Count, SideA, null, Template()));
         var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Cancelled));

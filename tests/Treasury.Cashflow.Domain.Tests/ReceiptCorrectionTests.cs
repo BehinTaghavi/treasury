@@ -28,6 +28,8 @@ public sealed class ReceiptCorrectionTests
         Instrument.Receive(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, number, "بانک ملت", Money.Rials(10_000_000), D(date), D("1405/10/01"),
             CounterpartyRef.ForDetail((payer ?? Payer).DetailCode, (payer ?? Payer).Name), "فروش محصولات", User, new ReceivedInstrumentDetails(SayadId: "1234567890123456"), receiptId);
 
+    private static readonly DateTimeOffset At = new(2026, 11, 20, 6, 15, 0, TimeSpan.Zero);
+
     private static string Code(Action act) => Assert.Throws<DomainException>(act).Code;
 
     private static Receipt SavedCash()
@@ -179,14 +181,21 @@ public sealed class ReceiptCorrectionTests
     {
         var r = SavedCash();
         Assert.Null(r.WhyNotDeletable(false, []));
-        r.Delete("clerk-2", voucherConfirmed: false, []);
+        r.Delete("clerk-2", voucherConfirmed: false, [], At);
         var e = Assert.IsType<ReceiptDeleted>(Assert.Single(r.PendingEvents));
         Assert.Equal((4, 1405, "clerk-2", 5_000_000m), (e.Number, e.FiscalYear, e.UserId, e.TotalRial));
+        // Owner, 20 Nov 2026 (answer to Q67): the receipt stays, marked «حذف شده», with who deleted it and when; its number stays taken.
+        Assert.Equal((ReceiptState.Deleted, "clerk-2", (DateTimeOffset?)At, 4), (r.State, r.DeletedBy, r.DeletedAt, r.Number));
+        // Nothing more is done to a deleted receipt.
+        Assert.Equal("Receipt.Deleted", r.WhyNotCorrectable(voucherConfirmed: false));
+        Assert.Equal("Receipt.Deleted", Code(() => r.CorrectCash(Header(), Desk, Money.Rials(1), User, voucherConfirmed: false)));
+        Assert.Equal("Receipt.Deleted", Code(() => r.Cancel(D("1405/08/24"), "اشتباه", User)));
+        Assert.Equal("Receipt.Deleted", Code(() => r.Delete(User, voucherConfirmed: false, [], At)));
 
-        Assert.Equal("Receipt.VoucherConfirmed", Code(() => SavedCash().Delete(User, voucherConfirmed: true, [])));
+        Assert.Equal("Receipt.VoucherConfirmed", Code(() => SavedCash().Delete(User, voucherConfirmed: true, [], At)));
         var cancelled = SavedCash();
         cancelled.Cancel(D("1405/08/24"), "اشتباه", User);
-        Assert.Equal("Receipt.AlreadyCancelled", Code(() => cancelled.Delete(User, voucherConfirmed: false, [])));
+        Assert.Equal("Receipt.AlreadyCancelled", Code(() => cancelled.Delete(User, voucherConfirmed: false, [], At)));
     }
 
     [Fact]
@@ -200,14 +209,14 @@ public sealed class ReceiptCorrectionTests
         Assert.Null(r.WhyNotDeletable(false, [a, b]));
         b.RegisterSayad(D("1405/08/25"), User, null);
         Assert.Equal("Instrument.CorrectionAfterStep", r.WhyNotDeletable(false, [a, b]));
-        Assert.Equal("Instrument.CorrectionAfterStep", Code(() => r.Delete(User, voucherConfirmed: false, [a, b])));
+        Assert.Equal("Instrument.CorrectionAfterStep", Code(() => r.Delete(User, voucherConfirmed: false, [a, b], At)));
         Assert.Empty(r.PendingEvents);
 
         var old = Cheque(Guid.NewGuid(), "777");
         var newId = Guid.NewGuid();
         var fresh = Cheque(newId, "888");
         var replacement = Receipt.RecordInstruments(newId, 5, Header(), [fresh], User, old);
-        Assert.Equal("Receipt.ReplacementNotDeleted", Code(() => replacement.Delete(User, voucherConfirmed: false, [fresh])));
+        Assert.Equal("Receipt.ReplacementNotDeleted", Code(() => replacement.Delete(User, voucherConfirmed: false, [fresh], At)));
     }
 
     [Fact]

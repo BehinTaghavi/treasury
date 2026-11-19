@@ -12,7 +12,8 @@
  * the form of its kind); a box of its own for the receipt number, which finds exactly that number (item 9: typed into the general
  * search box, a number also matched every date and code that contains it).
  * Owner's answers of 19 Nov 2026: «حذف رسید» beside «ویرایش رسید», at the same stage (Q59); «چاپ» of the list with «از تاریخ / تا تاریخ»
- * filled from the list (Q63).
+ * filled from the list (Q63). Owner, 20 Nov 2026 (answer to Q67): a deleted receipt stays in the list, on a light red ground with «حذف شده»
+ * written large; opened, it says who deleted it and when.
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
@@ -46,6 +47,8 @@ interface Receipt {
   notCorrectable?: string | null
   /** The same for «حذف» (owner's answer to Q59). */
   notDeletable?: string | null
+  /** A deleted receipt («حذف شده»): who deleted it, and the computer's date and time then. */
+  deletedBy?: string | null; deletedAt?: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
@@ -91,7 +94,10 @@ const shown = computed(() => {
     && (!key || searchKey(`${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date} ${
       statusGroups(r).map(g => g.name + (g.due ? ` ${dueMark(props.locale)}` : '')).join(' ')}`).includes(key)))
 })
-const totalShown = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
+const totalShown = computed(() => shown.value.filter(r => r.state === 'Recorded').reduce((s, r) => s + r.totalRial, 0))
+/** The computer's date and time of a deletion, in Iran's time. */
+const when = (iso: string | null | undefined) => (iso
+  ? new Intl.DateTimeFormat(fa.value ? 'fa-IR' : 'en-GB', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(iso)) : '')
 
 function accountName(r: Receipt) {
   if (r.accountKind === 'CashDesk') return L.desks.value.find(d => d.id === r.accountId)?.name ?? ''
@@ -167,20 +173,19 @@ const deleting = ref(false)
 async function removeSelected() {
   const r0 = selected.value
   if (!r0 || deleting.value) return
-  if (!window.confirm(t(`رسید ${name(kindNames, r0.kind)} شمارهٔ ${num(r0.number)} (${r0.payerName} – ${money(r0.totalRial)} ریال)${hasInstruments(r0) ? ' با چک‌ها و سفته‌های آن' : ''} حذف شود؟ شمارهٔ این رسید دوباره استفاده نمی‌شود.`,
-    `Delete ${name(kindNames, r0.kind)} receipt no. ${r0.number} (${r0.payerName} – ${money(r0.totalRial)} Rial)? Its number is not used again.`))) return
+  if (!window.confirm(t(`رسید ${name(kindNames, r0.kind)} شمارهٔ ${num(r0.number)} (${r0.payerName} – ${money(r0.totalRial)} ریال)${hasInstruments(r0) ? ' با چک‌ها و سفته‌های آن' : ''} حذف شود؟ رسید با عبارت «حذف شده» در فهرست می‌ماند و شمارهٔ آن به رسید دیگری داده نمی‌شود.`,
+    `Delete ${name(kindNames, r0.kind)} receipt no. ${r0.number} (${r0.payerName} – ${money(r0.totalRial)} Rial)? It stays in the list marked as deleted, and its number is not given to another receipt.`))) return
   deleting.value = true
   const r = await api.post<string>(`/api/cashflow/receipts/${r0.id}/delete`, { version: r0.version })
   deleting.value = false
   if (!r.ok) return show('error', translate(r.code, props.locale))
-  selected.value = null
-  show('ok', t(`رسید شمارهٔ ${num(r0.number)} حذف شد.`, `Receipt no. ${r0.number} deleted.`))
-  await load()
+  show('ok', t(`رسید شمارهٔ ${num(r0.number)} حذف شد و با عبارت «حذف شده» در فهرست مانده است.`, `Receipt no. ${r0.number} deleted; it stays in the list marked as deleted.`))
+  await Promise.all([open(r0.id), load()])
 }
 
 // ---- «چاپ» of the list with a range of dates (owner's answer to Q63) ----
 const inRange = (from: string | null, to: string | null) => shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
-const statusText = (r: Receipt) => (r.state === 'Cancelled' ? t('ابطال شده', 'Cancelled')
+const statusText = (r: Receipt) => (r.state === 'Deleted' ? t('حذف شده', 'Deleted') : r.state === 'Cancelled' ? t('ابطال شده', 'Cancelled')
   : hasInstruments(r) ? statusGroups(r).map(g => `${r.instrumentCount > 1 ? t(`${num(g.count)} برگ: `, `${g.count} × `) : ''}${g.name}${g.due ? ` (${dueMark(props.locale)})` : ''}`).join(fa.value ? '، ' : ', ')
   : t('ثبت شده', 'Recorded'))
 function printHtml(from: string | null = null, to: string | null = null) {
@@ -194,7 +199,7 @@ function printHtml(from: string | null = null, to: string | null = null) {
       t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')],
     rows: rows.map((r, i) => [num(i + 1), num(r.number), name(kindNames, r.kind) + (r.method ? ` – ${depositMethodName(r.method, fa.value)}` : ''), r.date,
       `${r.payerName} (${r.payerDetailCode})`, r.purpose, hasInstruments(r) ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r), money(r.totalRial), statusText(r)]),
-    total: { label: t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'), value: money(rows.filter(r => r.state !== 'Cancelled').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
+    total: { label: t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)'), value: money(rows.filter(r => r.state === 'Recorded').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
     locale: props.locale,
   })
 }
@@ -250,7 +255,7 @@ onMounted(async () => { await L.load(); await load() })
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', selected: selected?.id === r.id }]" @click="open(r.id)">
+          <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', deleted: r.state === 'Deleted', selected: selected?.id === r.id }]" @click="open(r.id)">
             <td class="num">{{ num(r.number) }}</td>
             <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ depositMethodName(r.method, fa) }}</span></td>
             <td class="num">{{ r.date }}</td>
@@ -260,7 +265,8 @@ onMounted(async () => { await L.load(); await load() })
             <td class="num">{{ r.amount !== null && r.currency !== 'IRR' ? `${money(r.amount)} ${r.currency}` : '' }}</td>
             <td class="num">{{ money(r.totalRial) }}</td>
             <td>
-              <span v-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
+              <span v-if="r.state === 'Deleted'" class="tr-deleted">{{ t('حذف شده', 'Deleted') }}</span>
+              <span v-else-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
               <template v-else-if="r.kind === 'Instruments'">
                 <div v-for="g in statusGroups(r)" :key="g.state">
                   <span v-if="r.instrumentCount > 1" class="muted small">{{ t(`${num(g.count)} برگ:`, `${g.count} ×`) }}</span> {{ g.name }}
@@ -273,7 +279,7 @@ onMounted(async () => { await L.load(); await load() })
           <tr v-if="!shown.length"><td colspan="9" class="muted">{{ receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
         </tbody>
         <tfoot v-if="shown.length">
-          <tr><td colspan="7"><strong>{{ t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)') }}</strong></td><td class="num"><strong>{{ money(totalShown) }}</strong></td><td /></tr>
+          <tr><td colspan="7"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(totalShown) }}</strong></td><td /></tr>
         </tfoot>
       </table>
     </div>
@@ -304,6 +310,11 @@ onMounted(async () => { await L.load(); await load() })
         <button v-if="!selected.notDeletable" type="button" class="tr-secondary danger" :disabled="deleting" @click="removeSelected">{{ t('حذف رسید', 'Delete the receipt') }}</button>
         <span v-else-if="selected.notDeletable !== selected.notCorrectable" class="muted small">{{ t('حذف بسته است:', 'Deletion is closed:') }} {{ translate(selected.notDeletable, locale) }}</span>
       </div>
+      <p v-if="selected.state === 'Deleted'" class="tr-msg error">
+        <span class="tr-deleted">{{ t('حذف شده', 'Deleted') }}</span>
+        {{ t(`– این رسید را ${selected.deletedBy ?? ''} در ${when(selected.deletedAt)} حذف کرده است. شمارهٔ آن به رسید دیگری داده نمی‌شود${hasInstruments(selected) ? ' و چک‌ها و سفته‌های آن از فهرست چک‌ها برداشته شده‌اند' : ''}.`,
+          `– deleted by ${selected.deletedBy ?? ''} on ${when(selected.deletedAt)}. Its number is not given to another receipt${hasInstruments(selected) ? ', and its cheques and notes were taken off the cheque lists' : ''}.`) }}
+      </p>
       <p v-if="selected.state === 'Cancelled'" class="tr-msg error">{{ t(`ابطال شده در ${selected.cancelledOn}: ${selected.cancelReason}`, `Cancelled on ${selected.cancelledOn}: ${selected.cancelReason}`) }}</p>
 
       <template v-if="terms">

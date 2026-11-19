@@ -27,6 +27,8 @@ export interface SavedReceipt {
   replacedInstrumentId: string | null; noteTerms: NoteTerms | null; notCorrectable: string | null
   /** The code of the rule that closes «حذف», or null while the receipt can be deleted (owner's answer to Q59). */
   notDeletable?: string | null
+  /** A deleted receipt («حذف شده», answer to Q67): who deleted it, and when. */
+  deletedBy?: string | null; deletedAt?: string | null
 }
 
 /** An amount as the amount boxes hold it: plain digits, without a float's tail ("12500000", "100.5"). */

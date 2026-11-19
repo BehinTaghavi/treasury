@@ -527,6 +527,11 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void Replace(Guid replacementReceiptId, FiscalDate date, string userId)
     {
         Require(replacementReceiptId != Guid.Empty, "Instrument.ReplacementRequired", "The replacement receipt is required.");
+
+        // Owner, 20 Nov 2026 (answer to Q66): "حتما این کنترل باید وجود داشته باشد در هنگام تعویض؛ ابطال چک قبلی ثبت شده باشد". The
+        // lifecycle table says the same; this names the reason to the user.
+        Require(Direction != InstrumentDirection.Received || State == InstrumentState.Cancelled, "Instrument.ReplaceNeedsCancellation",
+            $"Cheque {Number} must be cancelled («ابطال») before it is replaced.");
         Apply(InstrumentAction.Replace, date, userId, null, null, details: new StepDetails(ReceiptId: replacementReceiptId));
     }
 

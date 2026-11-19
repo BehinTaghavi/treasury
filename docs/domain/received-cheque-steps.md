@@ -58,7 +58,7 @@ of the company bank account.
 | (b) collected | date (after checking the statement), reference | bank account's معین · bank | «چک‌های در جریان وصول» · bank | owner's table — built |
 | (c) returned to the company | date, bank's note | «اسناد نزد صندوق» · payer | «چک‌های در جریان وصول» · bank | owner's table «عودت چک واگذاری توسط بانک» |
 | (e) bounced | **bounce notice no. and date** (required; on screens «گواهی عدم پرداخت»), its tracking code (optional), reason | «اسناد واخواست شده» · payer | «چک‌های در جریان وصول» · bank (from «عودت شده»: «اسناد نزد صندوق») | owner's table «برگشت چک واگذاری توسط بانک» (account name corrected by the owner, Q34) |
-| (d) replaced — **only a cancelled cheque, since 19 Nov** (section 9) | the new cheque(s) of the same payer (as on the cheque receipt form, which opens with the old cheque's purpose group, purpose, department, amount and currency) | «اسناد نزد صندوق» · payer (new cheque) | «مطالبات سوخت شده» · payer (the old cheque, which its cancellation moved there); a difference in amount goes to the purpose group · payer | Q31; owner's answer to Q62; the credit side is to be confirmed (Q64) |
+| (d) replaced — **only a cancelled cheque, since 19 Nov** (section 9) | the new cheque(s) of the same payer (as on the cheque receipt form, which opens with the old cheque's purpose group, purpose, department, amount and currency) | «اسناد نزد صندوق» · payer (new cheque) | «مطالبات سوخت شده» · payer (the old cheque, which its cancellation moved there); a difference in amount goes to the purpose group · payer | Q31; owner's answers to Q62 and Q64 (confirmed 20 Nov 2026) |
 | (f) cancelled — also the first step of a replacement | management's order no. and date, date, reason; the tick «اصل چک ممهور به مهر ابطال شد» (the user and the computer's date and time are kept beside it; answer to Q62) | new fixed account «مطالبات سوخت شده» · payer (guarantee: «طرف حساب انتظامی») | where the cheque is: «اسناد نزد صندوق» or «اسناد واخواست شده» (guarantee: «چک انتظامی به نفع شرکت») | owner's table «ابطال چک دریافتنی نزد صندوق» |
 | (g) ثبت انتقال (خرج چک) | the approved payment request of the kind «ثبت انتقال (خرج چک)» written for the cheque (its beneficiary, payment purpose group and purpose), tracking code of the transfer in Sayad (required); section 8 | payment purpose group's account · endorsee | «اسناد نزد صندوق» · payer | manual: «خرج چک: بد بستانکاران / حساب‌های پرداختنی» (Q32) |
 | (h) endorsement returned | bounce notice no. and date | «اسناد واخواست شده» · payer | the account debited at (g) · endorsee | owner's table «عودت چک‌های خرج شده … (پس از برگشت)» |
@@ -231,9 +231,11 @@ recorded** — registered in Sayad, deposited, back in the cash desk after a leg
 cheques of the receipt are still corrected and removed.** The receipt's date and payer are written on the locked cheque too, so they stay
 (`Receipt.FixedByMovedCheque`); purpose group, purpose, references and note can change. The receipt keeps its kind and its fiscal year.
 
-**Deletion of a receipt («حذف», answer to Q59).** Beside «ویرایش», at the same stage: a receipt recorded by mistake is deleted with the
-cheques or notes on it. Not deleted: a cancelled receipt, a receipt with a locked cheque (take the other cheques off with «ویرایش»), and
-the receipt of a replacement. The number of a deleted receipt is not given again (Q67).
+**Deletion of a receipt («حذف», answers to Q59 and Q67).** Beside «ویرایش», at the same stage. A receipt recorded by mistake becomes
+**«حذف شده»**: it stays in its place in the receipts lists on a light red ground with «حذف شده» written large (who deleted it and when is
+shown on the opened receipt), its number is not given again, the cheques or notes on it are deleted and leave the cheque lists, and it
+is left out of the totals. Not deleted: a cancelled receipt, a receipt with a locked cheque (take the other cheques off with
+«ویرایش»), and the receipt of a replacement.
 
 **Replacement (item 11; answer to Q62).** For internal control a cheque is **cancelled first** and only then replaced:
 1. «ابطال» (red, before «تعویض چک» on the cheque's row, where «تعویض چک» is switched off until then): date, number and date of management's
@@ -242,8 +244,10 @@ the receipt of a replacement. The number of a deleted receipt is not given again
 2. The cheque is now on the tab «ابطال‌شده (قابل تعویض)». «تعویض چک» there opens the cheque receipt form with the old cheque's purpose group,
    purpose, department, references, amount and currency, all free to change; saving receives the replacement cheque «نزد صندوق» and marks
    the old one «تعویض چک». Its voucher (on the new receipt): Dr «اسناد نزد صندوق» / Cr «مطالبات سوخت شده», the difference to the purpose
-   group (Q64).
-A replacement recorded before 19 Nov keeps its history and its voucher. Open points: Q64–Q66.
+   group (confirmed by the owner, Q64). A cheque that is not cancelled is refused with the words "cancel it first"
+   (`Instrument.ReplaceNeedsCancellation`; the check the owner asked for, Q66).
+A replacement recorded before 19 Nov keeps its history and its voucher. Q64–Q66 were answered on 20 Nov 2026: as built; the stamp tick
+stays optional, management's order stays required, «مطالبات سوخت شده» is one account of the company.
 
 **Purpose as the cheque's description (item 4).** The purpose of the receipt is written at the start of both lines of each cheque's
 voucher and shown under the payer in the cheque lists and on the cheque card.

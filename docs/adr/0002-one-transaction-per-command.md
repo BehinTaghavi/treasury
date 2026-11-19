@@ -26,7 +26,8 @@ no other command can be working on it with a different intent. A cheque taken of
 043 grants the delete), and the events `ReceiptCorrected`, `ReceivedInstrumentCorrected` and `ReceivedInstrumentRemoved` go to the outbox
 in the same transaction, so a consumer of the earlier `ReceiptRecorded` / `InstrumentStateChanged` events can follow the correction.
 
-Amendment (19 Nov 2026, the owner's answers to Q59 and Q60): **deleting** a receipt recorded by mistake (`ReceiptUseCases.DeleteAsync`)
-removes the receipt and the cheques or notes on it in one transaction, with `ReceiptDeleted` and `ReceivedInstrumentRemoved` in the
-outbox; a receipt without its cheques, or cheques without their receipt, never stay. A cheque on which a step was recorded is not
+Amendment (19 and 20 Nov 2026, the owner's answers to Q59, Q60 and Q67): **deleting** a receipt recorded by mistake
+(`ReceiptUseCases.DeleteAsync`) marks the receipt «حذف شده» (it stays in the list; its row is never removed) and removes the cheques or
+notes on it in one transaction, with `ReceiptDeleted` and `ReceivedInstrumentRemoved` in the outbox; a deleted receipt whose cheques
+are still in the cash desk never stays. A cheque on which a step was recorded is not
 touched by a correction and stops the deletion, so both commands still only change cheques nothing else is working on.

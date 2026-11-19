@@ -92,6 +92,12 @@ public enum ReceiptState
 {
     Recorded,
     Cancelled,
+
+    /// <summary>
+    /// «حذف شده»: recorded by mistake and deleted before its voucher was confirmed (owner's answer to Q59). The receipt stays in the
+    /// list, marked, so its number is seen to be taken (owner, 20 Nov 2026, answer to Q67); its cheques and notes are gone.
+    /// </summary>
+    Deleted,
 }
 
 public enum ReceiptAccountKind
@@ -236,6 +242,11 @@ public sealed class Receipt : AggregateRoot<Guid>
     public FiscalDate? CancelledOn { get; private set; }
 
     public string? CancelReason { get; private set; }
+
+    /// <summary>Who deleted the receipt («حذف شده»), and the computer's date and time then; null while it is not deleted.</summary>
+    public string? DeletedBy { get; private set; }
+
+    public DateTimeOffset? DeletedAt { get; private set; }
 
     /// <summary>Cash received into a cash desk (old Access form D_Naghd, Scode 17).</summary>
     public static Receipt RecordCash(Guid id, int number, ReceiptHeader header, ReceiptAccountFact cashDesk, Money amount, string userId)
@@ -435,16 +446,20 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// <param name="voucherConfirmed">The treasurer confirmed the receipt's voucher («تایید سند»).</param>
     public void EnsureCorrectable(bool voucherConfirmed)
     {
+        Require(State != ReceiptState.Deleted, "Receipt.Deleted", "The receipt was deleted.");
         Require(State == ReceiptState.Recorded, "Receipt.AlreadyCancelled", "The receipt is already cancelled.");
         Require(!voucherConfirmed, "Receipt.VoucherConfirmed", "The receipt's voucher is confirmed; it can no longer be changed.");
     }
 
     /// <summary>
-    /// The code of the rule that closes «ویرایش» for this receipt, or null while it can be corrected: cancelled, or voucher confirmed.
-    /// A cheque on which a step was recorded no longer closes the correction of its receipt, only its own (answer to Q60).
+    /// The code of the rule that closes «ویرایش» for this receipt, or null while it can be corrected: deleted, cancelled, or voucher
+    /// confirmed. A cheque on which a step was recorded no longer closes the correction of its receipt, only its own (answer to Q60).
     /// </summary>
     public string? WhyNotCorrectable(bool voucherConfirmed) =>
-        State != ReceiptState.Recorded ? "Receipt.AlreadyCancelled" : voucherConfirmed ? "Receipt.VoucherConfirmed" : null;
+        State == ReceiptState.Deleted ? "Receipt.Deleted"
+        : State != ReceiptState.Recorded ? "Receipt.AlreadyCancelled"
+        : voucherConfirmed ? "Receipt.VoucherConfirmed"
+        : null;
 
     /// <summary>
     /// The code of the rule that closes «حذف» for this receipt, or null while it can be deleted (see <see cref="Delete"/>).
@@ -460,13 +475,16 @@ public sealed class Receipt : AggregateRoot<Guid>
 
     /// <summary>
     /// Deletion («حذف») of a receipt recorded by mistake, before its voucher is confirmed (owner, 19 Nov 2026, answer to Q59: "امکان حذف
-    /// هم لازم است در این مرحله در کنار ویرایش پیش بینی شود"). The caller deletes the receipt and the cheques or notes on it; its number
-    /// is not given to another receipt. Not deleted: a cancelled receipt (it stays as the record of its cancellation), a receipt
-    /// with a cheque on which a step was recorded (take the other cheques off it with «ویرایش»), and a receipt that replaced a
-    /// cheque (the replaced cheque names it; its new cheques are corrected, returned or cancelled instead).
+    /// هم لازم است در این مرحله در کنار ویرایش پیش بینی شود"). The receipt becomes «حذف شده» and stays in the receipts list, marked,
+    /// with who deleted it and when, so its number is seen to be taken (owner, 20 Nov 2026, answer to Q67: "رسید حذف شده با ترام قرمز
+    /// کمرنگ با عبارت بزرگ شده «حذف شده» در ردیف رسیدها"); the caller deletes the cheques or notes on it, which leave the cheque lists.
+    /// Not deleted: a cancelled receipt (it stays as the record of its cancellation), a receipt with a cheque on which a step was
+    /// recorded (take the other cheques off it with «ویرایش»), and a receipt that replaced a cheque (the replaced cheque names it; its
+    /// new cheques are corrected, returned or cancelled instead).
     /// </summary>
     /// <param name="instruments">The cheques or notes of the receipt as stored.</param>
-    public void Delete(string userId, bool voucherConfirmed, IReadOnlyList<Instrument> instruments)
+    /// <param name="at">The computer's date and time, kept with the user who deleted it.</param>
+    public void Delete(string userId, bool voucherConfirmed, IReadOnlyList<Instrument> instruments, DateTimeOffset at)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
         if (WhyNotDeletable(voucherConfirmed, instruments) is { } code)
@@ -474,7 +492,10 @@ public sealed class Receipt : AggregateRoot<Guid>
             throw new DomainException(code, "The receipt can no longer be deleted.");
         }
 
-        Raise(new ReceiptDeleted(Id, Kind, FiscalYear, Number, Date, Payer.DetailCode, TotalRial, [.. _instrumentIds], userId));
+        State = ReceiptState.Deleted;
+        DeletedBy = userId.Trim();
+        DeletedAt = at;
+        Raise(new ReceiptDeleted(Id, Kind, FiscalYear, Number, Date, Payer.DetailCode, TotalRial, [.. _instrumentIds], DeletedBy));
     }
 
     /// <summary>
@@ -504,6 +525,7 @@ public sealed class Receipt : AggregateRoot<Guid>
     public void Cancel(FiscalDate date, string reason, string userId)
     {
         Require(Kind is not (ReceiptKind.Instruments or ReceiptKind.Notes), "Receipt.CancelInstruments", "Return each cheque or note to the payer instead of cancelling the receipt.");
+        Require(State != ReceiptState.Deleted, "Receipt.Deleted", "The receipt was deleted.");
         Require(State == ReceiptState.Recorded, "Receipt.AlreadyCancelled", "The receipt is already cancelled.");
         Require(!string.IsNullOrWhiteSpace(reason), "Receipt.CancelReasonRequired", "Give the reason for cancelling.");
         Require(!string.IsNullOrWhiteSpace(userId), "Receipt.UserRequired", "User is required.");
@@ -519,7 +541,7 @@ public sealed class Receipt : AggregateRoot<Guid>
         string? reference1, string? reference2, Guid? departmentId, bool salesProceeds, string? note, string recordedBy,
         ReceiptAccountKind? accountKind, Guid? accountId, DepositMethod? method, string? trackingNumber, Money? amount,
         IEnumerable<Guid> instrumentIds, decimal totalRial, ReceiptState state, FiscalDate? cancelledOn, string? cancelReason, long version,
-        Guid? replacedInstrumentId = null, string? payerSheba = null, NoteReceiptTerms? noteTerms = null)
+        Guid? replacedInstrumentId = null, string? payerSheba = null, NoteReceiptTerms? noteTerms = null, string? deletedBy = null, DateTimeOffset? deletedAt = null)
     {
         ArgumentNullException.ThrowIfNull(payer);
         var header = new ReceiptHeader(date, new PayerFact(payer.DetailCode ?? string.Empty, payer.DisplayName, true, true),
@@ -538,6 +560,8 @@ public sealed class Receipt : AggregateRoot<Guid>
             ReplacedInstrumentId = replacedInstrumentId,
             PayerSheba = payerSheba,
             NoteTerms = noteTerms,
+            DeletedBy = deletedBy,
+            DeletedAt = deletedAt,
         };
         r._instrumentIds.AddRange(instrumentIds);
         r.SetLoadedVersion(version);
@@ -620,7 +644,7 @@ public sealed record ReceiptCorrected(
     ReceiptAccountKind? AccountKind, Guid? AccountId, decimal? Amount, string? Currency, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
     bool SalesProceeds, string UserId) : DomainEvent;
 
-/// <summary>A receipt recorded by mistake was deleted, with the cheques or notes on it, before its voucher was confirmed.</summary>
+/// <summary>A receipt recorded by mistake was marked «حذف شده», and the cheques or notes on it deleted, before its voucher was confirmed.</summary>
 public sealed record ReceiptDeleted(
     Guid ReceiptId, ReceiptKind Kind, int FiscalYear, int Number, FiscalDate Date, string? PayerDetailCode, decimal TotalRial, IReadOnlyList<Guid> InstrumentIds,
     string UserId) : DomainEvent;

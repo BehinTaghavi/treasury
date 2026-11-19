@@ -66,7 +66,8 @@ public sealed class VoucherUseCases(
         unitOfWork.ExecuteAsync(async ct =>
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false);
-            if (receipt is null)
+            // A deleted receipt («حذف شده») has no voucher: it was deleted before one was confirmed.
+            if (receipt is null || receipt.State == ReceiptState.Deleted)
             {
                 return null;
             }
@@ -84,6 +85,11 @@ public sealed class VoucherUseCases(
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false)
                 ?? throw new DomainException("Receipt.NotFound", "The receipt was not found.");
+            if (receipt.State == ReceiptState.Deleted)
+            {
+                throw new DomainException("Receipt.Deleted", "The receipt was deleted.");
+            }
+
             if (receipt.State == ReceiptState.Cancelled)
             {
                 throw new DomainException("Voucher.SourceCancelled", "The receipt is cancelled.");

@@ -32,7 +32,7 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | عودت چک واگذاری توسط بانک | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | چک های در جریان وصول | بانک مربوطه |
 | عملیات | عودت چک‌های نزد صندوق | بدهکاران یا ... | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
 | عملیات | ابطال چک دریافتنی نزد صندوق | مطالبات سوخت شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
-| عملیات | دریافت چک تعویضی به جای چک ابطال شده – تعویض (افزودهٔ ۲۸ آبان ۱۴۰۵؛ طرف بستانکار: Q64) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | مطالبات سوخت شده (تفاوت مبلغ: گروه بابت) | ذینفع |
+| عملیات | دریافت چک تعویضی به جای چک ابطال شده – تعویض (افزودهٔ ۲۸ آبان ۱۴۰۵؛ تایید مدیرعامل ۲۹ آبان، Q64) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | مطالبات سوخت شده (تفاوت مبلغ: گروه بابت) | ذینفع |
 | عملیات | ابطال چک / سفته انتظامی دریافتی نزد صندوق | طرف حساب انتظامی | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی دریافتی به عادی | (۱) اسناد نزد صندوق / اسناد دریافتنی، (۲) طرف حساب انتظامی | ذینفع | (۱) درآمد حاصل از تضمین استفاده شده، (۲) چک انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
@@ -74,8 +74,8 @@ Since 19 Nov 2026 (owner's report no. 6):
   voucher «ابطال چک دریافتنی»: Dr «مطالبات سوخت شده» · payer / Cr where the cheque is («اسناد نزد صندوق», «اسناد واخواست شده» or «اسناد واخواست
   شده حقوقی شده») · payer — "حتی اگر بعدا چک تعویض گردد". The replacement cheque is then received on its own receipt: Dr «اسناد نزد صندوق» ·
   payer / Cr «مطالبات سوخت شده» · payer for the old cheque's amount, a difference to the purpose group (row added to the table above;
-  the credit side is proposed and waits for the owner, Q64). «مطالبات سوخت شده» is one fixed account of the company, chosen on the
-  page «شابلون اسناد خزانه داری» (Q65).
+  confirmed by the owner on 20 Nov 2026, Q64). «مطالبات سوخت شده» is one fixed account of the company, chosen on the page «شابلون اسناد
+  خزانه داری» (confirmed, Q65).
 - **A receipt's voucher follows the receipt until it is confirmed** (items 2 and 6): the voucher of an unconfirmed receipt is worked out
   from the receipt each time it is shown, so a corrected receipt shows the corrected voucher; «تایید سند» keeps the lines and closes the
   correction and the deletion of the receipt (answer to Q59). A purpose group stays correctable after it was used (answer to Q61); a

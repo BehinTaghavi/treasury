@@ -13,7 +13,8 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
     private const string Columns =
         "fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name, purpose, " +
         "reference1, reference2, department_id, sales_proceeds, note, recorded_by, account_kind, account_id, deposit_method, tracking_number, " +
-        "amount, currency, rate_to_rial, instrument_ids, total_rial, state, cancelled_on, cancel_reason, version, replaced_instrument_id, payer_sheba, note_terms";
+        "amount, currency, rate_to_rial, instrument_ids, total_rial, state, cancelled_on, cancel_reason, version, replaced_instrument_id, payer_sheba, note_terms, " +
+        "deleted_by, deleted_at";
 
     /// <summary>Enums as their names, so the stored JSON reads the same as the other columns.</summary>
     private static readonly System.Text.Json.JsonSerializerOptions TermsJson = new(System.Text.Json.JsonSerializerDefaults.Web)
@@ -48,7 +49,7 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.receipt ({Columns}) VALUES (@year, @id, @kind, @number, @date, @payer, @payer_name, @payer_code, @group, @group_name, @purpose, " +
             "@ref1, @ref2, @department, @sales, @note, @by, @account_kind, @account, @method, @tracking, @amount, @currency, @rate, @instruments, @total, @state, " +
-            "@cancelled_on, @cancel_reason, 1, @replaced, @sheba, @note_terms)"))
+            "@cancelled_on, @cancel_reason, 1, @replaced, @sheba, @note_terms, @deleted_by, @deleted_at)"))
         {
             Bind(cmd, s);
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -63,13 +64,15 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         ArgumentNullException.ThrowIfNull(receipt);
         var tx = PostgresUnitOfWork.Current;
         var s = ReceiptSnapshot.From(receipt, receipt.Version + 1);
-        // A cancellation changes the state; a correction (report no. 6, items 2 and 6) everything but the kind, number and fiscal year.
+        // A cancellation or a deletion («حذف شده») changes the state; a correction (report no. 6, items 2 and 6) everything but the kind,
+        // number and fiscal year.
         await using (var cmd = tx.Command(
             "UPDATE cashflow.receipt SET receipt_date = @date, payer_id = @payer, payer_name = @payer_name, payer_detail_code = @payer_code, " +
             "purpose_group_id = @group, purpose_group_name = @group_name, purpose = @purpose, reference1 = @ref1, reference2 = @ref2, department_id = @department, " +
             "sales_proceeds = @sales, note = @note, account_kind = @account_kind, account_id = @account, deposit_method = @method, tracking_number = @tracking, " +
             "amount = @amount, currency = @currency, rate_to_rial = @rate, instrument_ids = @instruments, total_rial = @total, payer_sheba = @sheba, note_terms = @note_terms, " +
-            "state = @state, cancelled_on = @cancelled_on, cancel_reason = @cancel_reason, version = version + 1, updated_at = now() " +
+            "state = @state, cancelled_on = @cancelled_on, cancel_reason = @cancel_reason, deleted_by = @deleted_by, deleted_at = @deleted_at, " +
+            "version = version + 1, updated_at = now() " +
             "WHERE fiscal_year = @year AND id = @id AND kind = @kind AND number = @number AND version = @expected"))
         {
             Bind(cmd, s);
@@ -77,26 +80,6 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
             if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
             {
                 throw new ConcurrencyConflictException($"Receipt {s.Id} was changed by someone else.");
-            }
-        }
-
-        await PostgresOutbox.WriteAsync(tx, receipt.PendingEvents, cancellationToken).ConfigureAwait(false);
-        receipt.MarkSaved(receipt.Version + 1);
-    }
-
-    /// <summary>A receipt deleted before its voucher was confirmed (owner's answer to Q59); its number is not given again.</summary>
-    public async Task RemoveAsync(Receipt receipt, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(receipt);
-        var tx = PostgresUnitOfWork.Current;
-        await using (var cmd = tx.Command("DELETE FROM cashflow.receipt WHERE fiscal_year = @year AND id = @id AND version = @expected"))
-        {
-            cmd.Parameters.AddWithValue("year", receipt.FiscalYear);
-            cmd.Parameters.AddWithValue("id", receipt.Id);
-            cmd.Parameters.AddWithValue("expected", receipt.Version);
-            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
-            {
-                throw new ConcurrencyConflictException($"Receipt {receipt.Id} was changed by someone else.");
             }
         }
 
@@ -147,6 +130,8 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
         cmd.Parameters.AddWithValue("cancel_reason", Db(s.CancelReason));
         cmd.Parameters.Add(new NpgsqlParameter("replaced", NpgsqlDbType.Uuid) { Value = Db(s.ReplacedInstrumentId) });
         cmd.Parameters.Add(new NpgsqlParameter("sheba", NpgsqlDbType.Text) { Value = Db(s.PayerSheba) });
+        cmd.Parameters.Add(new NpgsqlParameter("deleted_by", NpgsqlDbType.Text) { Value = Db(s.DeletedBy) });
+        cmd.Parameters.Add(new NpgsqlParameter("deleted_at", NpgsqlDbType.TimestampTz) { Value = Db(s.DeletedAt?.ToUniversalTime()) });
         cmd.Parameters.Add(new NpgsqlParameter("note_terms", NpgsqlDbType.Jsonb)
         {
             Value = s.NoteTerms is null ? DBNull.Value : System.Text.Json.JsonSerializer.Serialize(s.NoteTerms, TermsJson),
@@ -193,7 +178,9 @@ public sealed class PostgresReceiptRepository : IReceiptRepository
                 Version: r.GetInt64(29),
                 ReplacedInstrumentId: r.IsDBNull(30) ? null : r.GetGuid(30),
                 PayerSheba: Text(31),
-                NoteTerms: r.IsDBNull(32) ? null : System.Text.Json.JsonSerializer.Deserialize<NoteTermsSnapshot>(r.GetString(32), TermsJson)).ToDomain());
+                NoteTerms: r.IsDBNull(32) ? null : System.Text.Json.JsonSerializer.Deserialize<NoteTermsSnapshot>(r.GetString(32), TermsJson),
+                DeletedBy: Text(33),
+                DeletedAt: r.IsDBNull(34) ? null : new DateTimeOffset(r.GetFieldValue<DateTime>(34), TimeSpan.Zero)).ToDomain());
         }
 
         return list;

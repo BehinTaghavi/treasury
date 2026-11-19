@@ -11,7 +11,9 @@
  * - item 10: «چاپ» first asks «از تاریخ» and «تا تاریخ», filled with the first and last date of the rows now listed and free to change,
  *   and prints the receipts of that range;
  * - items 2 and 6: «ویرایش» on a row opens the receipt in the form above while its voucher is not confirmed;
- * - owner's answer to Q59 (19 Nov 2026): «حذف» beside it deletes a receipt recorded by mistake, at the same stage.
+ * - owner's answer to Q59 (19 Nov 2026): «حذف» beside it deletes a receipt recorded by mistake, at the same stage;
+ * - owner's answer to Q67 (20 Nov 2026): a deleted receipt stays in the list, on a light red ground with «حذف شده» written large, so its
+ *   number is seen to be taken; it is left out of the total.
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { chequeStateName, createApi, dueMark, formatAmount, groupChequeStatuses, receiptNumber, searchKey, todayJalali, translate,
@@ -97,6 +99,7 @@ function accountName(r: Receipt) {
 }
 /** The latest status as text: of a cheque receipt its cheques' statuses, otherwise recorded or cancelled. */
 function statusText(r: Receipt) {
+  if (r.state === 'Deleted') return t('حذف شده', 'Deleted')
   if (r.state === 'Cancelled') return t('ابطال شده', 'Cancelled')
   if (r.kind !== 'Instruments' && r.kind !== 'Notes') return t('ثبت شده', 'Recorded')
   return groupChequeStatuses(r.chequeStatuses, props.locale, r.kind === 'Notes')
@@ -109,7 +112,7 @@ const shown = computed(() => {
   return receipts.value.filter(r => (!method.value || r.method === method.value) && (wanted === null || r.number === wanted)
     && (!key || searchKey(`${r.date} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.trackingNumber ?? ''} ${statusText(r)}`).includes(key)))
 })
-const total = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
+const total = computed(() => shown.value.filter(r => r.state === 'Recorded').reduce((s, r) => s + r.totalRial, 0))
 const where = (r: Receipt) => (r.kind === 'Instruments' || r.kind === 'Notes' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
 const whereTitle = computed(() => (props.kind === 'Instruments' || props.kind === 'Notes' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
 
@@ -127,7 +130,7 @@ function printHtml(from: string | null = null, to: string | null = null) {
       ...(bank ? [t('نوع واریز', 'Kind of deposit'), t('پیگیری / شبا', 'Tracking / Sheba')] : []), t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')],
     rows: rows.map((r, i) => [num(i + 1), num(r.number), r.date, `${r.payerName} (${r.payerDetailCode})`, r.purpose, where(r),
       ...(bank ? [depositMethodName(r.method, fa.value), [r.trackingNumber, r.payerSheba].filter(Boolean).join(' – ')] : []), money(r.totalRial), statusText(r)]),
-    total: { label: t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)'), value: money(rows.filter(r => r.state !== 'Cancelled').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
+    total: { label: t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)'), value: money(rows.filter(r => r.state === 'Recorded').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
     locale: props.locale,
   })
 }
@@ -143,8 +146,8 @@ async function remove(r: Receipt) {
   busy.value = false
   if (!full.ok) return void (error.value = translate(full.code, props.locale))
   if (full.value.notDeletable) return void (error.value = `${t(`رسید شمارهٔ ${num(r.number)} حذف نمی‌شود:`, `Receipt no. ${r.number} is not deleted:`)} ${translate(full.value.notDeletable, props.locale)}`)
-  if (!window.confirm(t(`رسید شمارهٔ ${num(r.number)} (${r.payerName} – ${money(r.totalRial)} ریال) حذف شود؟ شمارهٔ این رسید دوباره استفاده نمی‌شود.`,
-    `Delete receipt no. ${r.number} (${r.payerName} – ${money(r.totalRial)} Rial)? Its number is not used again.`))) return
+  if (!window.confirm(t(`رسید شمارهٔ ${num(r.number)} (${r.payerName} – ${money(r.totalRial)} ریال) حذف شود؟ رسید با عبارت «حذف شده» در فهرست می‌ماند و شمارهٔ آن به رسید دیگری داده نمی‌شود.`,
+    `Delete receipt no. ${r.number} (${r.payerName} – ${money(r.totalRial)} Rial)? It stays in the list marked as deleted, and its number is not given to another receipt.`))) return
   busy.value = true
   const done = await api.post<string>(`/api/cashflow/receipts/${r.id}/delete`, { version: full.value.version })
   busy.value = false
@@ -190,7 +193,7 @@ defineExpose({ printHtml, load, inRange })
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in shown" :key="r.id" :class="{ cancelled: r.state === 'Cancelled', selected: r.id === editingId }">
+            <tr v-for="r in shown" :key="r.id" :class="{ cancelled: r.state === 'Cancelled', deleted: r.state === 'Deleted', selected: r.id === editingId }">
               <td class="num">{{ num(r.number) }}</td>
               <td class="num">{{ r.date }}</td>
               <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
@@ -201,7 +204,8 @@ defineExpose({ printHtml, load, inRange })
               </td>
               <td class="num">{{ money(r.totalRial) }}<span v-if="r.amount !== null && r.currency !== 'IRR'" class="muted small"> ({{ money(r.amount) }} {{ r.currency }})</span></td>
               <td>
-                <span v-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
+                <span v-if="r.state === 'Deleted'" class="tr-deleted">{{ t('حذف شده', 'Deleted') }}</span>
+                <span v-else-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
                 <template v-else-if="r.kind === 'Instruments'">
                   <div v-for="g in groupChequeStatuses(r.chequeStatuses, locale)" :key="g.state">
                     <span v-if="r.instrumentCount > 1" class="muted small">{{ t(`${num(g.count)} برگ:`, `${g.count} ×`) }}</span> {{ chequeStateName(g.state, locale) }}
@@ -212,7 +216,7 @@ defineExpose({ printHtml, load, inRange })
               </td>
               <td>
                 <!-- items 2 and 6: opens the receipt in the form above; the server says when it can no longer be corrected -->
-                <template v-if="r.state !== 'Cancelled'">
+                <template v-if="r.state === 'Recorded'">
                   <button type="button" class="tr-link" @click="emit('edit', r.id)">{{ t('ویرایش', 'Correct') }}</button>
                   <button type="button" class="tr-link danger" :disabled="busy" @click="remove(r)">{{ t('حذف', 'Delete') }}</button>
                 </template>
@@ -222,7 +226,7 @@ defineExpose({ printHtml, load, inRange })
               : receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی در این سال مالی ثبت نشده است.', 'No receipts in this fiscal year.') }}</td></tr>
           </tbody>
           <tfoot v-if="shown.length">
-            <tr><td :colspan="kind === 'BankDeposit' ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها)', 'Total (without cancelled)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td colspan="2" /></tr>
+            <tr><td :colspan="kind === 'BankDeposit' ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td colspan="2" /></tr>
           </tfoot>
         </table>
       </div>

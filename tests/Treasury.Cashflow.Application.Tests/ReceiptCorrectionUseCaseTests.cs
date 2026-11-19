@@ -187,25 +187,36 @@ public sealed class ReceiptCorrectionUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task A_receipt_is_deleted_with_its_cheques_before_its_voucher_is_confirmed_and_its_number_is_not_given_again_Q59()
+    public async Task A_deleted_receipt_stays_in_the_list_marked_deleted_and_its_cheques_are_gone_Q59_Q67()
     {
         var cash = (await _receipts.RecordCashAsync(new(Key(), Header(), FakeReceiptAccounts.Desk, 5_000), CancellationToken.None)).Value;
         Assert.Null((await Receipt(cash)).NotDeletable);
         Assert.Equal("Concurrency.Conflict", (await _receipts.DeleteAsync(new(Key(), cash, 9), CancellationToken.None)).ErrorCode);
         var deleted = await _receipts.DeleteAsync(new(Key(), cash, 1), CancellationToken.None);
         Assert.True(deleted.IsSuccess, deleted.ErrorCode);
-        Assert.Null(await _receipts.GetAsync(cash, CancellationToken.None));
-        Assert.Empty(await _receipts.ListAsync(1405, ReceiptKind.Cash, CancellationToken.None));
+
+        // Owner, 20 Nov 2026 (answer to Q67): the receipt is still listed, as «حذف شده», with who deleted it and when.
+        var view = await Receipt(cash);
+        Assert.Equal(("Deleted", 1, "clerk-1", true, 5_000m), (view.State, view.Number, view.DeletedBy, view.DeletedAt is not null, view.TotalRial));
+        Assert.Equal(("Receipt.Deleted", "Receipt.Deleted"), (view.NotCorrectable, view.NotDeletable));
+        Assert.Equal("Deleted", Assert.Single(await _receipts.ListAsync(1405, ReceiptKind.Cash, CancellationToken.None)).State);
         Assert.Contains(_db.OutboxMessages, m => m.Type.Contains("ReceiptDeleted", StringComparison.Ordinal));
-        Assert.Equal("Receipt.NotFound", (await _receipts.DeleteAsync(new(Key(), cash, 1), CancellationToken.None)).ErrorCode);
-        // The next cash receipt gets number 2: a deleted receipt's number is not used again.
+        // It is not deleted twice, corrected or cancelled, and it has no voucher.
+        Assert.Equal("Receipt.Deleted", (await _receipts.DeleteAsync(new(Key(), cash, 2), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.Deleted", (await _receipts.CorrectCashAsync(new(Key(), cash, 2, Header(), FakeReceiptAccounts.Desk, 1), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.Deleted", (await _receipts.CancelAsync(new(Key(), cash, "1405/08/24", "x", 2), CancellationToken.None)).ErrorCode);
+        Assert.Null(await _vouchers.ReceiptVoucherAsync(cash, CancellationToken.None));
+        Assert.Equal("Receipt.Deleted", (await _vouchers.ConfirmReceiptVoucherAsync(Key(), cash, CancellationToken.None)).ErrorCode);
+        // The next cash receipt gets number 2: the deleted receipt keeps its number.
         var next = (await _receipts.RecordCashAsync(new(Key(), Header(), FakeReceiptAccounts.Desk, 6_000), CancellationToken.None)).Value;
         Assert.Equal(2, (await Receipt(next)).Number);
 
         var cheques = (await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("000123"), Cheque("000124")]), CancellationToken.None)).Value;
         var ids = (await Receipt(cheques)).Instruments!.Select(i => i.Id).ToList();
         Assert.True((await _receipts.DeleteAsync(new(Key(), cheques, 1), CancellationToken.None)).IsSuccess);
-        Assert.Null(await _receipts.GetAsync(cheques, CancellationToken.None));
+        var gone = await Receipt(cheques);
+        Assert.Equal(("Deleted", 2, 20_000_000m), (gone.State, gone.InstrumentCount, gone.TotalRial));
+        Assert.Empty(gone.Instruments!);                                       // the cheques themselves are deleted
         Assert.Null(await _instruments.GetAsync(ids[0], CancellationToken.None));
         Assert.Empty(await _instruments.ListReceivedAsync(InstrumentState.InCashDesk, CancellationToken.None));
     }

@@ -71,7 +71,7 @@ function stepRecorded() { notice.value = null; savedCount.value++ }
 /** A receipt was deleted from the list under the form: if it was open for «ویرایش», the form is closed. */
 function receiptDeleted(id: string) {
   if (editing.value?.id === id) editing.value = null
-  notice.value = { kind: 'ok', text: t('رسید حذف شد.', 'The receipt was deleted.') }
+  notice.value = { kind: 'ok', text: t('رسید حذف شد و با عبارت «حذف شده» در فهرست مانده است.', 'The receipt was deleted; it stays in the list marked as deleted.') }
 }
 function editSaved() {
   const r = editing.value

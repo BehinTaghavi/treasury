@@ -1042,8 +1042,8 @@ def test_the_cashflow_service_may_delete_a_cheque_taken_off_a_corrected_receipt(
         assert c.execute("SELECT count(*) FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0] == 0
 
 
-def test_the_cashflow_service_may_delete_a_receipt_recorded_by_mistake(db):
-    # 043_cashflow_receipt_corrections.sql: the owner's answer to Q59 (19 Nov 2026). Its number stays taken.
+def test_a_deleted_receipt_keeps_its_row_with_who_deleted_it_and_when(db):
+    # 043_cashflow_receipt_corrections.sql: the owner's answers to Q59 and Q67 (19 and 20 Nov 2026). The row stays, in the state 'Deleted'.
     with psycopg.connect(db) as c:
         c.execute("SET ROLE cashflow_svc")
         rid = uuid.uuid4()
@@ -1052,5 +1052,20 @@ def test_the_cashflow_service_may_delete_a_receipt_recorded_by_mistake(db):
                    purpose_group_name, purpose, recorded_by, account_kind, account_id, amount, currency, total_rial, state)
                VALUES (1405, %s, 'Cash', 990001, '2026-11-14', %s, 'الف', '200015', %s, 'فروش', 'فروش', 'test', 'CashDesk', %s, 1000, 'IRR', 1000, 'Recorded')""",
             (rid, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
-        c.execute("DELETE FROM cashflow.receipt WHERE id = %s", (rid,))
-        assert c.execute("SELECT count(*) FROM cashflow.receipt WHERE id = %s", (rid,)).fetchone()[0] == 0
+        with pytest.raises(psycopg.errors.CheckViolation):   # deleted without who and when
+            with c.transaction():
+                c.execute("UPDATE cashflow.receipt SET state = 'Deleted' WHERE id = %s", (rid,))
+        with pytest.raises(psycopg.errors.CheckViolation):   # a mark of deletion on a receipt that is not deleted
+            with c.transaction():
+                c.execute("UPDATE cashflow.receipt SET deleted_at = now(), deleted_by = 'x' WHERE id = %s", (rid,))
+        c.execute("UPDATE cashflow.receipt SET state = 'Deleted', deleted_by = 'clerk-1', deleted_at = now() WHERE id = %s", (rid,))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.receipt SET state = 'Gone' WHERE id = %s", (rid,))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):   # the service never deletes a receipt row
+            with c.transaction():
+                c.execute("DELETE FROM cashflow.receipt WHERE id = %s", (rid,))
+        # A cancelled receipt still needs its date and reason.
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.receipt SET state = 'Cancelled', deleted_by = NULL, deleted_at = NULL WHERE id = %s", (rid,))

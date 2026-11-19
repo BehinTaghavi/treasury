@@ -175,9 +175,9 @@ public sealed class VoucherUseCaseTests : IDisposable
         var header = new ReceiptHeaderInput("1405/08/29", "200015", FakeReceiptReference.SalesGroup, "تعویض چک 445566");
 
         // Owner, 19 Nov 2026 (answer to Q62): the cheque is cancelled first; until then it is not replaced.
-        Assert.Equal("Instrument.InvalidTransition",
+        Assert.Equal("Instrument.ReplaceNeedsCancellation",
             (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Instrument.InvalidTransition",
+        Assert.Equal("Instrument.ReplaceNeedsCancellation",
             (await _receipts.PreviewReplacementAsync(new("preview", cheque, header, [Line("901", 6_000_000)]), CancellationToken.None)).ErrorCode);
         var cancel = await _instruments.ChangeStateAsync(
             new(Key(), cheque, InstrumentAction.Cancel, "1405/08/29", Note: "تعویض با دو چک", Reference: "م-21", DocumentDate: "1405/08/28", OriginalStamped: true), CancellationToken.None);
@@ -206,12 +206,12 @@ public sealed class VoucherUseCaseTests : IDisposable
         var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
         Assert.Equal([3, 4, 5], steps.Select(x => x.Step)); // deposit, return from the bank, cancellation; the replacement is on its receipt
         Assert.Equal([(true, "8101", 10_000_000m), (false, "1201", 10_000_000m)], steps[^1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.AmountRial)));
-        // The replacement takes it out of «مطالبات سوخت شده»; the difference of 1,000,000 goes to the purpose group (to confirm: Q64).
+        // The replacement takes it out of «مطالبات سوخت شده»; the difference of 1,000,000 goes to the purpose group (owner's answer to Q64).
         var v = (await _vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
         Assert.Equal([(true, "1201"), (true, "1201"), (false, "8101"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
         Assert.Equal(1_000_000m, v.Lines[^1].AmountRial);
         Assert.True(v.IsComplete);
-        Assert.Equal("Instrument.InvalidTransition", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.ReplaceNeedsCancellation", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]

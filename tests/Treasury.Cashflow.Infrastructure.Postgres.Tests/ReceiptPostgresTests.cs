@@ -87,12 +87,13 @@ public sealed class ReceiptPostgresTests : IDisposable
         Assert.Equal((before[1].Id, 2_500_000m, "1406/01/20", "1405/08/26", "اصفهان", "1405/08/26"),
             (kept.Id, kept.Amount, kept.DueDate, kept.IssueDate, kept.Details!.BranchName, Assert.Single(kept.History).Date));
 
-        // Owner's answer to Q59: «حذف» of the receipt with its cheques; the row and the cheques are gone.
+        // Owner's answers to Q59 and Q67: «حذف» keeps the receipt as «حذف شده» with who deleted it and when; its cheques are gone.
         var deleted = await _receipts.DeleteAsync(new(Key(), receipt, 2), CancellationToken.None);
         Assert.True(deleted.IsSuccess, deleted.ErrorCode);
-        Assert.Null(await _receipts.GetAsync(receipt, CancellationToken.None));
+        var gone = (await _receipts.GetAsync(receipt, CancellationToken.None))!;
+        Assert.Equal(("Deleted", "clerk-1", true, 3L, 0), (gone.State, gone.DeletedBy, gone.DeletedAt is not null, gone.Version, gone.Instruments!.Count));
         Assert.True((await _receipts.DeleteAsync(new(Key(), cash, 2), CancellationToken.None)).IsSuccess);
-        Assert.DoesNotContain(await _receipts.ListAsync(1405, ReceiptKind.Cash, CancellationToken.None), x => x.Id == cash);
+        Assert.Contains(await _receipts.ListAsync(1405, ReceiptKind.Cash, CancellationToken.None), x => x.Id == cash && x.State == "Deleted");
 
         await using var conn = await _dataSource.OpenConnectionAsync(CancellationToken.None);
         await using var cmd = new NpgsqlCommand(

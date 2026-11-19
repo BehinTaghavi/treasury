@@ -132,7 +132,7 @@ public static class ReceiptVouchers
     /// <param name="replacement">A replacement (تعویض). The old cheque was cancelled first (owner's answer to Q62, 19 Nov 2026), and its
     /// cancellation moved it to «مطالبات سوخت شده» (his voucher table, «ابطال چک دریافتنی»), so the replacement takes it out of there:
     /// Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده» for the old cheque; a difference in amount (answer to Q31) goes to
-    /// the purpose group, with the payer. To be confirmed by the owner (Q64). A replacement recorded before that rule credits the
+    /// the purpose group, with the payer (confirmed by the owner, 20 Nov 2026, answer to Q64). A replacement recorded before that rule credits the
     /// account the old cheque was in («اسناد نزد صندوق», «اسناد واخواست شده», «اسناد واخواست شده حقوقی شده»).</param>
     public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
         Replacement? replacement = null)
