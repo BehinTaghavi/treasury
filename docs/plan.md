@@ -19,8 +19,8 @@ Update this file when a task finishes (what is done, what is next). Months count
 
 | Requirement | Design | When |
 |---|---|---|
-| **Multi-tenancy**: separate client companies, groups (holdings) whose users work in several companies, own name/logo/users/administrator per company, central hosted service beside clients' own servers | ADR 0005; questions Q37–Q41 | Core with the Keycloak login (Phase B): catalog, company per request, company switch, name and logo, company administrators. Combined group reports with Phase G. Hosted-service deployment before wider rollout; the pilot stays on the client's server |
-| **Phones and tablets** ("gadget based") | ADR 0006; questions Q42–Q43 | A rule for every new screen from now on. One pass over the screens already built (after the receipts form uses Basic Information). Approval of payment requests on the phone with login and approval permissions (Phase B/C). Installable web app and notifications once the system is reachable from outside (needs login) |
+| **Multi-tenancy**: separate client companies, groups (holdings) whose users work in several companies, own name/logo/users/administrator per company, central hosted service beside clients' own servers | ADR 0005; Q37–Q41 answered | Core with the Keycloak login (Phase B): catalog, company per request, company switch, name and logo, company administrators. Combined group reports with Phase G. Hosted-service deployment before wider rollout; the pilot stays on the client's server |
+| **Phones and tablets** ("gadget based") | ADR 0006; Q42–Q43 answered | A rule for every new screen from now on. One pass over the screens already built (after the receipts form uses Basic Information). Approval of payment requests on the phone with login and approval permissions (Phase B/C). Installable web app and notifications once the system is reachable from outside (needs login) |
 
 ## Next tasks (Phase A)
 1. ~~Install the .NET 10 SDK in the cloud environment (setup script), build `Treasury.slnx` with real packages, run all tests with real xUnit; fix what fails. Give the owner the setup script to save in the environment.~~ Done 10 Nov 2026.
@@ -33,7 +33,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 ## Done log
 | Date | What |
 |---|---|
-| 2026-11-19 | Owner's two new requirements taken into the design, nothing built yet: **multi-tenancy** (separate companies, groups with users in several companies, combined reports, central hosted service, name/logo and administrator per company — ADR 0005) and **phones and tablets** (ADR 0006); decisions logged, plan updated, questions Q37–Q43 |
+| 2026-11-19 | Owner's two new requirements taken into the design, nothing built yet: **multi-tenancy** (separate companies, groups with users in several companies, combined reports, central hosted service, name/logo and administrator per company — ADR 0005) and **phones and tablets** (ADR 0006); decisions logged, plan updated; the owner agreed to the proposals of Q37–Q43 the same day (own Basic Information per company, separate records between companies of a group, first combined reports, group administrator, rights per company, phone-first jobs, no app store, SMS optional) |
 | 2026-11-15 | Pull request 8 merged into `main` on the owner's instruction (the work of 11–15 Nov, CI green; the reviewer's pass over it is still to come), so `main` matches the owner's test server. Home pages `README.md` / `README.en.md` and the reviewer's build-and-run guide brought in line with it |
 | 2026-11-15 | Reviewer's guide in Farsi (`docs/reviewer-guide.fa.md`): the code and its patterns explained, a pull-request review checklist, and a classified learning path for the technologies used |
 | 2026-11-15 | Pull requests 1–6 merged into `main` (CI green). Home page `README.md` rewritten in Farsi with the latest changes, status and next steps; English copy in `README.en.md` |

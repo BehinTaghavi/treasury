@@ -1,6 +1,6 @@
 # ADR 0006 — The system works on phones and tablets
 
-Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meaning devices — for example a manager approving a payment request from a phone). Details marked "to confirm" wait for the owner's answers Q42–Q43. Not built yet.
+Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meaning devices — for example a manager approving a payment request from a phone). Q42–Q43 answered the same day. Not built yet.
 
 ## Decision
 
@@ -10,10 +10,11 @@ Status: accepted as a business decision (CEO, 19 Nov 2026: "gadget based", meani
 4. **Designed first for the phone:** the task inbox and approving or rejecting payment requests, the dashboard (bank and cash balances, cheques due), and looking up a cheque, a receipt or a request. **Designed first for keyboard and large screen, but still working on a tablet or phone:** fast data entry (receipts, payments, Basic Information) and cheque printing (which needs the printer's PC).
 5. **Safety before reach:** phones mean access from outside the office, so the system is opened to the internet only with login in place, HTTPS only, and a second step (one-time code) for approvers and administrators, as the design document 8.2 already asks.
 
-## To confirm (owner)
+## Confirmed by the owner (Q42–Q43, 19 Nov 2026)
 
-- Which jobs must work well on a phone first (Q42).
-- Whether people should be told about waiting approvals by SMS or by a notification on the phone, and whether an app in a store is needed later (Q43). If a store app is ever needed, the same web application can be wrapped (for example with Capacitor) rather than rewritten.
+- The phone-first jobs are those of point 4.
+- **No app store.** Users open the address in the browser and add it to the home screen. If a store app is ever needed, the same web application can be wrapped (for example with Capacitor) rather than rewritten.
+- **Telling approvers about waiting requests:** a notification from the installed web app where the phone allows it, and SMS as an option switched on per company (needs an SMS provider; its key comes from the environment, rule 7).
 
 ## Consequences
 
