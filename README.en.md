@@ -44,6 +44,8 @@ By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the la
 | [#2](https://github.com/BehinTaghavi/treasury/pull/2) | Owner's review of the receipts screen | Main menu order: Dashboard, Basic information, Payment requests, Payments, Receipts, Reports. Rule N2: a received cheque cannot be cleared or bounced before its due date; depositing it for collection earlier stays allowed. |
 | [#1](https://github.com/BehinTaghavi/treasury/pull/1) | Phase A: first real build | Full build with NuGet packages and no warnings, PostgreSQL adapter tests on PostgreSQL 17, the whole system run with Docker Compose and `deploy/smoke-test.sh`, and CI with four jobs: `dotnet`, `database-and-migration`, `frontend`, `compose`. Test server on the owner's Windows PC, started with a double-click: `docs/test-server-windows.md`. |
 
+**19 Nov 2026, design only:** two new requirements of the owner were taken into the design; nothing of them is built yet. **Multi-tenancy:** separate client companies, groups (holdings) whose users work in several companies, combined group reports, a central hosted service beside clients' own servers, and its own name, logo and administrator for each company (`docs/adr/0005-multi-tenancy-companies-and-groups.md`). **Phones and tablets:** the same web application also works on phones and tablets, for example to approve a payment request (`docs/adr/0006-phones-and-tablets.md`). Questions Q37–Q43 were added for the owner.
+
 Before these, the first package (Phase 0) was loaded on 9 Nov 2026: repository skeleton, the cheque and cheque-book domain model, the database schema, the migration tool, the Nuxt shell with the receipts screen, the design document, and the old programs' source for reference.
 
 ## Current status
@@ -71,11 +73,12 @@ The full plan and phases A–G are in `docs/plan.md`.
 
 - **Review of pull request #8:** it was merged on the owner's instruction so that `main` matches his test server; the reviewer's pass over the work of 11–15 Nov is still to come.
 - **Left in Phase A:** migration dry run on an anonymised copy of Iran Nazho Co.'s data (`Cashnajoo86`), and deployment notes for the pilot server.
-- **Rest of Phase B:** login with Keycloak, and with it the permissions for approvals.
+- **Rest of Phase B:** login with Keycloak, and with it the permissions for approvals and **several companies** (company chosen at login, one database per company, company name and logo, an administrator per company; ADR 0005).
+- **Phones and tablets (ADR 0006):** from now on every new screen must also work on a phone and a tablet; the screens already built get one pass.
 - **Payment requests (Phase C):** the owner's answers to Q25–Q29, then paying approved requests (Phase E).
 - **Payments and cheque printing (Phase E):** the proposal in `docs/domain/cheque-printing.md` waits for the owner's answers to Q12–Q18.
 - **Later phases:** accounting vouchers sent to the general ledger (F), reports and the full pilot (G).
-- **Open business questions:** Q1–Q10 and Q25–Q29 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
+- **Open business questions:** Q1–Q10, Q25–Q29 and Q37–Q43 in `docs/domain/open-questions.md`, and Q12–Q18 in `docs/domain/cheque-printing.md`.
 
 ## Repository layout
 
