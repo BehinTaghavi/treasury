@@ -29,6 +29,10 @@ public sealed record RecordBankReceiptCommand(
     string IdempotencyKey, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial = null,
     string? PayerSheba = null);
 
+/// <summary>«واریز به کارت بانک»: the card is a petty-cash holder's (<paramref name="CardKind"/> PettyCashCard, the petty cash's id) or a company card.</summary>
+public sealed record RecordCardReceiptCommand(
+    string IdempotencyKey, ReceiptHeaderInput Header, ReceiptAccountKind CardKind, Guid CardId, DepositMethod Method, string? TrackingNumber, decimal Amount);
+
 /// <summary>One cheque or note on the form. <paramref name="BankId"/> is from the bank-names list (decision of 10 Nov 2026).</summary>
 /// <param name="Id">Correction of a receipt: the cheque this line corrects; null for a cheque added to the receipt.</param>
 public sealed record ReceivedInstrumentInput(
@@ -93,6 +97,11 @@ public sealed record CorrectCashReceiptCommand(string IdempotencyKey, Guid Id, l
 public sealed record CorrectBankReceiptCommand(
     string IdempotencyKey, Guid Id, long ExpectedVersion, ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount,
     decimal? RateToRial = null, string? PayerSheba = null);
+
+/// <inheritdoc cref="CorrectCashReceiptCommand"/>
+public sealed record CorrectCardReceiptCommand(
+    string IdempotencyKey, Guid Id, long ExpectedVersion, ReceiptHeaderInput Header, ReceiptAccountKind CardKind, Guid CardId, DepositMethod Method, string? TrackingNumber,
+    decimal Amount);
 
 /// <summary>Correction of a cheque receipt: a line with an id corrects that cheque, one without adds a cheque, a cheque left out is removed.</summary>
 public sealed record CorrectInstrumentReceiptCommand(string IdempotencyKey, Guid Id, long ExpectedVersion, ReceiptHeaderInput Header,
@@ -236,6 +245,16 @@ public sealed class ReceiptUseCases(
 
             // A bank account with a receipt is "in use" and can no longer be deleted (owner, 14 Nov 2026).
             await bankAccounts.MarkInUseAsync(account.Id, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
+            await receipts.AddAsync(receipt, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(receipt.Id);
+        }, cancellationToken);
+
+    /// <summary>«واریز به کارت بانک» (owner's report no. 6, item 12; answers to Q68–Q70): money paid onto a petty-cash holder's card or a company card.</summary>
+    public Task<Result<Guid>> RecordCardDepositAsync(RecordCardReceiptCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var (receipt, _) = await BuildCardDepositAsync(command, preview: false, ct).ConfigureAwait(false);
             await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
             await receipts.AddAsync(receipt, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(receipt.Id);
@@ -449,6 +468,13 @@ public sealed class ReceiptUseCases(
             return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(account.LedgerAccountCode, account.DetailCode), (Replacement?)null);
         }, cancellationToken);
 
+    public Task<Result<VoucherView>> PreviewCardDepositAsync(RecordCardReceiptCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
+        {
+            var (receipt, card) = await BuildCardDepositAsync(command, preview: true, ct).ConfigureAwait(false);
+            return (receipt, (IReadOnlyList<Instrument>)[], new LedgerSide(card.LedgerAccountCode, card.DetailCode), (Replacement?)null);
+        }, cancellationToken);
+
     public Task<Result<VoucherView>> PreviewInstrumentsAsync(RecordInstrumentReceiptCommand command, CancellationToken cancellationToken) =>
         PreviewAsync(async ct =>
         {
@@ -495,6 +521,27 @@ public sealed class ReceiptUseCases(
         var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.BankDeposit, ct).ConfigureAwait(false);
         return (Receipt.RecordBankDeposit(
             Guid.NewGuid(), number, header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial), currentUser.UserId, command.PayerSheba), account);
+    }
+
+    private async Task<(Receipt Receipt, ReceiptAccountFact Card)> BuildCardDepositAsync(RecordCardReceiptCommand command, bool preview, CancellationToken ct)
+    {
+        var card = await CardAsync(command.CardKind, command.CardId, ct).ConfigureAwait(false);
+        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var number = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.CardDeposit, ct).ConfigureAwait(false);
+        return (Receipt.RecordCardDeposit(
+            Guid.NewGuid(), number, header, card, command.Method, command.TrackingNumber, Amount(command.Amount, card.CurrencyCode, null), currentUser.UserId), card);
+    }
+
+    /// <summary>The bank card of «واریز به کارت بانک» as accounts-svc describes it; a cash desk or bank account is not one.</summary>
+    private async Task<ReceiptAccountFact> CardAsync(ReceiptAccountKind kind, Guid id, CancellationToken ct)
+    {
+        if (!kind.IsCard())
+        {
+            throw new DomainException("Receipt.AccountKindWrong", "A deposit onto a bank card names a petty-cash holder's card or a company card.");
+        }
+
+        return await accounts.CardAsync(kind, id, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Receipt.AccountNotFound", "The bank card was not found.");
     }
 
     private async Task<(Receipt Receipt, List<Instrument> Created, bool Duplicate)> BuildInstrumentsAsync(
@@ -679,6 +726,19 @@ public sealed class ReceiptUseCases(
             receipt.CorrectBankDeposit(header, account, command.Method, command.TrackingNumber, Amount(command.Amount, account.CurrencyCode, command.RateToRial),
                 currentUser.UserId, command.PayerSheba, confirmed);
             await bankAccounts.MarkInUseAsync(account.Id, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
+            await receipts.SaveAsync(receipt, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(receipt.Id);
+        }, cancellationToken);
+
+    /// <summary>Correction of a deposit onto a bank card; see <see cref="CorrectCashAsync"/>.</summary>
+    public Task<Result<Guid>> CorrectCardDepositAsync(CorrectCardReceiptCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var (receipt, confirmed) = await LoadForCorrectionAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
+            var card = await CardAsync(command.CardKind, command.CardId, ct).ConfigureAwait(false);
+            var (header, _) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+            receipt.CorrectCardDeposit(header, card, command.Method, command.TrackingNumber, Amount(command.Amount, card.CurrencyCode, null), currentUser.UserId, confirmed);
             await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
             await receipts.SaveAsync(receipt, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(receipt.Id);

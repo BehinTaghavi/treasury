@@ -388,6 +388,7 @@ public static class ReceiptVouchers
         ReceiptKind.Cash => "دریافت نقدی",
         ReceiptKind.BankDeposit => "واریز به حساب",
         ReceiptKind.Notes => "دریافت سفته",
+        ReceiptKind.CardDeposit => "واریز به کارت بانک",
         _ => "دریافت چک",
     };
 

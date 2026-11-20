@@ -37,6 +37,82 @@ public sealed class ReceiptTests
         Assert.IsType<ReceiptRecorded>(Assert.Single(r.PendingEvents));
     }
 
+    private static readonly ReceiptAccountFact HolderCard = new(ReceiptAccountKind.PettyCashCard, Guid.NewGuid(), "مریم کریمی – 6219861034529007", "IRR", true, "1104", "700002");
+    private static readonly ReceiptAccountFact CompanyCard = new(ReceiptAccountKind.CompanyCard, Guid.NewGuid(), "شرکت نمونه – 6037991234567893", "IRR", true, "1105", "600009");
+
+    [Theory]
+    [InlineData(DepositMethod.CardToCard)]
+    [InlineData(DepositMethod.DepositSlip)]
+    [InlineData(DepositMethod.PaymentGateway)]
+    public void Money_is_paid_onto_the_card_of_a_petty_cash_holder_or_a_company_card_report_6_item_12(DepositMethod method)
+    {
+        // Owner's report no. 6, item 12 («واریز به کارت بانک»); answer to Q70: card to card, a deposit slip or the company's gateway.
+        var r = Receipt.RecordCardDeposit(Guid.NewGuid(), 3, Header(), HolderCard, method, " 5544 ", Money.Rials(2_500_000), User);
+        Assert.Equal((ReceiptKind.CardDeposit, ReceiptAccountKind.PettyCashCard, HolderCard.Id, method, "5544", 3, 2_500_000m),
+            (r.Kind, r.AccountKind!.Value, r.AccountId!.Value, r.Method!.Value, r.TrackingNumber, r.Number, r.TotalRial));
+        Assert.Null(r.PayerSheba);
+        Assert.IsType<ReceiptRecorded>(Assert.Single(r.PendingEvents));
+        Assert.Equal(ReceiptAccountKind.CompanyCard, Receipt.RecordCardDeposit(Guid.NewGuid(), 4, Header(), CompanyCard, method, null, Money.Rials(1), User).AccountKind);
+    }
+
+    [Fact]
+    public void A_card_deposit_names_a_card_an_allowed_kind_of_deposit_and_an_active_card()
+    {
+        Assert.Equal("Receipt.AccountKindWrong", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), Bank, DepositMethod.CardToCard, null, Money.Rials(1), User)).Code);
+        Assert.Equal("Receipt.AccountKindWrong", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), Desk, DepositMethod.CardToCard, null, Money.Rials(1), User)).Code);
+        foreach (var method in new[] { DepositMethod.Paya, DepositMethod.Satna, DepositMethod.InternalTransfer, DepositMethod.Pos, DepositMethod.Transfer })
+        {
+            Assert.Equal("Receipt.CardDepositMethod", Assert.Throws<DomainException>(() =>
+                Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), HolderCard, method, null, Money.Rials(1), User)).Code);
+        }
+
+        Assert.Equal("Receipt.DepositMethodRequired", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), HolderCard, (DepositMethod)99, null, Money.Rials(1), User)).Code);
+        Assert.Equal("Receipt.AccountInactive", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), CompanyCard with { IsActive = false }, DepositMethod.CardToCard, null, Money.Rials(1), User)).Code);
+        Assert.Equal("Receipt.CurrencyMismatch", Assert.Throws<DomainException>(() =>
+            Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), HolderCard, DepositMethod.CardToCard, null, Money.Foreign(10, "USD", 600_000), User)).Code);
+
+        // A bank deposit still goes into a bank account, and cash into a cash desk.
+        Assert.Equal("Receipt.AccountKindWrong", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), CompanyCard, DepositMethod.CardToCard, null, Money.Rials(1), User)).Code);
+    }
+
+    [Fact]
+    public void The_voucher_of_a_card_deposit_debits_the_card_and_credits_the_purpose_group_answers_Q68_Q69()
+    {
+        // Owner, 20 Nov 2026 (Q68): Dr the petty cash's account with the holder's تفصیل / Cr the purpose group with the payer's تفصیل;
+        // (Q69) a company card without a bank account debits its own معین and تفصیل.
+        var template = new Treasury.Cashflow.Domain.Vouchers.VoucherTemplate();
+        var onHolder = Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), HolderCard, DepositMethod.CardToCard, null, Money.Rials(2_500_000), User);
+        var v = Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers.ForReceipt(onHolder, [], new(HolderCard.LedgerAccountCode, HolderCard.DetailCode), "4101", template);
+        Assert.Equal([(true, "1104", "700002", 2_500_000m), (false, "4101", "200015", 2_500_000m)], v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
+        Assert.StartsWith("واریز به کارت بانک", v.Operation, StringComparison.Ordinal);
+
+        var onCompany = Receipt.RecordCardDeposit(Guid.NewGuid(), 2, Header(), CompanyCard, DepositMethod.PaymentGateway, null, Money.Rials(900_000), User);
+        var w = Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers.ForReceipt(onCompany, [], new(CompanyCard.LedgerAccountCode, CompanyCard.DetailCode), "4101", template);
+        Assert.Equal([(true, "1105", "600009"), (false, "4101", "200015")], w.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+    }
+
+    [Fact]
+    public void A_card_deposit_is_corrected_until_its_voucher_is_confirmed_and_cancelled_like_a_bank_deposit()
+    {
+        var r = Receipt.RecordCardDeposit(Guid.NewGuid(), 1, Header(), HolderCard, DepositMethod.CardToCard, "T-1", Money.Rials(2_500_000), User);
+        r.CorrectCardDeposit(Header(purpose: "علی‌الحساب"), CompanyCard, DepositMethod.DepositSlip, "F-9", Money.Rials(3_000_000), User, voucherConfirmed: false);
+        Assert.Equal((ReceiptAccountKind.CompanyCard, CompanyCard.Id, DepositMethod.DepositSlip, "F-9", 3_000_000m, "علی‌الحساب", 1),
+            (r.AccountKind!.Value, r.AccountId!.Value, r.Method!.Value, r.TrackingNumber, r.TotalRial, r.Purpose, r.Number));
+        Assert.Equal("Receipt.CardDepositMethod", Assert.Throws<DomainException>(() =>
+            r.CorrectCardDeposit(Header(), CompanyCard, DepositMethod.Paya, null, Money.Rials(1), User, voucherConfirmed: false)).Code);
+        Assert.Equal("Receipt.VoucherConfirmed", Assert.Throws<DomainException>(() =>
+            r.CorrectCardDeposit(Header(), CompanyCard, DepositMethod.CardToCard, null, Money.Rials(1), User, voucherConfirmed: true)).Code);
+        Assert.Equal("Receipt.CorrectionKindDiffers", Assert.Throws<DomainException>(() =>
+            r.CorrectBankDeposit(Header(), Bank, DepositMethod.Pos, null, Money.Rials(1), User, null, voucherConfirmed: false)).Code);
+        r.Cancel(D("1405/08/24"), "ثبت اشتباه", User);
+        Assert.Equal(ReceiptState.Cancelled, r.State);
+    }
+
     [Fact]
     public void Cash_cannot_go_into_a_bank_account() =>
         Assert.Equal("Receipt.AccountKindWrong", Assert.Throws<DomainException>(() => Receipt.RecordCash(Guid.NewGuid(), 1, Header(), Bank, Money.Rials(1), User)).Code);

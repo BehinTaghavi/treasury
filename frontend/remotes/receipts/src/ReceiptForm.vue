@@ -18,6 +18,10 @@
  * in the list is added to it when the receipt is saved (report no. 6, item 4).
  * Owner's report no. 6 (19 Nov 2026): after saving, «چاپ رسید» shows and prints the receipt (item 21); the Sheba box has «IR» fixed in
  * it (item 16); the kind called «چک بانکی (رمزدار)» is «چک تضمین شده صیاد» (item 18).
+ * With kind `CardDeposit` the form is «واریز به کارت بانک» (report no. 6, item 12; the owner's answers to Q68–Q70 of 20 Nov 2026): the
+ * money is paid onto the bank card of a petty-cash holder of the company or onto a company bank card that has no bank account, card
+ * to card, with a deposit slip or through the company's payment gateway; always in Rial. Its voucher debits the petty cash's account
+ * with the holder's تفصیل, or the company card's own معین and تفصیل.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { chequeStateName, createApi, formatAmount, instrumentKindName, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -25,12 +29,12 @@ import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
 import ShebaInput from '@treasury/ui-kit/ShebaInput.vue'
-import { useLookups, type Detail, type Purpose } from './lookups'
+import { cardValue, useLookups, type Detail, type Purpose } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
-import { depositMethods, forForeignCurrency, needsSheba } from './depositMethods'
+import { depositMethods, forCard, forForeignCurrency, needsSheba } from './depositMethods'
 import { amountText, type SavedReceipt } from './savedReceipt'
 
-type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
+type Kind = 'Cash' | 'BankDeposit' | 'Instruments' | 'CardDeposit'
 type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
 interface Line {
   /** The saved cheque this line corrects («ویرایش»); empty for a new line. */
@@ -71,7 +75,10 @@ const isCheque = (k: LineKind) => k.endsWith('Cheque')
  */
 const accountHasCard = computed(() => (L.bankAccounts.value.find(a => a.id === money1.accountId)?.cards?.length ?? 0) > 0)
 const methodChoices = computed<Choice[]>(() => depositMethods
-  .filter(m => !m.retired && (accountCurrency.value === 'IRR' || forForeignCurrency(m.value)) && (m.value !== 'CardToCard' || accountHasCard.value))
+  .filter(m => !m.retired && (props.kind === 'CardDeposit'
+    // A deposit onto a bank card: card to card, a deposit slip or the company's gateway (owner's answer to Q70).
+    ? forCard(m.value)
+    : (accountCurrency.value === 'IRR' || forForeignCurrency(m.value)) && (m.value !== 'CardToCard' || accountHasCard.value)))
   .map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 /** The name of a currency for the words under an amount box: «ریال», or the currency's name from Basic Information. */
@@ -126,11 +133,16 @@ watch(() => header.groupId, id => void loadPurposes(id))
 
 // ---- cash and bank deposit ----
 const money1 = reactive({
-  accountId: e0?.accountId ?? '', method: e0?.method ?? '', tracking: e0?.trackingNumber ?? '', amount: amountText(e0?.amount), rate: amountText(e0?.rateToRial),
+  // A card deposit names its card by kind and id (a petty-cash holder's card, or a company card).
+  accountId: (e0?.kind === 'CardDeposit' ? cardValue(e0.accountKind, e0.accountId) : e0?.accountId) ?? '', method: e0?.method ?? '', tracking: e0?.trackingNumber ?? '', amount: amountText(e0?.amount), rate: amountText(e0?.rateToRial),
   sheba: e0?.payerSheba ?? '' })
 const deskChoices = computed<Choice[]>(() => L.desks.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name, hint: d.currencyCode })))
 const bankAccountChoices = computed<Choice[]>(() => L.bankAccounts.value.filter(a => a.isActive).map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
-const accountCurrency = computed(() =>
+/** The cards of «واریز به کارت بانک», the petty-cash holders' first; a card switched off stays only on the receipt that already names it. */
+const cardChoices = computed<Choice[]>(() => L.cards.value.filter(c => c.isActive || c.value === money1.accountId)
+  .map(c => ({ value: c.value, label: L.cardTitle(c, fa.value), muted: !c.isActive })))
+const chosenCard = computed(() => L.cards.value.find(c => c.value === money1.accountId))
+const accountCurrency = computed(() => props.kind === 'CardDeposit' ? 'IRR' :
   (props.kind === 'Cash' ? L.desks.value.find(d => d.id === money1.accountId)?.currencyCode : L.bankAccounts.value.find(a => a.id === money1.accountId)?.currencyCode) ?? 'IRR')
 // The kind of deposit is chosen by the user (no default); a kind the newly chosen account cannot take is cleared.
 watch(methodChoices, () => { if (money1.method && !methodChoices.value.some(c => c.value === money1.method)) money1.method = '' })
@@ -244,7 +256,7 @@ function lineBody(l: Line) {
 }
 
 /** The path of the request: a new receipt, the replacement of a cheque, or the saved receipt being corrected. */
-const kindPath = computed(() => (props.kind === 'Cash' ? 'cash' : props.kind === 'BankDeposit' ? 'bank' : 'instruments'))
+const kindPath = computed(() => (props.kind === 'Cash' ? 'cash' : props.kind === 'BankDeposit' ? 'bank' : props.kind === 'CardDeposit' ? 'card' : 'instruments'))
 
 /**
  * The request the form makes, or the code of the first thing missing (checked again by the server). `path` records a new receipt (or
@@ -273,6 +285,11 @@ function request(): { path: string; body: Record<string, unknown>; put?: string 
   if (accountCurrency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
   if (props.kind === 'Cash') return { path: '/api/cashflow/receipts/cash', put, body: { header: headerBody(), cashDeskId: money1.accountId, amount, rateToRial: rate } }
   if (!money1.method) return { error: 'Receipt.DepositMethodRequired' }
+  if (props.kind === 'CardDeposit') {
+    const card = chosenCard.value
+    if (!card) return { error: 'Receipt.AccountNotFound' }
+    return { path: '/api/cashflow/receipts/card', put, body: { header: headerBody(), cardKind: card.kind, cardId: card.id, method: money1.method, trackingNumber: money1.tracking || null, amount } }
+  }
   if (needsSheba(money1.method) && !money1.sheba.trim()) return { error: 'Receipt.ShebaRequired' }
   return { path: '/api/cashflow/receipts/bank', put, body: {
     header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate,
@@ -393,10 +410,31 @@ onMounted(async () => {
     </fieldset>
 
     <fieldset v-if="kind !== 'Instruments'">
-      <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : t('واریز به بانک', 'Paid into a bank account') }}</legend>
+      <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : kind === 'CardDeposit' ? t('واریز به کارت بانک', 'Paid onto a bank card') : t('واریز به بانک', 'Paid into a bank account') }}</legend>
       <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }}
         <SearchSelect v-model="money1.accountId" :options="deskChoices" required :aria-label="t('صندوق', 'Cash desk')" :none-text="t('صندوقی تعریف نشده است', 'No cash desk')" />
       </label>
+      <!-- «واریز به کارت بانک» (report no. 6, item 12): the card of a petty-cash holder, or a company card without a bank account. -->
+      <template v-else-if="kind === 'CardDeposit'">
+        <label class="wide">{{ t('کارت بانک (تنخواه‌گردان یا کارت شرکت)', 'Bank card (petty-cash holder or company card)') }}
+          <SearchSelect v-model="money1.accountId" :options="cardChoices" required :aria-label="t('کارت بانک', 'Bank card')" :none-text="t('کارت بانکی تعریف نشده است', 'No bank card')" />
+        </label>
+        <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
+          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
+        </label>
+        <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
+          <input v-model="money1.tracking" dir="ltr" />
+        </label>
+        <p v-if="!cardChoices.length" class="muted small wide">
+          {{ t('کارت بانکی تعریف نشده است. کارت تنخواه‌گردان در «اطلاعات پایه ← تنخواه گردان‌ها» (نحوهٔ نگهداری وجوه: کارت بانک) و کارت بانک شرکت که حساب بانکی ندارد در «اطلاعات پایه ← کارت‌های بانک شرکت (بدون حساب بانکی)» تعریف می‌شود.',
+            'No bank card is defined. A petty-cash holder\'s card is entered in Basic Information → Petty cash (kept on a bank card), a company card without a bank account in Basic Information → Company bank cards.') }}
+        </p>
+        <p v-else-if="chosenCard" class="muted small wide">
+          {{ chosenCard.kind === 'PettyCashCard'
+            ? t('این وجه به تنخواهِ همین تنخواه‌گردان اضافه می‌شود: سند، حساب تنخواه گردان را با تفصیل او بدهکار می‌کند.', "This money is added to this holder's petty cash: the voucher debits the petty-cash account with the holder's detail account.")
+            : t('سند، حساب معین و تفصیلِ همین کارت را بدهکار می‌کند.', "The voucher debits this card's ledger and detail account.") }}
+        </p>
+      </template>
       <template v-else>
         <label class="wide">{{ t('حساب بانکی', 'Bank account') }}
           <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />

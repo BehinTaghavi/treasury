@@ -28,10 +28,10 @@ import PrintRange from './PrintRange.vue'
 import { listPage, printPage, rangeText } from './printing'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
-import { depositMethodName, depositMethods } from './depositMethods'
+import { depositMethodName, depositMethods, forCard } from './depositMethods'
 import ChequeCard from './ChequeCard.vue'
 
-type Kind = 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes'
+type Kind = 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes' | 'CardDeposit'
 interface Receipt {
   id: string; kind: Kind; number: number; date: string; payerDetailCode: string; payerName: string; purposeGroupName: string; purpose: string
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; payerSheba: string | null
@@ -54,6 +54,7 @@ const L = useLookups(api)
 const year = computed(() => props.fiscalYear ?? Number(todayJalali().slice(0, 4)))
 const kindNames: Record<Kind, [string, string]> = {
   Instruments: ['چک', 'cheques'], Notes: ['سفته', 'promissory notes'], Cash: ['نقدی صندوق', 'cash'], BankDeposit: ['واریز مستقیم به حساب بانکی', 'direct bank deposits'],
+  CardDeposit: ['واریز به کارت بانک', 'deposits onto a bank card'],
 }
 const title = computed(() => t(`فهرست دریافت‌های ${kindNames[props.kind][0]} – سال مالی ${num(year.value)}`, `Receipts: ${kindNames[props.kind][1]} – fiscal year ${year.value}`))
 
@@ -71,7 +72,9 @@ const chequeSearch = ref('')
 const hasCheques = computed(() => props.kind === 'Instruments' || props.kind === 'Notes')
 const paper = computed<[string, string]>(() => (props.kind === 'Notes' ? ['سفته', 'note'] : ['چک', 'cheque']))
 const chequeNumbers = (r: Receipt) => (r.chequeStatuses ?? []).map(c => c.number ?? '').filter(Boolean)
-const methodChoices = computed<Choice[]>(() => depositMethods.map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
+/** Receipts with a kind of deposit: into a bank account, or onto a bank card. */
+const hasMethod = computed(() => props.kind === 'BankDeposit' || props.kind === 'CardDeposit')
+const methodChoices = computed<Choice[]>(() => depositMethods.filter(m => props.kind !== 'CardDeposit' || forCard(m.value)).map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
 let lookupsLoaded = false
 
 /** @param quiet A reading the user did not ask for: no «در حال خواندن», and a failure leaves the list as it is. */
@@ -128,11 +131,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshIfSeen)
 })
 
-function accountName(r: Receipt) {
-  if (r.accountKind === 'CashDesk') return L.desks.value.find(d => d.id === r.accountId)?.name ?? ''
-  const a = L.bankAccounts.value.find(x => x.id === r.accountId)
-  return a ? L.accountTitle(a) : ''
-}
+const accountName = (r: Receipt) => L.receiptAccountTitle(r, fa.value)
 const bankAccountTitle = (id: string | null | undefined) => { const a = L.bankAccounts.value.find(x => x.id === id); return a ? L.accountTitle(a) : '' }
 /** The latest status as text: of a cheque receipt its cheques' statuses, otherwise recorded or cancelled. */
 function statusText(r: Receipt) {
@@ -153,13 +152,14 @@ const shown = computed(() => {
 })
 const total = computed(() => shown.value.filter(r => r.state === 'Recorded').reduce((s, r) => s + r.totalRial, 0))
 const where = (r: Receipt) => (r.kind === 'Instruments' || r.kind === 'Notes' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
-const whereTitle = computed(() => (props.kind === 'Instruments' || props.kind === 'Notes' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
+const whereTitle = computed(() => (props.kind === 'Instruments' || props.kind === 'Notes' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk')
+  : props.kind === 'CardDeposit' ? t('کارت بانک', 'Bank card') : t('حساب بانکی', 'Bank account')))
 
 // ---- print: the rows now shown, within a range of dates (item 10), on a page of their own ----
 const inRange = (from: string | null, to: string | null) => shown.value.filter(r => (!from || r.date >= from) && (!to || r.date <= to))
 function printHtml(from: string | null = null, to: string | null = null) {
   const rows = inRange(from, to)
-  const bank = props.kind === 'BankDeposit'
+  const bank = hasMethod.value
   const range = rangeText(from, to, props.locale)
   return listPage({
     title: title.value,
@@ -216,7 +216,7 @@ defineExpose({ printHtml, load, inRange })
         <!-- item 20: a receipt is found by the number of one of its cheques -->
         <label v-if="hasCheques" style="width: 10rem">{{ t(`شماره ${paper[0]}`, `${paper[1]} no.`) }} <input v-model="chequeSearch" dir="ltr" inputmode="numeric" :aria-label="t(`شماره ${paper[0]}`, `${paper[1]} no.`)" /></label>
         <label style="flex: 1; min-width: 14rem">{{ t('جستجو (تاریخ، پرداخت کننده، بابت، وضعیت)', 'Search (date, payer, purpose, status)') }} <input v-model="search" /></label>
-        <label v-if="kind === 'BankDeposit'" style="width: 20rem">{{ t('نوع واریز', 'Kind of deposit') }}
+        <label v-if="hasMethod" style="width: 20rem">{{ t('نوع واریز', 'Kind of deposit') }}
           <SearchSelect v-model="method" :options="methodChoices" :empty-label="t('همه', 'All')" :aria-label="t('نوع واریز', 'Kind of deposit')" />
         </label>
         <button type="button" class="tr-secondary" :disabled="loading" @click="load()">{{ t('به‌روزرسانی', 'Refresh') }}</button>
@@ -233,7 +233,7 @@ defineExpose({ printHtml, load, inRange })
           <thead>
             <tr>
               <th>{{ t('شماره', 'No.') }}</th><th v-if="hasCheques">{{ t(`شماره ${paper[0]}`, `${paper[1]} no.`) }}</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th><th>{{ t('بابت', 'Purpose') }}</th>
-              <th>{{ whereTitle }}</th><th v-if="kind === 'BankDeposit'">{{ t('نوع واریز', 'Kind of deposit') }}</th>
+              <th>{{ whereTitle }}</th><th v-if="hasMethod">{{ t('نوع واریز', 'Kind of deposit') }}</th>
               <th>{{ t('مبلغ (ریال)', 'Amount (Rial)') }}</th><th>{{ t('وضعیت', 'Latest status') }}</th><th />
             </tr>
           </thead>
@@ -252,7 +252,7 @@ defineExpose({ printHtml, load, inRange })
               <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
               <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span></td>
               <td>{{ where(r) }}</td>
-              <td v-if="kind === 'BankDeposit'">{{ depositMethodName(r.method, fa) }}
+              <td v-if="hasMethod">{{ depositMethodName(r.method, fa) }}
                 <div v-if="r.trackingNumber || r.payerSheba" class="muted small num">{{ [r.trackingNumber, r.payerSheba].filter(Boolean).join(' – ') }}</div>
               </td>
               <td class="num">{{ money(r.totalRial) }}<span v-if="r.amount !== null && r.currency !== 'IRR'" class="muted small"> ({{ money(r.amount) }} {{ r.currency }})</span></td>
@@ -277,11 +277,11 @@ defineExpose({ printHtml, load, inRange })
                 <button v-if="r.state !== 'Deleted'" type="button" class="tr-link" @click="emit('print', r.id)">{{ t('چاپ رسید', 'Print receipt') }}</button>
               </td>
             </tr>
-            <tr v-if="!shown.length"><td :colspan="kind === 'BankDeposit' || hasCheques ? 9 : 8" class="muted">{{ loading ? t('در حال خواندن…', 'Loading…')
+            <tr v-if="!shown.length"><td :colspan="hasMethod || hasCheques ? 9 : 8" class="muted">{{ loading ? t('در حال خواندن…', 'Loading…')
               : receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی در این سال مالی ثبت نشده است.', 'No receipts in this fiscal year.') }}</td></tr>
           </tbody>
           <tfoot v-if="shown.length">
-            <tr><td :colspan="kind === 'BankDeposit' || hasCheques ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td colspan="2" /></tr>
+            <tr><td :colspan="hasMethod || hasCheques ? 6 : 5"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(total) }}</strong></td><td colspan="2" /></tr>
           </tfoot>
         </table>
       </div>

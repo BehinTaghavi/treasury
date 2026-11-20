@@ -37,6 +37,7 @@ const titles: Record<string, [string, string]> = {
   Instruments: ['رسید دریافت چک', 'Receipt of cheques'],
   Cash: ['رسید دریافت وجه نقد', 'Cash receipt'],
   BankDeposit: ['رسید واریز به بانک', 'Receipt of a deposit into a bank account'],
+  CardDeposit: ['رسید واریز به کارت بانک', 'Receipt of a deposit onto a bank card'],
 }
 const title = computed(() => { const x = titles[r.value.kind] ?? titles.Cash!; return fa.value ? x[0] : x[1] })
 const confirmations: Record<string, [string, string]> = {
@@ -44,6 +45,7 @@ const confirmations: Record<string, [string, string]> = {
     'The cheques listed above were received from the payer named. This receipt only records that the cheques were handed over; the debt is settled to the extent of the money collected from them.'],
   Cash: ['مبلغ بالا به صورت وجه نقد از پرداخت‌کنندهٔ نام‌برده دریافت و به صندوق تحویل شد.', 'The amount above was received in cash from the payer named and put into the cash desk.'],
   BankDeposit: ['واریز مبلغ بالا از طرف پرداخت‌کنندهٔ نام‌برده به حساب بانکی شرکت ثبت شد.', "The deposit of the amount above into the company's bank account by the payer named was recorded."],
+  CardDeposit: ['واریز مبلغ بالا از طرف پرداخت‌کنندهٔ نام‌برده به کارت بانکِ بالا ثبت شد.', 'The deposit of the amount above onto the bank card above by the payer named was recorded.'],
 }
 const confirmation = computed(() => { const x = confirmations[r.value.kind] ?? confirmations.Cash!; return fa.value ? x[0] : x[1] })
 const stamp = computed(() => (r.value.state === 'Deleted' ? t('حذف شده', 'Deleted') : r.value.state === 'Cancelled' ? t('ابطال شده', 'Cancelled') : ''))
@@ -114,10 +116,11 @@ const stamp = computed(() => (r.value.state === 'Deleted' ? t('حذف شده', '
         <tbody>
           <tr v-if="r.kind === 'Cash'"><th>{{ t('صندوق', 'Cash desk') }}</th><td colspan="3">{{ accountTitle }}</td></tr>
           <template v-else>
-            <tr><th>{{ t('حساب بانکی شرکت', 'Company bank account') }}</th><td>{{ accountTitle }}</td><th>{{ t('نوع واریز', 'Kind of deposit') }}</th><td>{{ depositMethodName(r.method, fa) }}</td></tr>
+            <tr><th>{{ r.kind === 'CardDeposit' ? t('کارت بانک', 'Bank card') : t('حساب بانکی شرکت', 'Company bank account') }}</th><td>{{ accountTitle }}</td><th>{{ t('نوع واریز', 'Kind of deposit') }}</th><td>{{ depositMethodName(r.method, fa) }}</td></tr>
             <!-- Codes read from bank papers (tracking number, Sheba) keep the digits they were typed with. -->
             <tr><th>{{ r.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}</th><td class="ltr">{{ r.trackingNumber }}</td>
-              <th>{{ t('شبای واریزکننده', "Payer's Sheba") }}</th><td class="ltr nowrap">{{ sheba(r.payerSheba) }}</td></tr>
+              <template v-if="r.payerSheba"><th>{{ t('شبای واریزکننده', "Payer's Sheba") }}</th><td class="ltr nowrap">{{ sheba(r.payerSheba) }}</td></template>
+              <template v-else><th /><td /></template></tr>
           </template>
           <tr><th>{{ t('مبلغ به عدد', 'Amount in figures') }}</th><td :colspan="foreign ? 1 : 3"><strong>{{ money(r.amount) }}</strong> {{ unit(r.currency) }}</td>
             <template v-if="foreign"><th>{{ t('نرخ ارز / هم‌ارز ریالی', 'Rate / Rial equivalent') }}</th>

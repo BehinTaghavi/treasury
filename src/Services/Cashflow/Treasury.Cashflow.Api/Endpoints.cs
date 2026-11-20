@@ -48,6 +48,9 @@ public sealed record CashReceiptRequest(ReceiptHeaderInput Header, Guid CashDesk
 public sealed record BankReceiptRequest(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial,
     string? PayerSheba = null);
 
+/// <summary>«واریز به کارت بانک»: <paramref name="CardKind"/> is PettyCashCard (then <paramref name="CardId"/> is the petty cash) or CompanyCard.</summary>
+public sealed record CardReceiptRequest(ReceiptHeaderInput Header, ReceiptAccountKind CardKind, Guid CardId, DepositMethod Method, string? TrackingNumber, decimal Amount);
+
 public sealed record InstrumentReceiptRequest(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
 /// <summary>The note receipt form (owner's form «فرم دریافت سفته», 16 Nov 2026).</summary>
@@ -68,6 +71,9 @@ public sealed record CashReceiptCorrection(ReceiptHeaderInput Header, Guid CashD
 /// <inheritdoc cref="CashReceiptCorrection"/>
 public sealed record BankReceiptCorrection(ReceiptHeaderInput Header, Guid BankAccountId, DepositMethod Method, string? TrackingNumber, decimal Amount, decimal? RateToRial,
     long Version, string? PayerSheba = null);
+
+/// <inheritdoc cref="CashReceiptCorrection"/>
+public sealed record CardReceiptCorrection(ReceiptHeaderInput Header, ReceiptAccountKind CardKind, Guid CardId, DepositMethod Method, string? TrackingNumber, decimal Amount, long Version);
 
 /// <summary>A line with an id corrects that cheque, a line without one adds a cheque, a cheque left out is taken off the receipt.</summary>
 public sealed record InstrumentReceiptCorrection(ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments, long Version);
@@ -182,6 +188,16 @@ public static class Endpoints
             ToHttp(await useCases.CorrectCashAsync(new CorrectCashReceiptCommand(Key(http), id, r.Version, r.Header, r.CashDeskId, r.Amount, r.RateToRial), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/receipts/{id}"));
 
+        api.MapPost("/receipts/card", async (CardReceiptRequest r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.RecordCardDepositAsync(
+                new RecordCardReceiptCommand(Key(http), r.Header, r.CardKind, r.CardId, r.Method, r.TrackingNumber, r.Amount), ct).ConfigureAwait(false),
+                id => $"/api/cashflow/receipts/{id}"));
+
+        api.MapPut("/receipts/{id:guid}/card", async (Guid id, CardReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
+            ToHttp(await useCases.CorrectCardDepositAsync(
+                new CorrectCardReceiptCommand(Key(http), id, r.Version, r.Header, r.CardKind, r.CardId, r.Method, r.TrackingNumber, r.Amount), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/receipts/{id}"));
+
         api.MapPut("/receipts/{id:guid}/bank", async (Guid id, BankReceiptCorrection r, HttpRequest http, ReceiptUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.CorrectBankDepositAsync(
                 new CorrectBankReceiptCommand(Key(http), id, r.Version, r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false),
@@ -230,6 +246,9 @@ public static class Endpoints
 
         api.MapPost("/receipts/bank/voucher-preview", async (BankReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
             Preview(await u.PreviewBankDepositAsync(new RecordBankReceiptCommand("preview", r.Header, r.BankAccountId, r.Method, r.TrackingNumber, r.Amount, r.RateToRial, r.PayerSheba), ct).ConfigureAwait(false)));
+
+        api.MapPost("/receipts/card/voucher-preview", async (CardReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewCardDepositAsync(new RecordCardReceiptCommand("preview", r.Header, r.CardKind, r.CardId, r.Method, r.TrackingNumber, r.Amount), ct).ConfigureAwait(false)));
 
         api.MapPost("/receipts/instruments/voucher-preview", async (InstrumentReceiptRequest r, ReceiptUseCases u, CancellationToken ct) =>
             Preview(await u.PreviewInstrumentsAsync(new RecordInstrumentReceiptCommand("preview", r.Header, r.Instruments), ct).ConfigureAwait(false)));

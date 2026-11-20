@@ -5,6 +5,7 @@
  * Owner's report no. 6 (19 Nov 2026), item 12: the tabs come in the order he gave, by how often each is used — cheque receipt, cheque
  * steps, cash, «واریز به بانک», «واریز به کارت بانک», note receipt, note steps, legal action — and the list, now «فهرست جامع دریافت‌ها»,
  * stands last in a coloured box. Item 21: «چاپ رسید» of any saved receipt is shown and printed here, under the screen in use.
+ * «واریز به کارت بانک» is a receipt form of its own kind since the owner's answers to Q68–Q70 (20 Nov 2026).
  */
 import { computed, ref } from 'vue'
 import { createApi, translate, type Locale } from '@treasury/ui-kit'
@@ -16,7 +17,6 @@ import ChequeOperations from './ChequeOperations.vue'
 import LegalAction from './LegalAction.vue'
 import ReceiptsPanel from './ReceiptsPanel.vue'
 import ReceiptPrint from './ReceiptPrint.vue'
-import CardDeposit from './CardDeposit.vue'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -32,7 +32,7 @@ const tabs = [
   // «واریز به بانک» replaces «واریز به حساب / کارتخوان» (report no. 6, item 12).
   { id: 'BankDeposit', title: ['واریز به بانک', 'Bank deposit'] },
   // Money paid onto the bank card of a petty-cash holder, or onto a company card without a bank account (report no. 6, item 12).
-  { id: 'cardDeposit', title: ['واریز به کارت بانک', 'Deposit onto a bank card'] },
+  { id: 'CardDeposit', title: ['واریز به کارت بانک', 'Deposit onto a bank card'] },
   // Owner's report no. 4, item 13, and his form «فرم دریافت سفته» (16 Nov 2026): promissory notes have a form of their own.
   { id: 'Notes', title: ['دریافت سفته', 'Promissory notes'] },
   // Owner, 16 Nov 2026: the steps of a note after receipt (to the bank, collected, handed back, endorsed…).
@@ -57,8 +57,8 @@ function startLegal(chequeId: string) { legalCheque.value = chequeId; tab.value 
  * Owner, 18 Nov 2026: on every receipt screen a button «فهرست دریافت‌ها» shows the receipts of that screen's kind under the form. The
  * cheque screens (steps, legal action) show the cheque receipts.
  */
-const panelKind = computed(() => (tab.value === 'Cash' || tab.value === 'BankDeposit' ? tab.value
-  : tab.value === 'cardDeposit' ? 'BankDeposit' : tab.value === 'Notes' || tab.value === 'noteSteps' ? 'Notes' : 'Instruments'))
+const panelKind = computed(() => (tab.value === 'Cash' || tab.value === 'BankDeposit' || tab.value === 'CardDeposit' ? tab.value
+  : tab.value === 'Notes' || tab.value === 'noteSteps' ? 'Notes' : 'Instruments'))
 /** Counts saved receipts and recorded cheque steps, so an open list shows the new receipt or the cheque's new status at once. */
 const savedCount = ref(0)
 
@@ -103,8 +103,8 @@ const hints: Record<string, [string, string]> = {
   Cash: ['وجه نقد دریافتی به صندوق؛ ارز همان ارز صندوق است.', 'Cash received into a cash desk, in the cash desk\'s currency.'],
   BankDeposit: ['واریز مستقیم مشتری به حساب بانکی شرکت: فیش، حواله (ساتنا/پایا)، کارتخوان یا کارت به کارت.',
     'Money the payer paid straight into a company bank account: slip, transfer, POS or card-to-card.'],
-  cardDeposit: ['واریز مشتری به کارت بانکِ تنخواه‌گردان‌های شرکت، یا به کارت بانک شرکت که حساب بانکی ندارد.',
-    'Money a payer paid onto the bank card of one of the company\'s petty-cash holders, or onto a company bank card without a bank account.'],
+  CardDeposit: ['واریز مشتری به کارت بانکِ تنخواه‌گردان‌های شرکت، یا به کارت بانک شرکت که حساب بانکی ندارد: کارت به کارت، با فیش واریزی یا از درگاه پرداخت شرکت.',
+    'Money a payer paid onto the bank card of one of the company\'s petty-cash holders, or onto a company bank card without a bank account: card to card, with a deposit slip or through the company\'s gateway.'],
   legal: ['چک برگشتی را از فهرست انتخاب کنید؛ مشخصات آن نمایش داده می‌شود. سپس تاریخ و شرح اقدام حقوقی را وارد و اسکن ضمائم را اضافه کنید. با ثبت، آخرین وضعیت چک «اقدام حقوقی» می‌شود.',
     'Choose the bounced cheque from the list; its particulars are shown. Enter the date and description of the legal action and add the scans. Recording it sets the cheque\'s latest status to legal action.'],
 }
@@ -125,14 +125,13 @@ const hints: Record<string, [string, string]> = {
       `You are correcting receipt no. ${editing.number}. It can be corrected or deleted until its voucher is confirmed; its number stays. A cheque or note with a step recorded on it stays locked.`) }}</p>
     <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" @print="printReceipt" />
     <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
-    <CardDeposit v-else-if="tab === 'cardDeposit'" :key="'card' + locale" :api-base="apiBase" :locale="locale" :token="token" @bank="openTab('BankDeposit')" />
     <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" @changed="stepRecorded" />
     <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" @edit="startEdit" @print="printReceipt" />
     <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale + (editing?.id ?? '')" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
                      @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" />
     <ReceiptForm v-else :key="tab + locale + (editing?.id ?? '')" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
                  @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" @print="printReceipt" />
-    <ReceiptsPanel v-if="tab !== 'list' && tab !== 'cardDeposit'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
+    <ReceiptsPanel v-if="tab !== 'list'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
                    :fiscal-year="fiscalYear" :refresh-key="savedCount" :editing-id="editing?.id" @edit="startEdit" @deleted="receiptDeleted" @print="printReceipt" />
     <!-- report no. 6, item 21: the printed receipt of the saved receipt chosen with «چاپ رسید» -->
     <ReceiptPrint v-if="printId" :key="printId + printRun" :receipt-id="printId" :api-base="apiBase" :locale="locale" :token="token" @close="printId = ''" />

@@ -30,13 +30,7 @@ const group = computed(() => L.groups.value.find(g => g.id === receipt.value?.pu
 const refTitle = (id: string | null | undefined) => L.references.value.find(x => x.id === id)?.name ?? ''
 const departmentName = computed(() => L.departments.value.find(d => d.id === receipt.value?.departmentId)?.name ?? '')
 const ledgerAccount = computed(() => { const code = group.value?.ledgerAccountCode; return code ? `${code} – ${L.accountName(code) ?? ''}` : '' })
-const accountTitle = computed(() => {
-  const r = receipt.value
-  if (!r) return ''
-  if (r.kind === 'Cash') return L.desks.value.find(d => d.id === r.accountId)?.name ?? ''
-  const a = L.bankAccounts.value.find(x => x.id === r.accountId)
-  return a ? L.accountTitle(a) : ''
-})
+const accountTitle = computed(() => (receipt.value ? L.receiptAccountTitle(receipt.value, props.locale === 'fa') : ''))
 const currencyName = (code: string) => L.currencies.value.find(c => c.code === code)?.name ?? code
 
 /** The company's logo as the shell reads it (with the login token once there is one). */

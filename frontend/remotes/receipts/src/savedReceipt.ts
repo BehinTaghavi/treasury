@@ -20,9 +20,9 @@ export interface SavedInstrument {
 }
 
 export interface SavedReceipt {
-  id: string; kind: 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes'; fiscalYear: number; number: number; date: string; payerDetailCode: string; payerName: string
+  id: string; kind: 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes' | 'CardDeposit'; fiscalYear: number; number: number; date: string; payerDetailCode: string; payerName: string
   purposeGroupId: string; purposeGroupName: string; purpose: string; reference1: string | null; reference2: string | null; departmentId: string | null
-  salesProceeds: boolean; note: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null
+  salesProceeds: boolean; note: string | null; accountKind?: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null
   currency: string | null; rateToRial: number | null; payerSheba: string | null; state: string; version: number; instruments: SavedInstrument[] | null
   replacedInstrumentId: string | null; noteTerms: NoteTerms | null; notCorrectable: string | null
   /** The code of the rule that closes «حذف», or null while the receipt can be deleted (owner's answer to Q59). */

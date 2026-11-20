@@ -117,6 +117,13 @@ public interface IReceiptAccountLookup
     Task<ReceiptAccountFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken);
 
     Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// A bank card money is paid onto on «واریز به کارت بانک»: the card of a petty-cash holder (<paramref name="kind"/> PettyCashCard,
+    /// <paramref name="id"/> the petty cash; its معین with the holder's تفصیل) or a company card without a bank account (CompanyCard;
+    /// its own معین and تفصیل). Null when there is none, or when the petty cash is not kept on a bank card.
+    /// </summary>
+    Task<ReceiptAccountFact?> CardAsync(ReceiptAccountKind kind, Guid id, CancellationToken cancellationToken);
 }
 
 /// <summary>Answered by reference-svc (ADR 0001). Failure to reach it: DomainException "Reference.Unavailable".</summary>

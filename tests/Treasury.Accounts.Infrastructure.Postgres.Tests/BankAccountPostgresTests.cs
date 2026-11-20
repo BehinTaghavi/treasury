@@ -86,6 +86,28 @@ public sealed class BankAccountPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_company_card_without_a_bank_account_round_trips_and_its_number_is_unique()
+    {
+        // Owner's answer to Q69 (20 Nov 2026); db/postgres/044_accounts_company_cards.sql. A card number per test run.
+        var body = $"62198{Math.Abs(_tag.GetHashCode()) % 100_000_000:D8}00"[..15];
+        var number = Enumerable.Range(0, 10).Select(d => body + d).First(Treasury.Accounts.Domain.BankAccounts.BankAccount.IsCardNumber);
+        var cards = new Treasury.Accounts.Application.CompanyCards.CompanyCardUseCases(
+            new PostgresUnitOfWork(_dataSource), new PostgresCompanyCardRepository(), new PostgresBankAccountRepository(), new FakeReference(), new PostgresIdempotencyStore(_dataSource));
+        var form = new Treasury.Accounts.Application.CompanyCards.CompanyCardForm(number, "شرکت نمونه " + _tag, FakeReference.Mellat, "1103", "100000");
+        var r = await cards.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        Assert.Equal("CompanyCard.NumberTaken", (await cards.RegisterAsync(new(Key(), form with { HolderName = "دیگری" }), CancellationToken.None)).ErrorCode);
+        var v = (await cards.ListAsync(true, CancellationToken.None)).Single(c => c.Id == r.Value);
+        Assert.Equal((number, "شرکت نمونه " + _tag, FakeReference.Mellat, "1103", "100000", true, 1L), (v.CardNumber, v.HolderName, v.BankId, v.LedgerAccountCode, v.DetailCode, v.IsActive, v.Version));
+
+        Assert.True((await cards.ChangeAsync(new(Key(), r.Value, form with { LedgerAccountCode = "130100", DetailCode = null }, 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await cards.SetActiveAsync(new(Key(), r.Value, false, 2), CancellationToken.None)).IsSuccess);
+        var after = (await cards.ListAsync(true, CancellationToken.None)).Single(c => c.Id == r.Value);
+        Assert.Equal(("130100", (string?)null, false, 3L), (after.LedgerAccountCode, after.DetailCode, after.IsActive, after.Version));
+        Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT count(*) FROM accounts.outbox WHERE type = 'CompanyCardChanged' AND payload->>'CompanyCardId' = @id", ("id", r.Value.ToString())));
+    }
+
+    [Fact]
     public async Task A_cash_desk_round_trips_and_its_name_is_unique()
     {
         var desks = new Treasury.Accounts.Application.CashDesks.CashDeskUseCases(

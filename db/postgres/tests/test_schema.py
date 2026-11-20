@@ -176,6 +176,12 @@ def test_the_scripts_run_again_over_rows_saved_with_the_newest_values(db):
                          issue_date, counterparty_id, counterparty_name, purpose, state)
                          VALUES (1405, %s, 'Received', 'OrdinaryCheque', 'R-1', 'b', 10, 10, '2026-04-01', %s, 'x', 'y', %s)""",
                       (i, uuid.uuid4(), state))
+        # 20 Nov 2026: a receipt of the newest kind, «واریز به کارت بانک» (033 rewrites the lists of kinds, 045 the account kinds).
+        card_receipt = uuid.uuid4()
+        c.execute("""INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id,
+                     purpose_group_name, purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency, total_rial, state)
+                     VALUES (1405, %s, 'CardDeposit', 990077, '2026-11-20', %s, 'x', '200015', %s, 'y', 'y', 'test', 'PettyCashCard', %s, 'CardToCard', 10, 'IRR', 10, 'Recorded')""",
+                  (card_receipt, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
         keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection")
         for k in keys:
             c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '9999') ON CONFLICT DO NOTHING", (k,))
@@ -185,6 +191,7 @@ def test_the_scripts_run_again_over_rows_saved_with_the_newest_values(db):
         finally:
             c.execute("DELETE FROM cashflow.instrument WHERE id = ANY(%s)", (ids,))
             c.execute("DELETE FROM cashflow.voucher_account WHERE ledger_account_code = '9999'")
+            c.execute("DELETE FROM cashflow.receipt WHERE id = %s", (card_receipt,))
 
 
 def test_a_name_is_unique_per_list_and_parent_and_a_currency_code_once(db):
@@ -1069,3 +1076,58 @@ def test_a_deleted_receipt_keeps_its_row_with_who_deleted_it_and_when(db):
         with pytest.raises(psycopg.errors.CheckViolation):
             with c.transaction():
                 c.execute("UPDATE cashflow.receipt SET state = 'Cancelled', deleted_by = NULL, deleted_at = NULL WHERE id = %s", (rid,))
+
+
+def test_a_company_card_without_a_bank_account_is_entered_once(db):
+    # 044_accounts_company_cards.sql: the owner's report no. 6, item 12, and his answer to Q69 (20 Nov 2026).
+    add = """INSERT INTO accounts.company_card (id, card_number, holder_name, bank_id, ledger_account, detail1)
+             VALUES (%s, %s, 'شرکت نمونه', %s, '1105', %s)"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        c.execute(add, (uuid.uuid4(), "6037991234567893", uuid.uuid4(), "600009"))
+        c.execute(add, (uuid.uuid4(), "6219861034529007", uuid.uuid4(), None))   # an account that takes no تفصیل
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "6037991234567893", uuid.uuid4(), None))
+        with pytest.raises(psycopg.errors.CheckViolation):   # 16 digits
+            with c.transaction():
+                c.execute(add, (uuid.uuid4(), "6037-9912-3456", uuid.uuid4(), None))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):   # a card is switched off, never deleted
+            with c.transaction():
+                c.execute("DELETE FROM accounts.company_card")
+        c.rollback()
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):   # another service asks accounts-svc, it does not read its table
+            c.execute("SELECT count(*) FROM accounts.company_card")
+
+
+def test_a_deposit_onto_a_bank_card_has_its_own_numbers_its_card_and_its_kinds_of_deposit(db):
+    # 045_cashflow_card_deposits.sql and the lists of 033: «واریز به کارت بانک» (owner's report no. 6, item 12; answers to Q68–Q70).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name,
+                 purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency, total_rial, state)
+             VALUES (1405, %s, %s, %s, '2026-11-20', %s, 'payer', '200015', %s, 'sales', 'sales', 'clerk', %s, %s, %s, 1000, 'IRR', 1000, 'Recorded')"""
+    row = lambda kind, n, account, method: (uuid.uuid4(), kind, n, uuid.uuid4(), uuid.uuid4(), account, uuid.uuid4(), method)
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        # A petty-cash holder's card or a company card; card to card, a deposit slip or the company's gateway (answer to Q70).
+        for n, (account, method) in enumerate([("PettyCashCard", "CardToCard"), ("CompanyCard", "DepositSlip"), ("CompanyCard", "PaymentGateway")]):
+            c.execute(add, row("CardDeposit", 9500 + n, account, method))
+        # Its own series: a bank deposit may have the same number in the same year (answer to Q19 for every kind).
+        c.execute(add, row("BankDeposit", 9500, "BankAccount", "CardToCard"))
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            with c.transaction():
+                c.execute(add, row("CardDeposit", 9500, "CompanyCard", "CardToCard"))
+        for account, method in (("BankAccount", "CardToCard"),      # a card deposit goes onto a card
+                                ("CashDesk", "CardToCard"),
+                                ("PettyCashCard", "Paya"),          # not a kind of deposit onto a card
+                                ("CompanyCard", None),
+                                ("Wallet", "CardToCard")):          # an unknown kind of account
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, row("CardDeposit", 9600, account, method))
+        with pytest.raises(psycopg.errors.CheckViolation):          # a bank deposit still goes into a bank account
+            with c.transaction():
+                c.execute(add, row("BankDeposit", 9601, "CompanyCard", "CardToCard"))
+        c.execute("INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'CardDeposit', 3) ON CONFLICT DO NOTHING")
+        c.rollback()
+

@@ -39,7 +39,7 @@ interface Instrument {
     guarantors: { name: string; nationalCode: string | null; detailCode?: string | null; phone?: string | null }[] | null } | null
 }
 interface Receipt {
-  id: string; kind: 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes'; fiscalYear: number; number: number; date: string; payerDetailCode: string; payerName: string
+  id: string; kind: 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes' | 'CardDeposit'; fiscalYear: number; number: number; date: string; payerDetailCode: string; payerName: string
   purposeGroupName: string; purpose: string; reference1: string | null; reference2: string | null; departmentId: string | null; salesProceeds: boolean; note: string | null
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; amount: number | null; currency: string | null
   rateToRial: number | null; totalRial: number; instrumentCount: number; state: string; cancelledOn: string | null; cancelReason: string | null
@@ -71,7 +71,7 @@ const year = ref(String(props.fiscalYear ?? thisYear))
 const yearChoices = computed<Choice[]>(() => Array.from({ length: 6 }, (_, i) => thisYear - 4 + i).map(y => ({ value: String(y), label: num(y) })))
 const kind = ref('')
 const kindNames: Record<string, [string, string]> = {
-  Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به بانک', 'Bank deposit'], Instruments: ['چک', 'Cheques'], Notes: ['سفته', 'Promissory notes'],
+  Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به بانک', 'Bank deposit'], CardDeposit: ['واریز به کارت بانک', 'Card deposit'], Instruments: ['چک', 'Cheques'], Notes: ['سفته', 'Promissory notes'],
 }
 /** Receipts that bring in instruments: cheques, or promissory notes (which have a receipt of their own). */
 const hasInstruments = (r: Receipt) => r.kind === 'Instruments' || r.kind === 'Notes'
@@ -106,11 +106,7 @@ const totalShown = computed(() => shown.value.filter(r => r.state === 'Recorded'
 const when = (iso: string | null | undefined) => (iso
   ? new Intl.DateTimeFormat(fa.value ? 'fa-IR' : 'en-GB', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(iso)) : '')
 
-function accountName(r: Receipt) {
-  if (r.accountKind === 'CashDesk') return L.desks.value.find(d => d.id === r.accountId)?.name ?? ''
-  const a = L.bankAccounts.value.find(x => x.id === r.accountId)
-  return a ? L.accountTitle(a) : ''
-}
+const accountName = (r: Receipt) => L.receiptAccountTitle(r, fa.value)
 
 async function load() {
   const q = new URLSearchParams({ year: year.value })
