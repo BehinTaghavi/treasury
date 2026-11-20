@@ -273,7 +273,7 @@ that has no bank account. **Built with the owner's answers to Q68–Q70 (20 Nov 
 cards (Basic Information → «تنخواه گردان‌ها», kept on a bank card) and the company's cards without a bank account (the new page
 «کارت‌های بانک شرکت (بدون حساب بانکی)»); the money comes card to card, with a deposit slip or through the company's gateway; the voucher
 is Dr the petty cash's account · holder (the money is added to that petty cash) or the company card's own معین · تفصیل / Cr the purpose
-group · payer. The receipts have their own numbers (Q75) and are corrected, deleted, cancelled and printed like a bank deposit. A card of
+group · payer. The receipts have their own numbers (confirmed by the owner, Q75) and are corrected, deleted, cancelled and printed like a bank deposit. A card of
 one of the company's bank accounts stays on «واریز به بانک» as «کارت به کارت».
 
 **The legal action's description (item 13).** «شرح اقدام حقوقی» is required: its box is drawn in red like every required field, and when
