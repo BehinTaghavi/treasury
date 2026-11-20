@@ -308,7 +308,6 @@ label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .tr-radio { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
 .tr-radio label { flex-direction: row; align-items: center; gap: .35rem; }
 input:not([type=radio]) { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }

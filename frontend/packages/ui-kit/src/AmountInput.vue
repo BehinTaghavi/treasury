@@ -47,12 +47,11 @@ function onInput(e: Event) {
   </span>
 </template>
 
-<!-- Not scoped: a screen marks a required field with `.req` on the label or cell around the box. -->
+<!-- Not scoped: a screen marks a required field with `.req` on the label or cell around the box (the red frame of a field left empty: required.css). -->
 <style>
 .tr-amount { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
-.tr-amount > input { width: 100%; box-sizing: border-box; padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
+.tr-amount > input { width: 100%; box-sizing: border-box; min-height: var(--tr-field-h, 0); padding: var(--tr-field-pad, .45rem .5rem); border: 1px solid var(--tr-field-border, #cbd2d9); border-radius: var(--tr-field-radius, 6px); font: inherit; background: #fff; }
 .tr-amount > input:disabled { background: #f5f7fa; color: #52606d; }
-.req > .tr-amount > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .tr-amount-words { color: #52606d; font-size: .78rem; line-height: 1.5; font-weight: 400; white-space: normal; }
 /* The words make this field taller than its neighbours: line the row of a form up at the top, so the boxes stay on one line and the
    words hang under their own box (the screens line their fields up at the bottom otherwise). */

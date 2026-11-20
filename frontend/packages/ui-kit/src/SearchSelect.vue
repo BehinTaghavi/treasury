@@ -130,7 +130,7 @@ function scrollToActive() {
 </script>
 
 <template>
-  <div ref="rootEl" class="ss" :class="{ open, required, disabled }" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) close() }">
+  <div ref="rootEl" class="ss" :class="{ open, required, disabled }" :data-empty="modelValue ? undefined : ''" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) close() }">
     <input
       ref="inputEl"
       :id="id"
@@ -170,8 +170,10 @@ function scrollToActive() {
 
 <style scoped>
 .ss { position: relative; display: flex; }
-.ss input { flex: 1; min-width: 0; padding: .45rem .5rem; padding-inline-end: 1.8rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
-.ss.required input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+/* The box follows the area's measures (--tr-field-*), so it lines up with the plain boxes beside it. A required box is marked at its
+   label and turns red only when left empty at a save attempt: required.css. */
+.ss input { flex: 1; min-width: 0; box-sizing: border-box; min-height: var(--tr-field-h, 0); padding: var(--tr-field-pad, .45rem .5rem); padding-inline-end: 1.8rem; border: 1px solid var(--tr-field-border, #cbd2d9);
+  border-radius: var(--tr-field-radius, 6px); font: inherit; background: #fff; }
 .ss input:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
 .ss-arrow { position: absolute; inset-inline-end: 2px; top: 2px; bottom: 2px; width: 1.6rem; border: 0; background: transparent; color: #52606d; cursor: pointer; padding: 0; }
 .ss-list { position: absolute; z-index: 20; inset-inline: 0; top: calc(100% + 2px); max-height: 18rem; overflow-y: auto; margin: 0; padding: .25rem 0; list-style: none; background: #fff; border: 1px solid #cbd2d9; border-radius: 6px; box-shadow: 0 6px 18px rgba(31, 41, 51, .15); }

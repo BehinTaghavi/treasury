@@ -86,7 +86,7 @@ function onKey(e: KeyboardEvent) {
 </script>
 
 <template>
-  <span ref="rootEl" class="ci" :class="{ required, disabled }" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) open = false }">
+  <span ref="rootEl" class="ci" :class="{ required, disabled }" :data-empty="modelValue ? undefined : ''" @focusout="(e: FocusEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node)) open = false }">
     <span class="ci-box">
       <input ref="inputEl" :id="id" role="combobox" :aria-expanded="open" :aria-controls="`${id}-list`" :aria-label="ariaLabel" :aria-required="required || undefined"
              :value="modelValue" :placeholder="placeholder" :disabled="disabled" :maxlength="maxlength" autocomplete="off" @input="onInput" @keydown="onKey" />
@@ -104,8 +104,8 @@ function onKey(e: KeyboardEvent) {
 <style scoped>
 .ci { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
 .ci-box { position: relative; display: flex; }
-.ci input { flex: 1; min-width: 0; padding: .45rem .5rem; padding-inline-end: 1.8rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
-.ci.required input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+.ci input { flex: 1; min-width: 0; box-sizing: border-box; min-height: var(--tr-field-h, 0); padding: var(--tr-field-pad, .45rem .5rem); padding-inline-end: 1.8rem; border: 1px solid var(--tr-field-border, #cbd2d9);
+  border-radius: var(--tr-field-radius, 6px); font: inherit; background: #fff; }
 .ci input:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
 .ci-arrow { position: absolute; inset-inline-end: 2px; top: 2px; bottom: 2px; width: 1.6rem; border: 0; background: transparent; color: #52606d; cursor: pointer; padding: 0; }
 .ci-list { position: absolute; z-index: 20; inset-inline: 0; top: calc(100% + 2px); max-height: 16rem; overflow-y: auto; margin: 0; padding: .25rem 0; list-style: none; background: #fff;

@@ -6,10 +6,9 @@ legend { font-weight: 600; padding: 0 .25rem; }
 label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .wide { grid-column: span 2; }
 .tr-check { flex-direction: row; align-items: center; gap: .35rem; align-self: end; padding-bottom: .55rem; }
-/* Required fields are drawn with a red frame (owner's report no. 2, item 12); no separate star, which pushed list boxes a line down. */
+/* A required field is marked at its label and its box turns red only when left empty at a save attempt (owner, 20 Nov 2026): ui-kit required.css. */
 input:not([type=checkbox]):not([type=radio]), select, textarea { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 input.ro { background: #f5f7fa; color: #52606d; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }

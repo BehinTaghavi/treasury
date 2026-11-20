@@ -55,16 +55,16 @@ function onInput(e: Event) {
   </span>
 </template>
 
-<!-- Not scoped: a screen marks a required or refused field with `.req` / `.bad` on the label around the box. -->
+<!-- Not scoped: a screen marks a refused field with `.bad` on the label around the box (a required one left empty: required.css). -->
 <style>
 .tr-sheba { display: flex; flex-direction: column; gap: .15rem; min-width: 0; }
-.tr-sheba-box { display: flex; align-items: stretch; border: 1px solid #cbd2d9; border-radius: 6px; background: #fff; overflow: hidden; }
+.tr-sheba-box { display: flex; align-items: stretch; box-sizing: border-box; min-height: var(--tr-field-h, 0); border: 1px solid var(--tr-field-border, #cbd2d9); border-radius: var(--tr-field-radius, 6px); background: #fff; overflow: hidden; }
 .tr-sheba-box:focus-within { outline: 2px solid #93b4f5; outline-offset: -1px; }
 .tr-sheba-ir { display: flex; align-items: center; padding: 0 .55rem; background: #eef2f7; color: #1f2933; font-weight: 700; letter-spacing: .05em; border-inline-end: 1px solid #cbd2d9; user-select: none; }
-.tr-sheba-box > input { flex: 1; min-width: 0; padding: .45rem .5rem; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; outline: 0; font: inherit; background: transparent;
+.tr-sheba-box > input { flex: 1; min-width: 0; padding: var(--tr-field-pad, .45rem .5rem); border: 0 !important; border-radius: 0 !important; box-shadow: none !important; outline: 0; font: inherit; background: transparent;
   font-variant-numeric: tabular-nums; letter-spacing: .03em; }
 .tr-sheba-box > input:disabled { background: #f5f7fa; color: #52606d; }
-.req > .tr-sheba > .tr-sheba-box, .bad > .tr-sheba > .tr-sheba-box { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+.bad > .tr-sheba > .tr-sheba-box { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .tr-sheba-hint { color: #52606d; font-size: .78rem; line-height: 1.5; font-weight: 400; }
 .tr-sheba-hint.bad { color: #b42318; }
 </style>
