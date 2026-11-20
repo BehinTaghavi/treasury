@@ -269,9 +269,12 @@ The report came again on 19 Nov 2026 with ten more items; items 1–11 are secti
 «عملیات چک‌های دریافتی», «دریافت نقدی», «واریز به بانک» (it was «واریز به حساب / کارتخوان»), «واریز به کارت بانک» (new), «دریافت سفته»,
 «عملیات سفته‌های دریافتی», «اقدام حقوقی», and last, in a coloured box, **«فهرست جامع دریافت‌ها»**.
 «واریز به کارت بانک» is for money a payer pays onto the bank card of one of the company's petty-cash holders, or onto a company bank card
-that has no bank account. The tab is in its place and shows the bank cards already defined (petty-cash holders' cards, and the company's
-cards on its bank accounts, whose deposits are recorded on «واریز به بانک» as «کارت به کارت»). **Its receipt form waits for Q68–Q70**: which
-account its voucher debits, where a company card without a bank account is defined, and how these receipts are numbered.
+that has no bank account. **Built with the owner's answers to Q68–Q70 (20 Nov 2026):** the card is chosen from the petty-cash holders'
+cards (Basic Information → «تنخواه گردان‌ها», kept on a bank card) and the company's cards without a bank account (the new page
+«کارت‌های بانک شرکت (بدون حساب بانکی)»); the money comes card to card, with a deposit slip or through the company's gateway; the voucher
+is Dr the petty cash's account · holder (the money is added to that petty cash) or the company card's own معین · تفصیل / Cr the purpose
+group · payer. The receipts have their own numbers (Q75) and are corrected, deleted, cancelled and printed like a bank deposit. A card of
+one of the company's bank accounts stays on «واریز به بانک» as «کارت به کارت».
 
 **The legal action's description (item 13).** «شرح اقدام حقوقی» is required: its box is drawn in red like every required field, and when
 «ثبت اقدام حقوقی» is pressed without it the reason is written under the box and the cursor is put in it.

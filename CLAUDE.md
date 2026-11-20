@@ -45,7 +45,7 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 Offline mode exists because some workspaces cannot reach NuGet: a small shim (`tests/Treasury.TestShim`) replaces xUnit and the PostgreSQL/Keycloak packages are left out. Do not use xUnit features the shim lacks without adding them to the shim.
 
 ## Where things are
-- `src/Services/Cashflow` — receipts, instruments and their steps, cheque types and cheque books, treasury vouchers (payments not built yet). `src/Services/Reference` — Basic Information lists, the company's name, logo and official details, and the copy of the chart of accounts. `src/Services/Accounts` — bank accounts, cash desks, petty cash, opening balances. `src/Services/Requests` — payment requests.
+- `src/Services/Cashflow` — receipts, instruments and their steps, cheque types and cheque books, treasury vouchers (payments not built yet). `src/Services/Reference` — Basic Information lists, the company's name, logo and official details, and the copy of the chart of accounts. `src/Services/Accounts` — bank accounts, company bank cards without a bank account, cash desks, petty cash, opening balances. `src/Services/Requests` — payment requests.
 - `db/postgres` — schema scripts (`apply.sh`), partition functions, schema tests.
 - `tools/migration` — old data → new schema, with reconciliation reports.
 - `frontend/shell`, `frontend/remotes/*`, `frontend/packages/ui-kit` — UI.

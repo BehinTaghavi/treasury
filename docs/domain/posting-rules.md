@@ -50,6 +50,10 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 (the last four rows of the table come from his answers of that day). The purpose group, bank account and cash desk supply their own accounts.
 
 - Money paid straight into a bank account: Dr the bank account's معین with the bank account's تفصیل / Cr purpose group, payer.
+- Money paid onto a bank card («واریز به کارت بانک», owner's answers to Q68 and Q69, 20 Nov 2026): onto the card of a petty-cash holder,
+  Dr the petty cash's معین («تنخواه گردان») with the holder's تفصیل — the money is added to that petty cash; onto a company bank card
+  that has no bank account, Dr the card's own معین and تفصیل (Basic Information → «کارت‌های بانک شرکت (بدون حساب بانکی)»). Both: Cr
+  purpose group, payer.
 - «چک های در جریان وصول» is one account for all banks; its تفصیل is the bank account's تفصیل.
 - One voucher for each receipt or operation (each step of a cheque); the treasurer confirms it. A voucher with an account not set
   cannot be confirmed; a confirmed voucher keeps its lines and its receipt can no longer be cancelled.
