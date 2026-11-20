@@ -5,6 +5,7 @@ using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Domain.Receipts;
+using Treasury.Cashflow.Domain.Transfers;
 
 namespace Treasury.Cashflow.Infrastructure;
 
@@ -119,6 +120,41 @@ public sealed record ChequeBookSnapshot(
 
     public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version, FormatId,
         SayadMiddle is { } m && SayadFirstSerial is { } s ? ChequeBookSayad.Restore(m, s) : null, PartlyUsed, SerialDigits);
+}
+
+/// <summary>Flat, storable form of a transfer between two bank accounts of the company. Dates are ISO dates.</summary>
+public sealed record BankTransferSnapshot(
+    Guid Id, int FiscalYear, int Number, DateOnly Date, TransferMethod Method, TransferChannel? Channel,
+    Guid SourceAccountId, string SourceAccountNumber, Guid SourceBankId, string SourceBankName,
+    Guid DestinationAccountId, string DestinationAccountNumber, Guid DestinationBankId, string DestinationBankName,
+    decimal Amount, string Currency, decimal? RateToRial, decimal AmountRial, string? TrackingNumber, string? Description, TransferChequeSnapshot? Cheque,
+    TransferState State, string RecordedBy, string? DeletedBy, DateTimeOffset? DeletedAt, long Version)
+{
+    public static BankTransferSnapshot From(BankTransfer t, long version) => new(
+        t.Id, t.FiscalYear, t.Number, t.Date.Value, t.Method, t.Channel,
+        t.Source.Id, t.Source.AccountNumber, t.Source.BankId, t.Source.BankName,
+        t.Destination.Id, t.Destination.AccountNumber, t.Destination.BankId, t.Destination.BankName,
+        t.Amount.Amount, t.Amount.Currency, t.Amount.RateToRial, t.Amount.ToRial(), t.TrackingNumber, t.Description, TransferChequeSnapshot.From(t.Cheque),
+        t.State, t.RecordedBy, t.DeletedBy, t.DeletedAt, version);
+
+    public BankTransfer ToDomain() => BankTransfer.Restore(
+        Id, Number, FiscalYear, new FiscalDate(Date), Method, Channel,
+        new TransferAccount(SourceAccountId, SourceAccountNumber, SourceBankId, SourceBankName),
+        new TransferAccount(DestinationAccountId, DestinationAccountNumber, DestinationBankId, DestinationBankName),
+        Currency == Money.Rial ? Money.Rials(Amount) : Money.Foreign(Amount, Currency, RateToRial ?? 0),
+        TrackingNumber, Description, Cheque?.ToDomain(), State, RecordedBy, DeletedBy, DeletedAt, Version);
+}
+
+/// <summary>Storable form of <see cref="TransferCheque"/> (JSON in cashflow.bank_transfer.cheque); dates are ISO dates.</summary>
+public sealed record TransferChequeSnapshot(
+    Guid IssuedChequeId, Guid ChequeBookId, long Sheet, string Number, string SayadId, DateOnly DueDate, Guid? ReceivedChequeId = null, DateOnly? ReceivedOn = null,
+    DateOnly? CollectedOn = null)
+{
+    public static TransferChequeSnapshot? From(TransferCheque? c) => c is null ? null
+        : new(c.IssuedChequeId, c.ChequeBookId, c.Sheet, c.Number, c.SayadId, c.DueDate.Value, c.ReceivedChequeId, c.ReceivedOn?.Value, c.CollectedOn?.Value);
+
+    public TransferCheque ToDomain() => new(IssuedChequeId, ChequeBookId, Sheet, Number, SayadId, new FiscalDate(DueDate), ReceivedChequeId,
+        ReceivedOn is { } r ? new FiscalDate(r) : null, CollectedOn is { } c ? new FiscalDate(c) : null);
 }
 
 public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid? BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)

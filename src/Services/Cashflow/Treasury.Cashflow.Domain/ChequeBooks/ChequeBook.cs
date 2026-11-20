@@ -247,6 +247,29 @@ public sealed class ChequeBook : AggregateRoot<Guid>
         DeactivateIfExhausted();
     }
 
+    /// <summary>
+    /// Frees a sheet whose cheque was recorded by mistake and deleted before anything was built on it (a transfer between the company's
+    /// own accounts deleted before its voucher was confirmed, owner's report no. 7): the record never happened, so the sheet can be
+    /// typed again. A voided sheet is never freed. A book that was switched off only because this was its last sheet is switched on again.
+    /// </summary>
+    public void Release(long sheet)
+    {
+        EnsureInRange(sheet);
+        if (!_usedSheets.TryGetValue(sheet, out var use) || use != SheetUse.Issued)
+        {
+            throw new DomainException("ChequeBook.SheetNotIssued", $"Sheet {sheet} is not an issued sheet; it cannot be freed.");
+        }
+
+        var wasExhausted = RemainingSheets == 0;
+        _usedSheets.Remove(sheet);
+        Raise(new ChequeSheetReleased(Id, sheet));
+        if (wasExhausted && !IsActive)
+        {
+            IsActive = true;
+            Raise(new ChequeBookActivated(Id));
+        }
+    }
+
     public void Deactivate()
     {
         if (IsActive)
@@ -441,6 +464,8 @@ public sealed record ChequeBookSayad
 }
 
 public sealed record ChequeSheetReserved(Guid ChequeBookId, long Sheet) : DomainEvent;
+
+public sealed record ChequeSheetReleased(Guid ChequeBookId, long Sheet) : DomainEvent;
 
 public sealed record ChequeSheetVoided(Guid ChequeBookId, long Sheet, string Reason) : DomainEvent;
 

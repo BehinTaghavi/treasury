@@ -31,3 +31,16 @@ Amendment (19 and 20 Nov 2026, the owner's answers to Q59, Q60 and Q67): **delet
 notes on it in one transaction, with `ReceiptDeleted` and `ReceivedInstrumentRemoved` in the outbox; a deleted receipt whose cheques
 are still in the cash desk never stays. A cheque on which a step was recorded is not
 touched by a correction and stops the deletion, so both commands still only change cheques nothing else is working on.
+
+Amendment (20 Nov 2026, transfers between the company's own bank accounts, owner's report no. 7): three commands of
+`TransferUseCases` and one of `InstrumentUseCases` save more than one aggregate in one transaction, each for the reason of the first
+amendment — what the user sees as one act must never be half-done. (1) **Issuing the transfer cheque** saves the cheque book (locked,
+rule R5), the new issued cheque and the new transfer, as `IssueChequeAsync` of Phase 0 already saved book and cheque together. (2) **The
+button to the receipts side** creates the received cheque and saves the transfer (version-checked) that now names it; a transfer
+without its received cheque, or a received cheque no transfer knows, would show the same sheet in two states. (3) **Recording the
+collection** of the received transfer cheque also marks the issued cheque «وصول شده» and finishes the transfer: the two instruments
+are the same sheet of paper, and nothing else works on the issued one (it has no screen of its own steps). (4) **Deleting** a cheque
+transfer (only before its cheque is on the receipts side) marks the transfer «حذف شده», removes the issued cheque and frees its sheet;
+**taking back** a receipts-side record removes the received cheque while it has no step. Every existing aggregate is saved with its
+version check; the events (`TransferChequeIssued`, `TransferChequeReceived`, `TransferChequeCollected`, `BankTransferDeleted`,
+`IssuedInstrumentRemoved`, `ChequeSheetReleased`…) go to the outbox in the same transaction.

@@ -45,6 +45,13 @@ public enum FixedAccount
 
     /// <summary>«سفته های در جریان وصول»: notes at the bank for collection, with the bank account's تفصیل (owner's table «واگذاری سفته به بانک»).</summary>
     NotesInCollection,
+
+    /// <summary>
+    /// «وجوه در راه»: money on its way between two bank accounts of the company (owner's report no. 7, 20 Nov 2026): debited when the
+    /// transfer cheque is issued («بدهکار: وجوه در راه، بستانکار: بانک انتقال دهنده»), credited when it is received («بدهکار: چک نزد
+    /// صندوق، بستانکار: وجوه در راه»).
+    /// </summary>
+    FundsInTransit,
 }
 
 /// <summary>
@@ -400,6 +407,12 @@ public enum VoucherSource
 {
     Receipt,
     ChequeStep,
+
+    /// <summary>
+    /// A transfer between two bank accounts of the company: step 0 is the voucher of an electronic transfer, or of the payment side of
+    /// a cheque transfer («انتقال دهنده»); step 1 the voucher of its receipts side («انتقال گیرنده»).
+    /// </summary>
+    Transfer,
 }
 
 /// <summary>

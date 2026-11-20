@@ -27,6 +27,8 @@ public static class PostgresRegistration
         services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IInstrumentAttachmentRepository, PostgresInstrumentAttachmentRepository>();
+        services.AddSingleton<IBankTransferRepository, PostgresBankTransferRepository>();
+        services.AddSingleton<ITransferLimitRepository, PostgresTransferLimitRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -608,6 +610,16 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
             cmd.Parameters.AddWithValue("use", use.ToString());
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             loaded.Add(sheet);
+        }
+
+        // A sheet freed by ChequeBook.Release (the cheque of a transfer deleted before its voucher was confirmed, schema 046).
+        foreach (var sheet in loaded.Where(sheet => !book.UsedSheets.ContainsKey(sheet)).ToList())
+        {
+            await using var cmd = tx.Command("DELETE FROM cashflow.cheque_sheet WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use = 'Issued'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            loaded.Remove(sheet);
         }
 
         tx.LoadedSheets[book.Id] = loaded;

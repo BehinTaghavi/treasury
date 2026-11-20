@@ -43,6 +43,9 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | اقدام حقوقی چک نزد صندوق، به فرض محال (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
 | عملیات | اقدام حقوقی چک / سفته تضمینی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد تضمینی حقوقی شده به نفع شرکت | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
 | عملیات | تحویل چک به صندوق پس از اقدام حقوقی (چک قابل وصول؛ تایید مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | اسناد واخواست شده حقوقی شده | ذینفع |
+| نقل و انتقال | نقل و انتقال بانکی با چک – انتقال دهنده (صدور چک؛ مدیرعامل، گزارش شمارهٔ ۷، ۲۹ آبان ۱۴۰۵) | وجوه در راه | — | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | نقل و انتقال بانکی با چک – انتقال گیرنده (دریافت چک؛ مدیرعامل، گزارش شمارهٔ ۷) | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده (پیشنهادی، Q78) | وجوه در راه | — |
+| نقل و انتقال | نقل و انتقال بانکی الکترونیکی: انتقال داخلی، پل، پایا، ساتنا (پیشنهادی، Q76) | بانک انتقال گیرنده | بانک مربوطه | بانک انتقال دهنده | بانک مربوطه |
 
 Built (owner's report no. 4, item 8, and his answers of 15 Nov 2026): a Basic Information page «شابلون اسناد خزانه داری» holds the
 company's account codes for the fixed accounts of this table: اسناد نزد صندوق / اسناد دریافتنی، چک های در جریان وصول، اسناد واخواست
@@ -85,5 +88,17 @@ Since 19 Nov 2026 (owner's report no. 6):
   correction and the deletion of the receipt (answer to Q59). A purpose group stays correctable after it was used (answer to Q61); a
   voucher confirmed before the group was corrected keeps its lines and is put right by a correcting treasury voucher (Phase F).
 - **The purpose is the description** (item 4): both lines of a cheque's or note's receipt voucher start with the receipt's purpose as written.
+
+Since 20 Nov 2026 (owner's report no. 7, «نقل و انتقال بین بانکی»; `Treasury.Cashflow.Domain.Vouchers.TransferVouchers`):
+- **Transfer by Sayad cheque**, as the owner wrote the two vouchers: the payer's side («انتقال دهنده», on the day the cheque is issued) Dr
+  «وجوه در راه» / Cr the source bank account's معین with its تفصیل; the receiver's side («انتقال گیرنده», on the day the cheque is recorded
+  on the receipts side) Dr «اسناد نزد صندوق» / Cr «وجوه در راه». «وجوه در راه» is a new fixed account of «شابلون اسناد خزانه داری»; it carries
+  no تفصیل, and «اسناد نزد صندوق» carries the source bank account's تفصیل, the drawer of the cheque (both proposed, Q78). From there the
+  cheque has the vouchers of every received cheque: «واگذاری چک به بانک» and «اعلام وصول» — so in the end the destination bank is debited
+  and «وجوه در راه» is back at zero. The payer's side has no further voucher when the cheque is collected (Q81).
+- **Electronic transfer** (internal, Pol, Paya, Satna): one voucher on the day of the order, Dr the destination bank account / Cr the
+  source bank account, each with its own معین and تفصیل (proposed, Q76). Bank fees are not built (Q77).
+- Each voucher of a transfer is confirmed by the treasurer («تایید سند») like a receipt's; until then an electronic transfer is corrected
+  or deleted and the voucher follows it.
 
 Next with their screens: payments, petty cash and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

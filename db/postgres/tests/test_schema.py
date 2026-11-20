@@ -182,7 +182,8 @@ def test_the_scripts_run_again_over_rows_saved_with_the_newest_values(db):
                      purpose_group_name, purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency, total_rial, state)
                      VALUES (1405, %s, 'CardDeposit', 990077, '2026-11-20', %s, 'x', '200015', %s, 'y', 'y', 'test', 'PettyCashCard', %s, 'CardToCard', 10, 'IRR', 10, 'Recorded')""",
                   (card_receipt, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
-        keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection")
+        # 20 Nov 2026 (046): «وجوه در راه» saved in the template; 031, 033, 035 and 038 rewrite the list of its keys at every start.
+        keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection", "FundsInTransit")
         for k in keys:
             c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '9999') ON CONFLICT DO NOTHING", (k,))
         try:
@@ -558,7 +559,7 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
                       "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
@@ -602,7 +603,7 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
                       "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
@@ -675,7 +676,7 @@ def test_a_voucher_is_confirmed_once_per_receipt_or_cheque_step_and_read_only_in
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
                       "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
@@ -748,7 +749,7 @@ def test_scans_of_a_legal_action_are_kept_with_the_cheque(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
                       "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
             c.execute("DELETE FROM cashflow.instrument_file WHERE fiscal_year = 1404")
@@ -1130,4 +1131,128 @@ def test_a_deposit_onto_a_bank_card_has_its_own_numbers_its_card_and_its_kinds_o
                 c.execute(add, row("BankDeposit", 9601, "CompanyCard", "CardToCard"))
         c.execute("INSERT INTO cashflow.receipt_number (fiscal_year, kind, last_number) VALUES (1405, 'CardDeposit', 3) ON CONFLICT DO NOTHING")
         c.rollback()
+
+
+def test_transfers_between_the_companys_accounts_have_their_numbers_ways_and_limits(db):
+    # 046_cashflow_bank_transfers.sql (owner's report no. 7, 20 Nov 2026: «نقل و انتقال بین بانکی»).
+    add = """INSERT INTO cashflow.bank_transfer (fiscal_year, id, number, transfer_date, method, channel, source_account_id, source_account_number, source_bank_id,
+                 source_bank_name, destination_account_id, destination_account_number, destination_bank_id, destination_bank_name, amount, currency, amount_rial,
+                 cheque, state, recorded_by)
+             VALUES (%(year)s, %(id)s, %(number)s, %(day)s, %(method)s, %(channel)s, %(source)s, '0101-1', %(source_bank)s, 'ملت', %(destination)s, '0202-1',
+                     %(destination_bank)s, 'ملی', 1000, %(currency)s, 1000, %(cheque)s, %(state)s, 'clerk')"""
+    mellat, melli, source = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    cheque = '{"issuedChequeId": "%s", "sheet": 100500, "number": "100500", "sayadId": "4821123456780007", "dueDate": "2027-01-05"}' % uuid.uuid4()
+
+    def row(number, method="Paya", channel="Remote", state="Recorded", same_bank=False, cheque=None, year=1405, day=date(2026, 11, 20), currency="IRR", destination=None):
+        return dict(year=year, id=uuid.uuid4(), number=number, day=day, method=method, channel=channel, source=source, source_bank=mellat,
+                    destination=destination or uuid.uuid4(), destination_bank=mellat if same_bank else melli, currency=currency, cheque=cheque, state=state)
+
+    with psycopg.connect(db) as c:
+        names = {r[0] for r in c.execute("SELECT relname FROM pg_class WHERE relname LIKE 'bank_transfer_fy14%'")}
+        assert {"bank_transfer_fy1404", "bank_transfer_fy1405"} <= names
+        c.execute("SET ROLE cashflow_svc")
+        c.execute(add, row(9001))
+        c.execute(add, row(9002, "Internal", "InPerson", same_bank=True))
+        c.execute(add, row(9003, "Cheque", None, "ChequeIssued", cheque=cheque))
+        c.execute(add, row(9004, "Cheque", None, "ChequeIssued", same_bank=True, cheque=cheque))   # a cheque may stay within one bank
+        c.execute(add, row(9001, year=1404, day=date(2025, 11, 20)))                               # numbers are per fiscal year
+        for bad, error in (
+            (row(9001), psycopg.errors.UniqueViolation),                                       # a number once a year
+            (row(9010, "Internal", "Remote"), psycopg.errors.CheckViolation),                  # internal: the same bank
+            (row(9010, "Satna", "Remote", same_bank=True), psycopg.errors.CheckViolation),     # Pol, Paya, Satna: two banks
+            (row(9010, "Paya", "Remote", currency="USD"), psycopg.errors.CheckViolation),      # and Rial
+            (row(9010, "Paya", None), psycopg.errors.CheckViolation),                          # an electronic order names its channel
+            (row(9010, "Cheque", "Remote", "ChequeIssued", cheque=cheque), psycopg.errors.CheckViolation),
+            (row(9010, "Cheque", None, "ChequeIssued"), psycopg.errors.CheckViolation),        # a cheque transfer keeps its cheque
+            (row(9010, "Cheque", None, "Recorded", cheque=cheque), psycopg.errors.CheckViolation),
+            (row(9010, "Paya", "Remote", "Collected"), psycopg.errors.CheckViolation),
+            (row(9010, "Card", "Remote"), psycopg.errors.CheckViolation),                      # an unknown way
+            (row(9010, destination=source), psycopg.errors.CheckViolation),                    # two different accounts
+            (row(9010, state="Deleted"), psycopg.errors.CheckViolation),                       # a deleted transfer says who and when
+        ):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, bad)
+        # Deleted by mistake: the row stays, marked; the service never removes it.
+        c.execute("UPDATE cashflow.bank_transfer SET state = 'Deleted', deleted_by = 'clerk', deleted_at = now() WHERE fiscal_year = 1405 AND number = 9001")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM cashflow.bank_transfer WHERE number = 9001")
+
+        take = """INSERT INTO cashflow.bank_transfer_number (fiscal_year, last_number) VALUES (%s, 1)
+                  ON CONFLICT (fiscal_year) DO UPDATE SET last_number = cashflow.bank_transfer_number.last_number + 1 RETURNING last_number"""
+        assert [c.execute(take, (y,)).fetchone()[0] for y in (1405, 1405, 1406, 1405)] == [1, 2, 1, 3]
+
+        # The limits are the company's data: they start with the owner's figures and are changed, emptied and given per bank.
+        limits = {r[0]: r[1:] for r in c.execute(
+            """SELECT method, min_per_order, max_per_order_in_person, max_per_order_remote, max_per_day_in_person, max_per_day_remote, max_count_per_day
+               FROM cashflow.transfer_limit WHERE bank_key = ''""")}
+        assert limits == {"Internal": (None, None, None, None, None, None), "Pol": (None, None, None, 3_000_000_000, 2_000_000_000, 5),
+                          "Paya": (None, 5_000_000_000, 3_000_000_000, None, None, 5), "Satna": (2_000_000_000, None, None, None, None, None)}
+        c.execute("INSERT INTO cashflow.transfer_limit (method, bank_key, max_per_order_remote) VALUES ('Internal', %s, 500000000)", (str(mellat),))
+        c.execute("DELETE FROM cashflow.transfer_limit WHERE bank_key = %s", (str(mellat),))
+        for bad in ("INSERT INTO cashflow.transfer_limit (method, bank_key) VALUES ('Cheque', '')",        # no limits for cheques
+                    "INSERT INTO cashflow.transfer_limit (method, bank_key) VALUES ('Pol', 'ملت')",         # a bank is named by its id
+                    "UPDATE cashflow.transfer_limit SET max_count_per_day = 0 WHERE method = 'Pol'",
+                    "UPDATE cashflow.transfer_limit SET min_per_order = -1 WHERE method = 'Satna'"):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(bad)
+
+        # A sheet of a deleted cheque transfer is freed by the service (the record never happened).
+        c.execute("RESET ROLE")
+        book = uuid.uuid4()
+        c.execute("INSERT INTO cashflow.cheque_book (id, bank_account_id, serial, first_sheet, last_sheet) VALUES (%s, %s, '1234', 100500, 100524)", (book, source))
+        c.execute("SET ROLE cashflow_svc")
+        c.execute("INSERT INTO cashflow.cheque_sheet (cheque_book_id, sheet, sheet_use) VALUES (%s, 100500, 'Issued')", (book,))
+        assert c.execute("DELETE FROM cashflow.cheque_sheet WHERE cheque_book_id = %s AND sheet = 100500 AND sheet_use = 'Issued'", (book,)).rowcount == 1
+
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE requests_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not read the transfers
+            with c.transaction():
+                c.execute("SELECT count(*) FROM cashflow.bank_transfer")
+        c.rollback()
+
+
+def test_a_transfer_has_its_vouchers_and_the_company_keeps_changed_limits_when_the_scripts_run_again(db):
+    # 046: confirmed vouchers of a transfer (source 'Transfer': step 0 the payer's or the electronic one, step 1 the receiver's), the
+    # closed-year guard on the transfers, and the seed of the limits, which must not bring back a figure the company changed.
+    add = """INSERT INTO cashflow.voucher (fiscal_year, id, source, source_id, step, operation, voucher_date, lines, total_rial, confirmed_by, confirmed_at)
+             VALUES (1405, %s, 'Transfer', %s, %s, 'نقل و انتقال بانکی', '2026-11-20', '[]', 1000, 'treasurer', now())"""
+    transfer = uuid.uuid4()
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        c.execute(add, (uuid.uuid4(), transfer, 0))
+        c.execute(add, (uuid.uuid4(), transfer, 1))
+        for step, error in ((1, psycopg.errors.UniqueViolation), (2, psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, (uuid.uuid4(), transfer, step))
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('FundsInTransit', '1109') ON CONFLICT DO NOTHING")
+        c.rollback()
+
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"))
+    old = uuid.uuid4()
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("UPDATE cashflow.transfer_limit SET max_per_order_remote = 7000000000, max_count_per_day = NULL WHERE method = 'Paya' AND bank_key = ''")
+        c.execute("""INSERT INTO cashflow.bank_transfer (fiscal_year, id, number, transfer_date, method, channel, source_account_id, source_account_number, source_bank_id,
+                         source_bank_name, destination_account_id, destination_account_number, destination_bank_id, destination_bank_name, amount, amount_rial, state, recorded_by)
+                     VALUES (1404, %s, 9900, '2025-11-20', 'Paya', 'Remote', %s, 'a', %s, 'x', %s, 'b', %s, 'y', 10, 10, 'Recorded', 'clerk')""",
+                  (old, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+        try:
+            result = subprocess.run([str(HERE / "apply.sh"), params["dbname"]], env=env, capture_output=True, text=True)
+            assert result.returncode == 0, result.stderr[-2000:]
+            assert c.execute("SELECT max_per_order_remote, max_count_per_day FROM cashflow.transfer_limit WHERE method = 'Paya' AND bank_key = ''").fetchone() == (7_000_000_000, None)
+            with pytest.raises(psycopg.errors.RaiseException):  # a transfer of a closed year is frozen, also after the scripts ran again
+                c.execute("UPDATE cashflow.bank_transfer SET description = 'x' WHERE id = %s", (old,))
+        finally:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+            c.execute("DELETE FROM cashflow.bank_transfer WHERE id = %s", (old,))
+            c.execute("UPDATE cashflow.transfer_limit SET max_per_order_remote = 3000000000, max_count_per_day = 5 WHERE method = 'Paya' AND bank_key = ''")
 

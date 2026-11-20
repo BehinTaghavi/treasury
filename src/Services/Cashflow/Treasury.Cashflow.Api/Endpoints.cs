@@ -4,6 +4,8 @@ using Treasury.Cashflow.Application.Abstractions;
 using Treasury.Cashflow.Application.ChequeBooks;
 using Treasury.Cashflow.Application.Instruments;
 using Treasury.Cashflow.Application.Receipts;
+using Treasury.Cashflow.Application.Transfers;
+using Treasury.Cashflow.Domain.Transfers;
 using Treasury.Cashflow.Domain.Receipts;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Infrastructure.InMemory;
@@ -82,6 +84,19 @@ public sealed record InstrumentReceiptCorrection(ReceiptHeaderInput Header, IRea
 public sealed record NoteReceiptCorrection(
     ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, long Version, IReadOnlyList<NoteGuarantorInput>? Guarantors = null,
     IReadOnlyList<Guid>? SignerIds = null);
+
+/// <summary>Correction of an electronic transfer, with the version the user saw.</summary>
+public sealed record ElectronicTransferCorrection(ElectronicTransferInput Form, long Version);
+
+/// <summary>Deletion of a transfer or taking back its receipts-side record, with the version the user saw.</summary>
+public sealed record TransferVersion(long Version);
+
+/// <param name="Date">The day the cheque is received; empty: the day it was issued.</param>
+public sealed record ReceiveTransferChequeRequest(long Version, string? Date = null);
+
+/// <summary>The limits of one electronic way of transfer, for every bank or (with <paramref name="BankId"/>) for one bank; empty: no limit.</summary>
+public sealed record TransferLimitRequest(
+    Guid? BankId, decimal? MinPerOrder, decimal? MaxPerOrderInPerson, decimal? MaxPerOrderRemote, decimal? MaxPerDayInPerson, decimal? MaxPerDayRemote, int? MaxCountPerDay);
 
 public static class Endpoints
 {
@@ -299,6 +314,56 @@ public static class Endpoints
             ToHttp(await useCases.ChangeStateAsync(new ChangeChequeBookStateCommand(Key(http), id, change, r.Version), ct).ConfigureAwait(false),
                 _ => $"/api/cashflow/cheque-books/{id}"));
 
+        // Transfers between the company's own bank accounts (owner's report no. 7, 20 Nov 2026): electronic within the configurable
+        // limits, and by Sayad cheque with its payment side («انتقال دهنده») and receipts side («انتقال گیرنده»).
+        api.MapGet("/transfers", async (int year, bool? cheque, TransferUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(year, cheque, ct).ConfigureAwait(false)));
+
+        api.MapGet("/transfers/{id:guid}", async (Guid id, TransferUseCases u, CancellationToken ct) =>
+            await u.GetAsync(id, ct).ConfigureAwait(false) is { } view ? Results.Ok(view) : Results.NotFound());
+
+        api.MapPost("/transfers/electronic", async (ElectronicTransferInput r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RecordElectronicAsync(new RecordElectronicTransferCommand(Key(http), r), ct).ConfigureAwait(false), id => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPut("/transfers/{id:guid}/electronic", async (Guid id, ElectronicTransferCorrection r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.CorrectElectronicAsync(new CorrectElectronicTransferCommand(Key(http), id, r.Version, r.Form), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/electronic/voucher-preview", async (ElectronicTransferInput r, Guid? correcting, TransferUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewElectronicAsync(r, correcting, ct).ConfigureAwait(false)));
+
+        api.MapPost("/transfers/cheque", async (TransferChequeInput r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.IssueChequeAsync(new IssueTransferChequeCommand(Key(http), r), ct).ConfigureAwait(false), id => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/cheque/voucher-preview", async (TransferChequeInput r, TransferUseCases u, CancellationToken ct) =>
+            Preview(await u.PreviewChequeAsync(r, ct).ConfigureAwait(false)));
+
+        api.MapPost("/transfers/{id:guid}/receive-cheque", async (Guid id, ReceiveTransferChequeRequest r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ReceiveChequeAsync(new ReceiveTransferChequeCommand(Key(http), id, r.Version, r.Date), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/{id:guid}/undo-receive", async (Guid id, TransferVersion r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.UndoReceiveAsync(new UndoTransferReceiptCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), _ => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/{id:guid}/delete", async (Guid id, TransferVersion r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.DeleteAsync(new DeleteTransferCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), _ => "/api/cashflow/transfers"));
+
+        api.MapGet("/transfers/{id:guid}/vouchers", async (Guid id, TransferUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.VouchersAsync(id, ct).ConfigureAwait(false)));
+
+        api.MapPost("/transfers/{id:guid}/vouchers/{step:int}/confirm", async (Guid id, int step, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ConfirmVoucherAsync(Key(http), id, step, ct).ConfigureAwait(false), _ => $"/api/cashflow/transfers/{id}/vouchers"));
+
+        // The limits of the electronic ways (Basic Information page «سقف‌های انتقال الکترونیکی»): data of the company, not code.
+        api.MapGet("/transfer-limits", async (TransferUseCases u, CancellationToken ct) => Results.Ok(await u.GetLimitsAsync(ct).ConfigureAwait(false)));
+
+        api.MapPut("/transfer-limits/{method}", async (TransferMethod method, TransferLimitRequest r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SetLimitAsync(new SetTransferLimitCommand(Key(http), method, r.BankId, r.MinPerOrder, r.MaxPerOrderInPerson, r.MaxPerOrderRemote,
+                r.MaxPerDayInPerson, r.MaxPerDayRemote, r.MaxCountPerDay), ct).ConfigureAwait(false), _ => "/api/cashflow/transfer-limits"));
+
+        api.MapPost("/transfer-limits/{method}/banks/{bankId:guid}/delete", async (TransferMethod method, Guid bankId, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RemoveBankLimitAsync(Key(http), method, bankId, ct).ConfigureAwait(false), _ => "/api/cashflow/transfer-limits"));
+
         api.MapPost("/payments/issue-cheque", async (IssueRequest r, HttpRequest http, InstrumentUseCases useCases, CancellationToken ct) =>
             ToHttp(await useCases.IssueChequeAsync(
                 new IssueChequeCommand(Key(http), r.PaymentId, r.BankAccountId, r.ChequeBookId, r.SheetNumber, r.Kind, r.Amount, r.IssueDate, r.DueDate, r.PayeeId, r.PayeeName, r.Purpose), ct).ConfigureAwait(false),
@@ -335,7 +400,8 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
-            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" or "Instrument.AttachmentNotFound" => StatusCodes.Status404NotFound,
+            "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" or "Instrument.AttachmentNotFound" or "Transfer.NotFound"
+                => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Accounts.Unavailable" or "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

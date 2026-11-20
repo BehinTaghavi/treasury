@@ -147,7 +147,8 @@ public sealed class InstrumentUseCases(
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser,
     IBankAccountLookup bankAccountLookup,
-    TimeProvider? clock = null)
+    TimeProvider? clock = null,
+    IBankTransferRepository? transfers = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -257,8 +258,36 @@ public sealed class InstrumentUseCases(
             }
 
             await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
+            if (command.Action == InstrumentAction.RecordCleared && instrument.Details.TransferId is { } transferId)
+            {
+                await CompleteTransferAsync(transferId, date, command.Reference, ct).ConfigureAwait(false);
+            }
+
             return Result<Guid>.Ok(instrument.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
+
+    /// <summary>
+    /// The cheque of a transfer between two bank accounts of the company was collected at the destination account (owner's report
+    /// no. 7): the transfer is finished, and the same cheque on the payment side — issued from the source account — is paid by its
+    /// bank («وصول شده»). The three are saved in the command that recorded the collection (ADR 0002 amendment of 20 Nov 2026), so the
+    /// payment side never shows an unpaid cheque that the receipts side shows collected.
+    /// </summary>
+    private async Task CompleteTransferAsync(Guid transferId, FiscalDate date, string? reference, CancellationToken ct)
+    {
+        if (transfers is null)
+        {
+            return;
+        }
+
+        var transfer = await transfers.GetAsync(transferId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Transfer.NotFound", "The transfer of this cheque was not found.");
+        transfer.MarkCollected(date);
+        var issued = await instruments.GetAsync(transfer.Cheque!.IssuedChequeId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+        issued.RecordPaidByBank(date, currentUser.UserId, reference);
+        await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
+        await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Issues a cheque for an approved payment: checks approval (R7), the posting window (R2), the bank balance (R8),
