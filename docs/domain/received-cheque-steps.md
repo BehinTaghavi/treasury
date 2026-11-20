@@ -260,3 +260,60 @@ Code: `Receipt.Correct*`, `Receipt.Delete`, `Receipt.WhyNotCorrectable` / `WhyNo
 `RemoveFromReceipt`, `Instrument.CancelReceived` (stamp), `InstrumentLifecycle` (Cancelled → Replace), `ReceiptUseCases.Correct*Async` /
 `DeleteAsync`, `ReceiptVouchers.ForReceipt` (replacement), schema 043; screens `ReceiptForm.vue`, `NoteReceiptForm.vue` (prop `edit`),
 `ReceiptsPanel.vue`, `ReceiptList.vue`, `ChequeOperations.vue`, `PrintRange.vue`, ui-kit `AmountInput.vue`, `ComboInput.vue`.
+
+## 10. Owner's report no. 6 as sent on 19 Nov 2026 (items 12–21): tabs, cheque card in the lists, printed receipts, «چک تضمین شده صیاد»
+
+The report came again on 19 Nov 2026 with ten more items; items 1–11 are section 9.
+
+**Order of the tabs (item 12).** «دریافت‌ها» opens with its tabs in the order the owner gave, by how often each is used: «دریافت چک»,
+«عملیات چک‌های دریافتی», «دریافت نقدی», «واریز به بانک» (it was «واریز به حساب / کارتخوان»), «واریز به کارت بانک» (new), «دریافت سفته»,
+«عملیات سفته‌های دریافتی», «اقدام حقوقی», and last, in a coloured box, **«فهرست جامع دریافت‌ها»**.
+«واریز به کارت بانک» is for money a payer pays onto the bank card of one of the company's petty-cash holders, or onto a company bank card
+that has no bank account. The tab is in its place and shows the bank cards already defined (petty-cash holders' cards, and the company's
+cards on its bank accounts, whose deposits are recorded on «واریز به بانک» as «کارت به کارت»). **Its receipt form waits for Q68–Q70**: which
+account its voucher debits, where a company card without a bank account is defined, and how these receipts are numbered.
+
+**The legal action's description (item 13).** «شرح اقدام حقوقی» is required: its box is drawn in red like every required field, and when
+«ثبت اقدام حقوقی» is pressed without it the reason is written under the box and the cursor is put in it.
+
+**The cheque card in the receipts lists (items 14 and 20).** A click or a double click on a row of a cheque receipt — in the list under
+the forms and in «فهرست جامع دریافت‌ها» — opens, at the bottom of the screen, the **cheque card** of each cheque of that receipt: every step
+with its date, the status after it, its details and its user, and the vouchers of the steps. **A click on a card closes it** («بستن» is
+there too). In the list under the forms a click on one cheque number opens that cheque's card only.
+
+**Cheque number in the lists (item 20).** Both lists have the column «شماره چک», a box «شماره چک» that finds a receipt by (part of) the
+number of one of its cheques, and the column in the printed list. The receipts list answers each cheque's id, number and kind with its
+status (`ChequeStatusView`).
+
+**Amount in words above a thousand milliard (item 15).** «میلیارد» is said once, after the whole number of milliards: 4,500,000,000,000
+is «چهار هزار و پانصد میلیارد ریال» (it was «چهار هزار میلیارد و پانصد میلیارد»).
+
+**Sheba and card numbers (items 16 and 17).** Every Sheba box (payer's Sheba of a Paya or Satna deposit, the transfer of a payment
+request, «ذینفعان / متعهدین / ضامنین») is the same box with **«IR» fixed inside it**; the 24 digits are typed after it and counted under
+the box. The refusal the owner met was not about the length: the 24 digits were refused for their **check digits** (the two digits after
+IR are calculated from the rest, so a number with a mistyped or made-up digit is not a Sheba), with a text that spoke of "IR and 24
+digits". A wrong length and wrong check digits are now two refusals with their own words (`Receipt.ShebaInvalid` /
+`Receipt.ShebaCheckDigits`, the same for payment requests), and the box says which it is while the number is typed. The same for the
+16-digit bank card number (`BankAccount.CardNumberInvalid` / `CardCheckDigit`, petty cash and payment requests alike): its last digit is
+a check digit.
+
+**«چک تضمین شده صیاد» (item 18).** The kind called «چک رمزدار بانکی» is now «چک تضمین شده صیاد» on every screen and printed form. Its
+course is that of every cheque (the owner: no different course is needed). Because its bank registered it in Sayad, the company does
+not register it but checks it there: for this kind the step «ثبت صیادی» is named **«کنترل چک در صیاد»** and its status «کنترل چک در صیاد
+انجام شد» (Q71 asks whether these names are right).
+
+**No cancellation after «ثبت صیادی» (item 19).** A cheque in the cash desk that is «ثبت صیادی شد» is not cancelled: the step
+SayadRegistered → Cancel left the lifecycle table, «ابطال» is shown switched off on such a row with the reason, and the server refuses
+with `Instrument.SayadRegisteredNotCancelled`. Such a cheque is deposited, transferred, or handed back to its payer; since a
+replacement needs a cancellation first (Q62), it is not replaced either. A cheque that came back from the bank or bounced is cancelled
+as before (Q72).
+
+**Printed receipts (item 21).** «چاپ رسید» shows and prints the receipt of **cheques, cash and a deposit into a bank account**, as the
+receipt of promissory notes already was: the company's name and logo, number and date, payer, purpose group and purpose, what was
+received with the total in figures and words, a sentence confirming the receipt, and three signatures (handed over by, received by the
+treasury, approved by). It is offered beside the message after saving, on each row of the list under the forms, and on the opened
+receipt in «فهرست جامع دریافت‌ها». The sentences and signatures are proposed (Q73).
+
+Code: `InstrumentLifecycle`, `Instrument.CancelReceived`, `DepositMethodRules.ShebaShape` / `ShebaCheckDigitsFit`, `ReceiptChequeStatus`,
+`ChequeStatusView`; ui-kit `ShebaInput.vue`, `cardNumberHint`, `amountInWords`, `instrumentKindName`, `chequeStateName(…, kind)`; receipts
+remote `ChequeCard.vue`, `cheque.ts`, `ReceiptSheet.vue`, `ReceiptPrint.vue`, `CardDeposit.vue`, `Receipts.vue`.

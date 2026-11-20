@@ -24,8 +24,8 @@
 | ۱۴ — برگشت شده | Bounced | RecordEndorsementReturned (برگشت خرج، با شمارهٔ گواهی عدم پرداخت یا اعلامیه) | Endorsed | بند ۱۴ (ح) | همه |
 | ۱۵ — عودت شده | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | دستورالعمل | همه |
 | — تعویض چک | Replaced | Replace (با رسید دریافت چک‌های جدید از همان پرداخت‌کننده) | **فقط Cancelled** (پاسخ مدیرعامل به Q62، ۲۸ آبان ۱۴۰۵: برای رعایت کنترل داخلی ابتدا ابطال می‌شود؛ پیش از آن InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal هم مجاز بود) | بند ۱۴ (د)، Q31؛ پاسخ Q62 | چک غیر تضمینی (سفته تعویض ندارد) |
-| — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، SayadRegistered، ReturnedFromBank، Bounced، InLegal | بند ۱۴ (و)، Q30 | همه |
-| — ثبت صیادی شد | SayadRegistered | RegisterSayad (تاریخ؛ کد رهگیری ثبت، اختیاری) | InCashDesk | مدیرعامل، ۲۷ آبان ۱۴۰۵ | فقط چک‌ها |
+| — ابطال شده | Cancelled | Cancel (شماره و تاریخ دستور مدیریت، علت) | InCashDesk، ReturnedFromBank، Bounced، InLegal — **نه SayadRegistered** (گزارش شمارهٔ ۶ مدیرعامل، بند ۱۹، ۲۸ آبان ۱۴۰۵: چکِ نزد صندوق که «ثبت صیادی شد» قابل ابطال نیست؛ `Instrument.SayadRegisteredNotCancelled`) | بند ۱۴ (و)، Q30؛ گزارش ۶ بند ۱۹ | همه |
+| — ثبت صیادی شد (برای «چک تضمین شده صیاد»: کنترل چک در صیاد انجام شد) | SayadRegistered | RegisterSayad (تاریخ؛ کد رهگیری ثبت، اختیاری). برای «چک تضمین شده صیاد» (BankCheque) همین مرحله «کنترل چک در صیاد» نام دارد: بانکِ صاحب حساب آن را در صیاد ثبت کرده است و شرکت فقط آن را کنترل می‌کند (گزارش ۶ مدیرعامل، بند ۱۸) | InCashDesk | مدیرعامل، ۲۷ آبان ۱۴۰۵؛ گزارش ۶ بند ۱۸ | فقط چک‌ها |
 | ۱۵ | ReturnedToIssuer | مرحلهٔ دیگر چک نزد صندوق (عودت از صندوق) | SayadRegistered | مدیرعامل، ۲۷ آبان ۱۴۰۵ | مانند InCashDesk |
 | ۱۶ — ثبت انتقال شد (خرج چک شد) | Endorsed | Endorse («ثبت انتقال (خرج چک)»: درخواست وجه تاییدشده‌ای که برای همان چک صادر شده، کد رهگیری ثبت انتقال در سامانهٔ صیاد) | SayadRegistered | مدیرعامل، ۲۸ آبان ۱۴۰۵؛ D_Check_Kh_m | چک عادی، چک بانکی |
 | ۱۴ + GoInlaw — اقدام حقوقی | InLegal | SendToLegal (تاریخ و شرح اقدام، در صفحهٔ «اقدام حقوقی»؛ اسکن ضمائم پس از آن اضافه می‌شود) | Bounced | مدیرعامل، ۲۷ آبان ۱۴۰۵ | همه |
@@ -60,7 +60,7 @@
 |---|---|---|
 | ۰ | OrdinaryCheque (چک عادی) | OrdinaryCheque (چک نقدی) |
 | ۱ | GuaranteeCheque (چک انتظامی) | GuaranteeCheque (چک انتظامی) |
-| ۲ | BankCheque (چک رمزدار/بانکی) | PostDatedCheque (چک مدت‌دار) |
+| ۲ | BankCheque (در برنامهٔ قدیم: چک رمزدار/بانکی؛ از گزارش ۶ مدیرعامل، بند ۱۸، در صفحه‌ها **«چک تضمین شده صیاد»**) | PostDatedCheque (چک مدت‌دار) |
 | ۳ | Instalment (اقساط) | Instalment (اقساط) |
 | ۴ | PromissoryNote (سفته) | PromissoryNote (سفته) |
 | ۵ | Other (سایر) | Other (سایر) |
