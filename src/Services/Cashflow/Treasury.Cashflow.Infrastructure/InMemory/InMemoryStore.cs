@@ -289,7 +289,8 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         {
             IReadOnlyList<ReceiptChequeStatus> list = db.Instruments.Values
                 .Where(s => s.ReceiptId is { } id && receiptIds.Contains(id))
-                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null))
+                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null,
+                    s.Id, s.Number, s.Kind))
                 .ToList();
             return Task.FromResult(list);
         }

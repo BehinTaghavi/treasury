@@ -141,6 +141,11 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Null(row.Instruments);
         Assert.Null(list.Single(r => r.Id == cash.Value).ChequeStatuses);
 
+        // Owner's report no. 6, items 14 and 20: each status names its cheque (id, number, kind), so the list shows and searches the
+        // cheque number and opens the cheque card.
+        Assert.Equal([(cheques[0], "445560", "OrdinaryCheque"), (cheques[1], "445561", "OrdinaryCheque"), (cheques[2], "445562", "OrdinaryCheque")],
+            row.ChequeStatuses!.Select(s => (s.Id, s.Number!, s.Kind!)));
+
         // The same on the opened receipt and on the cheque itself; at the bank the mark stays until the bank answers.
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheques[0], Bank.Id, "1405/08/24"), CancellationToken.None)).IsSuccess);

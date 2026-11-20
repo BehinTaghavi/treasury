@@ -336,6 +336,10 @@ public sealed class ReceiptPostgresTests : IDisposable
         var row = (await _receipts.ListAsync(1405, ReceiptKind.Instruments, CancellationToken.None)).Single(x => x.Id == r.Value);
         Assert.Equal(["InLegal", "SayadRegistered"], row.ChequeStatuses!.Select(s => s.State).Order());
 
+        // Owner's report no. 6, items 14 and 20: each status names its cheque, for the cheque-number column and the cheque card.
+        Assert.Equal([(second, "B" + number, "OrdinaryCheque", "InLegal"), (first, number, "OrdinaryCheque", "SayadRegistered")],
+            row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.Id, s.Number!, s.Kind!, s.State)));
+
         // Both due dates are in the past by now: the cheque still in the cash desk is marked «سررسید چک», the one with the lawyer is not.
         Assert.Equal([("InLegal", false), ("SayadRegistered", true)], row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.State, s.ReachedDueDate)));
     }

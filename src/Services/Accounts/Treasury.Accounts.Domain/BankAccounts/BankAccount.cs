@@ -282,7 +282,9 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         foreach (var card in cards)
         {
             var number = new string(PersianText.Key(card?.Number).Where(char.IsAsciiDigit).ToArray());
-            Require(IsCardNumber(number), "BankAccount.CardNumberInvalid", "A bank card number has 16 digits with a valid check digit.");
+            // Owner's report no. 6, item 17: 16 digits were typed and the refusal spoke of the length; the two faults are told apart.
+            Require(number.Length == 16, "BankAccount.CardNumberInvalid", "A bank card number has 16 digits.");
+            Require(IsCardNumber(number), "BankAccount.CardCheckDigit", "The check digit of the bank card number does not fit: a digit is wrong.");
             var holder = Clean(card!.HolderName);
             Require(holder is not null, "BankAccount.CardHolderRequired", "Enter the name on the bank card.");
             Require(clean.All(c => c.Number != number), "BankAccount.CardTwice", $"Card {number} is entered twice.");

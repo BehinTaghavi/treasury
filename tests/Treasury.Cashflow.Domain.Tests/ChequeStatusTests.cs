@@ -80,12 +80,33 @@ public sealed class ChequeStatusTests
         Assert.Equal((InstrumentState.SayadRegistered, "SY-100", "SY-100"), (c.State, c.History[^1].Reference, c.History[^1].Details!.SayadTracking));
         Assert.True(c.State.IsInCashDesk());
 
-        // Every step of «نزد صندوق» stays open, and the deposit at the bank (rule N3) and the transfer open; the registration itself is recorded once.
-        Assert.Equal(before.Concat([InstrumentAction.DepositForCollection, InstrumentAction.Endorse]).Order(), c.AllowedActions().Order());
+        // The steps of «نزد صندوق» stay open — except «ابطال» (owner's report no. 6, item 19) — and the deposit at the bank (rule N3) and
+        // the transfer open; the registration itself is recorded once.
+        Assert.Equal(before.Where(a => a != InstrumentAction.Cancel).Concat([InstrumentAction.DepositForCollection, InstrumentAction.Endorse]).Order(), c.AllowedActions().Order());
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => c.RegisterSayad(D("1405/08/03"), User)).Code);
 
         // No voucher: only the latest status changes (owner's answer to Q37, 18 Nov 2026).
         Assert.Null(ReceiptVouchers.ForStep(c, 2, Bank, null, Template()));
+    }
+
+    [Fact]
+    public void A_cheque_registered_in_Sayad_is_not_cancelled_report_6_item_19()
+    {
+        // Owner's report no. 6, item 19: «چک نزد صندوق "در صیادی ثبت شده" قابل ابطال نخواهد بود».
+        var c = Cheque();
+        Assert.Contains(InstrumentAction.Cancel, c.AllowedActions()); // before the registration it is
+        c.RegisterSayad(D("1405/08/02"), User);
+        Assert.DoesNotContain(InstrumentAction.Cancel, c.AllowedActions());
+        Assert.Null(InstrumentLifecycle.Find(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Cancel));
+        Assert.Equal("Instrument.SayadRegisteredNotCancelled",
+            Assert.Throws<DomainException>(() => c.CancelReceived(D("1405/08/10"), User, "م-12", D("1405/08/09"), "دستور مدیریت")).Code);
+        Assert.Equal(InstrumentState.SayadRegistered, c.State);
+
+        // It can still be handed back to its payer, and once it is back from the bank or bounced it is cancelled as before.
+        Assert.Contains(InstrumentAction.ReturnToIssuer, c.AllowedActions());
+        c.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User, "F-1");
+        c.ReturnFromBank(D("1405/08/06"), User, "مدارک ناقص");
+        Assert.Contains(InstrumentAction.Cancel, c.AllowedActions());
     }
 
     [Fact]
@@ -356,10 +377,10 @@ public sealed class ChequeStatusTests
     }
 
     [Fact]
-    public void A_cheque_registered_in_Sayad_is_cancelled_and_then_replaced_owner_answer_Q62()
+    public void A_cheque_in_the_cash_desk_is_cancelled_and_then_replaced_owner_answer_Q62()
     {
+        // The cheque is not registered in Sayad: once it is, it is no longer cancelled (owner's report no. 6, item 19).
         var old = Cheque();
-        old.RegisterSayad(D("1405/08/02"), User);
         Assert.DoesNotContain(InstrumentAction.Replace, old.AllowedActions());
         old.CancelReceived(D("1405/08/09"), User, "م-4", D("1405/08/08"), "تعویض");
         Assert.Equal([(true, "8101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(old, old.History.Count, Bank, null, Template())));

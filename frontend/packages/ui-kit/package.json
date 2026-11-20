@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./SearchSelect.vue": "./src/SearchSelect.vue",
     "./AmountInput.vue": "./src/AmountInput.vue",
-    "./ComboInput.vue": "./src/ComboInput.vue"
+    "./ComboInput.vue": "./src/ComboInput.vue",
+    "./ShebaInput.vue": "./src/ShebaInput.vue"
   },
   "scripts": {
     "test": "vitest run"

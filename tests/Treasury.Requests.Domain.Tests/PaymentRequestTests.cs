@@ -65,7 +65,9 @@ public sealed class PaymentRequestTests
     public void A_transfer_needs_the_receiving_account_a_Sheba_is_checked()
     {
         Assert.Equal("PaymentRequest.TransferAccountRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.Transfer), User)));
-        Assert.Equal("PaymentRequest.ShebaInvalid", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.Transfer) with { TransferAccount = "IR460120000000003123456788" }, User)));
+        // Owner's report no. 6, item 17: a wrong length and wrong check digits are told apart.
+        Assert.Equal("PaymentRequest.ShebaCheckDigits", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.Transfer) with { TransferAccount = "IR460120000000003123456788" }, User)));
+        Assert.Equal("PaymentRequest.ShebaInvalid", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.Transfer) with { TransferAccount = "IR4601200000000031234567" }, User)));
         var r = PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.Transfer) with { TransferAccount = "ir46 0120 0000 0000 3123 4567 89" }, User);
         Assert.Equal("IR460120000000003123456789", r.TransferAccount);
     }
@@ -74,7 +76,8 @@ public sealed class PaymentRequestTests
     public void Card_to_card_needs_a_valid_card_number()
     {
         Assert.Equal("PaymentRequest.CardNumberRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.CardToCard), User)));
-        Assert.Equal("PaymentRequest.CardNumberInvalid", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.CardToCard) with { CardNumber = "6037991234567890" }, User)));
+        Assert.Equal("PaymentRequest.CardCheckDigit", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.CardToCard) with { CardNumber = "6037991234567890" }, User)));
+        Assert.Equal("PaymentRequest.CardNumberInvalid", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.CardToCard) with { CardNumber = "603799123456789" }, User)));
         Assert.Equal("6037991234567893", PaymentRequest.Register(Guid.NewGuid(), 1, Form(PaymentMethod.CardToCard) with { CardNumber = "6037-9912-3456-7893" }, User).CardNumber);
     }
 

@@ -9,9 +9,10 @@
  * are shown; the amount of the request is the amount of the cheque.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { amountInWords, cardNumberHint, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
+import ShebaInput from '@treasury/ui-kit/ShebaInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { methods, useLookups, type Purpose, type TransferableCheque } from './lookups'
 import { ACCEPT, openFile, sizeText, uploadFile, type RequestFile } from './files'
@@ -282,10 +283,12 @@ onMounted(async () => {
         <SearchSelect v-model="form.method" :options="methodChoices" required :aria-label="t('نوع پرداخت', 'Payment method')" />
       </label>
       <label v-if="form.method === 'Transfer'" class="wide req">{{ t('انتقال به حساب بانکی (شبا)', 'Transfer to account (Sheba)') }}
-        <input v-model="form.transferAccount" dir="ltr" placeholder="IR..." />
+        <!-- Owner's report no. 6, item 16: «IR» is fixed in the box; the 24 digits are typed after it. -->
+        <ShebaInput v-model="form.transferAccount" :locale="locale" :aria-label="t('شماره شبا', 'Sheba')" />
       </label>
       <label v-if="form.method === 'CardToCard'" class="req">{{ t('انتقال به شماره کارت', 'To card number') }}
         <input v-model="form.cardNumber" dir="ltr" maxlength="19" inputmode="numeric" />
+        <small v-if="cardNumberHint(form.cardNumber, locale)" :class="cardNumberHint(form.cardNumber, locale)!.bad ? 'tr-card-bad' : 'muted'">{{ cardNumberHint(form.cardNumber, locale)!.text }}</small>
       </label>
       <!-- Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» shows the cheque's number, due date and who gave it, in place of «پرداخت از حساب بانکی». -->
       <template v-if="isTransfer">
@@ -338,6 +341,7 @@ onMounted(async () => {
 
 <style scoped src="./requests.css"></style>
 <style scoped>
+.tr-card-bad { color: #b42318; font-size: .78rem; }
 .full { grid-column: 1 / -1; }
 .tr-files { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .tr-files li { display: flex; gap: .5rem; align-items: center; }

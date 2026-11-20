@@ -431,13 +431,14 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         }
 
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT receipt_id, state, issue_date, due_date FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
+            "SELECT receipt_id, state, issue_date, due_date, id, number, kind FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
         cmd.Parameters.Add(new NpgsqlParameter("receipts", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = receiptIds.ToArray() });
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             list.Add(new ReceiptChequeStatus(r.GetGuid(0), Enum.Parse<InstrumentState>(r.GetString(1)), new FiscalDate(r.GetFieldValue<DateOnly>(2)),
-                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3))));
+                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3)),
+                r.GetGuid(4), await r.IsDBNullAsync(5, cancellationToken).ConfigureAwait(false) ? null : r.GetString(5), Enum.Parse<InstrumentKind>(r.GetString(6))));
         }
 
         return list;

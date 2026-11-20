@@ -398,14 +398,17 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             if (transfer!.StartsWith("IR", StringComparison.OrdinalIgnoreCase))
             {
                 transfer = transfer.Replace(" ", string.Empty, StringComparison.Ordinal).ToUpperInvariant();
-                Require(IsSheba(transfer), "PaymentRequest.ShebaInvalid", "The Sheba number is not valid (IR and 24 digits).");
+                // Owner's report no. 6, item 17: a wrong length and wrong check digits are told apart.
+                Require(transfer.Length == 26 && transfer[2..].All(char.IsAsciiDigit), "PaymentRequest.ShebaInvalid", "A Sheba number is IR and 24 digits.");
+                Require(IsSheba(transfer), "PaymentRequest.ShebaCheckDigits", "The check digits of the Sheba number do not fit: a digit is wrong.");
             }
         }
         else if (f.Method == PaymentMethod.CardToCard)
         {
             card = Clean(f.CardNumber)?.Replace(" ", string.Empty, StringComparison.Ordinal).Replace("-", string.Empty, StringComparison.Ordinal);
             Require(card is not null, "PaymentRequest.CardNumberRequired", "Enter the beneficiary's card number.");
-            Require(IsCardNumber(card!), "PaymentRequest.CardNumberInvalid", "The card number has 16 digits and a valid check digit.");
+            Require(card!.Length == 16 && card.All(char.IsAsciiDigit), "PaymentRequest.CardNumberInvalid", "A card number has 16 digits.");
+            Require(IsCardNumber(card), "PaymentRequest.CardCheckDigit", "The check digit of the card number does not fit: a digit is wrong.");
         }
 
         // Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)» names the received cheque instead of the account paid from. The cheque must have been

@@ -71,8 +71,13 @@ public sealed class ReceiptTests
         Assert.Equal(Sheba, Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, Sheba[2..]).PayerSheba);
         Assert.Equal("Receipt.ShebaRequired", Assert.Throws<DomainException>(() =>
             Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, " ")).Code);
-        Assert.Equal("Receipt.ShebaInvalid", Assert.Throws<DomainException>(() =>
+        // Owner's report no. 6, item 17: 24 digits with a wrong digit are refused for their check digits, not for their length.
+        Assert.Equal("Receipt.ShebaCheckDigits", Assert.Throws<DomainException>(() =>
             Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "IR062960000000100324200002")).Code);
+        Assert.Equal("Receipt.ShebaCheckDigits", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "123456789012345678901234")).Code);
+        // Persian digits are read.
+        Assert.Equal(Sheba, Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "۰۶۲۹۶۰۰۰۰۰۰۰۱۰۰۳۲۴۲۰۰۰۰۱").PayerSheba);
         Assert.Equal("Receipt.ShebaInvalid", Assert.Throws<DomainException>(() =>
             Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "IR0629600000001003242")).Code);
     }

@@ -16,12 +16,15 @@
  * locked; the other cheques are corrected, added and removed, and the date and payer written on the locked cheque stay (answer to Q60).
  * «بابت» is chosen from the purposes of its group, may be changed after it was chosen, or typed outside the list; a text that is not
  * in the list is added to it when the receipt is saved (report no. 6, item 4).
+ * Owner's report no. 6 (19 Nov 2026): after saving, «چاپ رسید» shows and prints the receipt (item 21); the Sheba box has «IR» fixed in
+ * it (item 16); the kind called «چک بانکی (رمزدار)» is «چک تضمین شده صیاد» (item 18).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { chequeStateName, createApi, formatAmount, instrumentKindName, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
+import ShebaInput from '@treasury/ui-kit/ShebaInput.vue'
 import { useLookups, type Detail, type Purpose } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import { depositMethods, forForeignCurrency, needsSheba } from './depositMethods'
@@ -47,18 +50,19 @@ const props = withDefaults(defineProps<{
   /** The saved receipt being corrected. */
   edit?: SavedReceipt
 }>(), { apiBase: '', locale: 'fa', token: undefined, replaces: undefined, edit: undefined })
-const emit = defineEmits<{ saved: [id: string]; cancelled: [] }>()
+const emit = defineEmits<{ saved: [id: string]; cancelled: []; print: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
 const money = (n: number) => formatAmount(n, props.locale)
 const L = useLookups(api)
 
+// Owner's report no. 6, item 18: «چک تضمین شده صیاد» replaces «چک رمزدار بانکی» (the kind BankCheque); its course is that of every cheque.
 const lineKinds: { value: LineKind; fa: string; en: string }[] = [
   { value: 'OrdinaryCheque', fa: 'چک', en: 'Cheque' },
-  { value: 'BankCheque', fa: 'چک بانکی (رمزدار)', en: 'Bank cheque' },
+  { value: 'BankCheque', fa: instrumentKindName('BankCheque', 'fa'), en: instrumentKindName('BankCheque', 'en') },
   { value: 'GuaranteeCheque', fa: 'چک تضمینی (انتظامی)', en: 'Guarantee cheque' },
-  // Promissory notes get forms of their own later (owner's report no. 4, item 13).
+  // Promissory notes have a form of their own (owner's report no. 4, item 13).
 ]
 const isCheque = (k: LineKind) => k.endsWith('Cheque')
 /**
@@ -199,6 +203,8 @@ const total = computed(() => props.kind === 'Instruments'
 
 // ---- save ----
 const saving = ref(false)
+/** The receipt just saved, for «چاپ رسید» beside the message (report no. 6, item 21). */
+const lastSaved = ref<{ id: string; number: string } | null>(null)
 const message = ref<{ kind: 'error' | 'warning' | 'ok'; text: string } | null>(null)
 const show = (kind: 'error' | 'warning' | 'ok', text: string) => { message.value = { kind, text } }
 
@@ -270,7 +276,7 @@ function request(): { path: string; body: Record<string, unknown>; put?: string 
   if (needsSheba(money1.method) && !money1.sheba.trim()) return { error: 'Receipt.ShebaRequired' }
   return { path: '/api/cashflow/receipts/bank', put, body: {
     header: headerBody(), bankAccountId: money1.accountId, method: money1.method, trackingNumber: money1.tracking || null, amount, rateToRial: rate,
-    payerSheba: needsSheba(money1.method) ? toLatinDigits(money1.sheba.trim()) : null } }
+    payerSheba: needsSheba(money1.method) ? money1.sheba : null } }
 }
 
 // ---- the voucher at the bottom of the form (nothing is saved) ----
@@ -297,6 +303,7 @@ async function refreshPreview() {
 
 async function save() {
   message.value = null
+  lastSaved.value = null
   const req = request()
   if ('error' in req) return show('error', translate(req.error, props.locale))
   const { path, body, put } = req
@@ -311,6 +318,7 @@ async function save() {
     const text = put ? t(`ویرایش رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} corrected.`) : t(`رسید شمارهٔ ${no} ثبت شد.`, `Receipt no. ${no} saved.`)
     if (r.warnings.length) show('warning', `${text} ${r.warnings.map(w => translate(w, props.locale)).join(' ')}`)
     else show('ok', text)
+    lastSaved.value = { id: r.value, number: no }
     Object.assign(money1, { amount: '', rate: '', tracking: '', sheba: '' })
     Object.assign(header, { purpose: '', ref1: '', ref2: '', note: '' })
     lines.value = [blankLine()]
@@ -385,7 +393,7 @@ onMounted(async () => {
     </fieldset>
 
     <fieldset v-if="kind !== 'Instruments'">
-      <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : t('واریز به حساب', 'Paid into a bank account') }}</legend>
+      <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : t('واریز به بانک', 'Paid into a bank account') }}</legend>
       <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }}
         <SearchSelect v-model="money1.accountId" :options="deskChoices" required :aria-label="t('صندوق', 'Cash desk')" :none-text="t('صندوقی تعریف نشده است', 'No cash desk')" />
       </label>
@@ -397,7 +405,8 @@ onMounted(async () => {
           <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
         </label>
         <label v-if="needsSheba(money1.method)" class="wide req">{{ t('شماره شبای واریزکننده (حساب مبدأ حواله)', "Payer's Sheba (the transfer's source account)") }}
-          <input v-model="money1.sheba" dir="ltr" placeholder="IR00 0000 0000 0000 0000 0000 00" />
+          <!-- Owner's report no. 6, item 16: «IR» is fixed in the box; the 24 digits are typed after it. -->
+          <ShebaInput v-model="money1.sheba" :locale="locale" :aria-label="t('شماره شبای واریزکننده', 'Payer\'s Sheba')" />
         </label>
         <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
           <input v-model="money1.tracking" dir="ltr" />
@@ -470,7 +479,11 @@ onMounted(async () => {
       <button type="submit" :disabled="saving">{{ edit ? t('ثبت ویرایش (Ctrl+Enter)', 'Save the correction (Ctrl+Enter)') : t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
       <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
     </div>
-    <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
+    <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}
+      <!-- report no. 6, item 21: the saved receipt is shown and printed -->
+      <button v-if="lastSaved && message.kind !== 'error'" type="button" class="tr-secondary" style="margin-inline-start: .75rem" @click="emit('print', lastSaved.id)">
+        {{ t(`چاپ رسید شمارهٔ ${lastSaved.number}`, `Print receipt no. ${lastSaved.number}`) }}</button>
+    </p>
     <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
     <p v-else-if="noPreview" class="muted small">{{ t('این رسید، رسید تعویض چک است؛ سند آن پس از ثبت ویرایش در «فهرست دریافت‌ها» دیده می‌شود.',
       'This receipt replaced a cheque; its voucher is shown in the receipts list after the correction is saved.') }}</p>

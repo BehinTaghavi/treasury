@@ -540,6 +540,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// cancels it and types the number and date of management's order (answer to Q30), with the reason.
     /// Owner, 19 Nov 2026 (answer to Q62): the cancellation records whether «اصل چک ممهور به مهر ابطال شد» was ticked, with the user
     /// who cancelled and the computer's date and time. A cheque that is to be replaced is cancelled first (see <see cref="Replace"/>).
+    /// Owner's report no. 6, item 19: a cheque in the cash desk that was registered in Sayad («ثبت صیادی شد») is not cancelled.
     /// </summary>
     /// <param name="originalStamped">The original cheque was stamped «ابطال».</param>
     /// <param name="recordedAt">The computer's date and time, written beside that tick with the user.</param>
@@ -547,6 +548,11 @@ public sealed class Instrument : AggregateRoot<Guid>
         DateTimeOffset? recordedAt = null)
     {
         Require(Direction == InstrumentDirection.Received, "Instrument.InvalidTransition", "Only a received cheque is cancelled this way.");
+
+        // Owner's report no. 6, item 19: a cheque in the cash desk that is registered in Sayad is not cancelled. The lifecycle table
+        // says the same; this names the reason to the user.
+        Require(State != InstrumentState.SayadRegistered, "Instrument.SayadRegisteredNotCancelled",
+            $"Cheque {Number} is registered in Sayad («ثبت صیادی شد») and cannot be cancelled.");
         Require(!string.IsNullOrWhiteSpace(orderNumber) && orderDate is not null, "Instrument.CancelOrderRequired",
             "Enter the number and date of management's order to cancel.");
         Require(orderDate is null || orderDate <= date, "Instrument.CancelOrderAfterCancel", "Management's order cannot be dated after the cancellation.");

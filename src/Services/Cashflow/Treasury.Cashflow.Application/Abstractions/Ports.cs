@@ -58,8 +58,12 @@ public interface IInstrumentAttachmentRepository
     Task RemoveAsync(InstrumentAttachment file, CancellationToken cancellationToken);
 }
 
-/// <summary>The latest state of one cheque or note of a receipt, with the dates «سررسید چک» is read from.</summary>
-public sealed record ReceiptChequeStatus(Guid ReceiptId, InstrumentState State, FiscalDate ReceivedOn, FiscalDate? DueDate);
+/// <summary>
+/// The latest state of one cheque or note of a receipt, with the dates «سررسید چک» is read from, and the cheque itself — its id, number
+/// and kind — so the receipts lists show and search the cheque number and open the cheque card (owner's report no. 6, items 14 and 20).
+/// </summary>
+public sealed record ReceiptChequeStatus(Guid ReceiptId, InstrumentState State, FiscalDate ReceivedOn, FiscalDate? DueDate,
+    Guid InstrumentId = default, string? Number = null, InstrumentKind Kind = InstrumentKind.OrdinaryCheque);
 
 /// <summary>
 /// Today's date in Iran (UTC+03:30; Iran has kept no daylight saving time since 1401). «سررسید چک» compares the due date with it.

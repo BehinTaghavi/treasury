@@ -11,7 +11,7 @@
  * the bounce when the cheque has one). A cheque that becomes collectable is handed back to the cash desk («تحویل به صندوق») from here.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { chequeStateName, createApi, formatAmount, instrumentKindName, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { ACCEPT, MAX_BYTES, openLegalFile, sizeText, uploadLegalFile, type LegalFile } from './legalFiles'
@@ -41,11 +41,7 @@ const bounced = ref<Cheque[]>([])
 const inDesk = ref<Cheque[]>([])
 const withDesk = ref(false)
 const guarantee = (c: Cheque) => c.kind === 'GuaranteeCheque' || c.kind === 'GuaranteeNote'
-const kindNames: Record<string, [string, string]> = {
-  OrdinaryCheque: ['چک', 'Cheque'], BankCheque: ['چک بانکی', 'Bank cheque'], GuaranteeCheque: ['چک تضمینی', 'Guarantee cheque'],
-  PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
-}
-const kindName = (c: Cheque) => (kindNames[c.kind] ? kindNames[c.kind]![fa.value ? 0 : 1] : c.kind)
+const kindName = (c: Cheque) => instrumentKindName(c.kind, props.locale)
 const inLegal = ref<Cheque[]>([])
 const busy = ref(false)
 const message = ref<{ kind: 'error' | 'ok' | 'warning'; text: string } | null>(null)
@@ -113,13 +109,23 @@ async function upload(chequeId: string, files: File[]): Promise<string[]> {
   return failed
 }
 
+/** The description was left empty when «ثبت اقدام حقوقی» was pressed (report no. 6, item 13). */
+const descriptionMissing = ref(false)
+const descriptionBox = ref<HTMLTextAreaElement | null>(null)
 async function record() {
   message.value = null
+  descriptionMissing.value = false
   const c = chosen.value
   if (!c) return show('error', t('چک را از فهرست انتخاب کنید.', 'Choose the cheque from the list.'))
   const date = normaliseJalali(form.date)
   if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
-  if (!form.description.trim()) return show('error', translate('Instrument.LegalActionDescriptionRequired', props.locale))
+  // Owner's report no. 6, item 13: without the description nothing is recorded, and the user did not see why — the box is framed in
+  // red (it is required), and when it is left empty the reason is written under it and the cursor is put in it.
+  if (!form.description.trim()) {
+    descriptionMissing.value = true
+    descriptionBox.value?.focus()
+    return show('error', translate('Instrument.LegalActionDescriptionRequired', props.locale))
+  }
   const certificateDate = form.certificateDate.trim() ? normaliseJalali(form.certificateDate) : null
   if (form.certificateDate.trim() && !certificateDate) return show('error', translate('FiscalDate.Invalid', props.locale))
   if (certificateRequired.value && !(form.certificateNo.trim() && certificateDate && form.certificateCode.trim()))
@@ -250,7 +256,7 @@ onMounted(async () => {
             <div><dt>{{ t('بابت', 'Purpose') }}</dt><dd>{{ chosen.purpose }}</dd></div>
             <div><dt>{{ t('تاریخ دریافت', 'Received') }}</dt><dd class="num">{{ chosen.issueDate }}</dd></div>
             <div><dt>{{ t('سررسید', 'Due') }}</dt><dd class="num">{{ chosen.dueDate ?? '—' }}</dd></div>
-            <div><dt>{{ t('وضعیت فعلی', 'Status now') }}</dt><dd>{{ chequeStateName(chosen.state, locale) }}</dd></div>
+            <div><dt>{{ t('وضعیت فعلی', 'Status now') }}</dt><dd>{{ chequeStateName(chosen.state, locale, chosen.kind) }}</dd></div>
             <template v-if="chosen.state === 'Bounced'">
               <div><dt>{{ t('گواهی عدم پرداخت', 'Certificate of non-payment') }}</dt><dd class="num">{{ bounceOf(chosen).notice }} – {{ bounceOf(chosen).date }}</dd></div>
               <div><dt>{{ t('علت برگشت', 'Reason') }}</dt><dd>{{ bounceOf(chosen).reason || '—' }}</dd></div>
@@ -266,8 +272,11 @@ onMounted(async () => {
         <label :class="{ req: certificateRequired }">{{ t('شمارهٔ گواهی عدم پرداخت', 'Certificate of non-payment no.') }} <input v-model="form.certificateNo" dir="ltr" :disabled="!chosen" /></label>
         <label :class="{ req: certificateRequired }">{{ t('تاریخ گواهی عدم پرداخت', 'Date of the certificate') }} <input v-model="form.certificateDate" dir="ltr" placeholder="1405/08/27" :disabled="!chosen" /></label>
         <label :class="{ req: certificateRequired }">{{ t('کد رهگیری گواهی عدم پرداخت', 'Tracking code of the certificate') }} <input v-model="form.certificateCode" dir="ltr" :disabled="!chosen" /></label>
-        <label class="full req">{{ t('شرح اقدام حقوقی', 'Description of the legal action') }}
-          <textarea v-model="form.description" rows="3" :disabled="!chosen" />
+        <!-- Owner's report no. 6, item 13: the description is required, so its box is red like every required field. -->
+        <label :class="['full', 'req', { missing: descriptionMissing }]">{{ t('شرح اقدام حقوقی (الزامی)', 'Description of the legal action (required)') }}
+          <textarea ref="descriptionBox" v-model="form.description" rows="3" :disabled="!chosen" @input="descriptionMissing = false" />
+          <small v-if="descriptionMissing" class="tr-missing" role="alert">{{ t('شرح اقدام حقوقی وارد نشده است؛ بدون آن وضعیت «اقدام حقوقی» ثبت نمی‌شود.',
+            'The description is empty; the legal action is not recorded without it.') }}</small>
         </label>
         <label class="full">{{ t('اسکن ضمائم اقدام حقوقی (PDF، JPG یا PNG، هر فایل حداکثر ۵ مگابایت)', 'Scans of the action\'s papers (PDF, JPG or PNG, up to 5 MB each)') }}
           <input ref="fileInput" type="file" :accept="ACCEPT" multiple :disabled="!chosen" @change="chooseFiles" />
@@ -370,5 +379,7 @@ onMounted(async () => {
 .tr-files li { display: flex; gap: .5rem; align-items: center; }
 .tr-card { margin-top: 1.25rem; padding: .75rem; border: 1px solid #d9e2ec; border-radius: 8px; }
 .tr-text { white-space: pre-wrap; }
+.missing > textarea { border-color: #b42318; box-shadow: 0 0 0 2px #f5c2c2; background: #fff5f5; }
+.tr-missing { color: #b42318; font-weight: 600; }
 textarea { resize: vertical; }
 </style>

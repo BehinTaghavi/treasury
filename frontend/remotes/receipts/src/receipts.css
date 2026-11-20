@@ -9,7 +9,7 @@ label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 /* Required fields are drawn with a red frame (owner's report no. 2, item 12); no separate star, which pushed list boxes a line down. */
 input:not([type=checkbox]):not([type=radio]), select, textarea { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 input.ro { background: #f5f7fa; color: #52606d; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+.req > input, .req > textarea { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }

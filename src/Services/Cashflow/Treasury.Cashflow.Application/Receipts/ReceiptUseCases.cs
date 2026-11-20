@@ -180,12 +180,13 @@ public sealed record ReceiptView(
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
         instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
-        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba, NoteTermsView.From(r.NoteTerms),
+        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t), i.Id, i.Number, i.Kind.ToString())).ToList(), r.PayerSheba, NoteTermsView.From(r.NoteTerms),
         notCorrectable, notDeletable, r.DeletedBy, r.DeletedAt);
 }
 
 /// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
-public sealed record ChequeStatusView(string State, bool ReachedDueDate);
+/// <summary>The latest status of one cheque of a receipt, with the cheque's id, number and kind (owner's report no. 6, items 14 and 20).</summary>
+public sealed record ChequeStatusView(string State, bool ReachedDueDate, Guid Id = default, string? Number = null, string? Kind = null);
 
 /// <summary>
 /// Receipts (owner, 14 Nov 2026): cash, money paid into a bank account (slip, transfer, POS, card-to-card) and cheques and notes,
@@ -861,7 +862,7 @@ public sealed class ReceiptUseCases(
             var withCheques = list.Where(r => r.Kind is ReceiptKind.Instruments or ReceiptKind.Notes).Select(r => r.Id).ToList();
             var statuses = (await instruments.ListStatusesByReceiptsAsync(withCheques, ct).ConfigureAwait(false)).ToLookup(
                 s => s.ReceiptId,
-                s => new ChequeStatusView(s.State.ToString(), ReceivedChequeStatus.HasReachedDueDate(s.State, s.ReceivedOn, s.DueDate, today)));
+                s => new ChequeStatusView(s.State.ToString(), ReceivedChequeStatus.HasReachedDueDate(s.State, s.ReceivedOn, s.DueDate, today), s.InstrumentId, s.Number, s.Kind.ToString()));
             return list.Select(r => ReceiptView.From(r, statuses: r.Kind is ReceiptKind.Instruments or ReceiptKind.Notes ? statuses[r.Id].ToList() : null)).ToList();
         }, cancellationToken);
 

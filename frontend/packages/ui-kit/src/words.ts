@@ -2,12 +2,15 @@
  * Amounts in Persian words («مبلغ به حروف»; new-version manual: "مبلغ به حروف: توسط سیستم نگارش می یابد"), as written on Iranian
  * cheques: groups of three digits joined with «و», e.g. 12,500,000 → «دوازده میلیون و پانصد هزار». A thousand is «یک هزار».
  * The unit (ریال …) is added by the caller. Whole numbers up to 999 هزار میلیارد; decimals are not written.
+ * Owner's report no. 6, item 15: above a thousand «میلیارد» the word «میلیارد» is said once, after the whole number of milliards —
+ * 4,500,000,000,000 is «چهار هزار و پانصد میلیارد», not «چهار هزار میلیارد و پانصد میلیارد».
  */
 const ones = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
 const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده']
 const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود']
 const hundreds = ['', 'یکصد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد']
-const scales = ['', 'هزار', 'میلیون', 'میلیارد', 'هزار میلیارد']
+const scales = ['', 'هزار', 'میلیون']
+const MILLIARD = 1_000_000_000
 
 function below1000(n: number): string {
   const parts: string[] = []
@@ -22,16 +25,23 @@ function below1000(n: number): string {
   return parts.join(' و ')
 }
 
+/** A whole number below a milliard: groups of three digits, each with its scale, joined with «و». */
+function belowMilliard(n: number): string[] {
+  const groups: string[] = []
+  for (let i = 0, rest = n; rest > 0; i++, rest = Math.floor(rest / 1000)) {
+    const g = rest % 1000
+    if (g) groups.unshift(scales[i] ? `${below1000(g)} ${scales[i]}` : below1000(g))
+  }
+  return groups
+}
+
 export function amountInWords(value: number): string {
   const n = Math.floor(Math.abs(value))
   if (!Number.isFinite(n) || n >= 1e15) return ''
   if (n === 0) return 'صفر'
-  const groups: string[] = []
-  let rest = n
-  for (let i = 0; rest > 0; i++, rest = Math.floor(rest / 1000)) {
-    const g = rest % 1000
-    if (g) groups.unshift(scales[i] ? `${below1000(g)} ${scales[i]}` : below1000(g))
-  }
+  // The milliards are read as one number («چهار هزار و پانصد»), then «میلیارد» once.
+  const milliards = Math.floor(n / MILLIARD)
+  const groups = [...(milliards ? [`${belowMilliard(milliards).join(' و ')} میلیارد`] : []), ...belowMilliard(n % MILLIARD)]
   return (value < 0 ? 'منفی ' : '') + groups.join(' و ')
 }
 

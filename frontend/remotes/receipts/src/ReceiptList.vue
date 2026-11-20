@@ -14,18 +14,23 @@
  * Owner's answers of 19 Nov 2026: «حذف رسید» beside «ویرایش رسید», at the same stage (Q59); «چاپ» of the list with «از تاریخ / تا تاریخ»
  * filled from the list (Q63). Owner, 20 Nov 2026 (answer to Q67): a deleted receipt stays in the list, on a light red ground with «حذف شده»
  * written large; opened, it says who deleted it and when.
+ * Owner's report no. 6 as sent on 19 Nov 2026: this is «فهرست جامع دریافت‌ها» (item 12). Item 20: a column «شماره چک», a box that finds
+ * a receipt by the number of one of its cheques, and the column in the printed list. Items 14 and 20: a click (or double click) on a
+ * row of a cheque or note receipt shows, under the receipt, the cheque card of each of its cheques — the course the cheque has run;
+ * a click on a card closes it. Item 21: «چاپ رسید» shows and prints the receipt of any kind (the parent prints it).
  */
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, normaliseJalali, receiptNumber, searchKey, todayJalali, translate,
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { createApi, dueMark, dueWaitsFor, formatAmount, groupChequeStatuses, instrumentKindName, normaliseJalali, receiptNumber, searchKey, todayJalali, toLatinDigits, translate,
   type ChequeStatus, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import { depositMethodName } from './depositMethods'
-import NoteReceiptPrint from './NoteReceiptPrint.vue'
+import ChequeCard from './ChequeCard.vue'
+import { stateNameOf } from './cheque'
 import PrintRange from './PrintRange.vue'
 import { listPage, printPage, rangeText } from './printing'
-import { attachmentNames, checkNames, formNames, maturityNames, reasonNames, type NoteChecks, type NoteReceipt, type NoteTerms } from './notes'
+import { attachmentNames, checkNames, formNames, maturityNames, reasonNames, type NoteChecks, type NoteTerms } from './notes'
 
 interface Instrument {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; amountInRial: number
@@ -53,7 +58,7 @@ interface Receipt {
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
-const emit = defineEmits<{ edit: [id: string] }>()
+const emit = defineEmits<{ edit: [id: string]; print: [id: string] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const t = (f: string, e: string) => (props.locale === 'fa' ? f : e)
 const fa = computed(() => props.locale === 'fa')
@@ -66,15 +71,11 @@ const year = ref(String(props.fiscalYear ?? thisYear))
 const yearChoices = computed<Choice[]>(() => Array.from({ length: 6 }, (_, i) => thisYear - 4 + i).map(y => ({ value: String(y), label: num(y) })))
 const kind = ref('')
 const kindNames: Record<string, [string, string]> = {
-  Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به حساب', 'Bank deposit'], Instruments: ['چک', 'Cheques'], Notes: ['سفته', 'Promissory notes'],
+  Cash: ['نقدی', 'Cash'], BankDeposit: ['واریز به بانک', 'Bank deposit'], Instruments: ['چک', 'Cheques'], Notes: ['سفته', 'Promissory notes'],
 }
 /** Receipts that bring in instruments: cheques, or promissory notes (which have a receipt of their own). */
 const hasInstruments = (r: Receipt) => r.kind === 'Instruments' || r.kind === 'Notes'
 const kindChoices = computed<Choice[]>(() => Object.entries(kindNames).map(([value, [f, e]]) => ({ value, label: fa.value ? f : e })))
-const instrumentKinds: Record<string, [string, string]> = {
-  OrdinaryCheque: ['چک', 'Cheque'], BankCheque: ['چک بانکی', 'Bank cheque'], GuaranteeCheque: ['چک تضمینی', 'Guarantee cheque'],
-  PromissoryNote: ['سفته', 'Note'], GuaranteeNote: ['سفته تضمینی', 'Guarantee note'], Instalment: ['اقساط', 'Instalment'], Other: ['سایر', 'Other'],
-}
 /** The «وضعیت» column: the cheques of a cheque receipt grouped by their latest status. */
 const statusGroups = (r: Receipt) => groupChequeStatuses(r.chequeStatuses, props.locale, r.kind === 'Notes')
 const name = (m: Record<string, [string, string]>, k: string | null | undefined) => (k && m[k] ? (fa.value ? m[k][0] : m[k][1]) : k ?? '')
@@ -83,6 +84,10 @@ const receipts = ref<Receipt[]>([])
 const search = ref('')
 /** «شماره رسید»: exactly this number (report no. 6, item 9). */
 const numberSearch = ref('')
+/** «شماره چک» (item 20): the receipts holding a cheque or note whose number contains these digits. */
+const chequeSearch = ref('')
+const plain = (text: string) => toLatinDigits(text).replace(/[^0-9A-Za-z]/g, '')
+const chequeNumbers = (r: Receipt) => (r.chequeStatuses ?? []).map(c => c.number ?? '').filter(Boolean)
 const selected = ref<Receipt | null>(null)
 const message = ref<{ kind: 'error' | 'ok'; text: string } | null>(null)
 const show = (k: 'error' | 'ok', text: string) => { message.value = { kind: k, text } }
@@ -90,7 +95,9 @@ const show = (k: 'error' | 'ok', text: string) => { message.value = { kind: k, t
 const shown = computed(() => {
   const key = searchKey(search.value)
   const wanted = receiptNumber(numberSearch.value)
+  const cheque = plain(chequeSearch.value)
   return receipts.value.filter(r => (wanted === null || r.number === wanted)
+    && (!cheque || chequeNumbers(r).some(n => plain(n).includes(cheque)))
     && (!key || searchKey(`${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.purposeGroupName} ${r.trackingNumber ?? ''} ${r.date} ${
       statusGroups(r).map(g => g.name + (g.due ? ` ${dueMark(props.locale)}` : '')).join(' ')}`).includes(key)))
 })
@@ -114,26 +121,32 @@ async function load() {
 }
 
 async function open(id: string) {
-  printing.value = false
   const [r, v] = await Promise.all([api.get<Receipt>(`/api/cashflow/receipts/${id}`), api.get<Voucher>(`/api/cashflow/receipts/${id}/voucher`)])
   if (r.ok) selected.value = r.value
   voucher.value = v.ok ? v.value : null
   for (const k of Object.keys(steps)) delete steps[k]
 }
 
-// ---- a receipt of promissory notes: its terms, and the printed receipt for the signatures ----
-const printing = ref(false)
-const terms = computed(() => (selected.value?.kind === 'Notes' ? selected.value.noteTerms : null))
-const selectedGroup = computed(() => L.groups.value.find(g => g.id === selected.value?.purposeGroupId))
-const refTitle = (id: string | null | undefined) => L.references.value.find(x => x.id === id)?.name ?? ''
-const accountOf = (code: string | null | undefined) => (code ? `${code} – ${L.accountName(code) ?? ''}` : '')
-const ticked = (c: NoteChecks | null | undefined) => checkNames.filter(([k]) => c?.[k]).map(([, f, e]) => t(f, e)).join('، ')
-/** Shows the receipt as a sheet and opens the browser's print window; only the sheet is printed. */
-async function print() {
-  printing.value = true
-  await nextTick()
-  window.print()
+// ---- items 14 and 20: the cheque cards of the row clicked, under the opened receipt ----
+const cards = ref<string[]>([])
+const cardKey = ref(0)
+const bankAccountTitle = (id: string | null | undefined) => { const a = L.bankAccounts.value.find(x => x.id === id); return a ? L.accountTitle(a) : '' }
+/** A click or a double click on a row opens the receipt and, of a cheque or note receipt, the card of each of its cheques. */
+async function openRow(r: Receipt) {
+  cards.value = hasInstruments(r) && r.state !== 'Deleted' ? (r.chequeStatuses ?? []).map(c => c.id).filter((id): id is string => !!id) : []
+  cardKey.value++
+  await open(r.id)
 }
+/** The second press of a double click would select a word of the row. */
+const noSelectOnDoubleClick = (e: MouseEvent) => { if (e.detail > 1) e.preventDefault() }
+function showCard(id: string) {
+  if (!cards.value.includes(id)) cards.value = [...cards.value, id]
+  cardKey.value++
+}
+
+// ---- a receipt of promissory notes: its terms ----
+const terms = computed(() => (selected.value?.kind === 'Notes' ? selected.value.noteTerms : null))
+const ticked = (c: NoteChecks | null | undefined) => checkNames.filter(([k]) => c?.[k]).map(([, f, e]) => t(f, e)).join('، ')
 
 // ---- vouchers ----
 const voucher = ref<Voucher | null>(null)
@@ -192,12 +205,12 @@ function printHtml(from: string | null = null, to: string | null = null) {
   const rows = inRange(from, to)
   const range = rangeText(from, to, props.locale)
   return listPage({
-    title: t(`فهرست دریافت‌ها${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – سال مالی ${num(Number(year.value))}`, `Receipts${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – fiscal year ${year.value}`),
+    title: t(`فهرست جامع دریافت‌ها${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – سال مالی ${num(Number(year.value))}`, `Receipts${kind.value ? ' – ' + name(kindNames, kind.value) : ''} – fiscal year ${year.value}`),
     subtitle: `${range ? range + ' – ' : ''}${t(`تاریخ چاپ: ${todayJalali()} – تعداد: ${num(rows.length)} – از جدید به قدیم`, `Printed ${todayJalali()} – ${rows.length} receipts – newest first`)}${
-      search.value || numberSearch.value ? t(' – با فیلتر', ' – filtered') : ''}`,
-    head: [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('نوع', 'Kind'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), t('صندوق / حساب / تعداد برگ', 'Cash desk / account / items'),
+      search.value || numberSearch.value || chequeSearch.value ? t(' – با فیلتر', ' – filtered') : ''}`,
+    head: [t('ردیف', '#'), t('شماره رسید', 'Receipt no.'), t('شماره چک / سفته', 'Cheque / note no.'), t('نوع', 'Kind'), t('تاریخ', 'Date'), t('پرداخت کننده', 'Payer'), t('بابت', 'Purpose'), t('صندوق / حساب / تعداد برگ', 'Cash desk / account / items'),
       t('مبلغ (ریال)', 'Amount (Rial)'), t('وضعیت', 'Status')],
-    rows: rows.map((r, i) => [num(i + 1), num(r.number), name(kindNames, r.kind) + (r.method ? ` – ${depositMethodName(r.method, fa.value)}` : ''), r.date,
+    rows: rows.map((r, i) => [num(i + 1), num(r.number), chequeNumbers(r).join(fa.value ? '، ' : ', '), name(kindNames, r.kind) + (r.method ? ` – ${depositMethodName(r.method, fa.value)}` : ''), r.date,
       `${r.payerName} (${r.payerDetailCode})`, r.purpose, hasInstruments(r) ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r), money(r.totalRial), statusText(r)]),
     total: { label: t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)'), value: money(rows.filter(r => r.state === 'Recorded').reduce((sum, r) => sum + r.totalRial, 0)), cellsAfter: 1 },
     locale: props.locale,
@@ -221,7 +234,7 @@ async function confirmCancel() {
 
 
 defineExpose({ load, printHtml })
-watch([year, kind], () => { selected.value = null; void load() })
+watch([year, kind], () => { selected.value = null; cards.value = []; void load() })
 onMounted(async () => { await L.load(); await load() })
 </script>
 
@@ -237,6 +250,10 @@ onMounted(async () => { await L.load(); await load() })
       <label style="width: 9rem">{{ t('شماره رسید', 'Receipt no.') }}
         <input v-model="numberSearch" dir="ltr" inputmode="numeric" :aria-label="t('شماره رسید', 'Receipt no.')" />
       </label>
+      <!-- item 20: a receipt is found by the number of one of its cheques or notes -->
+      <label style="width: 10rem">{{ t('شماره چک / سفته', 'Cheque / note no.') }}
+        <input v-model="chequeSearch" dir="ltr" inputmode="numeric" :aria-label="t('شماره چک / سفته', 'Cheque / note no.')" />
+      </label>
       <label style="flex: 1; min-width: 14rem">{{ t('جستجو (پرداخت کننده، بابت، پیگیری، تاریخ، وضعیت)', 'Search (payer, purpose, tracking, date, status)') }}
         <input v-model="search" />
       </label>
@@ -244,19 +261,22 @@ onMounted(async () => { await L.load(); await load() })
                   @print="(from, to) => printPage(printHtml(from, to))" />
     </div>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
+    <p class="muted small" style="margin: .25rem 0 0">{{ t('با کلیک یا دبل‌کلیک روی هر ردیف، رسید و «کارت چک» چک‌های آن (سیر مراحل هر چک) در پایین صفحه باز می‌شود؛ با کلیک روی کارت چک، کارت بسته می‌شود.',
+      'Click or double-click a row to open the receipt and the card of each of its cheques (the course of its steps) below; click a cheque card to close it.') }}</p>
 
     <div class="tr-scroll">
       <table class="tr-table">
         <thead>
           <tr>
-            <th>{{ t('شماره', 'No.') }}</th><th>{{ t('نوع', 'Kind') }}</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
+            <th>{{ t('شماره', 'No.') }}</th><th>{{ t('شماره چک / سفته', 'Cheque / note no.') }}</th><th>{{ t('نوع', 'Kind') }}</th><th>{{ t('تاریخ', 'Date') }}</th><th>{{ t('پرداخت کننده', 'Payer') }}</th>
             <th>{{ t('بابت', 'Purpose') }}</th><th>{{ t('صندوق / حساب', 'Cash desk / account') }}</th><th>{{ t('مبلغ', 'Amount') }}</th>
             <th>{{ t('ریالی', 'Rial') }}</th><th>{{ t('وضعیت', 'Latest status') }}</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', deleted: r.state === 'Deleted', selected: selected?.id === r.id }]" @click="open(r.id)">
+          <tr v-for="r in shown" :key="r.id" :class="['clickable', { cancelled: r.state === 'Cancelled', deleted: r.state === 'Deleted', selected: selected?.id === r.id }]" @click="openRow(r)" @mousedown="noSelectOnDoubleClick">
             <td class="num">{{ num(r.number) }}</td>
+            <td class="num"><div v-for="c in r.chequeStatuses ?? []" :key="c.id ?? c.number ?? ''">{{ c.number }}</div></td>
             <td>{{ name(kindNames, r.kind) }}<span v-if="r.method" class="muted small"> – {{ depositMethodName(r.method, fa) }}</span></td>
             <td class="num">{{ r.date }}</td>
             <td>{{ r.payerName }} <span class="muted small">{{ r.payerDetailCode }}</span></td>
@@ -268,7 +288,7 @@ onMounted(async () => { await L.load(); await load() })
               <span v-if="r.state === 'Deleted'" class="tr-deleted">{{ t('حذف شده', 'Deleted') }}</span>
               <span v-else-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
               <template v-else-if="r.kind === 'Instruments'">
-                <div v-for="g in statusGroups(r)" :key="g.state">
+                <div v-for="g in statusGroups(r)" :key="g.state + g.name">
                   <span v-if="r.instrumentCount > 1" class="muted small">{{ t(`${num(g.count)} برگ:`, `${g.count} ×`) }}</span> {{ g.name }}
                   <span v-if="g.due" class="tr-tag due" :title="dueWaitsFor(g.state, locale)">{{ dueMark(locale) }}<template v-if="g.count > 1"> ({{ num(g.due) }})</template></span>
                 </div>
@@ -276,10 +296,10 @@ onMounted(async () => { await L.load(); await load() })
               <template v-else>{{ t('ثبت شده', 'Recorded') }}</template>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="9" class="muted">{{ receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="10" class="muted">{{ receipts.length ? t('با این جستجو رسیدی پیدا نشد.', 'No receipt matches.') : t('رسیدی ثبت نشده است.', 'No receipts.') }}</td></tr>
         </tbody>
         <tfoot v-if="shown.length">
-          <tr><td colspan="7"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(totalShown) }}</strong></td><td /></tr>
+          <tr><td colspan="8"><strong>{{ t('جمع (بدون ابطال‌شده‌ها و حذف‌شده‌ها)', 'Total (without cancelled and deleted)') }}</strong></td><td class="num"><strong>{{ money(totalShown) }}</strong></td><td /></tr>
         </tfoot>
       </table>
     </div>
@@ -302,7 +322,10 @@ onMounted(async () => { await L.load(); await load() })
         · {{ t('ثبت', 'By') }}: {{ selected.recordedBy }}
       </p>
       <p v-if="selected.note" class="small">{{ selected.note }}</p>
-      <!-- Owner's report no. 6, items 2 and 6: a receipt is corrected until its voucher is confirmed. -->
+      <!-- Owner's report no. 6, items 2 and 6: a receipt is corrected until its voucher is confirmed. Item 21: «چاپ رسید». -->
+      <div v-if="selected.state !== 'Deleted'" class="tr-buttons">
+        <button type="button" class="tr-secondary" @click="emit('print', selected.id)">{{ t('چاپ رسید', 'Print receipt') }}</button>
+      </div>
       <div v-if="selected.state === 'Recorded'" class="tr-buttons">
         <button v-if="!selected.notCorrectable" type="button" @click="emit('edit', selected.id)">{{ t('ویرایش رسید', 'Correct the receipt') }}</button>
         <span v-else class="muted small">{{ t('ویرایش بسته است:', 'Correction is closed:') }} {{ translate(selected.notCorrectable, locale) }}</span>
@@ -337,10 +360,6 @@ onMounted(async () => { await L.load(); await load() })
           <template v-if="terms.deliveredBy"> · {{ t('تحویل‌دهنده', 'Handed over by') }}: {{ terms.deliveredBy }}</template>
           <template v-if="terms.signers?.length"> · {{ t('امضاکنندگان مجاز', 'Authorised signatories') }}: {{ terms.signers.map(s => s.position ? `${s.name} (${s.position})` : s.name).join('، ') }}</template>
         </p>
-        <div class="tr-buttons">
-          <button type="button" class="tr-secondary" @click="print">{{ t('چاپ رسید', 'Print receipt') }}</button>
-          <button v-if="printing" type="button" class="tr-link" @click="printing = false">{{ t('بستن پیش‌نمایش چاپ', 'Close print preview') }}</button>
-        </div>
       </template>
 
       <div v-if="!hasInstruments(selected) && selected.state === 'Recorded' && !voucher?.confirmedBy" class="tr-buttons">
@@ -370,7 +389,7 @@ onMounted(async () => { await L.load(); await load() })
             </thead>
             <tbody>
               <tr v-for="i in selected.instruments" :key="i.id">
-                <td>{{ name(instrumentKinds, i.kind) }}
+                <td>{{ instrumentKindName(i.kind, locale) }}
                   <span v-if="!i.details?.onDemand" :class="['tr-tag', i.isPostDated ? 'later' : 'current']">{{ i.isPostDated ? t('مدت‌دار', 'Post-dated') : t('روز', 'Current') }}</span>
                 </td>
                 <td class="num">{{ i.number }}<div v-if="i.details?.sayadId" class="muted small">{{ t('صیاد', 'Sayad') }}: {{ i.details.sayadId }}</div></td>
@@ -384,11 +403,12 @@ onMounted(async () => { await L.load(); await load() })
                 <td class="num">{{ i.dueDate ?? (i.details?.onDemand ? t('عندالمطالبه', 'On demand') : '') }}</td>
                 <td class="num">{{ money(i.amount) }} <span v-if="i.currency !== 'IRR'">{{ i.currency }}</span></td>
                 <td class="num">{{ money(i.amountInRial) }}</td>
-                <td>{{ chequeStateName(i.state, locale, selected.kind === 'Notes') }}
+                <td>{{ stateNameOf(i.state, i.kind, locale) }}
                   <span v-if="i.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(i.state, locale)">{{ dueMark(locale) }}</span>
                   <div v-if="i.reachedDueDate" class="muted small">{{ dueWaitsFor(i.state, locale) }}</div>
                 </td>
                 <td>
+                  <button type="button" class="tr-link" @click="showCard(i.id)">{{ selected.kind === 'Notes' ? t('کارت سفته', 'Note card') : t('کارت چک', 'Cheque card') }}</button>
                   <button type="button" class="tr-link" @click="toggleSteps(i.id)">{{ steps[i.id] ? t('بستن اسناد مراحل', 'Hide step vouchers') : t('اسناد مراحل چک', 'Step vouchers') }}</button>
                 </td>
               </tr>
@@ -408,9 +428,9 @@ onMounted(async () => { await L.load(); await load() })
       <VoucherTable v-if="voucher" :voucher="voucher" :locale="locale" :account-name="L.accountName" :can-confirm="selected.state === 'Recorded'" :busy="confirming"
                     @confirm="confirmReceiptVoucher" />
 
-      <NoteReceiptPrint v-if="terms && printing" :receipt="(selected as unknown as NoteReceipt)" :locale="locale" :ledger-account="accountOf(selectedGroup?.ledgerAccountCode)"
-                        :department-name="L.departments.value.find(d => d.id === selected!.departmentId)?.name ?? ''"
-                        :reference1-title="refTitle(selectedGroup?.reference1Id)" :reference2-title="refTitle(selectedGroup?.reference2Id)" />
+      <!-- items 14 and 20: the cheque cards of this receipt, at the bottom of the screen; a click on a card closes it -->
+      <ChequeCard v-for="id in cards" :key="id" :cheque-id="id" :refresh-key="cardKey" close-on-click :api-base="apiBase" :locale="locale" :token="token"
+                  :bank-account-name="bankAccountTitle" :ledger-account-name="L.accountName" @close="cards = cards.filter(x => x !== id)" />
     </section>
   </div>
 </template>
