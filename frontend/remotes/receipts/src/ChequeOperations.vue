@@ -361,10 +361,10 @@ onMounted(async () => { await L.load(); await load() })
             <td>{{ c.counterparty }}</td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ stateName(c.state) }}
-              <span v-if="c.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(c.state, locale)">{{ dueMark(locale) }}</span>
+              <span v-if="c.reachedDueDate" class="tr-tag due" :title="words(dueWaitsFor(c.state, locale))">{{ words(dueMark(locale)) }}</span>
               <div v-if="c.state === 'DepositedForCollection'" class="muted small">{{ accountName(c.collectionAccountId) || c.destination }}</div>
               <div v-else-if="c.state === 'Endorsed'" class="muted small">{{ c.destination }}</div>
-              <div v-if="c.reachedDueDate" class="muted small">{{ dueWaitsFor(c.state, locale) }}</div>
+              <div v-if="c.reachedDueDate" class="muted small">{{ words(dueWaitsFor(c.state, locale)) }}</div>
             </td>
             <td class="tr-actions" @click.stop>
               <button v-for="a in rowActions(c)" :key="a" type="button" :class="['tr-link', { danger: a === 'Cancel' || a === 'RecordBounced' }]" @click="start(c, a)">
@@ -396,7 +396,7 @@ onMounted(async () => { await L.load(); await load() })
       <div class="tr-buttons">
         <h3 style="margin: 0">{{ t(`کارت چک ${card.number}`, `Cheque ${card.number}`) }}</h3>
         <span class="tr-tag">{{ t('آخرین وضعیت', 'Latest status') }}: {{ stateName(card.state) }}</span>
-        <span v-if="card.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(card.state, locale)">{{ dueMark(locale) }}</span>
+        <span v-if="card.reachedDueDate" class="tr-tag due" :title="words(dueWaitsFor(card.state, locale))">{{ words(dueMark(locale)) }}</span>
         <span class="muted small"><template v-if="card.bankName">{{ card.bankName }} · </template>{{ card.counterparty }} · {{ card.dueDate ? `${t('سررسید', 'due')} ${card.dueDate}` : card.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(card.amount) }} {{ card.currency }}</span>
         <button type="button" class="tr-link" @click="card = null">{{ t('بستن', 'Close') }}</button>
       </div>
