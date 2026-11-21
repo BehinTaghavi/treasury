@@ -10,6 +10,10 @@
  * report no. 6), and «تایید سند». A deleted transfer stays in the list, light red, marked «حذف شده», so its number is seen to be taken.
  * The same screen stands in «دریافت‌ها» and in «پرداخت‌ها»: a transfer is a payment of the source bank and a receipt of the destination bank.
  * The form follows the receipt form the owner approved on 20 Nov 2026 (numbered cards, summary beside them, required fields marked by a dot).
+ * Owner, 21 Nov 2026 (answers to Q76–Q82): every transfer pays an approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت»
+ * («برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود») — the request is chosen first, it sets the two accounts
+ * and proposes what is left to pay on it; and the bank's fee («کارمزد خدمات بانکی») is typed with the transfer and debited to the
+ * company's fee account in the same voucher.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { amountTextInWords, createApi, formatAmount, markMissing, normaliseJalali, parseAmount, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -19,7 +23,8 @@ import { useLookups } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import TransferVoucher from './TransferVoucher.vue'
 import { amountText } from './savedReceipt'
-import { accountText, channelName, channelShortName, channels, limitFor, limitLines, methodName, methodShortName, methodUse, totalRial, waysFor, type Transfer, type TransferChannel, type TransferLimit } from './transfers'
+import { accountText, channelName, channelShortName, channels, limitFor, limitLines, methodName, methodShortName, methodUse, payableRequests, requestLabel, totalRial, waysFor,
+  type Transfer, type TransferChannel, type TransferLimit, type TransferRequest } from './transfers'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -32,10 +37,45 @@ const L = useLookups(api)
 const year = computed(() => props.fiscalYear ?? Number(todayJalali().slice(0, 4)))
 
 // ---- the form ----
-const blank = () => ({ date: todayJalali(), sourceId: '', destinationId: '', method: '', channel: '' as TransferChannel | '', amount: '', rate: '', tracking: '', description: '' })
+const blank = () => ({
+  date: todayJalali(), requestId: '', sourceId: '', destinationId: '', method: '', channel: '' as TransferChannel | '', amount: '', rate: '', fee: '', tracking: '', description: '' })
 const form = reactive(blank())
 /** The saved transfer being corrected («ویرایش»). */
 const editing = ref<Transfer | null>(null)
+
+// ---- the approved payment request the transfer pays (answer to Q82) ----
+const requests = ref<TransferRequest[]>([])
+const requestsLoaded = ref(false)
+async function loadRequests() {
+  const r = await api.get<TransferRequest[]>(`/api/requests/payment-requests?year=${year.value}&state=Approved`)
+  const list = r.ok ? payableRequests(r.value) : []
+  // The request of the transfer being corrected stays in the list, also when that transfer paid it in full («پرداخت شده»).
+  const own = editing.value?.paymentRequestId
+  if (own && !list.some(x => x.id === own)) {
+    const mine = await api.get<TransferRequest>(`/api/requests/payment-requests/${own}`)
+    if (mine.ok) list.unshift(mine.value)
+  }
+  requests.value = list
+  requestsLoaded.value = true
+  if (form.requestId && !list.some(x => x.id === form.requestId)) form.requestId = ''
+}
+const accountOf = (id: string | null) => { const a = L.bankAccounts.value.find(x => x.id === id); return a ? L.accountTitle(a) : '—' }
+const chosenRequest = computed(() => requests.value.find(r => r.id === form.requestId))
+/** What may still be paid on the chosen request: what is left, plus what the transfer being corrected already paid on it. */
+const available = computed(() => {
+  const r = chosenRequest.value
+  return r ? r.remainingAmount + (editing.value?.paymentRequestId === r.id ? editing.value.amount : 0) : null
+})
+const requestChoices = computed<Choice[]>(() => requests.value.map(r => ({
+  value: r.id, label: `${t('درخواست', 'Request')} ${num(r.number)} – ${requestLabel(r, accountOf(r.payFromId), accountOf(r.transferToAccountId), props.locale)}` })))
+/** The request names the two accounts: they are set from it and locked; what is left on it is proposed as the amount. */
+watch(chosenRequest, (r, before) => {
+  if (!r) return
+  form.sourceId = r.payFromId ?? ''
+  form.destinationId = r.transferToAccountId ?? ''
+  if (!form.amount || (before && before.id !== r.id)) form.amount = amountText(available.value)
+})
+
 const source = computed(() => L.bankAccounts.value.find(a => a.id === form.sourceId))
 const destination = computed(() => L.bankAccounts.value.find(a => a.id === form.destinationId))
 const currency = computed(() => source.value?.currencyCode ?? 'IRR')
@@ -80,17 +120,21 @@ const totalWords = computed(() => (amountRial.value > 0 ? amountTextInWords(Stri
 function request(): { body: Record<string, unknown> } | { error: string } {
   const date = normaliseJalali(form.date)
   if (!date) return { error: 'FiscalDate.Invalid' }
+  if (!form.requestId) return { error: 'Transfer.RequestRequired' }
   if (!form.sourceId) return { error: 'Transfer.SourceRequired' }
   if (!form.destinationId) return { error: 'Transfer.DestinationRequired' }
   if (!form.method) return { error: 'Transfer.MethodRequired' }
   if (!form.channel) return { error: 'Transfer.ChannelRequired' }
   const amount = parseAmount(form.amount)
   if (amount === null || amount <= 0) return { error: 'Money.NotPositive' }
+  if (available.value !== null && amount > available.value) return { error: 'Transfer.RequestOverpaid' }
   const rate = currency.value === 'IRR' ? null : parseAmount(form.rate)
   if (currency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
+  const fee = form.fee.trim() ? parseAmount(form.fee) : null
+  if (form.fee.trim() && (fee === null || fee < 0)) return { error: 'Transfer.FeeInvalid' }
   return { body: {
     date, sourceAccountId: form.sourceId, destinationAccountId: form.destinationId, method: form.method, channel: form.channel, amount, rateToRial: rate,
-    trackingNumber: form.tracking.trim() || null, description: form.description.trim() || null } }
+    trackingNumber: form.tracking.trim() || null, description: form.description.trim() || null, paymentRequestId: form.requestId, fee: fee || null } }
 }
 
 // ---- the voucher while the form is filled (nothing is saved) ----
@@ -136,9 +180,11 @@ async function save() {
     show('ok', old ? t(`ویرایش نقل و انتقال شمارهٔ ${no} ثبت شد.`, `Transfer no. ${no} corrected.`)
       : t(`نقل و انتقال شمارهٔ ${no} ثبت شد. سند آن را در فهرست زیر «تایید سند» کنید.`, `Transfer no. ${no} saved. Confirm its voucher in the list below.`))
     editing.value = null
-    // After a correction the form is empty again; after a new transfer the accounts and the way stay for the next one.
-    Object.assign(form, old ? blank() : { amount: '', rate: '', tracking: '', description: '' })
-    await load()
+    // After a correction the form is empty again; after a new transfer the request, the accounts and the way stay for the next one
+    // (while something is left to pay on the request), with what is now left on the request as the amount.
+    Object.assign(form, old ? blank() : { amount: '', rate: '', fee: '', tracking: '', description: '' })
+    await Promise.all([load(), loadRequests()])
+    if (!old && chosenRequest.value) form.amount = amountText(available.value)
   } finally {
     saving.value = false
   }
@@ -170,14 +216,21 @@ function startEdit(x: Transfer) {
   voucherOf.value = ''
   editing.value = x
   Object.assign(form, {
-    date: x.date, sourceId: x.sourceAccountId, destinationId: x.destinationAccountId, method: x.method, channel: x.channel ?? '', amount: amountText(x.amount),
-    rate: amountText(x.rateToRial), tracking: x.trackingNumber ?? '', description: x.description ?? '' })
+    date: x.date, requestId: '', sourceId: x.sourceAccountId, destinationId: x.destinationAccountId, method: x.method, channel: x.channel ?? '', amount: amountText(x.amount),
+    rate: amountText(x.rateToRial), fee: amountText(x.fee ?? null), tracking: x.trackingNumber ?? '', description: x.description ?? '' })
+  // Its own request is offered again, also when the transfer paid it in full; the amount stays the transfer's.
+  void loadRequests().then(() => {
+    if (editing.value?.id !== x.id || !x.paymentRequestId || !requests.value.some(r => r.id === x.paymentRequestId)) return
+    form.requestId = x.paymentRequestId
+    form.amount = amountText(x.amount)
+  })
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 function cancelEdit() {
   editing.value = null
   message.value = null
   Object.assign(form, blank())
+  void loadRequests()
 }
 
 /** «حذف» of a transfer recorded by mistake, before its voucher is confirmed; it stays in the list marked «حذف شده». */
@@ -193,8 +246,9 @@ async function remove(x: Transfer) {
   if (!r.ok) return void (listError.value = translate(r.code, props.locale))
   if (editing.value?.id === x.id) cancelEdit()
   if (voucherOf.value === x.id) voucherOf.value = ''
-  show('ok', t(`نقل و انتقال شمارهٔ ${num(x.number)} حذف شد و با عبارت «حذف شده» در فهرست مانده است.`, `Transfer no. ${x.number} was deleted; it stays in the list marked as deleted.`))
-  await load()
+  show('ok', t(`نقل و انتقال شمارهٔ ${num(x.number)} حذف شد و با عبارت «حذف شده» در فهرست مانده است؛ مبلغ آن به ماندهٔ درخواست وجه برگشت.`,
+    `Transfer no. ${x.number} was deleted; it stays in the list marked as deleted, and its amount is to be paid on the request again.`))
+  await Promise.all([load(), loadRequests()])
 }
 
 /** The transfer whose voucher is open under the list for «تایید سند». */
@@ -203,9 +257,9 @@ const voucherOf = ref('')
 onMounted(async () => {
   const [, l] = await Promise.all([L.load(), api.get<TransferLimit[]>('/api/cashflow/transfer-limits')])
   if (l.ok) limits.value = l.value
-  await load()
+  await Promise.all([load(), loadRequests()])
 })
-watch(year, () => void load())
+watch(year, () => { void load(); void loadRequests() })
 </script>
 
 <template>
@@ -220,15 +274,25 @@ watch(year, () => void load())
             <span class="tr-req-note"><span class="tr-req-dot" aria-hidden="true" />{{ t('پر کردن الزامی است', 'must be filled in') }}</span>
           </header>
           <fieldset class="tr-fields">
+            <!-- Owner, 21 Nov 2026 (answer to Q82): every transfer pays an approved payment request; it names the two accounts. -->
+            <label class="wide3">{{ t('درخواست وجه تأییدشده', 'Approved payment request') }}
+              <SearchSelect v-model="form.requestId" :options="requestChoices" required :aria-label="t('درخواست وجه تأییدشده', 'Approved payment request')"
+                            :none-text="t('درخواست وجه تأییدشده‌ای برای نقل و انتقال نیست', 'No approved request for a transfer')" />
+            </label>
+            <p v-if="requestsLoaded && !requests.length" class="tr-msg warning wide3">
+              {{ t('برای هر نقل و انتقال ابتدا باید در «درخواست وجه» یک درخواست با نوع پرداخت «نقل و انتقال بین حساب‌های شرکت» ثبت و تایید شود؛ سپس همان درخواست در اینجا انتخاب می‌شود.',
+                "Every transfer first needs a payment request of the kind \"transfer between the company's accounts\", written and approved under Payment requests; that request is then chosen here.") }}
+            </p>
             <label class="req">{{ t('تاریخ انتقال', 'Date') }} <input v-model="form.date" placeholder="1405/08/29" dir="ltr" /></label>
             <label class="wide">{{ t('حساب مبدأ (انتقال دهنده)', 'Source account (the payer)') }}
-              <SearchSelect v-model="form.sourceId" :options="sourceChoices" required :aria-label="t('حساب مبدأ (انتقال دهنده)', 'Source account')"
-                            :none-text="t('حساب بانکی فعالی تعریف نشده است', 'No active bank account')" />
+              <SearchSelect v-model="form.sourceId" :options="sourceChoices" required disabled :aria-label="t('حساب مبدأ (انتقال دهنده)', 'Source account')"
+                            :empty-label="t('— از درخواست وجه —', '— from the request —')" />
             </label>
             <label class="wide">{{ t('حساب مقصد (انتقال گیرنده)', 'Destination account (the receiver)') }}
-              <SearchSelect v-model="form.destinationId" :options="destinationChoices" required :aria-label="t('حساب مقصد (انتقال گیرنده)', 'Destination account')"
-                            :none-text="source ? t('حساب دیگری با همین ارز نیست', 'No other account in this currency') : t('حساب بانکی فعالی تعریف نشده است', 'No active bank account')" />
+              <SearchSelect v-model="form.destinationId" :options="destinationChoices" required disabled :aria-label="t('حساب مقصد (انتقال گیرنده)', 'Destination account')"
+                            :empty-label="t('— از درخواست وجه —', '— from the request —')" />
             </label>
+            <p class="muted small wide3">{{ t('دو حساب از درخواست وجه می‌آیند و در اینجا تغییر نمی‌کنند.', 'The two accounts come from the payment request and are not changed here.') }}</p>
             <p v-if="L.bankAccounts.value.length < 2" class="muted small wide3">
               {{ t('برای نقل و انتقال دست‌کم دو حساب بانکی شرکت لازم است؛ حساب‌ها در «اطلاعات پایه ← حساب‌های بانکی» تعریف می‌شوند.',
                 'A transfer needs at least two bank accounts of the company; they are entered in Basic Information → Bank accounts.') }}
@@ -267,11 +331,18 @@ watch(year, () => void load())
                 : t('دو حساب در دو بانک متفاوت هستند: «پل» برای مبالغ کم و فوری، «پایا» برای مبالغ متوسط، «ساتنا» برای مبالغ بالا.',
                   'The accounts are in two different banks: Pol for small urgent amounts, Paya for middle amounts, Satna for large amounts.') }}
             </p>
-            <label class="req wide">{{ t('مبلغ', 'Amount') }} ({{ currency }}) <AmountInput v-model="form.amount" :decimals="currency === 'IRR' ? 0 : 2" :unit="unit" /></label>
+            <label class="req wide">{{ t('مبلغ', 'Amount') }} ({{ currency }}) <AmountInput v-model="form.amount" :decimals="currency === 'IRR' ? 0 : 2" :unit="unit" />
+              <small v-if="available !== null" class="muted">{{ t(`ماندهٔ درخواست وجه: ${money(available)} – مبلغ می‌تواند کمتر باشد، ولی بیشتر نه.`,
+                `Left on the request: ${money(available)} – the amount may be less, never more.`) }}</small>
+            </label>
             <template v-if="currency !== 'IRR'">
               <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="form.rate" :decimals="4" unit="ریال" /></label>
               <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="amountRial ? money(amountRial) : ''" readonly /></label>
             </template>
+            <!-- Owner, 21 Nov 2026 (answer to Q77): the bank's fee is debited to «هزینه کارمزد خدمات بانکی» in the same voucher. -->
+            <label class="wide">{{ t('کارمزد بانک (ریال)', "Bank's fee (Rial)") }} <AmountInput v-model="form.fee" :decimals="0" unit="ریال" />
+              <small class="muted">{{ t('اختیاری؛ در همین سند به حساب «هزینه کارمزد خدمات بانکی» بدهکار می‌شود.', 'Optional; debited to the bank-fee account in the same voucher.') }}</small>
+            </label>
             <label>{{ t('شماره پیگیری', 'Tracking no.') }} <input v-model="form.tracking" dir="ltr" :placeholder="t('اختیاری', 'Optional')" /></label>
             <label class="wide3">{{ t('شرح', 'Description') }} <input v-model="form.description" maxlength="500" :placeholder="t('اختیاری', 'Optional')" /></label>
           </fieldset>
@@ -296,11 +367,13 @@ watch(year, () => void load())
         <div class="tr-card tr-summary">
           <h3>{{ t('خلاصهٔ نقل و انتقال', 'Summary') }}</h3>
           <dl>
+            <div><dt>{{ t('درخواست وجه', 'Payment request') }}</dt><dd class="num">{{ chosenRequest ? num(chosenRequest.number) : '—' }}</dd></div>
             <div><dt>{{ t('از حساب (انتقال دهنده)', 'From') }}</dt><dd>{{ source ? L.accountTitle(source) : '—' }}</dd></div>
             <div><dt>{{ t('به حساب (انتقال گیرنده)', 'To') }}</dt><dd>{{ destination ? L.accountTitle(destination) : '—' }}</dd></div>
             <div><dt>{{ t('روش', 'Way') }}</dt><dd>{{ form.method ? methodName(form.method, locale) : '—' }}</dd></div>
             <div><dt>{{ t('نحوهٔ دستور', 'Order') }}</dt><dd>{{ form.channel ? channelName(form.channel, locale) : '—' }}</dd></div>
             <div><dt>{{ t('تاریخ', 'Date') }}</dt><dd class="num" dir="ltr">{{ form.date || '—' }}</dd></div>
+            <div v-if="parseAmount(form.fee)"><dt>{{ t('کارمزد بانک', "Bank's fee") }}</dt><dd class="num">{{ money(parseAmount(form.fee)!) }}</dd></div>
           </dl>
           <div class="tr-total">
             <span>{{ t('مبلغ (ریال)', 'Amount (Rial)') }}</span>
@@ -334,11 +407,12 @@ watch(year, () => void load())
           </thead>
           <tbody>
             <tr v-for="x in shown" :key="x.id" :class="{ deleted: x.state === 'Deleted', selected: editing?.id === x.id || voucherOf === x.id }">
-              <td class="num">{{ num(x.number) }}</td>
+              <td class="num">{{ num(x.number) }}<span v-if="x.paymentRequestNumber" class="muted small tr-nowrap">{{ t('درخواست', 'request') }} {{ num(x.paymentRequestNumber) }}</span></td>
               <td class="num">{{ x.date }}</td>
               <td class="tr-nowrap" :title="`${methodName(x.method, locale)} – ${channelName(x.channel, locale)}`">{{ methodShortName(x.method, locale) }}<span class="muted small">{{ channelShortName(x.channel, locale) }}</span></td>
               <td><dl class="tr-accounts"><dt>{{ t('از', 'from') }}</dt><dd>{{ from(x) }}</dd><dt>{{ t('به', 'to') }}</dt><dd>{{ to(x) }}</dd></dl></td>
-              <td class="num">{{ money(x.amount) }} <span v-if="x.currency !== 'IRR'">{{ x.currency }}</span></td>
+              <td class="num">{{ money(x.amount) }} <span v-if="x.currency !== 'IRR'">{{ x.currency }}</span>
+                <span v-if="x.fee" class="muted small tr-nowrap">{{ t('کارمزد', 'fee') }} {{ money(x.fee) }}</span></td>
               <td><span class="num" dir="ltr">{{ x.trackingNumber }}</span><span v-if="x.description" class="muted small">{{ x.description }}</span></td>
               <td class="tr-nowrap">
                 <span v-if="x.state === 'Deleted'" class="tr-deleted">{{ t('حذف شده', 'Deleted') }}</span>
@@ -358,7 +432,7 @@ watch(year, () => void load())
           </tbody>
         </table>
       </div>
-      <TransferVoucher v-if="voucherOf" :key="voucherOf" :transfer-id="voucherOf" :step="0" :api-base="apiBase" :locale="locale" :token="token"
+      <TransferVoucher v-if="voucherOf" :key="voucherOf" :transfer-id="voucherOf" :steps="[0]" :api-base="apiBase" :locale="locale" :token="token"
                        :account-name="L.accountName" @confirmed="load" @close="voucherOf = ''" />
     </section>
   </div>
