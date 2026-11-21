@@ -180,6 +180,7 @@ Your users have used the Access system for many years and are fast with it. The 
 - **One search pattern everywhere**, with saved filters and export to Excel/PDF.
 - **Visual cheque-layout designer** (drag fields over a scanned cheque image) replacing the current coordinate tables.
 - **Dashboard** with bank and cash balances and liquidity forecast.
+- **Phones and tablets** *(added 19 Nov 2026, ADR 0006)*: the same web application adapts to the screen and can be installed on the home screen; approving payment requests, the task inbox, the dashboard and look-ups are designed for the phone first.
 - Usability testing with 5–6 real users from your clients at the end of each phase.
 
 ### 6.3 Framework decision: Next.js 16 or Nuxt 4
@@ -264,7 +265,7 @@ For Iran Nazho Co. the old program's `Coyearinfo` table lists **24 fiscal years 
 - **Containers everywhere** (Docker images, built once and promoted from test to production).
 - **Kubernetes** for central / multi-client hosting; **k3s** or **Docker Compose** for small clients that run on a single server on-premises. Same images in both cases.
 - **API gateway** (Apache APISIX or YARP) as the single entry point: TLS, routing, rate limiting, token validation.
-- **Multi-tenancy:** one database per client company (strong isolation of financial data), shared application services, tenant resolved from the user's token.
+- **Multi-tenancy:** one database per client company (strong isolation of financial data), shared application services, tenant resolved from the user's token. *Extended on 19 Nov 2026 (ADR 0005):* a client may be a group (holding) of several companies, each with its own database; a user may work in several companies of the group and chooses the company at login; users with the right get combined reports across the group; each company has its own name, logo, users and administrator; the same software runs as a central hosted service and on a client's own server.
 - **Branches and remote users** connect over HTTPS only; no direct database or service access from user machines. Optional read replicas for branches with slow links.
 - **Resilience:** retries with back-off and circuit breakers (Polly), health checks, horizontal scaling of busy services, message broker buffers peaks.
 

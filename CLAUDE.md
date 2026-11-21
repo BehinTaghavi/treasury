@@ -18,6 +18,8 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 - .NET 10, Clean Architecture, DDD. One folder per service under `src/Services/<Service>/` with `Domain`, `Application`, `Infrastructure`, `Api` projects. Dependencies point inward only — `tests/Treasury.ArchitectureTests` enforces it.
 - PostgreSQL 17, one database per client company, **one schema per service**, transactional tables **LIST-partitioned by fiscal year** (`db/postgres`).
 - Frontend: Nuxt 4 shell (host) + Vue micro-frontends loaded with Module Federation 2.0 at run time, client-side rendering only (`frontend/`).
+- **Multi-tenancy (ADR 0005, owner 19 Nov 2026; not built yet):** a company is the tenant with its own database — never add a `company_id` column or let one command touch two companies. A client may be a group of companies; users may work in several. New code must not assume one company per installation beyond the single connection string that exists today.
+- **Phones and tablets (ADR 0006, owner 19 Nov 2026):** one web application for all devices; every new or changed screen must be usable at 360 px and 768 px width, right-to-left.
 - Keycloak for identity; open-source dependencies only. Do not add MediatR ≥13, AutoMapper ≥15, MassTransit ≥9, FluentAssertions ≥8 (commercial licences).
 
 ## Rules for every change
