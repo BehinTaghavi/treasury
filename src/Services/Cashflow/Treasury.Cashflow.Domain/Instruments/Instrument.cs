@@ -58,6 +58,7 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="SayadTracking">Endorsement: tracking number of the transfer in the Sayad system (answer to Q32).</param>
 /// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
 /// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
+/// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -67,7 +68,14 @@ public sealed record StepDetails(
     string? Purpose = null,
     string? SayadTracking = null,
     Guid? ReceiptId = null,
-    Guid? PaymentRequestId = null);
+    Guid? PaymentRequestId = null,
+    string? TrackingCode = null);
+
+/// <summary>
+/// The bank's certificate of non-payment («گواهی عدم پرداخت», the owner's term of 18 Nov 2026 for what was called the bounce notice): its
+/// number, date and tracking code, as entered on the legal-action screen.
+/// </summary>
+public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, string? TrackingCode);
 
 /// <summary>
 /// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
@@ -126,6 +134,10 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// (چک روز). Manual: "چنانچه تاریخ چک دریافتی روز باشد (مساوی تاریخ کامپیوتر یا کوچکتر از آن) … تیک می خورد".
     /// </summary>
     public bool IsPostDated => Direction == InstrumentDirection.Received && DueDate is { } due && due > IssueDate;
+
+    /// <summary>«سررسید چک» (owner, 18 Nov 2026): see <see cref="ReceivedChequeStatus.HasReachedDueDate"/>.</summary>
+    public bool HasReachedDueDate(FiscalDate today) =>
+        Direction == InstrumentDirection.Received && ReceivedChequeStatus.HasReachedDueDate(State, IssueDate, DueDate, today);
 
     /// <summary>Our bank account for issued cheques.</summary>
     public Guid? BankAccountId { get; private set; }
@@ -259,11 +271,12 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// The cheque leaves the cash desk («در جریان وصول نزد صندوق») for one of our bank accounts («در جریان وصول نزد بانک»), owner's
     /// report no. 4, item 9; old form D_Check_Vag_m (account and deposit slip «شماره فیش واگذاری»). The account must be switched on and
-    /// in the cheque's currency.
+    /// in the cheque's currency. Rule N3 (owner, 18 Nov 2026): a cheque is deposited only after «ثبت صیادی».
     /// </summary>
     public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
     {
         ArgumentNullException.ThrowIfNull(account);
+        RequireSayadRegistration();
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -277,7 +290,21 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
+        RequireSayadRegistration();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
+    }
+
+    /// <summary>
+    /// Rule N3 (owner, 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ چک بدون آن به بانک واگذار نمی‌شود"): a cheque still «نزد صندوق» is
+    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m).
+    /// </summary>
+    private void RequireSayadRegistration()
+    {
+        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk)
+        {
+            Require(Kind.IsCollectable(), "Instrument.KindNotAllowedForAction", $"'{InstrumentAction.DepositForCollection}' is not allowed for {Kind}."); // R3
+            throw new DomainException("Instrument.SayadRegistrationRequired", "Register the cheque in Sayad before depositing it at the bank.");
+        }
     }
 
     /// <summary>
@@ -294,17 +321,57 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// (e)). From the bank, or after the bank returned the cheque (answer to Q33). Rule N2 also applies (answer to Q11): not before the due
     /// date. The step's date is the notice's date.
     /// </summary>
-    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber)
+    /// <param name="trackingCode">The tracking code of the certificate of non-payment (گواهی عدم پرداخت), when typed (owner, 18 Nov 2026).</param>
+    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber, string? trackingCode = null)
     {
         var fromBank = State == InstrumentState.DepositedForCollection;
+        var code = Clean(trackingCode);
         Apply(InstrumentAction.RecordBounced, date, userId, Clean(noticeNumber), reason,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
                 Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
             },
-            details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
+            details: fromBank || code is not null ? new StepDetails(AccountId: fromBank ? CollectionAccountId : null, TrackingCode: code) : null);
     }
+
+    /// <summary>
+    /// «ثبت صیادی شد» (owner, 18 Nov 2026): the cheque in the cash desk is registered in the banks' Sayad system. The tracking number of
+    /// the registration may be recorded. The cheque stays in the cash desk.
+    /// </summary>
+    public void RegisterSayad(FiscalDate date, string userId, string? trackingNumber = null, string? note = null) =>
+        Apply(InstrumentAction.RegisterSayad, date, userId, Clean(trackingNumber), Clean(note),
+            details: Clean(trackingNumber) is { } tracking ? new StepDetails(SayadTracking: tracking) : null);
+
+    /// <summary>
+    /// «اقدام حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal
+    /// action and collection; rarely the action is taken on a cheque still in the cash desk (answer to Q38). Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
+    /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
+    /// </summary>
+    /// <param name="certificate">The certificate of non-payment (گواهی عدم پرداخت): number, date and tracking code. Required for a bounced
+    /// ordinary cheque or note (owner, 18 Nov 2026); a guarantee item, or a cheque taken to law from the cash desk, may have none.</param>
+    public void SendToLegal(FiscalDate date, string userId, string? description, NonPaymentCertificate? certificate = null)
+    {
+        var (number, issued, code) = (Clean(certificate?.Number), certificate?.Date, Clean(certificate?.TrackingCode));
+        Apply(InstrumentAction.SendToLegal, date, userId, number, Clean(description),
+            validate: () =>
+            {
+                Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action.");
+                Require(State != InstrumentState.Bounced || Kind.IsGuarantee() || (number is not null && issued is not null && code is not null),
+                    "Instrument.NonPaymentCertificateRequired", "Enter the number, date and tracking code of the certificate of non-payment.");
+            },
+            details: issued is null && code is null ? null : new StepDetails(DocumentDate: issued, TrackingCode: code));
+    }
+
+    /// <summary>
+    /// The cheque or note in legal action became collectable, during the action or at its end: it is handed back to the cash desk, at the
+    /// start of the cycle («نزد صندوق»), and goes on like a new cheque (owner's answer to Q38 (2), 18 Nov 2026).
+    /// </summary>
+    public void ReturnFromLegal(FiscalDate date, string userId, string? note = null) =>
+        Apply(InstrumentAction.ReturnFromLegal, date, userId, null, Clean(note), () => Destination = null);
+
+    /// <summary>The step (1 = received) that put the cheque in legal action, while it is there; scans are attached to it.</summary>
+    public int? LegalActionStep => State == InstrumentState.InLegal ? _history.FindLastIndex(h => h.Action == InstrumentAction.SendToLegal) + 1 : null;
 
     /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
     public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>
@@ -343,8 +410,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// The receiver of an endorsed cheque brings it back bounced, with the bank's bounce notice (owner's item 14 (h)). The cheque becomes
     /// «برگشت شده» again in the company's hands; rule N2 applies.
     /// </summary>
-    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null) =>
+    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null, string? trackingCode = null) =>
         Apply(InstrumentAction.RecordEndorsementReturned, date, userId, Clean(noticeNumber), reason,
+            details: Clean(trackingCode) is { } code ? new StepDetails(TrackingCode: code) : null,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");

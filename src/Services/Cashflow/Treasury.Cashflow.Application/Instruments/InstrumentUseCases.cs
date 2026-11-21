@@ -36,7 +36,8 @@ public sealed record ChangeInstrumentStateCommand(
     string? Destination = null,
     string? Note = null,
     string? Reference = null,
-    string? DocumentDate = null);
+    string? DocumentDate = null,
+    string? TrackingCode = null);
 
 
 public sealed record IssueChequeCommand(
@@ -61,10 +62,11 @@ public sealed record InstrumentHistoryView(string Action, string? From, string T
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
     Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
-    Guid? PaymentRequestId = null)
+    Guid? PaymentRequestId = null, string? TrackingCode = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId,
+            d.TrackingCode);
 }
 
 public sealed record InstrumentView(
@@ -91,9 +93,11 @@ public sealed record InstrumentView(
     bool IsPostDated = false,
     ReceivedInstrumentDetails? Details = null,
     Guid? CollectionAccountId = null,
-    string? CounterpartyDetailCode = null)
+    string? CounterpartyDetailCode = null,
+    bool ReachedDueDate = false)
 {
-    public static InstrumentView From(Instrument i) => new(
+    /// <param name="today">Today's date, to mark «سررسید چک» (owner, 18 Nov 2026); without it the mark stays off.</param>
+    public static InstrumentView From(Instrument i, FiscalDate? today = null) => new(
         i.Id,
         i.Direction.ToString(),
         i.Kind.ToString(),
@@ -118,7 +122,8 @@ public sealed record InstrumentView(
         i.IsPostDated,
         i.Direction == InstrumentDirection.Received ? i.Details : null,
         i.CollectionAccountId,
-        i.Counterparty.DetailCode);
+        i.Counterparty.DetailCode,
+        today is { } t && i.HasReachedDueDate(t));
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -133,7 +138,8 @@ public sealed class InstrumentUseCases(
     IBankBalanceQuery bankBalances,
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser,
-    IBankAccountLookup bankAccountLookup)
+    IBankAccountLookup bankAccountLookup,
+    TimeProvider? clock = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -189,13 +195,27 @@ public sealed class InstrumentUseCases(
                     instrument.RecordCleared(date, user, command.Reference);
                     break;
                 case InstrumentAction.RecordBounced:
-                    instrument.RecordBounced(date, user, command.Note, command.Reference);
+                    instrument.RecordBounced(date, user, command.Note, command.Reference, command.TrackingCode);
                     break;
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);
                     break;
                 case InstrumentAction.ReturnFromBank:
                     instrument.ReturnFromBank(date, user, command.Note);
+                    break;
+                case InstrumentAction.RegisterSayad:
+                    // Owner, 18 Nov 2026: «ثبت صیادی شد»; the reference is the tracking number of the registration, when typed.
+                    instrument.RegisterSayad(date, user, command.Reference, command.Note);
+                    break;
+                case InstrumentAction.SendToLegal:
+                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action, the
+                    // reference, document date and tracking code are those of the certificate of non-payment (گواهی عدم پرداخت).
+                    instrument.SendToLegal(date, user, command.Note, new NonPaymentCertificate(
+                        command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate), command.TrackingCode));
+                    break;
+                case InstrumentAction.ReturnFromLegal:
+                    // Owner's answer to Q38 (2): the cheque became collectable and goes back to the cash desk.
+                    instrument.ReturnFromLegal(date, user, command.Note);
                     break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
@@ -332,13 +352,13 @@ public sealed class InstrumentUseCases(
     /// <summary>Received cheques in a state, by due date: in the cash desk (to deposit) or at the bank (to record collected or bounced).</summary>
     public Task<IReadOnlyList<InstrumentView>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<InstrumentView>>(async ct =>
-            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(InstrumentView.From).ToList(), cancellationToken);
+            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(i => InstrumentView.From(i, IranClock.Today(clock))).ToList(), cancellationToken);
 
     public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>
         {
             var instrument = await instruments.GetAsync(id, ct).ConfigureAwait(false);
-            return instrument is null ? null : InstrumentView.From(instrument);
+            return instrument is null ? null : InstrumentView.From(instrument, IranClock.Today(clock));
         }, cancellationToken);
 
     private async Task EnsureOpenAsync(FiscalDate date, CancellationToken ct)

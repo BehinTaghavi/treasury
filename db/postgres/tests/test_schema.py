@@ -528,7 +528,8 @@ def test_receipts_are_partitioned_numbered_once_per_kind_and_read_only_in_a_clos
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -571,7 +572,8 @@ def test_payment_requests_have_their_own_schema_numbers_and_closed_years(db):
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -643,7 +645,8 @@ def test_a_voucher_is_confirmed_once_per_receipt_or_cheque_step_and_read_only_in
     finally:
         with psycopg.connect(db, autocommit=True) as c:
             c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
-            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
 
 
@@ -665,6 +668,113 @@ def test_received_cheques_can_come_back_from_the_bank_be_replaced_or_cancelled_a
         c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('BadDebts', '8101') ON CONFLICT DO NOTHING")
         assert c.execute("SELECT column_name FROM information_schema.columns WHERE table_schema = 'cashflow' AND table_name = 'receipt' "
                          "AND column_name = 'replaced_instrument_id'").fetchone() is not None
+        c.rollback()
+
+
+def test_received_cheques_can_be_registered_in_sayad_and_handed_to_the_lawyer(db):
+    # 033_cashflow_cheque_status.sql (owner, 18 Nov 2026: the latest status of a received cheque).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405)
+        for state in ("SayadRegistered", "DepositedForCollection", "Bounced", "InLegal", "Replaced"):
+            c.execute("UPDATE cashflow.instrument SET state = %s WHERE id = %s", (state, iid))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE cashflow.instrument SET state = 'WithLawyer' WHERE id = %s", (iid,))
+        index = c.execute("SELECT indexdef FROM pg_indexes WHERE schemaname = 'cashflow' AND indexname = 'instrument_due'").fetchone()
+        assert index is not None and "SayadRegistered" in index[0]
+        c.rollback()
+
+
+def test_scans_of_a_legal_action_are_kept_with_the_cheque(db):
+    # 034_cashflow_legal_action_files.sql (owner, 18 Nov 2026: the screen «اقدام حقوقی» keeps the scans of the action's papers).
+    add = """INSERT INTO cashflow.instrument_file (fiscal_year, file_id, instrument_id, step, file_name, content_type, size, uploaded_by, uploaded_at, content)
+             VALUES (%s, %s, %s, 4, 'a.pdf', %s, %s, 'treasurer', now(), %s)"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid, fid = uuid.uuid4(), uuid.uuid4()
+        c.execute(add, (1405, fid, iid, "application/pdf", 4, b"%PDF"))
+        assert c.execute("SELECT tableoid::regclass::text FROM cashflow.instrument_file WHERE file_id = %s", (fid,)).fetchone()[0] == "cashflow.instrument_file_fy1405"
+        for row in ((1405, uuid.uuid4(), iid, "text/html", 4, b"%PDF"),       # only PDF, JPEG or PNG
+                    (1405, uuid.uuid4(), iid, "application/pdf", 5, b"%PDF"),  # the size is the content's size
+                    (1405, uuid.uuid4(), iid, "application/pdf", 0, b"")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, row)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # a scan is added or removed, never changed
+            with c.transaction():
+                c.execute("UPDATE cashflow.instrument_file SET file_name = 'b.pdf'")
+        c.execute("DELETE FROM cashflow.instrument_file WHERE file_id = %s", (fid,))
+        c.execute(add, (1404, uuid.uuid4(), iid, "application/pdf", 4, b"%PDF"))
+        c.commit()
+
+    with psycopg.connect(db, autocommit=True) as c:
+        c.execute("SELECT cashflow.close_fiscal_year(1404)")
+    try:
+        with psycopg.connect(db) as c:
+            c.execute("SET ROLE cashflow_svc")
+            with pytest.raises(psycopg.errors.RaiseException):  # a closed year takes no new scan
+                c.execute(add, (1404, uuid.uuid4(), uuid.uuid4(), "application/pdf", 4, b"%PDF"))
+    finally:
+        with psycopg.connect(db, autocommit=True) as c:
+            c.execute("UPDATE cashflow.fiscal_period SET status = 'Open' WHERE fiscal_year = 1404")
+            for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404",
+                      "requests.payment_request_fy1404", "requests.request_file_fy1404"):
+                c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
+            c.execute("DELETE FROM cashflow.instrument_file WHERE fiscal_year = 1404")
+
+
+def test_the_voucher_template_has_the_account_of_cheques_in_legal_action(db):
+    # 035_cashflow_legal_action_voucher.sql (owner's answer to Q38, 18 Nov 2026: «اسناد واخواست شده حقوقی شده»).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('ProtestedChequesInLegal', '1204') ON CONFLICT DO NOTHING")
+        # Guarantee cheques and notes in legal action (answer to Q42): «اسناد تضمینی حقوقی شده به نفع شرکت».
+        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('GuaranteeChequesInLegal', '9102') ON CONFLICT DO NOTHING")
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('LegalCheques', '1')")
+        c.rollback()
+
+
+def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
+    # 036_cashflow_deposit_kinds.sql (owner, 18 Nov 2026: the kinds of a direct deposit into a bank account).
+    add = """INSERT INTO cashflow.receipt (fiscal_year, id, kind, number, receipt_date, payer_id, payer_name, payer_detail_code, purpose_group_id, purpose_group_name,
+                 purpose, recorded_by, account_kind, account_id, deposit_method, amount, currency, total_rial, state, payer_sheba)
+             VALUES (1405, %s, 'BankDeposit', %s, '2026-11-18', %s, 'payer', '200015', %s, 'sales', 'sales', 'clerk', 'BankAccount', %s, %s, 1000, 'IRR', 1000, 'Recorded', %s)"""
+    row = lambda n, method, sheba: (uuid.uuid4(), n, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), method, sheba)
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        for n, (method, sheba) in enumerate([("Paya", "IR062960000000100324200001"), ("Satna", "IR062960000000100324200001"), ("InternalTransfer", None),
+                                             ("PaymentGateway", None), ("CardToCard", None), ("DepositSlip", None), ("Transfer", None), ("Pos", None)]):
+            c.execute(add, row(9000 + n, method, sheba))
+        for method, sheba in (("Paya", None),                                  # a Paya transfer needs its Sheba
+                              ("DepositSlip", "IR062960000000100324200001"),   # other kinds carry none
+                              ("Satna", "IR06-2960"),                          # IR and 24 digits
+                              ("Cheque", None)):                               # an unknown kind
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, row(9100, method, sheba))
+        c.rollback()
+
+
+def test_the_company_profile_is_one_row(db):
+    # 037_reference_company_profile.sql (owner, 18 Nov 2026: «مشخصات شرکت»; the city and postal code are the legal address's).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        c.execute("INSERT INTO reference.company_profile (name, legal_address, city_id, postal_code) VALUES ('sample', 'legal', %s, '1234567890')", (uuid.uuid4(),))
+        with pytest.raises(psycopg.errors.UniqueViolation):   # one profile per client database
+            with c.transaction():
+                c.execute("INSERT INTO reference.company_profile (name, city_id) VALUES ('second', %s)", (uuid.uuid4(),))
+        for name, postal in ((" ", None), ("sample", "123")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute("UPDATE reference.company_profile SET name = %s, postal_code = %s", (name, postal))
+        c.execute("RESET ROLE")
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the table
+            with c.transaction():
+                c.execute("SELECT * FROM reference.company_profile")
         c.rollback()
 
 
