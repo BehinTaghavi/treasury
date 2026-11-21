@@ -73,7 +73,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         "beneficiary_id, beneficiary_detail_code, beneficiary_name, purpose_group_id, purpose_group_name, purpose, reference1, reference2, " +
         "amount, currency, method, priority, transfer_account, card_number, pay_from_kind, pay_from_id, due_date, department_id, " +
         "has_main_beneficiaries, attachments, note, state, approved_by, approved_at, cancel_reason, version, payments, " +
-        "cheque_id, cheque_number, cheque_due_date, cheque_payer, cheque_bank, cheque_sayad_id";
+        "cheque_id, cheque_number, cheque_due_date, cheque_payer, cheque_bank, cheque_sayad_id, transfer_to_account_id";
 
     public async Task<PaymentRequest?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -100,7 +100,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             $"INSERT INTO requests.payment_request ({Columns}) VALUES (@year, @id, @number, @by, @date, @requester, @requester_name, @requester_dept, @cost_center, " +
             "@beneficiary, @beneficiary_code, @beneficiary_name, @group, @group_name, @purpose, @ref1, @ref2, @amount, @currency, @method, @priority, " +
             "@transfer, @card, @from_kind, @from_id, @due, @department, @main, @attachments, @note, @state, @approved_by, @approved_at, @cancel_reason, 1, @payments, " +
-            "@cheque_id, @cheque_number, @cheque_due, @cheque_payer, @cheque_bank, @cheque_sayad)"))
+            "@cheque_id, @cheque_number, @cheque_due, @cheque_payer, @cheque_bank, @cheque_sayad, @transfer_to)"))
         {
             cmd.Parameters.AddWithValue("number", request.Number);
             cmd.Parameters.AddWithValue("by", request.RecordedBy);
@@ -124,7 +124,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             "card_number = @card, pay_from_kind = @from_kind, pay_from_id = @from_id, due_date = @due, department_id = @department, " +
             "has_main_beneficiaries = @main, attachments = @attachments, note = @note, state = @state, approved_by = @approved_by, approved_at = @approved_at, " +
             "cancel_reason = @cancel_reason, payments = @payments, cheque_id = @cheque_id, cheque_number = @cheque_number, cheque_due_date = @cheque_due, " +
-            "cheque_payer = @cheque_payer, cheque_bank = @cheque_bank, cheque_sayad_id = @cheque_sayad, " +
+            "cheque_payer = @cheque_payer, cheque_bank = @cheque_bank, cheque_sayad_id = @cheque_sayad, transfer_to_account_id = @transfer_to, " +
             "version = version + 1, updated_at = now() WHERE fiscal_year = @year AND id = @id AND version = @expected"))
         {
             Bind(cmd, request);
@@ -272,6 +272,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         cmd.Parameters.Add(new NpgsqlParameter("cheque_payer", NpgsqlDbType.Text) { Value = Db(d.Cheque?.PayerName) });
         cmd.Parameters.Add(new NpgsqlParameter("cheque_bank", NpgsqlDbType.Text) { Value = Db(d.Cheque?.BankName) });
         cmd.Parameters.Add(new NpgsqlParameter("cheque_sayad", NpgsqlDbType.Text) { Value = Db(d.Cheque?.SayadId) });
+        cmd.Parameters.Add(new NpgsqlParameter("transfer_to", NpgsqlDbType.Uuid) { Value = Db(d.TransferToAccountId) });
         cmd.Parameters.Add(new NpgsqlParameter("payments", NpgsqlDbType.Jsonb)
         {
             Value = System.Text.Json.JsonSerializer.Serialize(
@@ -328,7 +329,8 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
                         .Select(p => new RequestPayment(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, new FiscalDate(p.Date), p.UserId)).ToList(),
                 Cheque: Id(36) is { } chequeId
                     ? new TransferCheque(chequeId, r.GetString(37), r.IsDBNull(38) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(38)), r.GetString(39), Text(40), Text(41))
-                    : null);
+                    : null,
+                TransferToAccountId: Id(42));
             list.Add(PaymentRequest.Restore(r.GetGuid(1), r.GetInt32(2), r.GetInt32(0), r.GetString(3), data, r.GetInt64(34)));
         }
 

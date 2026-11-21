@@ -27,6 +27,8 @@ public static class PostgresRegistration
         services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IInstrumentAttachmentRepository, PostgresInstrumentAttachmentRepository>();
+        services.AddSingleton<IBankTransferRepository, PostgresBankTransferRepository>();
+        services.AddSingleton<ITransferLimitRepository, PostgresTransferLimitRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -431,13 +433,14 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         }
 
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT receipt_id, state, issue_date, due_date FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
+            "SELECT receipt_id, state, issue_date, due_date, id, number, kind FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
         cmd.Parameters.Add(new NpgsqlParameter("receipts", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = receiptIds.ToArray() });
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             list.Add(new ReceiptChequeStatus(r.GetGuid(0), Enum.Parse<InstrumentState>(r.GetString(1)), new FiscalDate(r.GetFieldValue<DateOnly>(2)),
-                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3))));
+                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3)),
+                r.GetGuid(4), await r.IsDBNullAsync(5, cancellationToken).ConfigureAwait(false) ? null : r.GetString(5), Enum.Parse<InstrumentKind>(r.GetString(6))));
         }
 
         return list;
@@ -607,6 +610,26 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
             cmd.Parameters.AddWithValue("use", use.ToString());
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             loaded.Add(sheet);
+        }
+
+        // A sheet that was issued and is now void (the cheque of a transfer cancelled before its Sayad registration, owner's answer to
+        // Q79): until 21 Nov 2026 only new sheets were written, so voiding an issued sheet was lost here.
+        foreach (var (sheet, _) in book.UsedSheets.Where(kv => kv.Value == SheetUse.Voided && loaded.Contains(kv.Key)))
+        {
+            await using var cmd = tx.Command("UPDATE cashflow.cheque_sheet SET sheet_use = 'Voided' WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use <> 'Voided'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        // A sheet freed by ChequeBook.Release (the cheque of a transfer deleted before its voucher was confirmed, schema 046).
+        foreach (var sheet in loaded.Where(sheet => !book.UsedSheets.ContainsKey(sheet)).ToList())
+        {
+            await using var cmd = tx.Command("DELETE FROM cashflow.cheque_sheet WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use = 'Issued'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            loaded.Remove(sheet);
         }
 
         tx.LoadedSheets[book.Id] = loaded;

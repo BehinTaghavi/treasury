@@ -123,6 +123,30 @@ public sealed class ReceiptPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_deposit_onto_a_bank_card_round_trips_with_its_card_and_its_own_numbers()
+    {
+        // db/postgres/045_cashflow_card_deposits.sql and the lists of 033: «واریز به کارت بانک» (owner's report no. 6, item 12).
+        var holder = Guid.NewGuid();
+        var company = Guid.NewGuid();
+        var first = await _receipts.RecordCardDepositAsync(new(Key(), Header(), ReceiptAccountKind.PettyCashCard, holder, DepositMethod.CardToCard, "T-9", 2_500_000), CancellationToken.None);
+        Assert.True(first.IsSuccess, first.ErrorCode);
+        var second = await _receipts.RecordCardDepositAsync(new(Key(), Header(), ReceiptAccountKind.CompanyCard, company, DepositMethod.DepositSlip, "F-3", 900_000), CancellationToken.None);
+        Assert.True(second.IsSuccess, second.ErrorCode);
+        var v = (await _receipts.GetAsync(first.Value, CancellationToken.None))!;
+        Assert.Equal(("CardDeposit", "PettyCashCard", holder, "CardToCard", "T-9", 2_500_000m, "IRR", 2_500_000m),
+            (v.Kind, v.AccountKind, v.AccountId!.Value, v.Method, v.TrackingNumber, v.Amount!.Value, v.Currency, v.TotalRial));
+        var w = (await _receipts.GetAsync(second.Value, CancellationToken.None))!;
+        Assert.Equal(("CompanyCard", company, "DepositSlip", v.Number + 1), (w.AccountKind, w.AccountId!.Value, w.Method, w.Number));
+
+        // Corrected under its number, onto the other card.
+        Assert.True((await _receipts.CorrectCardDepositAsync(
+            new(Key(), first.Value, v.Version, Header(), ReceiptAccountKind.CompanyCard, company, DepositMethod.PaymentGateway, null, 3_000_000), CancellationToken.None)).IsSuccess);
+        var after = (await _receipts.GetAsync(first.Value, CancellationToken.None))!;
+        Assert.Equal((v.Number, "CompanyCard", "PaymentGateway", (string?)null, 3_000_000m), (after.Number, after.AccountKind, after.Method, after.TrackingNumber, after.TotalRial));
+        Assert.Contains(await _receipts.ListAsync(1405, ReceiptKind.CardDeposit, CancellationToken.None), r => r.Id == second.Value);
+    }
+
+    [Fact]
     public async Task Cheques_and_notes_are_saved_with_their_receipt_and_details()
     {
         var number = Guid.NewGuid().ToString("N")[..8];
@@ -336,6 +360,10 @@ public sealed class ReceiptPostgresTests : IDisposable
         var row = (await _receipts.ListAsync(1405, ReceiptKind.Instruments, CancellationToken.None)).Single(x => x.Id == r.Value);
         Assert.Equal(["InLegal", "SayadRegistered"], row.ChequeStatuses!.Select(s => s.State).Order());
 
+        // Owner's report no. 6, items 14 and 20: each status names its cheque, for the cheque-number column and the cheque card.
+        Assert.Equal([(second, "B" + number, "OrdinaryCheque", "InLegal"), (first, number, "OrdinaryCheque", "SayadRegistered")],
+            row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.Id, s.Number!, s.Kind!, s.State)));
+
         // Both due dates are in the past by now: the cheque still in the cash desk is marked «سررسید چک», the one with the lawyer is not.
         Assert.Equal([("InLegal", false), ("SayadRegistered", true)], row.ChequeStatuses!.OrderBy(s => s.State).Select(s => (s.State, s.ReachedDueDate)));
     }
@@ -364,6 +392,9 @@ public sealed class ReceiptPostgresTests : IDisposable
 
         public Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult<ReceiptAccountFact?>(new(ReceiptAccountKind.BankAccount, id, "0101", id == Dollar ? "USD" : "IRR", true));
+
+        public Task<ReceiptAccountFact?> CardAsync(ReceiptAccountKind kind, Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult<ReceiptAccountFact?>(new(kind, id, "کارت", "IRR", true, "1104", "700002"));
     }
 
     private sealed class BankAccounts : IBankAccountLookup
@@ -389,6 +420,10 @@ public sealed class ReceiptPostgresTests : IDisposable
         public Task<string?> BankNameAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<string?>("بانک ملت");
 
         public Task<string?> CompanyCityAsync(CancellationToken cancellationToken) => Task.FromResult<string?>("تهران");
+
+
+        public Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) =>
+            Task.FromResult<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?>(null);
 
         public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
             Task.FromResult<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?>(new(code, "حساب " + code, true, true));

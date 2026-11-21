@@ -85,3 +85,53 @@ export function receiptNumber(text: string): number | null {
   if (!digits) return null
   return /^\d+$/.test(digits) ? Number(digits) : Number.NaN
 }
+
+/**
+ * The digits of a Sheba number as typed or pasted: «IR», spaces and dashes are dropped, Persian digits are read, at most 24 digits are
+ * kept. «IR» is fixed in front of every Sheba box (owner's report no. 6, item 16), so only the digits are typed.
+ */
+export function shebaDigits(text: string | null | undefined): string {
+  return toLatinDigits(text ?? '').replace(/^\s*ir/i, '').replace(/\D/g, '').slice(0, 24)
+}
+
+/** The 24 digits as banks print them after «IR»: "06 2960 0000 0010 0324 2000 01". */
+export function groupSheba(digits: string): string {
+  const parts = [digits.slice(0, 2)]
+  for (let i = 2; i < digits.length; i += 4) parts.push(digits.slice(i, i + 4))
+  return parts.filter(Boolean).join(' ')
+}
+
+/** The IBAN check of a complete Sheba (the same as the servers'): "IRkk" moved to the end, I = 18 and R = 27, the number mod 97 is 1. */
+export function shebaCheckDigitsFit(digits24: string): boolean {
+  if (!/^\d{24}$/.test(digits24)) return false
+  let remainder = 0
+  for (const c of digits24.slice(2) + '1827' + digits24.slice(0, 2)) remainder = (remainder * 10 + Number(c)) % 97
+  return remainder === 1
+}
+
+/** The check digit of a 16-digit bank card number (Luhn, the same as the servers'). */
+export function cardCheckDigitFits(digits16: string): boolean {
+  if (!/^\d{16}$/.test(digits16)) return false
+  let sum = 0
+  for (let i = 0; i < 16; i++) {
+    let d = Number(digits16[15 - i])
+    if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9 }
+    sum += d
+  }
+  return sum % 10 === 0
+}
+
+/**
+ * What to say under a bank card box while it is typed (owner's report no. 6, item 17): how many of the 16 digits are in, and — once
+ * all 16 are — whether the check digit fits, so a mistyped digit is not mistaken for a wrong length. Null for an empty box.
+ */
+export function cardNumberHint(text: string | null | undefined, locale: Locale = 'fa'): { bad: boolean; text: string } | null {
+  const digits = toLatinDigits(text ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  const fa = locale === 'fa'
+  if (digits.length !== 16) return { bad: true, text: fa ? `${digits.length.toLocaleString('fa-IR')} رقم از ۱۶ رقم` : `${digits.length} of 16 digits` }
+  return cardCheckDigitFits(digits)
+    ? { bad: false, text: fa ? '۱۶ رقم – رقم کنترل درست است' : '16 digits – the check digit fits' }
+    : { bad: true, text: fa ? '۱۶ رقم وارد شده است ولی رقم کنترل کارت جور نیست: یکی از رقم‌ها اشتباه است یا این شماره، کارت واقعی نیست.'
+        : '16 digits are entered but the check digit does not fit: a digit is wrong, or this is not a real card number.' }
+}

@@ -157,9 +157,13 @@ public sealed class VoucherUseCases(
         LedgerSide? side = null;
         if (receipt.AccountId is { } accountId)
         {
-            var fact = receipt.AccountKind == ReceiptAccountKind.CashDesk
-                ? await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false)
-                : await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false);
+            var fact = receipt.AccountKind switch
+            {
+                ReceiptAccountKind.CashDesk => await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false),
+                // «واریز به کارت بانک»: the petty cash's account with its holder's تفصیل, or the company card's own (answers to Q68, Q69).
+                { } kind when kind.IsCard() => await accounts.CardAsync(kind, accountId, ct).ConfigureAwait(false),
+                _ => await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false),
+            };
             side = new LedgerSide(fact?.LedgerAccountCode, fact?.DetailCode);
         }
 

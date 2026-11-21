@@ -11,7 +11,8 @@ namespace Treasury.Cashflow.Infrastructure;
 /// </summary>
 public sealed class HttpBankAccountLookup(HttpClient http) : IBankAccountLookup
 {
-    private sealed record Account(Guid Id, string AccountNumber, bool IsActive, bool? HasCheques, string? CurrencyCode, string? LedgerAccountCode, string? Detail1Code);
+    private sealed record Account(Guid Id, string AccountNumber, bool IsActive, bool? HasCheques, string? CurrencyCode, string? LedgerAccountCode, string? Detail1Code,
+        Guid? BankId = null, string? BranchName = null, string? BranchCode = null);
 
     public async Task<BankAccountFact?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -26,7 +27,8 @@ public sealed class HttpBankAccountLookup(HttpClient http) : IBankAccountLookup
 
             response.EnsureSuccessStatusCode();
             var a = await response.Content.ReadFromJsonAsync<Account>(cancellationToken).ConfigureAwait(false);
-            return a is null ? null : new BankAccountFact(a.Id, a.AccountNumber, a.IsActive, a.HasCheques ?? true, a.CurrencyCode ?? "IRR", a.LedgerAccountCode, a.Detail1Code);
+            return a is null ? null : new BankAccountFact(a.Id, a.AccountNumber, a.IsActive, a.HasCheques ?? true, a.CurrencyCode ?? "IRR", a.LedgerAccountCode, a.Detail1Code,
+                a.BankId, a.BranchName, a.BranchCode);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {

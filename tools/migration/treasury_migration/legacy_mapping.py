@@ -46,7 +46,7 @@ TRANSITIONS = {
     (RECEIVED, "SayadRegistered", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "SayadRegistered", "ReturnToIssuer"): "ReturnedToIssuer",
     (RECEIVED, "SayadRegistered", "Endorse"): "Endorsed",
-    (RECEIVED, "SayadRegistered", "Cancel"): "Cancelled",
+    # Owner's report no. 6, item 19: a cheque registered in Sayad is not cancelled (no SayadRegistered -> Cancel).
     (RECEIVED, "Bounced", "SendToLegal"): "InLegal",
     (RECEIVED, "InLegal", "Cancel"): "Cancelled",
     # Owner, 19 Nov 2026 (answer to Q62): a cheque is replaced only after it was cancelled.

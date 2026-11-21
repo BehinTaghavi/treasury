@@ -289,7 +289,6 @@ legend { font-weight: 600; padding: 0 .25rem; }
 label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 input { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 input.ro { background: #f5f7fa; color: #52606d; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
@@ -314,9 +313,9 @@ button:disabled { opacity: .5; cursor: default; }
 .sayad { grid-column: span 2; display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .sayad-boxes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
 .sayad-boxes input { text-align: center; letter-spacing: .15em; min-width: 0; }
-.req .sayad-boxes input:not(.ro) { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+.req[data-missing] .sayad-boxes input:not(.ro) { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 input:disabled { background: #f5f7fa; color: #7b8794; }
-select { padding: .45rem .5rem; border: 1px solid #d64545; border-radius: 6px; font: inherit; background: #fff; }
+select { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 .kind { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; align-items: center; }
 .kind small { flex-basis: 100%; }
 .choice { flex-direction: row; align-items: center; gap: .4rem; font-size: .9rem; }

@@ -108,6 +108,25 @@ public sealed class VoucherUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task The_voucher_of_a_deposit_onto_a_bank_card_is_shown_and_confirmed_answers_Q68_Q69()
+    {
+        // Owner, 20 Nov 2026: a deposit onto a petty-cash holder's card debits the petty cash's account with the holder's تفصیل (Q68);
+        // one onto a company card without a bank account debits the card's own معین and تفصیل (Q69).
+        var onHolder = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.CardToCard, null, 2_500_000), CancellationToken.None);
+        var v = (await _vouchers.ReceiptVoucherAsync(onHolder.Value, CancellationToken.None))!;
+        Assert.Equal([(true, "1104", "700002", 2_500_000m), (false, "4101", "200015", 2_500_000m)], v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
+        Assert.True((await _vouchers.ConfirmReceiptVoucherAsync(Key(), onHolder.Value, CancellationToken.None)).IsSuccess);
+        Assert.Equal("Receipt.VoucherConfirmed", (await _receipts.CorrectCardDepositAsync(
+            new(Key(), onHolder.Value, 1, Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.CardToCard, null, 1), CancellationToken.None)).ErrorCode);
+
+        var onCompany = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.DepositSlip, "F-2", 900_000), CancellationToken.None);
+        var w = (await _vouchers.ReceiptVoucherAsync(onCompany.Value, CancellationToken.None))!;
+        Assert.Equal([(true, "1105", "600009"), (false, "4101", "200015")], w.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+    }
+
+    [Fact]
     public async Task A_confirmed_voucher_keeps_its_lines_when_the_template_changes()
     {
         await SetTemplate();

@@ -60,3 +60,30 @@ describe('latest status of a received cheque (owner, 18 Nov 2026)', () => {
     expect(groupChequeStatuses(null, 'fa')).toEqual([])
   })
 })
+
+import { instrumentKindName } from './index'
+
+describe('«چک تضمین شده صیاد» (owner\'s report no. 6, item 18)', () => {
+  it('replaces the name «چک رمزدار بانکی»', () => {
+    expect(instrumentKindName('BankCheque', 'fa')).toBe('چک تضمین شده صیاد')
+    expect(instrumentKindName('OrdinaryCheque', 'fa')).toBe('چک')
+  })
+  it('is checked in Sayad where other cheques are registered; every other step keeps its name', () => {
+    expect(chequeActionName('RegisterSayad', 'fa', 'BankCheque')).toBe('کنترل چک در صیاد')
+    expect(chequeStateName('SayadRegistered', 'fa', 'BankCheque')).toBe('کنترل چک در صیاد انجام شد')
+    expect(chequeActionName('RegisterSayad', 'fa', 'OrdinaryCheque')).toBe('ثبت صیادی')
+    expect(chequeStateName('SayadRegistered', 'fa')).toBe('ثبت صیادی شد')
+    expect(chequeActionName('DepositForCollection', 'fa', 'BankCheque')).toBe('واگذاری به بانک')
+    // A note is still named by `true` or by its kind.
+    expect(chequeStateName('Endorsed', 'fa', true)).toBe('خرج شده')
+    expect(chequeStateName('Endorsed', 'fa', 'PromissoryNote')).toBe('خرج شده')
+  })
+  it('groups the cheques of a receipt by the name shown', () => {
+    const groups = groupChequeStatuses([
+      { state: 'SayadRegistered', reachedDueDate: false, kind: 'OrdinaryCheque' },
+      { state: 'SayadRegistered', reachedDueDate: true, kind: 'BankCheque' },
+      { state: 'SayadRegistered', reachedDueDate: false, kind: 'OrdinaryCheque' },
+    ], 'fa')
+    expect(groups.map(g => [g.name, g.count, g.due])).toEqual([['ثبت صیادی شد', 2, 0], ['کنترل چک در صیاد انجام شد', 1, 1]])
+  })
+})

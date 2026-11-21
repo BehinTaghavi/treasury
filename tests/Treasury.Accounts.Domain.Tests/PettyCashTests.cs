@@ -62,7 +62,9 @@ public sealed class PettyCashTests
         Assert.Equal("PettyCash.KeepingRequired", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Cash = false } }, Ledger, Groups)));
         Assert.Equal("PettyCash.KeepingBankIncomplete", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Bank = true, BankAccountName = "حساب جاری" } }, Ledger, Groups)));
         Assert.Equal("PettyCash.KeepingCardIncomplete", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardNumber = "6037991234567893" } }, Ledger, Groups)));
-        Assert.Equal("PettyCash.CardNumberInvalid", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardHolderName = "علی رضایی", CardNumber = "6037991234567890" } }, Ledger, Groups)));
+        // Owner's report no. 6, item 17: a wrong length and a wrong check digit are told apart.
+        Assert.Equal("PettyCash.CardNumberInvalid", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardHolderName = "علی رضایی", CardNumber = "603799123456789" } }, Ledger, Groups)));
+        Assert.Equal("PettyCash.CardCheckDigit", Code(() => PettyCashFund.Register(Guid.NewGuid(), Data() with { Keeping = CashOnly with { Card = true, CardHolderName = "علی رضایی", CardNumber = "6037991234567890" } }, Ledger, Groups)));
     }
 
     [Fact]

@@ -16,6 +16,12 @@ public enum ReceiptKind
     BankDeposit,
     Instruments,
     Notes,
+
+    /// <summary>
+    /// «واریز به کارت بانک» (owner's report no. 6, item 12; his answers to Q68–Q70, 20 Nov 2026): money a payer pays onto the bank card
+    /// of one of the company's petty-cash holders, or onto a company bank card that has no bank account. Numbered in its own series.
+    /// </summary>
+    CardDeposit,
 }
 
 /// <summary>
@@ -55,6 +61,13 @@ public static class DepositMethodRules
     /// <summary>Paya and Satna transfers are recorded with the Sheba they came from.</summary>
     public static bool NeedsSheba(this DepositMethod method) => method is DepositMethod.Paya or DepositMethod.Satna;
 
+    /// <summary>
+    /// A deposit onto a bank card is card to card, or — owner's answer to Q70, 20 Nov 2026: «ممکن است فیش واریزی داشته باشد و یا بصورت
+    /// استفاده از درگاه شرکت باشد» — paid in with a deposit slip or through the company's payment gateway.
+    /// </summary>
+    public static bool IsForCard(this DepositMethod method) =>
+        method is DepositMethod.CardToCard or DepositMethod.DepositSlip or DepositMethod.PaymentGateway;
+
     /// <summary>A foreign-currency account receives cash deposits and bank transfers only (owner's report no. 4, item 7).</summary>
     public static bool IsForForeignCurrency(this DepositMethod method) =>
         method is DepositMethod.DepositSlip or DepositMethod.Paya or DepositMethod.Satna or DepositMethod.InternalTransfer;
@@ -63,28 +76,34 @@ public static class DepositMethodRules
     /// An Iranian Sheba (IBAN): IR and 24 digits, checked with the IBAN check digits. The same rule as reference-svc's beneficiary Sheba;
     /// repeated here because services share no domain code (ADR 0001). Returns it without spaces and in capitals, or null when invalid.
     /// </summary>
-    public static string? NormaliseSheba(string? text)
+    public static string? NormaliseSheba(string? text) => ShebaShape(text) is { } sheba && ShebaCheckDigitsFit(sheba) ? sheba : null;
+
+    /// <summary>
+    /// The text as a Sheba of the right shape — IR and 24 digits, without spaces, in capitals; the "IR" may be left out, Persian digits are
+    /// read — or null. The check digits are a second question (<see cref="ShebaCheckDigitsFit"/>), so the user is told which of the two
+    /// is wrong (owner's report no. 6, item 17: 24 digits were typed and the refusal spoke of the length).
+    /// </summary>
+    public static string? ShebaShape(string? text)
     {
-        var s = new string((text ?? string.Empty).Where(c => !char.IsWhiteSpace(c) && c != '-').ToArray()).ToUpperInvariant();
+        var s = new string(PersianText.Key(text).Where(c => !char.IsWhiteSpace(c) && c != '-').ToArray()).ToUpperInvariant();
         if (s.Length == 24 && s.All(char.IsAsciiDigit))
         {
             s = "IR" + s;
         }
 
-        if (s.Length != 26 || !s.StartsWith("IR", StringComparison.Ordinal) || !s[2..].All(char.IsAsciiDigit))
-        {
-            return null;
-        }
+        return s.Length == 26 && s.StartsWith("IR", StringComparison.Ordinal) && s[2..].All(char.IsAsciiDigit) ? s : null;
+    }
 
-        // IBAN check: move "IRkk" to the end, I = 18 and R = 27, the number mod 97 is 1.
-        var rearranged = s[4..] + "1827" + s[2..4];
+    /// <summary>IBAN check: move "IRkk" to the end, I = 18 and R = 27, the number mod 97 is 1.</summary>
+    public static bool ShebaCheckDigitsFit(string sheba)
+    {
         var remainder = 0;
-        foreach (var c in rearranged)
+        foreach (var c in sheba[4..] + "1827" + sheba[2..4])
         {
             remainder = ((remainder * 10) + (c - '0')) % 97;
         }
 
-        return remainder == 1 ? s : null;
+        return remainder == 1;
     }
 }
 
@@ -104,6 +123,18 @@ public enum ReceiptAccountKind
 {
     CashDesk,
     BankAccount,
+
+    /// <summary>The bank card of a petty-cash holder (accounts-svc: the petty cash's «نحوهٔ نگهداری وجوه»); «واریز به کارت بانک».</summary>
+    PettyCashCard,
+
+    /// <summary>A bank card of the company that has no bank account (accounts-svc: company cards); «واریز به کارت بانک».</summary>
+    CompanyCard,
+}
+
+public static class ReceiptAccountKinds
+{
+    /// <summary>The bank cards money is paid onto on «واریز به کارت بانک».</summary>
+    public static bool IsCard(this ReceiptAccountKind kind) => kind is ReceiptAccountKind.PettyCashCard or ReceiptAccountKind.CompanyCard;
 }
 
 /// <summary>A cash desk or one of our bank accounts as accounts-svc describes it when a receipt is recorded.</summary>
@@ -266,6 +297,27 @@ public sealed class Receipt : AggregateRoot<Guid>
         return RecordMoney(id, ReceiptKind.BankDeposit, number, header, bankAccount, method, trackingNumber, amount, userId, sheba);
     }
 
+    /// <summary>
+    /// «واریز به کارت بانک» (owner's report no. 6, item 12): money a payer pays onto the bank card of a petty-cash holder of the company,
+    /// or onto a company bank card that has no bank account. Owner's answers of 20 Nov 2026: the voucher debits the petty cash's account
+    /// with the holder's تفصیل — the money is added to that petty cash — or the card's own معین and تفصیل (Q68, Q69), and credits the
+    /// purpose group with the payer's تفصیل; the money comes card to card, with a deposit slip or through the company's gateway (Q70).
+    /// </summary>
+    public static Receipt RecordCardDeposit(
+        Guid id, int number, ReceiptHeader header, ReceiptAccountFact card, DepositMethod method, string? trackingNumber, Money amount, string userId)
+    {
+        CheckCardDeposit(card, method);
+        return RecordMoney(id, ReceiptKind.CardDeposit, number, header, card, method, trackingNumber, amount, userId);
+    }
+
+    private static void CheckCardDeposit(ReceiptAccountFact card, DepositMethod method)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        Require(card.Kind.IsCard(), "Receipt.AccountKindWrong", "A deposit onto a bank card names a petty-cash holder's card or a company card.");
+        Require(Enum.IsDefined(method), "Receipt.DepositMethodRequired", "Choose how the money was paid in.");
+        Require(method.IsForCard(), "Receipt.CardDepositMethod", "A deposit onto a bank card is card to card, a deposit slip or the company's payment gateway.");
+    }
+
     /// <summary>The rules of a deposit's kind; returns the Sheba as it is kept (Paya and Satna only).</summary>
     private static string? CheckDeposit(ReceiptAccountFact bankAccount, DepositMethod method, string? payerSheba)
     {
@@ -284,7 +336,8 @@ public sealed class Receipt : AggregateRoot<Guid>
         if (method.NeedsSheba())
         {
             Require(!string.IsNullOrWhiteSpace(payerSheba), "Receipt.ShebaRequired", "Enter the Sheba number of the Paya or Satna transfer.");
-            sheba = DepositMethodRules.NormaliseSheba(payerSheba) ?? throw new DomainException("Receipt.ShebaInvalid", "The Sheba number is not valid.");
+            sheba = DepositMethodRules.ShebaShape(payerSheba) ?? throw new DomainException("Receipt.ShebaInvalid", "A Sheba number is IR and 24 digits.");
+            Require(DepositMethodRules.ShebaCheckDigitsFit(sheba), "Receipt.ShebaCheckDigits", "The check digits of the Sheba number do not fit: a digit is wrong.");
         }
 
         return sheba;
@@ -404,6 +457,17 @@ public sealed class Receipt : AggregateRoot<Guid>
         CheckMoney(bankAccount, amount);
         ApplyHeader(header);
         SetMoney(bankAccount, method, trackingNumber, amount, sheba);
+        Raise(Corrected(userId));
+    }
+
+    /// <inheritdoc cref="CorrectCash"/>
+    public void CorrectCardDeposit(ReceiptHeader header, ReceiptAccountFact card, DepositMethod method, string? trackingNumber, Money amount, string userId, bool voucherConfirmed)
+    {
+        RequireCorrectable(ReceiptKind.CardDeposit, header, userId, voucherConfirmed);
+        CheckCardDeposit(card, method);
+        CheckMoney(card, amount);
+        ApplyHeader(header);
+        SetMoney(card, method, trackingNumber, amount, null);
         Raise(Corrected(userId));
     }
 
@@ -583,7 +647,7 @@ public sealed class Receipt : AggregateRoot<Guid>
     private static void CheckMoney(ReceiptAccountFact account, Money amount)
     {
         ArgumentNullException.ThrowIfNull(amount);
-        Require(account.IsActive, "Receipt.AccountInactive", "The cash desk or bank account is switched off.");
+        Require(account.IsActive, "Receipt.AccountInactive", "The cash desk, bank account or bank card is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), amount.Currency, StringComparison.OrdinalIgnoreCase), "Receipt.CurrencyMismatch",
             $"The amount must be in the account's currency ({account.CurrencyCode}).");
     }

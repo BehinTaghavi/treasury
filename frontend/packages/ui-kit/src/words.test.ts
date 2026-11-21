@@ -12,6 +12,14 @@ describe('amount in Persian words (مبلغ به حروف)', () => {
     expect(amountInWords(0)).toBe('صفر')
     expect(amountInWords(1_500.75)).toBe('یک هزار و پانصد')
   })
+  it('says میلیارد once, after the whole number of milliards (report no. 6, item 15)', () => {
+    expect(amountInWords(4_500_000_000_000)).toBe('چهار هزار و پانصد میلیارد')
+    expect(amountInWords(1_000_000_000_000)).toBe('یک هزار میلیارد')
+    expect(amountInWords(999_000_000_000)).toBe('نهصد و نود و نه میلیارد')
+    expect(amountInWords(1_234_567_890_123)).toBe('یک هزار و دویست و سی و چهار میلیارد و پانصد و شصت و هفت میلیون و هشتصد و نود هزار و یکصد و بیست و سه')
+    expect(amountInWords(25_000_300_000_000_000 / 100)).toBe('دویست و پنجاه هزار و سه میلیارد')
+    expect(amountTextInWords('4,500,000,000,000', 'ریال')).toBe('چهار هزار و پانصد میلیارد ریال')
+  })
 })
 
 import { groupAmount, parseAmount } from './index'

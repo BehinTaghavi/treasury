@@ -1,5 +1,6 @@
 using Treasury.Accounts.Domain.BankAccounts;
 using Treasury.Accounts.Domain.CashDesks;
+using Treasury.Accounts.Domain.CompanyCards;
 using Treasury.Accounts.Domain.PettyCash;
 
 namespace Treasury.Accounts.Application.Abstractions;
@@ -39,6 +40,21 @@ public interface ICashDeskRepository
     Task SaveAsync(CashDesk desk, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<CashDesk>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+}
+
+/// <summary>The company's bank cards without a bank account (owner's answer to Q69, 20 Nov 2026).</summary>
+public interface ICompanyCardRepository
+{
+    Task<CompanyCard?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Is this card number (16 digits) already another company card?</summary>
+    Task<bool> NumberTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken);
+
+    Task AddAsync(CompanyCard card, CancellationToken cancellationToken);
+
+    Task SaveAsync(CompanyCard card, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<CompanyCard>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 }
 
 public interface IPettyCashRepository

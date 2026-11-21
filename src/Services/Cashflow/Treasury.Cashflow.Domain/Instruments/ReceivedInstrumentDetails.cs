@@ -35,6 +35,9 @@ public sealed record NoteChecks(bool Signature = false, bool Date = false, bool 
 /// </summary>
 /// <param name="WrittenOn">Note: the issue date written on it (the instrument's own IssueDate is the day it was received).</param>
 /// <param name="OnDemand">Note: payable on demand («عندالمطالبه»); it has no due date.</param>
+/// <param name="TransferId">A cheque of a transfer between two bank accounts of the company (owner's report no. 7, «نقل و انتقال
+/// (انتقال گیرنده)»): the transfer. Such a cheque came on no receipt; its drawer is the company's own source account.</param>
+/// <param name="TransferAccountId">A transfer cheque: the destination bank account, the only account it is deposited at.</param>
 public sealed record ReceivedInstrumentDetails(
     Guid? BankId = null,
     string? BranchName = null,
@@ -47,7 +50,9 @@ public sealed record ReceivedInstrumentDetails(
     IReadOnlyList<NoteGuarantor>? Guarantors = null,
     DateOnly? WrittenOn = null,
     bool OnDemand = false,
-    NoteChecks? Checks = null)
+    NoteChecks? Checks = null,
+    Guid? TransferId = null,
+    Guid? TransferAccountId = null)
 {
     public const int SayadIdLength = 16;
 
@@ -104,7 +109,8 @@ public sealed record ReceivedInstrumentDetails(
         return new ReceivedInstrumentDetails(
             cheque ? BankId : null, cheque ? Clean(BranchName) : null, cheque ? Clean(BranchCode) : null, cheque ? Clean(AccountNumber) : null,
             Clean(AccountHolder), Clean(City), cheque && OutOfTown, sayad, cleanGuarantors,
-            note ? WrittenOn : null, note && OnDemand, note ? Checks : null);
+            note ? WrittenOn : null, note && OnDemand, note ? Checks : null,
+            cheque ? TransferId : null, cheque && TransferId is not null ? TransferAccountId : null);
     }
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();

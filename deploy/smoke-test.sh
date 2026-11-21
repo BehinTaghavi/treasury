@@ -65,4 +65,9 @@ curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheq
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
 
+# Transfers between the company's own bank accounts (owner's report no. 7; schema 046): the limits start with the owner's figures
+# and the year's transfers can be listed.
+curl -sf "$base/api/cashflow/transfer-limits" | grep -q '"method":"Satna","bankId":null,"minPerOrder":2000000000' || fail "transfer limits (schema 046) are not served with the starting figures"
+[[ "$(status "$base/api/cashflow/transfers?year=1405")" == 200 ]] || fail "the list of transfers between bank accounts does not answer"
+
 echo "OK: shell, receipts, basic information and payment requests micro-frontends, Keycloak, and the cashflow, reference, accounts and requests APIs with PostgreSQL work at $base"

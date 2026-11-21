@@ -17,6 +17,8 @@ public sealed record PettyCashChangeRequest(Treasury.Accounts.Application.PettyC
 
 public sealed record CashDeskChangeRequest(Treasury.Accounts.Application.CashDesks.CashDeskForm Form, long Version);
 
+public sealed record CompanyCardChangeRequest(Treasury.Accounts.Application.CompanyCards.CompanyCardForm Form, long Version);
+
 public static class Endpoints
 {
     public static void MapBankAccountEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
@@ -74,6 +76,28 @@ public static class Endpoints
             ToHttp(await useCases.SetActiveAsync(new(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
     }
 
+    /// <summary>The company's bank cards without a bank account (owner's answer to Q69) under /api/accounts/company-cards.</summary>
+    public static void MapCompanyCardEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
+    {
+        var api = app.MapGroup("/api/accounts/company-cards");
+        if (requireAuthorization)
+        {
+            api.RequireAuthorization();
+        }
+
+        api.MapGet("/", async (bool? includeInactive, Treasury.Accounts.Application.CompanyCards.CompanyCardUseCases u, CancellationToken ct) =>
+            Results.Ok(await u.ListAsync(includeInactive ?? false, ct).ConfigureAwait(false)));
+
+        api.MapPost("/", async (Treasury.Accounts.Application.CompanyCards.CompanyCardForm form, HttpRequest http, Treasury.Accounts.Application.CompanyCards.CompanyCardUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RegisterAsync(new(Key(http), form), ct).ConfigureAwait(false)));
+
+        api.MapPut("/{id:guid}", async (Guid id, CompanyCardChangeRequest r, HttpRequest http, Treasury.Accounts.Application.CompanyCards.CompanyCardUseCases u, CancellationToken ct) =>
+            ToHttp(await u.ChangeAsync(new(Key(http), id, r.Form, r.Version), ct).ConfigureAwait(false)));
+
+        api.MapPost("/{id:guid}/{change:regex(^(activate|deactivate)$)}", async (Guid id, string change, VersionRequest r, HttpRequest http, Treasury.Accounts.Application.CompanyCards.CompanyCardUseCases u, CancellationToken ct) =>
+            ToHttp(await u.SetActiveAsync(new(Key(http), id, change == "activate", r.Version), ct).ConfigureAwait(false)));
+    }
+
     /// <summary>Petty cash holders (manual item 11) under /api/accounts/petty-cash.</summary>
     public static void MapPettyCashEndpoints(this IEndpointRouteBuilder app, bool requireAuthorization)
     {
@@ -125,7 +149,7 @@ public static class Endpoints
         var status = result.ErrorCode switch
         {
             "Request.IdempotencyKeyRequired" => StatusCodes.Status400BadRequest,
-            "BankAccount.NotFound" or "CashDesk.NotFound" or "PettyCash.NotFound" => StatusCodes.Status404NotFound,
+            "BankAccount.NotFound" or "CashDesk.NotFound" or "PettyCash.NotFound" or "CompanyCard.NotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

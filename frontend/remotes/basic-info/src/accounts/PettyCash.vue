@@ -7,7 +7,7 @@
  * money – bank account, cash and/or bank card (item 12) – and top-up onto a bank card (item 13).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { cardNumberHint, createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
@@ -198,7 +198,8 @@ onMounted(async () => {
             <small v-if="form.keeping.bank && !form.keeping.card" class="muted">{{ t('اگر وجوه تنخواه در حساب بانکی روی کارت بانک است، «کارت بانک» را هم انتخاب کنید.', 'If the money is on a bank card, tick «Bank card» too.') }}</small>
             <template v-if="form.keeping.card">
               <label class="req"><span>{{ t('عنوان دارندهٔ کارت', 'Card holder') }}</span><input v-model="form.keeping.cardHolderName" /></label>
-              <label class="req"><span>{{ t('شماره کارت (۱۶ رقم)', 'Card number (16 digits)') }}</span><input v-model="form.keeping.cardNumber" dir="ltr" inputmode="numeric" maxlength="19" placeholder="6037-9900-0000-0000" /></label>
+              <label class="req"><span>{{ t('شماره کارت (۱۶ رقم)', 'Card number (16 digits)') }}</span><input v-model="form.keeping.cardNumber" dir="ltr" inputmode="numeric" maxlength="19" placeholder="6037-9900-0000-0000" />
+                <small v-if="cardNumberHint(form.keeping.cardNumber, locale)" :class="cardNumberHint(form.keeping.cardNumber, locale)!.bad ? 'tr-card-bad' : 'muted'">{{ cardNumberHint(form.keeping.cardNumber, locale)!.text }}</small></label>
             </template>
           </div>
         </div>
@@ -252,8 +253,10 @@ onMounted(async () => {
 
 <style scoped src="../organization/organization.css"></style>
 <style scoped>
+.tr-card-bad { color: #b42318; font-size: .78rem; }
 .lbl { display: block; font-size: .85rem; margin-bottom: .25rem; }
 .keeping { display: grid; gap: .5rem; }
-.keep-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: end; }
-.keep-row .tr-check { min-width: 7rem; }
+/* Lined up at the top: the hint under the card number makes that field taller than the others. */
+.keep-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; }
+.keep-row .tr-check { min-width: 7rem; align-self: start; padding-top: 1.6rem; }
 </style>

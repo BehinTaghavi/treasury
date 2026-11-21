@@ -52,7 +52,8 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner, 18 Nov 2026: ثبت صیادی → واگذاری به بانک; D_Check_Vag_m, Checktype 0/2 only"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Owner, 18 Nov 2026: عودت از صندوق; D_Check_Od_m"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "Owner, 19 Nov 2026: ثبت انتقال (خرج چک) only after ثبت صیادی شد; item 14 (g); D_Check_Kh_m, Checktype 0/2 only"),
-        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f) for a cheque in the cash desk"),
+        // Owner's report no. 6, item 19 (19 Nov 2026): «چک نزد صندوق "در صیادی ثبت شده" قابل ابطال نخواهد بود» — the step
+        // SayadRegistered -> Cancel of item 14 (f) is gone; such a cheque goes to the bank, is transferred, or is handed back to its payer.
         new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.SendToLegal, InstrumentState.InLegal, AnyKind, "Owner, 18 Nov 2026: اقدام حقوقی (تحویل چک برگشتی به وکیل شرکت); old flag GoInlaw"),
         new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f): cancellation in any state by management's order"),
 

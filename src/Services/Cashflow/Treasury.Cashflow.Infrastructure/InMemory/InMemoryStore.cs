@@ -21,6 +21,11 @@ public sealed class InMemoryDatabase : IDisposable
     internal readonly Dictionary<Guid, ReceiptSnapshot> Receipts = [];
     internal readonly Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers = [];
     internal readonly Dictionary<int, int> PaymentSheetNumbers = [];
+    internal readonly Dictionary<Guid, BankTransferSnapshot> Transfers = [];
+    internal readonly Dictionary<int, int> TransferNumbers = [];
+
+    /// <summary>The company's transfer limits; a new company starts with the owner's figures (report no. 7), as schema 046 does.</summary>
+    internal List<Treasury.Cashflow.Domain.Transfers.TransferLimit> TransferLimits { get; set; } = [.. Treasury.Cashflow.Domain.Transfers.TransferLimits.OwnerDefaults().Rows];
     internal readonly Dictionary<Guid, ChequeBookSnapshot> ChequeBooks = [];
     internal readonly Dictionary<Guid, ChequeFormatSnapshot> ChequeFormats = [];
     internal readonly Dictionary<Guid, (string Type, byte[] Data)> ChequeImages = [];
@@ -54,6 +59,12 @@ internal sealed class PendingChanges
     public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
 
     public Dictionary<int, int> PaymentSheetNumbers { get; } = [];
+
+    public Dictionary<Guid, BankTransferSnapshot> Transfers { get; } = [];
+
+    public Dictionary<int, int> TransferNumbers { get; } = [];
+
+    public List<Treasury.Cashflow.Domain.Transfers.TransferLimit>? TransferLimits { get; set; }
 
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
 
@@ -108,6 +119,21 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var (year, n) in pending.PaymentSheetNumbers)
                 {
                     db.PaymentSheetNumbers[year] = n;
+                }
+
+                foreach (var (id, s) in pending.Transfers)
+                {
+                    db.Transfers[id] = s;
+                }
+
+                foreach (var (year, n) in pending.TransferNumbers)
+                {
+                    db.TransferNumbers[year] = n;
+                }
+
+                if (pending.TransferLimits is { } limits)
+                {
+                    db.TransferLimits = limits;
                 }
 
                 foreach (var (id, s) in pending.ChequeBooks)
@@ -289,7 +315,8 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         {
             IReadOnlyList<ReceiptChequeStatus> list = db.Instruments.Values
                 .Where(s => s.ReceiptId is { } id && receiptIds.Contains(id))
-                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null))
+                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null,
+                    s.Id, s.Number, s.Kind))
                 .ToList();
             return Task.FromResult(list);
         }

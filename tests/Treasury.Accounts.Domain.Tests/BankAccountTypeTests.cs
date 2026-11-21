@@ -59,7 +59,9 @@ public sealed class BankAccountTypeTests
     [Fact]
     public void A_card_has_a_valid_16_digit_number_a_holder_and_is_entered_once()
     {
-        Assert.Equal("BankAccount.CardNumberInvalid", Code(() => BankAccount.Register(Guid.NewGuid(), Data(BankAccountType.CurrentQardHasan, cards: [new("6037991234567890", "x")]), Ledger)));
+        // Owner's report no. 6, item 17: 16 digits with a wrong digit are refused for the check digit, not for the length.
+        Assert.Equal("BankAccount.CardNumberInvalid", Code(() => BankAccount.Register(Guid.NewGuid(), Data(BankAccountType.CurrentQardHasan, cards: [new("603799123456789", "x")]), Ledger)));
+        Assert.Equal("BankAccount.CardCheckDigit", Code(() => BankAccount.Register(Guid.NewGuid(), Data(BankAccountType.CurrentQardHasan, cards: [new("6037991234567890", "x")]), Ledger)));
         Assert.Equal("BankAccount.CardHolderRequired", Code(() => BankAccount.Register(Guid.NewGuid(), Data(BankAccountType.CurrentQardHasan, cards: [new(Card1, " ")]), Ledger)));
         Assert.Equal("BankAccount.CardTwice", Code(() => BankAccount.Register(Guid.NewGuid(), Data(BankAccountType.CurrentQardHasan, cards: [new(Card1, "x"), new(Card1, "y")]), Ledger)));
     }

@@ -25,3 +25,9 @@ export const needsSheba = (method: string) => method === 'Paya' || method === 'S
 
 /** A foreign-currency account takes cash deposits and bank transfers only (owner's report no. 4, item 7). */
 export const forForeignCurrency = (method: string) => ['DepositSlip', 'Paya', 'Satna', 'InternalTransfer'].includes(method)
+
+/**
+ * A deposit onto a bank card («واریز به کارت بانک») is card to card, or — owner's answer to Q70, 20 Nov 2026 — paid in with a
+ * deposit slip or through the company's payment gateway.
+ */
+export const forCard = (method: string) => ['CardToCard', 'DepositSlip', 'PaymentGateway'].includes(method)

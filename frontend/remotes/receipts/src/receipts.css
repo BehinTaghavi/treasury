@@ -1,29 +1,36 @@
-/* Shared by the receipt screens (same look as the Basic Information screens). */
+/* Shared by the receipt screens. Owner, 20 Nov 2026 (the design he approved): white cards on the grey page, taller boxes with rounder
+   corners, dark-blue headings, one blue for the buttons. The measures of the boxes come from --tr-field-* (set in Receipts.vue), which
+   the shared boxes of the ui-kit follow too. */
 h3 { margin: 0 0 .5rem; }
 .tr-form { display: grid; gap: .75rem; margin: 1rem 0; }
-fieldset { border: 1px solid #e4e7eb; border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .75rem; align-items: end; padding: .75rem; margin: 0; }
-legend { font-weight: 600; padding: 0 .25rem; }
-label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
+fieldset { border: 1px solid #dfe4ec; border-radius: 12px; background: #fff; display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .9rem .85rem; align-items: end; padding: .9rem 1.1rem 1.1rem; margin: 0; min-width: 0; }
+legend { font-weight: 600; padding: 0 .35rem; color: #1b2f55; }
+label { display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; font-weight: 500; color: #445066; }
+label > input, label > select, label > textarea { font-weight: 400; }
 .wide { grid-column: span 2; }
-.tr-check { flex-direction: row; align-items: center; gap: .35rem; align-self: end; padding-bottom: .55rem; }
-/* Required fields are drawn with a red frame (owner's report no. 2, item 12); no separate star, which pushed list boxes a line down. */
-input:not([type=checkbox]):not([type=radio]), select, textarea { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
+.tr-check { flex-direction: row; align-items: center; gap: .4rem; align-self: end; padding-bottom: .6rem; font-size: .9rem; font-weight: 400; color: #18233a; }
+/* A required field is marked at its label and its box turns red only when left empty at a save attempt (owner, 20 Nov 2026): ui-kit required.css. */
+input:not([type=checkbox]):not([type=radio]), select, textarea { box-sizing: border-box; min-height: var(--tr-field-h, 0); padding: var(--tr-field-pad, .45rem .5rem); border: 1px solid var(--tr-field-border, #cbd2d9); border-radius: var(--tr-field-radius, 6px);
+  font: inherit; color: #18233a; background: #fff; }
+input:not([type=checkbox]):not([type=radio]):focus, select:focus, textarea:focus { outline: 2px solid #2a5bd7; outline-offset: 1px; }
 input.ro { background: #f5f7fa; color: #52606d; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
-button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
+button { padding: .5rem .9rem; border-radius: 8px; border: 1px solid #2a5bd7; background: #2a5bd7; color: #fff; font: inherit; cursor: pointer; }
+button:hover:not(:disabled) { filter: brightness(.94); }
+button:focus-visible { outline: 2px solid #1b2f55; outline-offset: 1px; }
 button:disabled { opacity: .5; cursor: default; }
-.tr-secondary { background: #fff; color: #1d4ed8; }
-.tr-link { background: transparent; color: #1d4ed8; border-color: transparent; padding: .2rem .4rem; }
+.tr-secondary { background: #fff; color: #1b2f55; border-color: #c9d1dd; }
+.tr-link { background: transparent; color: #2a5bd7; border-color: transparent; padding: .35rem .5rem; }
 .tr-link.danger { color: #b42318; }
 .tr-secondary.danger { color: #b42318; border-color: #b42318; }
 .tr-buttons { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
-.tr-msg { padding: .5rem .75rem; border-radius: 6px; margin: .5rem 0; }
+.tr-msg { padding: .6rem .9rem; border-radius: 8px; margin: .5rem 0; }
 .tr-msg.error { background: #fdecea; color: #8a1c1c; }
 .tr-msg.warning { background: #fff7e0; color: #7a5200; }
 .tr-msg.ok { background: #e6f4ea; color: #1e5631; }
 .tr-table { width: 100%; border-collapse: collapse; margin-top: .75rem; }
-.tr-table th, .tr-table td { padding: .4rem .5rem; border-bottom: 1px solid #e4e7eb; text-align: start; vertical-align: middle; }
+.tr-table th, .tr-table td { padding: .45rem .55rem; border-bottom: 1px solid #e7ebf1; text-align: start; vertical-align: middle; }
+.tr-table th { background: #f3f5f9; color: #445066; font-weight: 600; font-size: .85rem; }
 .tr-table tr.cancelled td { color: #9aa5b1; text-decoration: line-through; }
 /* A deleted receipt stays in the list on a light red ground with «حذف شده» written large (owner, 20 Nov 2026, answer to Q67). */
 .tr-table tr.deleted td { background: #fde8e6; color: #7b8794; }
@@ -53,3 +60,12 @@ fieldset.tr-block { display: block; }
 .tr-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); gap: .4rem 1.5rem; margin-top: .75rem; padding: .75rem; background: #fff;
   border: 1px solid #e4e7eb; border-radius: 6px; font-size: .9rem; }
 @media (max-width: 720px) { .wide { grid-column: auto; } }
+/* The cards of a form (owner, 20 Nov 2026): a numbered heading, then the boxes on a grid without a frame of their own. */
+.tr-card { background: #fff; border: 1px solid #dfe4ec; border-radius: 14px; padding: 1rem 1.25rem 1.25rem; min-width: 0; }
+.tr-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; margin-bottom: .9rem; }
+.tr-card-head h3 { margin: 0; font-size: 1rem; color: #18233a; }
+.tr-step { width: 1.65rem; height: 1.65rem; border-radius: 50%; background: #e6edfb; color: #1b2f55; display: inline-flex; align-items: center; justify-content: center; font-size: .82rem; font-weight: 700; }
+.tr-pill { padding: .05rem .65rem; border-radius: 1rem; background: #eef1f6; color: #445066; font-size: .78rem; font-weight: 600; }
+fieldset.tr-fields { border: 0; border-radius: 0; background: transparent; padding: 0; }
+.tr-card > p:last-child { margin-bottom: 0; }
+.tr-card .tr-table { margin-top: .5rem; }

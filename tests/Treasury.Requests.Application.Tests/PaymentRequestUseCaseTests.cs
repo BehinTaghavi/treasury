@@ -188,4 +188,32 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
             new(Key(), second, "endorse:c:3", "EndorsedCheque", FakeCheques.Registered, "چک 445566 بانک ملت", FakeCheques.Amount, "IRR", "1405/08/25"), CancellationToken.None)).IsSuccess);
         Assert.Equal("Paid", (await View(second)).State);
     }
+
+    [Fact]
+    public async Task A_request_for_a_transfer_between_the_companys_accounts_asks_accounts_svc_about_both_accounts()
+    {
+        // Owner, 21 Nov 2026 (answer to Q82): every transfer needs a payment request and its approval.
+        var input = new PaymentRequestInput("1405/08/30", FakeReference.Requester, Guid.Empty, Guid.Empty, "تأمین موجودی", 3_000_000_000, PaymentMethod.OwnAccountTransfer,
+            PayFromId: FakeAccounts.Bank, TransferToAccountId: FakeAccounts.OtherBank);
+        var id = await Register(input);
+        var v = await View(id);
+        Assert.Equal(("OwnAccountTransfer", (Guid?)FakeAccounts.Bank, (Guid?)FakeAccounts.OtherBank, "0303-9911", PaymentRequest.OwnTransferGroupName, 3_000_000_000m),
+            (v.Method, v.PayFromId, v.TransferToAccountId, v.BeneficiaryName, v.PurposeGroupName, v.RemainingAmount));
+        Assert.DoesNotContain(_reference.Marked, m => m.List is "beneficiaries" or "purpose-groups"); // nothing of Basic Information is named
+
+        async Task<string?> Fails(PaymentRequestInput i) => (await _requests.RegisterAsync(new(Key(), i), CancellationToken.None)).ErrorCode;
+        Assert.Equal("PaymentRequest.TransferToRequired", await Fails(input with { TransferToAccountId = null }));
+        Assert.Equal("PaymentRequest.TransferFromRequired", await Fails(input with { PayFromId = null }));
+        Assert.Equal("PaymentRequest.PayFromNotFound", await Fails(input with { TransferToAccountId = Guid.NewGuid() }));
+        Assert.Equal("PaymentRequest.TransferSameAccount", await Fails(input with { TransferToAccountId = FakeAccounts.Bank }));
+        Assert.Equal("PaymentRequest.PayFromCurrency", await Fails(input with { TransferToAccountId = FakeAccounts.DollarBank }));
+
+        // Approved, then paid by cashflow-svc's transfer; a cheque endorsement cannot pay it.
+        Assert.True((await _requests.ChangeAsync(new(Key(), id, "approve", 1), CancellationToken.None)).IsSuccess);
+        Assert.Equal("PaymentRequest.PaymentKindMismatch",
+            (await _requests.RecordPaymentAsync(new(Key(), id, "e1", "EndorsedCheque", Guid.NewGuid(), "چک", 1_000, "IRR", "1405/08/30"), CancellationToken.None)).ErrorCode);
+        Assert.True((await _requests.RecordPaymentAsync(
+            new(Key(), id, "transfer:1", PaymentRequest.OwnTransferPaymentKind, null, "نقل و انتقال شماره 1", 3_000_000_000, "IRR", "1405/08/30"), CancellationToken.None)).IsSuccess);
+        Assert.Equal(("Paid", 0m), ((await View(id)).State, (await View(id)).RemainingAmount));
+    }
 }

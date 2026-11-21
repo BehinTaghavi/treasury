@@ -147,7 +147,8 @@ public sealed class InstrumentUseCases(
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser,
     IBankAccountLookup bankAccountLookup,
-    TimeProvider? clock = null)
+    TimeProvider? clock = null,
+    IBankTransferRepository? transfers = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -190,6 +191,15 @@ public sealed class InstrumentUseCases(
                 return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
             }
 
+            // The issued cheque of a transfer between the company's own accounts (owner's report no. 7) is the same sheet as the
+            // received one: its steps follow the transfer (collected on the receipts side, or deleted with the transfer), never by hand.
+            if (instrument.Direction == InstrumentDirection.Issued && transfers is not null && instrument.PaymentId is { } paymentId
+                && await transfers.GetAsync(paymentId, ct).ConfigureAwait(false) is not null)
+            {
+                return Result<Guid>.Fail("Transfer.IssuedChequeFollowsTransfer",
+                    "This cheque belongs to a transfer between the company's bank accounts; its steps are recorded on the receipts side of the transfer.");
+            }
+
             var date = FiscalDate.ParseJalali(command.Date);
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var user = currentUser.UserId;
@@ -212,6 +222,12 @@ public sealed class InstrumentUseCases(
                     instrument.ReturnFromBank(date, user, command.Note);
                     break;
                 case InstrumentAction.RegisterSayad:
+                    // A transfer cheque (owner, 21 Nov 2026, answer to Q79): the receipts side registers it in Sayad only after the payer did.
+                    if (transfers is not null && instrument.Details.TransferId is { } ofTransfer)
+                    {
+                        (await transfers.GetAsync(ofTransfer, ct).ConfigureAwait(false))?.EnsureReceiverMayRegisterSayad();
+                    }
+
                     // Owner, 18 Nov 2026: «ثبت صیادی شد»; the reference is the tracking number of the registration, when typed.
                     instrument.RegisterSayad(date, user, command.Reference, command.Note);
                     break;
@@ -257,8 +273,45 @@ public sealed class InstrumentUseCases(
             }
 
             await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
+            if (command.Action == InstrumentAction.RecordCleared && instrument.Details.TransferId is { } transferId)
+            {
+                await CompleteTransferAsync(transferId, date, command.Reference, ct).ConfigureAwait(false);
+            }
+
             return Result<Guid>.Ok(instrument.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
+
+    /// <summary>
+    /// The cheque of a transfer between two bank accounts of the company was collected at the destination account (owner's report
+    /// no. 7): the transfer is finished, and the same cheque on the payment side — issued from the source account — is paid by its
+    /// bank («وصول شده»). The three are saved in the command that recorded the collection (ADR 0002 amendment of 20 Nov 2026), so the
+    /// payment side never shows an unpaid cheque that the receipts side shows collected.
+    /// </summary>
+    private async Task CompleteTransferAsync(Guid transferId, FiscalDate date, string? reference, CancellationToken ct)
+    {
+        if (transfers is null)
+        {
+            return;
+        }
+
+        var transfer = await transfers.GetAsync(transferId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Transfer.NotFound", "The transfer of this cheque was not found.");
+        var issued = await instruments.GetAsync(transfer.Cheque!.IssuedChequeId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+
+        // A post-dated cheque whose maturity («سررسید») was not recorded on the payment side leaves «اسناد پرداختنی» now: it has been
+        // paid out of the bank account (owner's answer to Q81: «به محض سررسید شدن از حساب بانک خارج»).
+        if (transfer.IsPostDated && transfer.Cheque.MaturedOn is null)
+        {
+            transfer.RecordMatured(date, currentUser.UserId);
+            issued.RecordMatured(date, currentUser.UserId);
+        }
+
+        transfer.MarkCollected(date);
+        issued.RecordPaidByBank(date, currentUser.UserId, reference);
+        await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
+        await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Issues a cheque for an approved payment: checks approval (R7), the posting window (R2), the bank balance (R8),
