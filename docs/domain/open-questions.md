@@ -55,6 +55,16 @@ Proposal: `received-cheque-steps.md`.
 | Q35 | When several cheques are deposited together on **one slip** (or collected on one statement date), is it **one voucher** for the slip or one per cheque? | **Answered 15 Nov 2026: one voucher per cheque.** | Your answer "one voucher for each operation" can mean either. |
 | Q36 | **Endorsement and payment requests:** must every endorsement («خرج چک») pay an **approved payment request** (the request then becomes paid), or is the request optional? (Your answer repeated the question.) | **Answered 15 Nov 2026: yes, every endorsement pays an approved payment request** (in full or in part; the request is paid when its payments reach its amount; a returned endorsed cheque takes its payment back). | Decides whether the endorsement screen must choose an approved request. |
 
+## Company name, logo and official details (owner, 16 Nov 2026)
+
+Numbered QC (company): these two were asked as Q37 and Q38 in pull request 12, while Q37–Q47 below are the questions of 18 Nov 2026.
+
+Built: Basic Information → «مشخصات شرکت» keeps the company's name, logo and official details, on the same page as the addresses of 18 Nov 2026 (Q46); the name and logo are shown at the top of every screen.
+
+| # | Question | Proposed behaviour | Why |
+|---|---|---|---|
+| QC1 | Should **printed forms and reports** (receipt, payment request, cheque delivery, reports) also carry the company's **name and logo** at the top when they are built? | **Answered 16 Nov 2026: yes.** Every printed form and report starts with the logo and the name from «مشخصات شرکت»; built with each printed form (Phases E and G). | "At the top of all forms" may mean the screens, the printouts, or both; the screens are done. |
+| QC2 | Which **other company details** belong on the company's page (شناسه ملی, کد اقتصادی, شماره ثبت, address, postal code, telephone)? | **Answered 16 Nov 2026: add شناسه ملی, کد اقتصادی, شماره ثبت, نشانی, کد پستی, تلفن, آدرس سایت and ایمیل.** Built: all optional, each checked when filled in (شناسه ملی 11 digits with check digit, کد اقتصادی 11 or 12 digits, کد پستی 10 digits). «نشانی» and «کد پستی» are the address and the postal code of the legal address that the page has since 18 Nov 2026 (one of each, not two). | They are needed on official printouts, not on the screens. |
 ## Latest status of a received cheque (owner, 18 Nov 2026)
 
 Built as described in `received-cheque-steps.md`, section 5. These points were not settled by the description:

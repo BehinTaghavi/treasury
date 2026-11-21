@@ -2,7 +2,7 @@
 /**
  * Basic Information (اطلاعات پایه), in the order of the new-version manual.
  * The simple lists share one editor (CatalogueList). All 14 items of the manual's Basic Information are here (owner, 12 Nov 2026:
- * finish Basic Information so it is reviewed at once).
+ * finish Basic Information so it is reviewed at once), after «مشخصات شرکت» (the company's name, logo and addresses; owner, 16 and 18 Nov 2026).
  */
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
@@ -45,7 +45,8 @@ const lists: ListSpec[] = [
 
 /** The menu, in the order of the new-version manual ("اطلاعات پایه" items 1–10), with the copy of the accounting system's accounts. */
 const sections: { id: string; title: [string, string] }[] = [
-  // Owner, 18 Nov 2026: the company's name, address and legal address (its city decides «خارج از مرکز» on received cheques).
+  // Owner, 16 Nov 2026: the company's name and logo, shown at the top of every screen. First, as the system is set up with it.
+  // Owner, 18 Nov 2026: its address and legal address (the city decides «خارج از مرکز» on received cheques). One page for both.
   { id: 'company', title: ['مشخصات شرکت', 'Company particulars'] },
   ...lists.filter(l => l.list !== 'references').map(l => ({ id: l.list, title: l.title })),
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },

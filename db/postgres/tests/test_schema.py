@@ -758,7 +758,7 @@ def test_direct_deposits_have_their_kind_and_a_sheba_for_paya_and_satna(db):
         c.rollback()
 
 
-def test_the_company_profile_is_one_row(db):
+def test_the_company_profile_is_one_row_with_a_small_logo(db):
     # 037_reference_company_profile.sql (owner, 18 Nov 2026: «مشخصات شرکت»; the city and postal code are the legal address's).
     with psycopg.connect(db) as c:
         c.execute("SET ROLE reference_svc")
@@ -770,11 +770,37 @@ def test_the_company_profile_is_one_row(db):
             with pytest.raises(psycopg.errors.CheckViolation):
                 with c.transaction():
                     c.execute("UPDATE reference.company_profile SET name = %s, postal_code = %s", (name, postal))
+        # 038_reference_company_details_and_logo.sql (owner, 16 Nov 2026): the logo is a PNG/JPEG of at most 1 MB, kept apart.
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_profile SET logo_type = 'application/pdf'")
+        c.execute("UPDATE reference.company_profile SET logo_type = 'image/png'")
+        c.execute("INSERT INTO reference.company_profile_logo (data) VALUES (%s)", (b"\x89PNG",))
+        with pytest.raises(psycopg.errors.UniqueViolation):   # one logo, like the one profile
+            with c.transaction():
+                c.execute("INSERT INTO reference.company_profile_logo (data) VALUES (%s)", (b"\x89PNG",))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE reference.company_profile_logo SET data = %s", (b"x" * (1024 * 1024 + 1),))
+        # Optional official details, each with its shape.
+        c.execute(
+            "UPDATE reference.company_profile SET national_id = '10101010103', economic_code = '411111111111', registration_number = '12345', "
+            "phone = '+98-21-88880000', website = 'www.example.ir', email = 'info@example.ir'")
+        for column, bad in (("national_id", "1234567890"), ("economic_code", "4111"), ("registration_number", "12/3"), ("phone", "abc"),
+                            ("website", ""), ("email", "info")):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE reference.company_profile SET {column} = %s", (bad,))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("DELETE FROM reference.company_profile")  # the profile is corrected, never deleted
+        c.execute("DELETE FROM reference.company_profile_logo")
         c.execute("RESET ROLE")
         c.execute("SET ROLE cashflow_svc")
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the table
-            with c.transaction():
-                c.execute("SELECT * FROM reference.company_profile")
+        for table in ("company_profile", "company_profile_logo"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service asks reference-svc, it does not read the tables
+                with c.transaction():
+                    c.execute(f"SELECT * FROM reference.{table}")
         c.rollback()
 
 
