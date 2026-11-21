@@ -9,7 +9,7 @@ import { chequeStateName, formatAmount, toLatinDigits, type Locale } from '@trea
 export type TransferMethod = 'Internal' | 'Pol' | 'Paya' | 'Satna' | 'Cheque'
 export type ElectronicMethod = Exclude<TransferMethod, 'Cheque'>
 export type TransferChannel = 'InPerson' | 'Remote'
-export type TransferState = 'Recorded' | 'ChequeIssued' | 'ChequeReceived' | 'Collected' | 'Deleted'
+export type TransferState = 'Recorded' | 'ChequeIssued' | 'ChequeReceived' | 'Collected' | 'Deleted' | 'Cancelled'
 
 /** The cheque of a cheque transfer: the same sheet on the payment side (issued) and on the receipts side (received). */
 export interface TransferCheque {
@@ -17,6 +17,13 @@ export interface TransferCheque {
   receivedChequeId: string | null; receivedOn: string | null; collectedOn: string | null
   /** The latest status of the cheque on the receipts side (an instrument state), once it is there. */
   receivedState: string | null; reachedDueDate: boolean
+  /** The day the payer registered the cheque in Sayad («پرداخت ثبت صیاد شد»); null: not yet, and the cheque can still be cancelled (answer to Q79). */
+  payerSayadOn?: string | null
+  /** A post-dated cheque stays in «اسناد پرداختنی» until its maturity («سررسید») is recorded (answer to Q81). */
+  isPostDated?: boolean; maturedOn?: string | null; canMature?: boolean
+  cancelledOn?: string | null; cancelReason?: string | null
+  /** The code of the rule that closes «ابطال چک», or null while it is open. */
+  whyNotCancellable?: string | null
 }
 export interface Transfer {
   id: string; fiscalYear: number; number: number; date: string; method: TransferMethod; channel: TransferChannel | null
@@ -28,7 +35,54 @@ export interface Transfer {
   /** The code of the rule that closes «ویرایش» / «حذف», or null while it is open. */
   whyNotCorrectable: string | null; whyNotDeletable: string | null
   canUndoReceive: boolean; version: number
+  /** The bank's fee of an electronic transfer («کارمزد خدمات بانکی», answer to Q77). */
+  fee?: number | null
+  /** The approved payment request the transfer pays (answer to Q82). */
+  paymentRequestId?: string | null; paymentRequestNumber?: number | null
+  /** The voucher steps the treasurer confirmed: 0 payer / electronic, 1 receiver, 2 maturity, 3 and 4 the two sides of a cancellation. */
+  confirmedSteps?: number[] | null
 }
+
+/**
+ * An approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026, answer to Q82: «برای نقل و انتقال از هر
+ * نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود»), as GET /api/requests/payment-requests answers it.
+ */
+export interface TransferRequest {
+  id: string; number: number; date: string; method: string; state: string; purpose: string; amount: number; currency: string
+  payFromId: string | null; transferToAccountId: string | null; paidAmount: number; remainingAmount: number; beneficiaryName: string
+}
+export const OWN_TRANSFER = 'OwnAccountTransfer'
+/** The requests a transfer may pay: approved ones of the kind «نقل و انتقال بین حساب‌های شرکت», lowest number first. */
+export const payableRequests = (all: readonly TransferRequest[]) =>
+  all.filter(r => r.method === OWN_TRANSFER && r.state === 'Approved' && r.remainingAmount > 0).sort((a, b) => a.number - b.number)
+/** «از حساب … به حساب … – مبلغ … – مانده …»: a request as it is offered in the list box (its number is the hint). */
+export function requestLabel(r: Pick<TransferRequest, 'amount' | 'remainingAmount' | 'purpose'>, from: string, to: string, locale: Locale): string {
+  const n = (x: number) => formatAmount(x, locale)
+  return locale === 'fa'
+    ? `از حساب ${from} به حساب ${to} – مبلغ ${n(r.amount)} – مانده ${n(r.remainingAmount)}${r.purpose ? ` – ${r.purpose}` : ''}`
+    : `from ${from} to ${to} – amount ${n(r.amount)} – left ${n(r.remainingAmount)}${r.purpose ? ` – ${r.purpose}` : ''}`
+}
+
+/** The vouchers of a transfer by their step, in the owner's words. */
+const voucherTitles: Record<number, [string, string]> = {
+  0: ['سند انتقال دهنده', "The payer's voucher"],
+  1: ['سند انتقال گیرنده', "The receiver's voucher"],
+  2: ['سند سررسید چک پرداختنی', 'Maturity of the payable cheque'],
+  3: ['سند ابطال – انتقال دهنده', "Cancellation – the payer's side"],
+  4: ['سند ابطال – انتقال گیرنده', "Cancellation – the receiver's side"],
+}
+export function voucherTitle(step: number, cheque: boolean, locale: Locale): string {
+  if (!cheque && step === 0) return locale === 'fa' ? 'سند نقل و انتقال' : 'Voucher of the transfer'
+  const x = voucherTitles[step]
+  return x ? x[locale === 'fa' ? 0 : 1] : String(step)
+}
+/** The steps the payment side shows (everything but the receiver's own vouchers), and the ones the receipts side shows. */
+export const payerSteps: readonly number[] = [0, 2, 3]
+export const receiverSteps: readonly number[] = [1, 4]
+/** Every voucher of these steps that exists is confirmed. `existing` is the number of vouchers the transfer has among them. */
+export const isConfirmed = (t: Pick<Transfer, 'confirmedSteps'>, step: number) => (t.confirmedSteps ?? []).includes(step)
+/** A cheque transfer whose cheque can still take a step on the payment side: neither collected, cancelled nor deleted. */
+export const isOpenCheque = (t: Pick<Transfer, 'state' | 'cheque'>) => !!t.cheque && (t.state === 'ChequeIssued' || t.state === 'ChequeReceived')
 /** One row of «سقف‌های انتقال الکترونیکی»; null is "no limit"; `bankId` null is the general row of the way. */
 export interface TransferLimit {
   method: ElectronicMethod; bankId: string | null; minPerOrder: number | null; maxPerOrderInPerson: number | null; maxPerOrderRemote: number | null
@@ -146,17 +200,25 @@ export const groupSayad = (id: string | null | undefined) => (id ?? '').replace(
  */
 export function chequeTransferStatus(t: Pick<Transfer, 'state' | 'cheque'>, locale: Locale): string {
   const fa = locale === 'fa'
+  // Owner, 21 Nov 2026 (answer to Q79): the payer's Sayad registration is a step of its own; until it is recorded the cheque is only
+  // «صادر شد» and can be cancelled.
+  const registered = !!t.cheque?.payerSayadOn
   switch (t.state) {
     case 'Deleted': return fa ? 'حذف شده' : 'Deleted'
-    case 'ChequeIssued': return fa ? 'پرداخت ثبت صیاد شد – در انتظار ثبت در دریافت' : 'Issued and registered in Sayad – waiting for the receipts side'
+    case 'Cancelled': return fa ? 'ابطال شده' : 'Cancelled'
+    case 'ChequeIssued': return registered
+      ? (fa ? 'پرداخت ثبت صیاد شد – در انتظار ثبت در دریافت' : 'Issued and registered in Sayad – waiting for the receipts side')
+      : (fa ? 'صادر شد – ثبت صیادی پرداخت نشده' : 'Issued – not yet registered in Sayad by the payer')
     case 'Collected': return fa ? 'وصول شد' : 'Collected'
     case 'ChequeReceived': {
       const state = chequeStateName(t.cheque?.receivedState ?? 'InCashDesk', locale)
+      if (!registered) return fa ? `دریافت شد – ${state} – ثبت صیادی پرداخت نشده` : `Received – ${state} – not yet registered in Sayad by the payer`
       return fa ? `دریافت شد – ${state}` : `Received – ${state}`
     }
     default: return fa ? 'ثبت شده' : 'Recorded'
   }
 }
 
-/** The total of the rows that count: deleted transfers are left out, as deleted receipts are. */
-export const totalRial = (rows: readonly Pick<Transfer, 'state' | 'amountRial'>[]) => rows.filter(r => r.state !== 'Deleted').reduce((s, r) => s + r.amountRial, 0)
+/** The total of the rows that count: deleted transfers are left out, as deleted receipts are, and so are cancelled cheques. */
+export const totalRial = (rows: readonly Pick<Transfer, 'state' | 'amountRial'>[]) =>
+  rows.filter(r => r.state !== 'Deleted' && r.state !== 'Cancelled').reduce((s, r) => s + r.amountRial, 0)

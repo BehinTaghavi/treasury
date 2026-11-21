@@ -71,7 +71,14 @@ export const methods: { value: string; fa: string; en: string }[] = [
   { value: 'CardToCard', fa: 'کارت به کارت', en: 'Card to card' },
   // Owner, 19 Nov 2026: a received cheque registered in Sayad is handed on to the beneficiary.
   { value: 'ChequeTransfer', fa: 'ثبت انتقال (خرج چک)', en: 'Cheque transfer (endorsement)' },
+  // Owner, 21 Nov 2026 (answer to Q82): every transfer between the company's own bank accounts needs a request and its approval.
+  { value: 'OwnAccountTransfer', fa: 'نقل و انتقال بین حساب‌های شرکت', en: "Transfer between the company's accounts" },
 ]
+
+/** The payment method of a request that moves money between two bank accounts of the company (no beneficiary, no purpose group). */
+export const OWN_TRANSFER = 'OwnAccountTransfer'
+/** What is sent in place of the beneficiary and the purpose group of such a request: requests-svc does not ask for them. */
+export const NO_ID = '00000000-0000-0000-0000-000000000000'
 
 export const stateNames: Record<string, [string, string]> = {
   Registered: ['ثبت شده', 'Registered'], Approved: ['تایید شده', 'Approved'], Paid: ['پرداخت شده', 'Paid'], Cancelled: ['ابطال شده', 'Cancelled'],

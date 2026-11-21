@@ -64,6 +64,17 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['وجوه در راه', 'Funds in transit'],
     use: ['نقل و انتقال با چک بین حساب‌های شرکت: بدهکار هنگام صدور چک، بستانکار هنگام دریافت آن', "A transfer by cheque between the company's own accounts: debited when the cheque is issued, credited when it is received"],
   },
+  // Owner's answers of 21 Nov 2026: the bank's fee of a transfer (Q77) and a post-dated issued cheque until its due date (Q81).
+  BankFees: {
+    title: ['هزینه کارمزد خدمات بانکی', 'Bank service fees'],
+    use: ['حساب عمومی هزینه‌های مالی (معین یا معین در معین): بدهکار هنگام ثبت کارمزد نقل و انتقال؛ بستانکار آن بانک انتقال دهنده است',
+      'One general account of the financial expenses: debited with the fee of a transfer; credited to the source bank'],
+  },
+  NotesPayable: {
+    title: ['اسناد پرداختنی', 'Notes payable'],
+    use: ['چک مدت‌دار صادره تا سررسید: بستانکار هنگام صدور چک، بدهکار هنگام ثبت سررسید (بستانکار: بانک)؛ تفصیل: تفصیل حساب بانکی صادرکننده',
+      "A post-dated issued cheque until its due date: credited when the cheque is issued, debited when its maturity is recorded (credit: the bank); detail: the issuing bank account's detail"],
+  },
   NotesInCollection: {
     title: ['سفته‌های در جریان وصول', 'Notes in collection'],
     use: ['بدهکار هنگام واگذاری سفته به بانک، بستانکار هنگام وصول، واخواست یا عودت؛ تفصیل: تفصیل حساب بانکی', "Debited when a note goes to the bank, credited when collected, protested or returned; detail: the bank account's detail"],

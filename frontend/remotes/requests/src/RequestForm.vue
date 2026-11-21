@@ -7,6 +7,10 @@
  * Owner, 19 Nov 2026: with the payment method «ثبت انتقال (خرج چک)» the received cheque is chosen in place of «پرداخت از حساب بانکی» —
  * only cheques whose latest status is «ثبت صیادی شد» are offered — and its number, due date and the name of who gave it to the company
  * are shown; the amount of the request is the amount of the cheque.
+ * Owner, 21 Nov 2026 (answer to Q82: «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود»): with the payment
+ * method «نقل و انتقال بین حساب‌های شرکت» the request names two bank accounts of the company — «حساب مبدأ (انتقال دهنده)» and «حساب
+ * مقصد (انتقال گیرنده)», both required — instead of a beneficiary and a purpose group; the references and «ذینفعان اصلی دارد» are
+ * hidden with them. Treasury pays the approved request with an electronic transfer or a Sayad cheque in «پرداخت‌ها».
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { amountInWords, cardNumberHint, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
@@ -14,7 +18,7 @@ import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
 import ShebaInput from '@treasury/ui-kit/ShebaInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
-import { methods, useLookups, type Purpose, type TransferableCheque } from './lookups'
+import { methods, NO_ID, OWN_TRANSFER, useLookups, type Purpose, type TransferableCheque } from './lookups'
 import { ACCEPT, openFile, sizeText, uploadFile, type RequestFile } from './files'
 
 interface View {
@@ -23,6 +27,7 @@ interface View {
   transferAccount: string | null; cardNumber: string | null; payFromId: string | null; dueDate: string | null; departmentId: string | null
   hasMainBeneficiaries: boolean; attachments: number; note: string | null; version: number; files: RequestFile[] | null
   cheque: { instrumentId: string; number: string; dueDate: string | null; payerName: string; bankName: string | null } | null
+  transferToAccountId: string | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; editId?: string | null }>(),
@@ -36,7 +41,7 @@ const L = useLookups(api)
 const empty = () => ({
   date: todayJalali(), requesterId: '', beneficiaryId: '', hasMainBeneficiaries: false, priority: '1', amount: '', currency: 'IRR',
   purposeGroupId: '', purpose: '', ref1: '', ref2: '', method: 'CurrentCheque', transferAccount: '', cardNumber: '', payFromId: '',
-  dueDate: '', departmentId: '', attachments: '0', note: '', chequeId: '',
+  dueDate: '', departmentId: '', attachments: '0', note: '', chequeId: '', transferToId: '',
 })
 const form = reactive(empty())
 const editing = ref<{ number: number; version: number } | null>(null)
@@ -100,6 +105,16 @@ const payFromChoices = computed<Choice[]>(() => form.method === 'Cash'
   ? L.desks.value.filter(d => d.isActive && d.currencyCode === form.currency).map(d => ({ value: d.id, label: d.name }))
   : L.bankAccounts.value.filter(a => a.isActive && a.currencyCode === form.currency).map(a => ({ value: a.id, label: L.accountTitle(a) })))
 
+// ---- «نقل و انتقال بین حساب‌های شرکت» (answer to Q82): two bank accounts of the company instead of a beneficiary ----
+const isOwn = computed(() => form.method === OWN_TRANSFER)
+/** The receiving account: another bank account of the company in the request's currency. */
+const transferToChoices = computed<Choice[]>(() => L.bankAccounts.value
+  .filter(a => (a.isActive || a.id === form.transferToId) && a.currencyCode === form.currency && a.id !== form.payFromId)
+  .map(a => ({ value: a.id, label: L.accountTitle(a), muted: !a.isActive })))
+watch(() => [form.method, form.currency, form.payFromId], () => {
+  if (form.transferToId && (!isOwn.value || !transferToChoices.value.some(c => c.value === form.transferToId))) form.transferToId = ''
+})
+
 // ---- «ثبت انتقال (خرج چک)»: the received cheques that are «ثبت صیادی شد» ----
 const isTransfer = computed(() => form.method === 'ChequeTransfer')
 const cheques = ref<TransferableCheque[]>([])
@@ -146,11 +161,14 @@ async function load(id: string) {
   const r = await api.get<View>(`/api/requests/payment-requests/${id}`)
   if (!r.ok) return show('error', translate(r.code, props.locale))
   const v = r.value
+  // A request for a transfer between the company's accounts has no beneficiary and no purpose group of Basic Information.
+  const own = v.method === OWN_TRANSFER
   Object.assign(form, {
-    date: v.date, requesterId: v.requesterId, beneficiaryId: v.beneficiaryId, hasMainBeneficiaries: v.hasMainBeneficiaries, priority: String(v.priority),
-    amount: String(v.amount), currency: v.currency, purposeGroupId: v.purposeGroupId, purpose: v.purpose, ref1: v.reference1 ?? '', ref2: v.reference2 ?? '',
+    date: v.date, requesterId: v.requesterId, beneficiaryId: own ? '' : v.beneficiaryId, hasMainBeneficiaries: v.hasMainBeneficiaries, priority: String(v.priority),
+    amount: String(v.amount), currency: v.currency, purposeGroupId: own ? '' : v.purposeGroupId, purpose: v.purpose, ref1: v.reference1 ?? '', ref2: v.reference2 ?? '',
     method: v.method, transferAccount: v.transferAccount ?? '', cardNumber: v.cardNumber ?? '', payFromId: v.payFromId ?? '', dueDate: v.dueDate ?? '',
     departmentId: v.departmentId ?? '', attachments: String(v.attachments), note: v.note ?? '', chequeId: v.cheque?.instrumentId ?? '',
+    transferToId: v.transferToAccountId ?? '',
   })
   editing.value = { number: v.number, version: v.version }
   storedFiles.value = v.files ?? []
@@ -172,18 +190,21 @@ async function save() {
   const date = normaliseJalali(form.date)
   if (!date || (form.dueDate && !normaliseJalali(form.dueDate))) return show('error', translate('FiscalDate.Invalid', props.locale))
   if (!form.requesterId) return show('error', translate('PaymentRequest.RequesterRequired', props.locale))
-  if (!form.beneficiaryId) return show('error', translate('PaymentRequest.BeneficiaryRequired', props.locale))
+  const own = isOwn.value
+  if (!own && !form.beneficiaryId) return show('error', translate('PaymentRequest.BeneficiaryRequired', props.locale))
   if (!amount.value) return show('error', translate('PaymentRequest.AmountRequired', props.locale))
-  if (!form.purposeGroupId) return show('error', translate('PaymentRequest.PurposeGroupRequired', props.locale))
+  if (!own && !form.purposeGroupId) return show('error', translate('PaymentRequest.PurposeGroupRequired', props.locale))
   if (!form.purpose.trim()) return show('error', translate('PaymentRequest.PurposeRequired', props.locale))
+  if (own && !form.payFromId) return show('error', translate('PaymentRequest.TransferFromRequired', props.locale))
+  if (own && !form.transferToId) return show('error', translate('PaymentRequest.TransferToRequired', props.locale))
   if (isTransfer.value && !form.chequeId) return show('error', translate('PaymentRequest.ChequeRequired', props.locale))
   const input = {
-    date, requesterId: form.requesterId, beneficiaryId: form.beneficiaryId, purposeGroupId: form.purposeGroupId, purpose: form.purpose.trim(),
-    amount: amount.value, method: form.method, currency: form.currency, priority: Number(form.priority), reference1: form.ref1 || null,
-    reference2: form.ref2 || null, transferAccount: toLatinDigits(form.transferAccount.trim()) || null, cardNumber: toLatinDigits(form.cardNumber.trim()) || null,
+    date, requesterId: form.requesterId, beneficiaryId: own ? NO_ID : form.beneficiaryId, purposeGroupId: own ? NO_ID : form.purposeGroupId, purpose: form.purpose.trim(),
+    amount: amount.value, method: form.method, currency: form.currency, priority: Number(form.priority), reference1: own ? null : form.ref1 || null,
+    reference2: own ? null : form.ref2 || null, transferToAccountId: own ? form.transferToId : null, transferAccount: toLatinDigits(form.transferAccount.trim()) || null, cardNumber: toLatinDigits(form.cardNumber.trim()) || null,
     payFromId: isTransfer.value ? null : form.payFromId || null, dueDate: !isTransfer.value && form.dueDate ? normaliseJalali(form.dueDate) : null,
     chequeId: isTransfer.value ? form.chequeId : null, departmentId: form.departmentId || null,
-    hasMainBeneficiaries: form.hasMainBeneficiaries, attachments: Number(toLatinDigits(form.attachments) || 0), note: form.note || null,
+    hasMainBeneficiaries: !own && form.hasMainBeneficiaries, attachments: Number(toLatinDigits(form.attachments) || 0), note: form.note || null,
   }
   saving.value = true
   try {
@@ -240,13 +261,27 @@ onMounted(async () => {
       </label>
     </fieldset>
 
+    <!-- The kind of payment comes first: it decides which fields the request has (owner, 21 Nov 2026, answer to Q82). -->
     <fieldset>
-      <legend>{{ t('ذینفع و مبلغ', 'Beneficiary and amount') }}</legend>
-      <label class="wide">{{ t('ذینفع', 'Beneficiary') }}
-        <SearchSelect v-model="form.beneficiaryId" :options="beneficiaryChoices" required :aria-label="t('ذینفع', 'Beneficiary')"
-                      :none-text="t('ذینفعی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'Not found; define it in Basic Information first')" />
+      <legend>{{ t('نوع پرداخت', 'Payment method') }}</legend>
+      <label class="wide">{{ t('نوع پرداخت', 'Payment method') }}
+        <SearchSelect v-model="form.method" :options="methodChoices" required :aria-label="t('نوع پرداخت', 'Payment method')" />
       </label>
-      <label class="tr-check"><input v-model="form.hasMainBeneficiaries" type="checkbox" /> {{ t('پرداخت جمعی دارد (ذینفعان اصلی دارد)', 'Paid on to main beneficiaries') }}</label>
+      <p v-if="isOwn" class="tr-own-note full">
+        {{ t('نقل و انتقال بین دو حساب بانکی خود شرکت: به‌جای ذینفع و گروه بابت، حساب مبدأ (انتقال دهنده) و حساب مقصد (انتقال گیرنده) را در «نحوهٔ پرداخت» انتخاب کنید. پس از تایید، خزانه‌داری آن را در «پرداخت‌ها» با انتقال الکترونیکی یا چک صیادی انجام می‌دهد.',
+          "A transfer between two of the company's own bank accounts: instead of a beneficiary and a purpose group, choose the source and the destination account under \"How to pay\". Once approved, treasury carries it out under Payments by an electronic transfer or a Sayad cheque.") }}
+      </p>
+    </fieldset>
+
+    <fieldset>
+      <legend>{{ isOwn ? t('مبلغ', 'Amount') : t('ذینفع و مبلغ', 'Beneficiary and amount') }}</legend>
+      <template v-if="!isOwn">
+        <label class="wide">{{ t('ذینفع', 'Beneficiary') }}
+          <SearchSelect v-model="form.beneficiaryId" :options="beneficiaryChoices" required :aria-label="t('ذینفع', 'Beneficiary')"
+                        :none-text="t('ذینفعی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'Not found; define it in Basic Information first')" />
+        </label>
+        <label class="tr-check"><input v-model="form.hasMainBeneficiaries" type="checkbox" /> {{ t('پرداخت جمعی دارد (ذینفعان اصلی دارد)', 'Paid on to main beneficiaries') }}</label>
+      </template>
       <!-- «ثبت انتقال (خرج چک)»: the amount and currency are the cheque's (owner, 19 Nov 2026). -->
       <label v-if="isTransfer" class="req">{{ t('مبلغ (برابر مبلغ چک)', 'Amount (the cheque\'s)') }}
         <input class="ro" :value="amount ? formatAmount(amount, locale) : ''" readonly dir="ltr" :placeholder="t('چک را در «نحوهٔ پرداخت» انتخاب کنید', 'Choose the cheque below')" />
@@ -261,18 +296,22 @@ onMounted(async () => {
 
     <fieldset>
       <legend>{{ t('بابت', 'Purpose') }}</legend>
-      <label>{{ t('گروه بابت', 'Purpose group') }}
+      <!-- A transfer between the company's accounts has no purpose group; its purpose is written as it is. -->
+      <label v-if="isOwn" class="wide req">{{ t('بابت (شرح نقل و انتقال)', 'Purpose of the transfer') }}
+        <input v-model="form.purpose" maxlength="150" :placeholder="t('مثلاً: تأمین موجودی حساب …', 'e.g. to fund account …')" />
+      </label>
+      <label v-if="!isOwn">{{ t('گروه بابت', 'Purpose group') }}
         <SearchSelect v-model="form.purposeGroupId" :options="groupChoices" required :aria-label="t('گروه بابت', 'Purpose group')"
                       :none-text="t('گروه بابت پرداختی تعریف نشده است', 'No payment purpose group')" />
       </label>
-      <label class="wide req">{{ t('بابت', 'Purpose') }}
+      <label v-if="!isOwn" class="wide req">{{ t('بابت', 'Purpose') }}
         <ComboInput v-model="form.purpose" :options="purposes.filter(x => x.isActive).map(x => x.name)" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
                     :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
                     :none-text="form.purposeGroupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
                     :new-hint="form.purposeGroupId ? t('بابت تازه: با ثبت درخواست به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the request adds it to this group\'s list.') : ''" />
       </label>
-      <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="form.ref1" /></label>
-      <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="form.ref2" /></label>
+      <label v-if="!isOwn && group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="form.ref1" /></label>
+      <label v-if="!isOwn && group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="form.ref2" /></label>
       <!-- Owner's report no. 4, item 11: titled «واحد سازمانی درخواست کننده». -->
       <label v-if="departmentChoices.length">{{ t('واحد سازمانی درخواست کننده', 'Requesting department') }}
         <SearchSelect v-model="form.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('واحد سازمانی درخواست کننده', 'Requesting department')" />
@@ -281,9 +320,6 @@ onMounted(async () => {
 
     <fieldset>
       <legend>{{ t('نحوهٔ پرداخت', 'How to pay') }}</legend>
-      <label>{{ t('نوع پرداخت', 'Payment method') }}
-        <SearchSelect v-model="form.method" :options="methodChoices" required :aria-label="t('نوع پرداخت', 'Payment method')" />
-      </label>
       <label v-if="form.method === 'Transfer'" class="wide req">{{ t('انتقال به حساب بانکی (شبا)', 'Transfer to account (Sheba)') }}
         <!-- Owner's report no. 6, item 16: «IR» is fixed in the box; the 24 digits are typed after it. -->
         <ShebaInput v-model="form.transferAccount" :locale="locale" :aria-label="t('شماره شبا', 'Sheba')" />
@@ -303,6 +339,18 @@ onMounted(async () => {
         <label>{{ t('تاریخ سررسید چک', 'Cheque due date') }} <input class="ro" :value="cheque?.dueDate ?? ''" readonly dir="ltr" /></label>
         <label class="wide">{{ t('نام واگذارنده چک', 'Cheque given by') }} <input class="ro" :value="cheque?.counterparty ?? ''" readonly /></label>
         <label v-if="cheque?.details?.sayadId">{{ t('شماره صیادی چک', 'Sayad number') }} <input class="ro" :value="cheque.details.sayadId" readonly dir="ltr" /></label>
+      </template>
+      <!-- Owner, 21 Nov 2026 (answer to Q82): the two bank accounts of a transfer between the company's own accounts, both required. -->
+      <template v-else-if="isOwn">
+        <label class="wide">{{ t('حساب مبدأ (انتقال دهنده)', 'Source account (the payer)') }}
+          <SearchSelect v-model="form.payFromId" :options="payFromChoices" required :aria-label="t('حساب مبدأ (انتقال دهنده)', 'Source account')"
+                        :none-text="t('حساب بانکی فعالی با این ارز تعریف نشده است', 'No active bank account in this currency')" />
+        </label>
+        <label class="wide">{{ t('حساب مقصد (انتقال گیرنده)', 'Destination account (the receiver)') }}
+          <SearchSelect v-model="form.transferToId" :options="transferToChoices" required :aria-label="t('حساب مقصد (انتقال گیرنده)', 'Destination account')"
+                        :none-text="t('حساب بانکی دیگری با همین ارز نیست', 'No other bank account in this currency')" />
+        </label>
+        <label>{{ t('سررسید (اختیاری)', 'Due date (optional)') }} <input v-model="form.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
       </template>
       <template v-else>
         <label class="wide">{{ form.method === 'Cash' ? t('پرداخت از صندوق', 'Pay from cash desk') : t('پرداخت از حساب بانکی', 'Pay from bank account') }}
@@ -345,6 +393,7 @@ onMounted(async () => {
 <style scoped>
 .tr-card-bad { color: #b42318; font-size: .78rem; }
 .full { grid-column: 1 / -1; }
+.tr-own-note { margin: 0; padding: .6rem .9rem; border: 1px solid #d5dff3; border-radius: 10px; background: #f1f5fd; color: #2b3850; font-size: .85rem; line-height: 1.9; }
 .tr-files { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .tr-files li { display: flex; gap: .5rem; align-items: center; }
 </style>
