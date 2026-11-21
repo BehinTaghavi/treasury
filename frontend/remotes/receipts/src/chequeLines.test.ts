@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { lineIncomplete, lineTiming, rialOf, summariseLines, type ChequeLineFacts } from './chequeLines'
 import { receiptsMenu } from './receiptsMenu'
+import { paymentsMenu } from './paymentsMenu'
 import { menuItems } from '@treasury/ui-kit'
 
 const cheque = (over: Partial<ChequeLineFacts> = {}): ChequeLineFacts =>
@@ -52,14 +53,18 @@ describe('cheque lines of the receipt form (design approved by the owner, 20 Nov
 })
 
 describe('menu of «دریافت‌ها»', () => {
-  it('keeps the order the owner gave (report no. 6, item 12), with the list last in a coloured box', () => {
+  it('keeps the order the owner gave (report no. 6, item 12), the transfer screens of report no. 7 at the end of their groups, and the list last in a coloured box', () => {
     const items = menuItems(receiptsMenu)
     expect(items.map(i => i.title[0])).toEqual([
-      'دریافت چک', 'عملیات چک‌های دریافتی', 'دریافت نقدی', 'واریز به بانک', 'واریز به کارت بانک', 'دریافت سفته', 'عملیات سفته‌های دریافتی', 'اقدام حقوقی',
-      'فهرست جامع دریافت‌ها',
+      'دریافت چک', 'عملیات چک‌های دریافتی', 'دریافت چک – نقل و انتقال (انتقال گیرنده)', 'دریافت نقدی', 'واریز به بانک', 'واریز به کارت بانک',
+      'نقل و انتقال بانکی (الکترونیکی)', 'دریافت سفته', 'عملیات سفته‌های دریافتی', 'اقدام حقوقی', 'فهرست جامع دریافت‌ها',
     ])
     expect(items.filter(i => i.boxed).map(i => i.id)).toEqual(['list'])
     expect(new Set(items.map(i => i.id)).size).toBe(items.length)
+  })
+  it('names the payment side of a transfer cheque and the electronic transfer in «پرداخت‌ها» (report no. 7)', () => {
+    expect(menuItems(paymentsMenu).map(i => i.title[0])).toEqual(['پرداخت چک – نقل و انتقال (انتقال دهنده)', 'انتقال الکترونیکی بین بانک‌های شرکت'])
+    for (const g of paymentsMenu) expect(g.title?.every(x => x.length > 0)).toBe(true)
   })
   it('names every group but the boxed list in both languages', () => {
     for (const g of receiptsMenu.slice(0, -1)) expect(g.title?.every(x => x.length > 0)).toBe(true)

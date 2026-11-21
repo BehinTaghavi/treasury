@@ -9,6 +9,10 @@
  * Owner, 20 Nov 2026 (the design he approved): the kinds are no longer a row of tabs but a column beside the main menu (receiptsMenu.ts,
  * ui-kit SectionMenu), in the same order; each screen has its name as heading, one line of explanation, and the rest of the
  * explanation behind «راهنمای این فرم».
+ * Owner's report no. 7 (20 Nov 2026), «نقل و انتقال بین بانکی»: «دریافت چک – نقل و انتقال (انتقال گیرنده)» lists the cheques the company
+ * issued from one of its accounts for another and records their receipt; «نقل و انتقال بانکی (الکترونیکی)» is the electronic transfer
+ * (انتقال داخلی، پل، پایا، ساتنا). Both are also in «پرداخت‌ها» (Payments.vue). They are not receipts of a payer, so the receipts list
+ * under the forms is not shown with them.
  */
 import { computed, ref } from 'vue'
 import { createApi, menuItems, translate, type Locale } from '@treasury/ui-kit'
@@ -23,6 +27,8 @@ import ChequeOperations from './ChequeOperations.vue'
 import LegalAction from './LegalAction.vue'
 import ReceiptsPanel from './ReceiptsPanel.vue'
 import ReceiptPrint from './ReceiptPrint.vue'
+import ElectronicTransfer from './ElectronicTransfer.vue'
+import TransferChequeReceive from './TransferChequeReceive.vue'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -45,6 +51,8 @@ function startLegal(chequeId: string) { legalCheque.value = chequeId; tab.value 
  * Owner, 18 Nov 2026: on every receipt screen a button «فهرست دریافت‌ها» shows the receipts of that screen's kind under the form. The
  * cheque screens (steps, legal action) show the cheque receipts.
  */
+/** The screens of a transfer between the company's own accounts: no payer, no receipt number, so no receipts list under them. */
+const isTransfer = computed(() => tab.value === 'transferCheque' || tab.value === 'electronicTransfer')
 const panelKind = computed(() => (tab.value === 'Cash' || tab.value === 'BankDeposit' || tab.value === 'CardDeposit' ? tab.value
   : tab.value === 'Notes' || tab.value === 'noteSteps' ? 'Notes' : 'Instruments'))
 /** Counts saved receipts and recorded cheque steps, so an open list shows the new receipt or the cheque's new status at once. */
@@ -103,6 +111,17 @@ const hints: Partial<Record<Tab, { line: [string, string]; more?: [string, strin
     'Money the payer paid straight into a company bank account: slip, transfer, POS or card-to-card.'] },
   CardDeposit: { line: ['واریز مشتری به کارت بانکِ تنخواه‌گردان‌های شرکت، یا به کارت بانک شرکت که حساب بانکی ندارد: کارت به کارت، با فیش واریزی یا از درگاه پرداخت شرکت.',
     'Money a payer paid onto the bank card of one of the company\'s petty-cash holders, or onto a company bank card without a bank account: card to card, with a deposit slip or through the company\'s gateway.'] },
+  transferCheque: {
+    line: ['چک‌هایی که شرکت از یک حساب خود برای انتقال به حساب دیگرش صادر کرده است؛ دریافت آن‌ها در اینجا ثبت می‌شود.',
+      'Cheques the company issued from one of its accounts to move money to another; their receipt is recorded here.'],
+    more: ['نقل و انتقال بین دو حساب شرکت همزمان یک پرداخت (بانک انتقال دهنده) و یک دریافت (بانک انتقال گیرنده) است. ابتدا پرداخت چک در «پرداخت‌ها ← پرداخت چک – نقل و انتقال (انتقال دهنده)» ثبت می‌شود (پرداخت ثبت صیاد شد)؛ سپس با دگمهٔ همان فرم یا در اینجا، دریافت همان چک ثبت می‌شود. سند انتقال دهنده: بدهکار «وجوه در راه»، بستانکار بانک انتقال دهنده. سند انتقال گیرنده: بدهکار «اسناد نزد صندوق»، بستانکار «وجوه در راه».',
+      'A transfer between two accounts of the company is at once a payment (the paying bank) and a receipt (the receiving bank). The cheque is first entered under Payments → Cheque payment – transfer (the payer); then its receipt is recorded with the button of that form or here. Payer\'s voucher: debit funds in transit, credit the paying bank. Receiver\'s voucher: debit cheques in the cash desk, credit funds in transit.'],
+  },
+  electronicTransfer: {
+    line: ['جابجایی وجه بین دو حساب بانکی شرکت بدون چک: انتقال داخلی، پل، پایا یا ساتنا.', 'Money moved between two bank accounts of the company without a cheque: internal, Pol, Paya or Satna.'],
+    more: ['انتقال داخلی (حساب به حساب) بین دو حساب شرکت در یک بانک است؛ پل (مبالغ کم و فوری)، پایا (مبالغ متوسط) و ساتنا (مبالغ بالا) بین دو بانک متفاوت. سقف مبلغ هر روش در «اطلاعات پایه ← سقف‌های انتقال الکترونیکی» تعیین می‌شود و قابل تغییر است. همین صفحه در «پرداخت‌ها» هم هست.',
+      'The internal transfer is between two accounts of the company in one bank; Pol (small, urgent), Paya (middle) and Satna (large amounts) between two different banks. The limits of each way are kept, and changed, in Basic Information → Electronic transfer limits. The same screen is also under Payments.'],
+  },
   legal: {
     line: ['چک برگشتی را از فهرست انتخاب کنید؛ مشخصات آن نمایش داده می‌شود.', 'Choose the bounced cheque from the list; its particulars are shown.'],
     more: ['سپس تاریخ و شرح اقدام حقوقی را وارد و اسکن ضمائم را اضافه کنید. با ثبت، آخرین وضعیت چک «اقدام حقوقی» می‌شود.',
@@ -135,12 +154,15 @@ const helpOpen = ref(false)
       <ChequeOperations v-if="tab === 'collection'" :key="'collection' + locale" :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" @print="printReceipt" />
       <ChequeOperations v-else-if="tab === 'noteSteps'" :key="'noteSteps' + locale" notes :api-base="apiBase" :locale="locale" :token="token" @legal="startLegal" @changed="stepRecorded" />
       <LegalAction v-else-if="tab === 'legal'" :key="'legal' + locale + (legalCheque ?? '')" :api-base="apiBase" :locale="locale" :token="token" :cheque-id="legalCheque" @changed="stepRecorded" />
+      <TransferChequeReceive v-else-if="tab === 'transferCheque'" :key="'transferCheque' + locale" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear"
+                             @changed="stepRecorded" @steps="openTab('collection')" />
+      <ElectronicTransfer v-else-if="tab === 'electronicTransfer'" :key="'electronicTransfer' + locale" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" />
       <ReceiptList v-else-if="tab === 'list'" :api-base="apiBase" :locale="locale" :token="token" :fiscal-year="fiscalYear" @edit="startEdit" @print="printReceipt" />
       <NoteReceiptForm v-else-if="tab === 'Notes'" :key="'notes' + locale + (editing?.id ?? '')" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
                        @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" />
       <ReceiptForm v-else :key="tab + locale + (editing?.id ?? '')" :kind="tab" :api-base="apiBase" :locale="locale" :token="token" :edit="editing ?? undefined"
                    @saved="editing ? editSaved() : savedCount++" @cancelled="editing = null" @print="printReceipt" />
-      <ReceiptsPanel v-if="tab !== 'list'" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
+      <ReceiptsPanel v-if="tab !== 'list' && !isTransfer" :key="'panel' + panelKind + locale" :kind="panelKind" :api-base="apiBase" :locale="locale" :token="token"
                      :fiscal-year="fiscalYear" :refresh-key="savedCount" :editing-id="editing?.id" @edit="startEdit" @deleted="receiptDeleted" @print="printReceipt" />
       <!-- report no. 6, item 21: the printed receipt of the saved receipt chosen with «چاپ رسید» -->
       <ReceiptPrint v-if="printId" :key="printId + printRun" :receipt-id="printId" :api-base="apiBase" :locale="locale" :token="token" @close="printId = ''" />

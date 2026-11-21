@@ -8,6 +8,8 @@ namespace Treasury.Requests.Application.PaymentRequests;
 /// <summary>The request form as typed. Dates are Jalali text; requester, beneficiary and purpose group come from Basic Information.</summary>
 /// <param name="PayFromId">Optional: a cash desk for cash, otherwise a bank account.</param>
 /// <param name="ChequeId">«ثبت انتقال (خرج چک)»: the received cheque to hand on (owner, 19 Nov 2026).</param>
+/// <param name="TransferToAccountId">«نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026): the receiving company bank account; the
+/// beneficiary and the purpose group are then left empty and <paramref name="PayFromId"/> is the account the money leaves.</param>
 public sealed record PaymentRequestInput(
     string Date,
     Guid RequesterId,
@@ -28,7 +30,8 @@ public sealed record PaymentRequestInput(
     bool HasMainBeneficiaries = false,
     int Attachments = 0,
     string? Note = null,
-    Guid? ChequeId = null);
+    Guid? ChequeId = null,
+    Guid? TransferToAccountId = null);
 
 public sealed record RegisterPaymentRequestCommand(string IdempotencyKey, PaymentRequestInput Input);
 
@@ -53,7 +56,7 @@ public sealed record PaymentRequestView(
     string? PayFromKind, Guid? PayFromId, string? DueDate, Guid? DepartmentId, bool HasMainBeneficiaries, int Attachments, string? Note,
     string State, string RecordedBy, string? ApprovedBy, DateTimeOffset? ApprovedAt, string? CancelReason, long Version,
     IReadOnlyList<RequestAttachment>? Files = null, decimal PaidAmount = 0, IReadOnlyList<RequestPaymentView>? Payments = null,
-    TransferChequeView? Cheque = null)
+    TransferChequeView? Cheque = null, Guid? TransferToAccountId = null, decimal RemainingAmount = 0)
 {
     public static PaymentRequestView From(PaymentRequest r) => new(
         r.Id, r.FiscalYear, r.Number, r.Date.ToJalaliString(), r.RequesterId, r.RequesterName, r.RequesterDepartmentId, r.CostCenterCode,
@@ -62,7 +65,8 @@ public sealed record PaymentRequestView(
         r.DueDate?.ToJalaliString(), r.DepartmentId, r.HasMainBeneficiaries, r.Attachments, r.Note, r.State.ToString(), r.RecordedBy, r.ApprovedBy,
         r.ApprovedAt, r.CancelReason, r.Version, r.Files, r.PaidAmount,
         r.Payments.Select(p => new RequestPaymentView(p.Key, p.Kind, p.InstrumentId, p.Reference, p.Amount, p.Date.ToJalaliString(), p.UserId)).ToList(),
-        r.Cheque is { } c ? new TransferChequeView(c.InstrumentId, c.Number, c.DueDate?.ToJalaliString(), c.PayerName, c.BankName, c.SayadId) : null);
+        r.Cheque is { } c ? new TransferChequeView(c.InstrumentId, c.Number, c.DueDate?.ToJalaliString(), c.PayerName, c.BankName, c.SayadId) : null,
+        r.TransferToAccountId, r.RemainingAmount);
 }
 
 /// <summary>
@@ -218,10 +222,18 @@ public sealed class PaymentRequestUseCases(
 
         var requester = await reference.RequesterAsync(input.RequesterId, ct).ConfigureAwait(false)
             ?? throw new DomainException("PaymentRequest.RequesterRequired", "Choose the requester.");
-        var beneficiary = await reference.BeneficiaryAsync(input.BeneficiaryId, ct).ConfigureAwait(false)
+        // A transfer between the company's own accounts (answer to Q82) names two bank accounts, not a beneficiary and a purpose group.
+        var ownTransfer = input.Method == PaymentMethod.OwnAccountTransfer;
+        var beneficiary = ownTransfer ? null : await reference.BeneficiaryAsync(input.BeneficiaryId, ct).ConfigureAwait(false)
             ?? throw new DomainException("PaymentRequest.BeneficiaryRequired", "Choose the beneficiary.");
-        var group = await reference.PurposeGroupAsync(input.PurposeGroupId, ct).ConfigureAwait(false)
+        var group = ownTransfer ? null : await reference.PurposeGroupAsync(input.PurposeGroupId, ct).ConfigureAwait(false)
             ?? throw new DomainException("PaymentRequest.PurposeGroupRequired", "Choose the purpose group.");
+        PayFromFact? transferTo = null;
+        if (ownTransfer && input.TransferToAccountId is { } toId && toId != Guid.Empty)
+        {
+            transferTo = await accounts.BankAccountAsync(toId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.PayFromNotFound", "The bank account or cash desk was not found.");
+        }
         // «ثبت انتقال (خرج چک)»: the cheque is asked from cashflow-svc; a cheque is promised to one open request only.
         ReceivedChequeFact? cheque = null;
         if (input.Method == PaymentMethod.ChequeTransfer && input.ChequeId is { } chequeId && chequeId != Guid.Empty)
@@ -247,14 +259,21 @@ public sealed class PaymentRequestUseCases(
             FiscalDate.ParseJalali(input.Date), requester, beneficiary, group, input.Purpose ?? string.Empty, input.Amount, input.Currency ?? string.Empty,
             input.Method, input.Priority, input.Reference1, input.Reference2, input.TransferAccount, input.CardNumber, payFrom,
             string.IsNullOrWhiteSpace(input.DueDate) ? null : FiscalDate.ParseJalali(input.DueDate), input.DepartmentId, input.HasMainBeneficiaries,
-            input.Attachments, input.Note, cheque);
+            input.Attachments, input.Note, cheque, transferTo);
     }
 
     private async Task MarkInUseAsync(PaymentRequestForm form, CancellationToken ct)
     {
         await reference.MarkInUseAsync("requesters", form.Requester.Id, ct).ConfigureAwait(false);
-        await reference.MarkInUseAsync("beneficiaries", form.Beneficiary.Id, ct).ConfigureAwait(false);
-        await reference.MarkInUseAsync("purpose-groups", form.PurposeGroup.Id, ct).ConfigureAwait(false);
+        if (form.Beneficiary is { } beneficiary)
+        {
+            await reference.MarkInUseAsync("beneficiaries", beneficiary.Id, ct).ConfigureAwait(false);
+        }
+
+        if (form.PurposeGroup is { } group)
+        {
+            await reference.MarkInUseAsync("purpose-groups", group.Id, ct).ConfigureAwait(false);
+        }
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

@@ -10,7 +10,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { createApi, dueMark, dueWaitsFor, formatAmount, instrumentKindName, translate, type Locale } from '@treasury/ui-kit'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
-import { actionNameOf, isNoteKind, noteWording, stateNameOf, type Cheque, type Step } from './cheque'
+import { actionNameOf, isNoteKind, isTransferCheque, noteWording, stateNameOf, transferChequeMark, type Cheque, type Step } from './cheque'
 
 const props = withDefaults(defineProps<{
   chequeId: string; apiBase?: string; locale?: Locale; token?: () => string | undefined
@@ -93,6 +93,8 @@ function onCardClick(e: MouseEvent) {
       <div class="tr-buttons">
         <h3 style="margin: 0">{{ t(`کارت چک ${cheque.number ?? ''}`, `Cheque ${cheque.number ?? ''}`) }}</h3>
         <span v-if="!note && cheque.kind !== 'OrdinaryCheque'" class="tr-tag">{{ instrumentKindName(cheque.kind, locale) }}</span>
+        <!-- Owner's report no. 7: the company's own cheque, issued for a transfer between two of its bank accounts. -->
+        <span v-if="isTransferCheque(cheque)" class="tr-tag later">{{ transferChequeMark(locale) }}</span>
         <span class="tr-tag">{{ t('آخرین وضعیت', 'Latest status') }}: {{ stateName(cheque.state) }}</span>
         <span v-if="cheque.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(cheque.state, locale)">{{ dueMark(locale) }}</span>
         <span class="muted small"><template v-if="cheque.bankName">{{ cheque.bankName }} · </template>{{ cheque.counterparty }} · {{ cheque.dueDate ? `${t('سررسید', 'due')} ${cheque.dueDate}` : cheque.details?.onDemand ? t('عندالمطالبه', 'on demand') : '' }} · {{ money(cheque.amount) }} {{ cheque.currency }}<template v-if="cheque.details?.sayadId"> · {{ t('صیاد', 'Sayad') }} {{ cheque.details.sayadId }}</template><template v-if="cheque.purpose"> · {{ t('شرح', 'Description') }}: {{ cheque.purpose }}</template></span>
@@ -114,7 +116,9 @@ function onCardClick(e: MouseEvent) {
           </tr>
         </tbody>
       </table>
-      <p v-if="!vouchers.length" class="muted small">{{ t('سند دریافت این چک در فهرست دریافت‌ها (رسید آن) است؛ مرحله‌ای که سند حسابداری داشته باشد هنوز ثبت نشده است.',
+      <p v-if="isTransferCheque(cheque)" class="muted small">{{ t('این چک، چک نقل و انتقال بین بانک‌های شرکت است: سند دریافت آن (بدهکار اسناد نزد صندوق، بستانکار وجوه در راه) در «دریافت چک – نقل و انتقال (انتقال گیرنده)» تایید می‌شود و فقط ثبت صیادی، به بانک مقصد واگذار و وصول می‌شود.',
+        "This is a cheque of a transfer between the company's own accounts: its receipt voucher (debit cheques in the cash desk, credit funds in transit) is confirmed under «Cheque receipt – transfer (the receiver)», and it is only registered in Sayad, deposited at the destination bank and collected.") }}</p>
+      <p v-else-if="!vouchers.length" class="muted small">{{ t('سند دریافت این چک در فهرست دریافت‌ها (رسید آن) است؛ مرحله‌ای که سند حسابداری داشته باشد هنوز ثبت نشده است.',
         "This cheque's receipt voucher is on its receipt in the receipts list; no step with a voucher yet.") }}</p>
       <VoucherTable v-for="v in vouchers" :key="v.step" :voucher="v" :locale="locale" :account-name="ledgerAccountName" can-confirm :busy="confirming"
                     @confirm="confirmVoucher(v.step)" />

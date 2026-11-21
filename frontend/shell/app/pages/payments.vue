@@ -1,7 +1,10 @@
 <script setup lang="ts">
-const { t } = useShell()
+const { locale, fiscalYear } = useShell()
+const { $apiBase } = useNuxtApp()
 </script>
 
 <template>
-  <p class="muted">{{ t('این صفحه در فازهای بعدی به‌صورت یک micro-frontend جداگانه اضافه می‌شود.', 'This area will be added as a separate micro-frontend in a later phase.') }}</p>
+  <!-- The payments area (owner's report no. 7: transfers between the company's bank accounts) is exposed by the receipts micro-frontend
+       (frontend/remotes/receipts, ./Payments) and loaded at run time; the other payment screens join it in Phase E. -->
+  <RemoteArea module="receipts/Payments" :component-props="{ locale, apiBase: $apiBase, fiscalYear }" :key="locale + fiscalYear" />
 </template>
