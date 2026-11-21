@@ -27,6 +27,7 @@ public sealed class ChequeStatusTests
         [FixedAccount.BadDebts] = "8101",
         [FixedAccount.ProtestedChequesInLegal] = "1204",
         [FixedAccount.GuaranteeChequesInLegal] = "9102",
+        [FixedAccount.GuaranteeNotesForCompany] = "9103",
     });
 
     private static Instrument Cheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string received = "1405/08/01", string? due = "1405/09/01") =>
@@ -146,7 +147,15 @@ public sealed class ChequeStatusTests
         var v = ReceiptVouchers.ForStep(cheque, 2, Bank, null, Template());
         Assert.Equal([(true, "9102", "200015"), (false, "9101", "200015")], Lines(v));
         Assert.Equal("اقدام حقوقی چک تضمینی", v!.Operation);
-        Assert.Equal([(true, "9102", "200015"), (false, "9101", "200015")], Lines(ReceiptVouchers.ForStep(note, 2, Bank, null, Template())));
+        // A guarantee note is in its own memorandum account, «سفته انتظامی به نفع شرکت» (owner's table «دریافت سفته انتظامی», 16 Nov 2026):
+        // the legal action credits that account, and handing the note back to the cash desk debits it again.
+        var noteVoucher = ReceiptVouchers.ForStep(note, 2, Bank, null, Template());
+        Assert.Equal([(true, "9102", "200015"), (false, "9103", "200015")], Lines(noteVoucher));
+        Assert.Equal("اقدام حقوقی سفته تضمینی", noteVoucher!.Operation);
+        var handedBack = Cheque(InstrumentKind.GuaranteeNote, due: null);
+        handedBack.SendToLegal(D("1405/08/10"), User, "اقدام حقوقی روی سفته تضمینی");
+        handedBack.ReturnFromLegal(D("1405/08/20"), User);
+        Assert.Equal([(true, "9103", "200015"), (false, "9102", "200015")], Lines(ReceiptVouchers.ForStep(handedBack, 3, Bank, null, Template())));
 
         // Cancelled in legal action: out of the account it is in now (answer to the owner's point 3).
         cheque.CancelReceived(D("1405/09/01"), User, "م-3", D("1405/08/30"), "پایان دعوی");

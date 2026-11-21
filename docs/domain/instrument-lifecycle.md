@@ -10,13 +10,13 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | Old | New state | Reached by | From | Old form | Kinds |
 |---|---|---|---|---|---|
 | 11 | InCashDesk | Receive | — | D_Check | all |
-| 12 | DepositedForCollection | DepositForCollection (needs collection account) | SayadRegistered (rule N3; in the old data: InCashDesk) | D_Check_Vag_m; owner, 18 Nov 2026 | ordinary, bank cheque |
+| 12 | DepositedForCollection | DepositForCollection (needs collection account) | a cheque: SayadRegistered (rule N3; in the old data: InCashDesk); an ordinary promissory note: InCashDesk (a note is not in Sayad) | D_Check_Vag_m; owner, 16 and 18 Nov 2026 | ordinary and bank cheque; ordinary promissory note (owner, 16 Nov 2026) |
 | 13 | Cleared | RecordCleared | DepositedForCollection | D_Check_vos_m | all |
 | 14 | Bounced | RecordBounced | DepositedForCollection | D_Check_vos_m, Checkbacked | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | InCashDesk | D_Check_Od_m | all |
-| 16 | Endorsed | Endorse (receiver تفصیل, payment purpose group, purpose, Sayad tracking no.) | InCashDesk | D_Check_Kh_m | ordinary, bank cheque |
+| 16 | Endorsed | Endorse (receiver تفصیل, payment purpose group, purpose, Sayad tracking no.) | InCashDesk | D_Check_Kh_m | ordinary and bank cheque; ordinary promissory note (owner, 16 Nov 2026) |
 | — | ReturnedFromBank (عودت شده از بانک) | ReturnFromBank | DepositedForCollection | owner's item 14 (c) | all |
-| 12 | DepositedForCollection | DepositForCollection again | ReturnedFromBank | owner's item 14, Q33 | ordinary, bank cheque |
+| 12 | DepositedForCollection | DepositForCollection again | ReturnedFromBank | owner's item 14, Q33 | ordinary and bank cheque; ordinary promissory note (owner, 16 Nov 2026) |
 | 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
 | 14 | Bounced | RecordEndorsementReturned (bounce notice no.) | Endorsed | owner's item 14 (h) | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | manual | all |
@@ -36,6 +36,8 @@ Latest status as the owner described it on 18 Nov 2026 (`received-cheque-steps.m
 the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be replaced or cancelled.
 **«سررسید چک» is not a state**: it is a mark on a post-dated cheque (due after the day it was received) that is still in the cash
 desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDueDate`); no step is recorded for it.
+
+**Promissory notes (owner, 16 Nov 2026: «مراحل سفته پس از دریافت شامل واگذاری به بانک، وصول، استرداد، خرج سفته (ظهرنویسی و انتقال به غیر) و …»).** A received note follows the same states and steps as a received cheque, with other kinds allowed: an **ordinary** note (`PromissoryNote`) may now be deposited at the bank and endorsed (old rule R3 allowed ordinary and bank cheques only). **A note is not in the Sayad system**: the step «ثبت صیادی» is for cheques only, so rule N3 (18 Nov 2026) does not hold a note back and an ordinary note goes to the bank straight from the cash desk — the one line of the table where a note and a cheque start from different states. A **guarantee or trust** note (`GuaranteeNote`) is only handed back («استرداد», ReturnToIssuer) or cancelled, or gets a legal action; a protested ordinary note may get a legal action too (owner, 18 Nov 2026). For a note the bounce is its protest («واخواست», with the protest's number), the return to the payer is «استرداد به متعهد», and an endorsement has no Sayad transfer. A note payable on demand has no due date, so rule N2 does not hold it back. Screen: «عملیات سفته‌های دریافتی». Confirmed by the owner's answers to QN13–QN16; converting a guarantee note to an ordinary one and replacing a note are not needed.
 
 ## Issued (old Dp = 2)
 

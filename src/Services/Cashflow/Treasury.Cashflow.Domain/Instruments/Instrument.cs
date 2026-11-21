@@ -79,7 +79,8 @@ public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, str
 
 /// <summary>
 /// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
-/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32).
+/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32). An endorsed promissory
+/// note («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026) has no Sayad transfer.
 /// </summary>
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
 
@@ -152,7 +153,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Date written on the instrument (received side: date received).</summary>
     public FiscalDate IssueDate { get; }
 
-    /// <summary>Maturity (سررسید). Null only for guarantee items.</summary>
+    /// <summary>Maturity (سررسید). Null only for guarantee items and notes payable on demand («عندالمطالبه»).</summary>
     public FiscalDate? DueDate { get; }
 
     public CounterpartyRef Counterparty { get; }
@@ -198,7 +199,8 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// A cheque or note received on a receipt (رسید دریافت), with what is written on it. A cheque needs its bank (rule R1); a
-    /// promissory note has no bank and may name up to two guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»).
+    /// promissory note has no bank and may name up to three guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»; owner's
+    /// answer to QN3).
     /// </summary>
     public static Instrument Receive(
         Guid id,
@@ -218,8 +220,14 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
         Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
         Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
-        ValidateCommon(kind, drawer, purpose, dueDate);
         var checkedDetails = details.Validated(kind);
+
+        // Owner's note receipt form (16 Nov 2026): a note payable on demand («عندالمطالبه») has no due date; a dated note is not due
+        // before the day it was written (old rule R6, which the old program applied to cheques).
+        ValidateCommon(kind, drawer, purpose, dueDate, checkedDetails.OnDemand);
+        Require(!checkedDetails.OnDemand || dueDate is null, "Instrument.OnDemandHasDueDate", "A note payable on demand has no due date.");
+        Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
+            "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
 
         var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
             string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
@@ -296,11 +304,12 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// Rule N3 (owner, 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ چک بدون آن به بانک واگذار نمی‌شود"): a cheque still «نزد صندوق» is
-    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m).
+    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m). A promissory note is not in Sayad: an ordinary note
+    /// goes from the cash desk to the bank (owner, 16 Nov 2026), and the lifecycle table decides which notes may.
     /// </summary>
     private void RequireSayadRegistration()
     {
-        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk)
+        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && Kind.IsCheque())
         {
             Require(Kind.IsCollectable(), "Instrument.KindNotAllowedForAction", $"'{InstrumentAction.DepositForCollection}' is not allowed for {Kind}."); // R3
             throw new DomainException("Instrument.SayadRegistrationRequired", "Register the cheque in Sayad before depositing it at the bank.");
@@ -391,11 +400,13 @@ public sealed class Instrument : AggregateRoot<Guid>
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
         Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        // Only cheques are transferred in the Sayad system; a note is endorsed on its back.
+        var sayad = Kind.IsCheque() ? Clean(endorsement.SayadTracking) : null;
+        Require(!Kind.IsCheque() || sayad is not null, "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
         Require(endorsement.PaymentRequestId != Guid.Empty, "Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
-        Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
+        Apply(InstrumentAction.Endorse, date, userId, sayad, note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
-                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim(),
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: sayad,
                 PaymentRequestId: endorsement.PaymentRequestId));
     }
 
@@ -577,12 +588,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         }
     }
 
-    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate)
+    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate, bool onDemand = false)
     {
         ArgumentNullException.ThrowIfNull(counterparty);
         Require(!string.IsNullOrWhiteSpace(counterparty.DisplayName), "Instrument.CounterpartyRequired", "Drawer or payee is required.");
         Require(!string.IsNullOrWhiteSpace(purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(kind.IsGuarantee() || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+        Require(kind.IsGuarantee() || onDemand || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
     }
 
     private static void Require(bool condition, string code, string message)

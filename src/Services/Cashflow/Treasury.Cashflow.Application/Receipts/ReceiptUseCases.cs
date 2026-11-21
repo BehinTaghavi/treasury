@@ -47,6 +47,37 @@ public sealed record ReceivedInstrumentInput(
 
 public sealed record RecordInstrumentReceiptCommand(string IdempotencyKey, ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
+/// <summary>One promissory note on the note receipt form (owner's form «فرم دریافت سفته», 16 Nov 2026). Amounts are in Rial.</summary>
+/// <param name="IssueDate">«تاریخ صدور» written on the note (Jalali text); optional.</param>
+/// <param name="DueDate">«تاریخ سررسید»; required with «معین», not given with «عندالمطالبه».</param>
+public sealed record NoteLineInput(string Number, string? IssueDate, string? DueDate, decimal Amount, NoteChecks? Checks = null);
+
+/// <summary>A guarantor or endorser («ضامن / ظهرنویس») on the note receipt form.</summary>
+/// <param name="DetailCode">Its تفصیل, when it has one; the name is then taken from it unless typed.</param>
+/// <param name="NoteNumber">The note it guarantees («شماره سفته مرتبط»); empty: every note on the receipt.</param>
+public sealed record NoteGuarantorInput(string? Name, string? NationalCode = null, string? DetailCode = null, string? Phone = null, string? NoteNumber = null);
+
+/// <summary>The receipt-level part of the note receipt form; dates are Jalali text.</summary>
+public sealed record NoteTermsInput(
+    NoteReason Reason,
+    NoteForm Form,
+    NoteMaturity Maturity,
+    string? IssuerNationalCode = null,
+    string? IssuerPhone = null,
+    string? CommitmentSubject = null,
+    string? ReturnTerms = null,
+    string? CustodyPlace = null,
+    bool OriginalReceived = false,
+    string? OriginalReceivedOn = null,
+    string? Discrepancy = null,
+    NoteAttachments? Attachments = null,
+    string? DeliveredBy = null);
+
+/// <param name="SignerIds">The authorised signatories chosen by the signature rule of the note receipt (Basic Information).</param>
+public sealed record RecordNoteReceiptCommand(
+    string IdempotencyKey, ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null,
+    IReadOnlyList<Guid>? SignerIds = null);
+
 public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string Date, string Reason, long ExpectedVersion);
 
 /// <summary>Replacement of a received cheque (تعویض, owner's item 14 (d)): a cheque receipt of the new cheques, from the same payer.</summary>
@@ -57,6 +88,17 @@ public sealed record EndorseChequeCommand(string IdempotencyKey, Guid Instrument
 
 /// <summary>The receiver brings an endorsed cheque back bounced (owner's item 14 (h)), with the bank's bounce notice.</summary>
 public sealed record EndorsementReturnedCommand(string IdempotencyKey, Guid InstrumentId, string Date, string? NoticeNumber, string? Reason = null, string? TrackingCode = null);
+
+/// <summary>The receipt-level part of a note receipt as the screens and the printed receipt show it.</summary>
+public sealed record NoteTermsView(
+    string Reason, string Form, string Maturity, string? IssuerNationalCode, string? IssuerPhone, string? CommitmentSubject, string? ReturnTerms,
+    string? CustodyPlace, bool OriginalReceived, string? OriginalReceivedOn, string? Discrepancy, NoteAttachments Attachments, string? DeliveredBy,
+    IReadOnlyList<ReceiptSigner> Signers)
+{
+    public static NoteTermsView? From(NoteReceiptTerms? t) => t is null ? null : new(
+        t.Reason.ToString(), t.Form.ToString(), t.Maturity.ToString(), t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace,
+        t.OriginalReceived, t.OriginalReceivedOn?.ToJalaliString(), t.Discrepancy, t.Attachments ?? new NoteAttachments(), t.DeliveredBy, t.Signers ?? []);
+}
 
 public sealed record ReceiptView(
     Guid Id,
@@ -91,7 +133,8 @@ public sealed record ReceiptView(
     IReadOnlyList<InstrumentView>? Instruments = null,
     Guid? ReplacedInstrumentId = null,
     IReadOnlyList<ChequeStatusView>? ChequeStatuses = null,
-    string? PayerSheba = null)
+    string? PayerSheba = null,
+    NoteTermsView? NoteTerms = null)
 {
     /// <param name="statuses">The latest state of the receipt's cheques, for the list (owner, 18 Nov 2026: the «وضعیت» column).</param>
     public static ReceiptView From(Receipt r, IReadOnlyList<Instrument>? instruments = null, FiscalDate? today = null, IReadOnlyList<ChequeStatusView>? statuses = null) => new(
@@ -100,7 +143,8 @@ public sealed record ReceiptView(
         r.AccountKind?.ToString(), r.AccountId, r.Method?.ToString(), r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial,
         r.TotalRial, r.InstrumentIds.Count, r.State.ToString(), r.CancelledOn?.ToJalaliString(), r.CancelReason, r.RecordedBy, r.Version,
         instruments?.Select(i => InstrumentView.From(i, today)).ToList(), r.ReplacedInstrumentId,
-        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba);
+        statuses ?? instruments?.Select(i => new ChequeStatusView(i.State.ToString(), today is { } t && i.HasReachedDueDate(t))).ToList(), r.PayerSheba,
+        NoteTermsView.From(r.NoteTerms));
 }
 
 /// <summary>The latest state of one cheque or note of a receipt; <see cref="ReachedDueDate"/> marks «سررسید چک».</summary>
@@ -127,6 +171,9 @@ public sealed class ReceiptUseCases(
     IPaymentRequestLookup paymentRequests,
     TimeProvider? clock = null)
 {
+    /// <summary>The name reference-svc gives the note receipt among the documents with a signature rule.</summary>
+    public const string NoteReceiptDocument = "NoteReceipt";
+
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
 
@@ -178,6 +225,31 @@ public sealed class ReceiptUseCases(
         }, cancellationToken);
 
     /// <summary>
+    /// Promissory notes of one issuer on a note receipt (owner's form «فرم دریافت سفته», 16 Nov 2026; report no. 4, item 13), numbered in
+    /// a series of their own. Each note becomes an instrument in the cash desk, saved with the receipt in one transaction (ADR 0002).
+    /// </summary>
+    public Task<Result<Guid>> RecordNotesAsync(RecordNoteReceiptCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var (receipt, created) = await BuildNotesAsync(command, preview: false, ct).ConfigureAwait(false);
+            await reference.MarkInUseAsync("purpose-groups", receipt.PurposeGroupId, ct).ConfigureAwait(false);
+            await receipts.AddAsync(receipt, ct).ConfigureAwait(false);
+            foreach (var note in created)
+            {
+                await instruments.AddAsync(note, ct).ConfigureAwait(false);
+            }
+
+            return Result<Guid>.Ok(receipt.Id);
+        }, cancellationToken);
+
+    public Task<Result<VoucherView>> PreviewNotesAsync(RecordNoteReceiptCommand command, CancellationToken cancellationToken) =>
+        PreviewAsync(async ct =>
+        {
+            var (receipt, created) = await BuildNotesAsync(command, preview: true, ct).ConfigureAwait(false);
+            return (receipt, (IReadOnlyList<Instrument>)created, (LedgerSide?)null, (Replacement?)null);
+        }, cancellationToken);
+
+    /// <summary>
     /// Replacement («تعویض», owner's item 14 (d)): the new cheques come on a cheque receipt of their own (cheque receipt numbers) that names
     /// the old cheque, which becomes «تعویض شده». They may differ in amount and number (answer to Q31). The receipt, the new cheques and
     /// the old cheque are saved in one transaction (ADR 0002 amendment).
@@ -220,7 +292,8 @@ public sealed class ReceiptUseCases(
     /// Endorsement («خرج چک», owner's item 14 (g)): the cheque pays an approved payment request (answer to Q36). The request's beneficiary
     /// receives it and its payment purpose group (debited on the voucher) and purpose are taken; the cheque may pay the request in full or
     /// in part, never more than remains; the Sayad transfer's tracking number is required (answer to Q32). The payment is recorded on the
-    /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice.
+    /// request in requests-svc under a key of the cheque and step, so a retried command does not pay twice. An ordinary promissory note
+    /// is endorsed the same way («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026), without a Sayad transfer.
     /// </summary>
     public Task<Result<Guid>> EndorseAsync(EndorseChequeCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
@@ -260,7 +333,8 @@ public sealed class ReceiptUseCases(
                 date, currentUser.UserId, command.Note);
             var key = cheque.EndorsementPaymentKey(cheque.History.Count);
             await paymentRequests.RecordPaymentAsync(request.Id,
-                new RequestPaymentInput(key, cheque.Id, $"چک {cheque.Number} {cheque.BankName}".Trim(), cheque.Amount.Amount, cheque.Amount.Currency, date.ToJalaliString()), ct)
+                new RequestPaymentInput(key, cheque.Id, (cheque.Kind.IsNote() ? $"سفته {cheque.Number}" : $"چک {cheque.Number} {cheque.BankName}").Trim(), cheque.Amount.Amount,
+                    cheque.Amount.Currency, date.ToJalaliString()), ct)
                 .ConfigureAwait(false);
             await instruments.SaveAsync(cheque, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(cheque.Id);
@@ -416,6 +490,75 @@ public sealed class ReceiptUseCases(
         return (Receipt.RecordInstruments(receiptId, number, header, created, user, replaces), created, duplicate);
     }
 
+    private async Task<(Receipt Receipt, List<Instrument> Created)> BuildNotesAsync(RecordNoteReceiptCommand command, bool preview, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(command.Terms);
+        ArgumentNullException.ThrowIfNull(command.Notes);
+        if (command.Notes.Count > MaxInstruments)
+        {
+            throw new DomainException("Receipt.TooManyInstruments", $"At most {MaxInstruments} cheques and notes on one receipt.");
+        }
+
+        var (header, date) = await HeaderAsync(command.Header, ct).ConfigureAwait(false);
+        var t = command.Terms;
+        var terms = new NoteReceiptTerms(
+            t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
+            string.IsNullOrWhiteSpace(t.OriginalReceivedOn) ? null : FiscalDate.ParseJalali(t.OriginalReceivedOn), t.Discrepancy, t.Attachments, t.DeliveredBy);
+        var rule = await reference.SignatureRuleAsync(NoteReceiptDocument, ct).ConfigureAwait(false);
+
+        // Guarantors come from the تفصیل list or are typed; each guarantees one note («شماره سفته مرتبط») or all of them.
+        var numbers = command.Notes.Select(n => n.Number?.Trim() ?? string.Empty).ToList();
+        var guarantors = new List<(NoteGuarantor Guarantor, string? NoteNumber)>();
+        foreach (var g in command.Guarantors ?? [])
+        {
+            var name = g.Name;
+            var code = string.IsNullOrWhiteSpace(g.DetailCode) ? null : g.DetailCode.Trim();
+            if (code is not null)
+            {
+                var detail = await reference.PayerAsync(code, ct).ConfigureAwait(false)
+                    ?? throw new DomainException("Receipt.GuarantorDetailNotFound", "The guarantor's تفصیل was not found.");
+                name = string.IsNullOrWhiteSpace(name) ? detail.Name : name;
+            }
+
+            var noteNumber = string.IsNullOrWhiteSpace(g.NoteNumber) ? null : g.NoteNumber.Trim();
+            if (noteNumber is not null && !numbers.Contains(noteNumber))
+            {
+                throw new DomainException("Receipt.GuarantorNoteNotFound", $"Note {noteNumber} named for a guarantor is not on this receipt.");
+            }
+
+            guarantors.Add((new NoteGuarantor(name ?? string.Empty, g.NationalCode, code, g.Phone), noteNumber));
+        }
+
+        var receiptId = Guid.NewGuid();
+        var payer = CounterpartyRef.ForDetail(header.Payer.DetailCode, header.Payer.Name);
+        var user = currentUser.UserId;
+        var kind = terms.InstrumentKind;
+        var onDemand = terms.Maturity == NoteMaturity.OnDemand;
+        var created = new List<Instrument>();
+        var seen = new HashSet<string>();
+        foreach (var line in command.Notes)
+        {
+            var number = line.Number?.Trim() ?? string.Empty;
+            var details = new ReceivedInstrumentDetails(
+                Guarantors: guarantors.Where(g => g.NoteNumber is null || g.NoteNumber == number).Select(g => g.Guarantor).ToList(),
+                WrittenOn: string.IsNullOrWhiteSpace(line.IssueDate) ? null : FiscalDate.ParseJalali(line.IssueDate).Value,
+                OnDemand: onDemand,
+                Checks: line.Checks ?? new NoteChecks());
+            var note = Instrument.Receive(
+                Guid.NewGuid(), kind, number, null, new MoneyInput(line.Amount).ToMoney(), date,
+                string.IsNullOrWhiteSpace(line.DueDate) ? null : FiscalDate.ParseJalali(line.DueDate), payer, header.Purpose, user, details, receiptId);
+            if (!seen.Add(note.Number!))
+            {
+                throw new DomainException("Receipt.SameInstrumentTwice", $"Cheque or note {note.Number} is entered twice on this receipt.");
+            }
+
+            created.Add(note);
+        }
+
+        var receiptNumber = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Notes, ct).ConfigureAwait(false);
+        return (Receipt.RecordNotes(receiptId, receiptNumber, header, terms, created, user, rule, command.SignerIds), created);
+    }
+
     public Task<Result<Guid>> CancelAsync(CancelReceiptCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
@@ -453,12 +596,13 @@ public sealed class ReceiptUseCases(
                 return null;
             }
 
-            IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(id, ct).ConfigureAwait(false) : [];
+            IReadOnlyList<Instrument> lines = receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes
+                ? await instruments.ListByReceiptAsync(id, ct).ConfigureAwait(false) : [];
             return ReceiptView.From(receipt, lines, IranClock.Today(clock));
         }, cancellationToken);
 
     /// <summary>
-    /// Receipts of a fiscal year, newest first, each with the latest state of its cheques (owner, 18 Nov 2026: the last column of the
+    /// Receipts of a fiscal year, newest first, each with the latest state of its cheques or notes (owner, 18 Nov 2026: the last column of the
     /// receipts list is the latest status); open a receipt to see the cheques themselves.
     /// </summary>
     public Task<IReadOnlyList<ReceiptView>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken) =>
@@ -466,11 +610,11 @@ public sealed class ReceiptUseCases(
         {
             var list = await receipts.ListAsync(fiscalYear, kind, ct).ConfigureAwait(false);
             var today = IranClock.Today(clock);
-            var withCheques = list.Where(r => r.Kind == ReceiptKind.Instruments).Select(r => r.Id).ToList();
+            var withCheques = list.Where(r => r.Kind is ReceiptKind.Instruments or ReceiptKind.Notes).Select(r => r.Id).ToList();
             var statuses = (await instruments.ListStatusesByReceiptsAsync(withCheques, ct).ConfigureAwait(false)).ToLookup(
                 s => s.ReceiptId,
                 s => new ChequeStatusView(s.State.ToString(), ReceivedChequeStatus.HasReachedDueDate(s.State, s.ReceivedOn, s.DueDate, today)));
-            return list.Select(r => ReceiptView.From(r, statuses: r.Kind == ReceiptKind.Instruments ? statuses[r.Id].ToList() : null)).ToList();
+            return list.Select(r => ReceiptView.From(r, statuses: r.Kind is ReceiptKind.Instruments or ReceiptKind.Notes ? statuses[r.Id].ToList() : null)).ToList();
         }, cancellationToken);
 
     /// <summary>Old D_Naghd / D_variz: date, payer and purpose are required; the date must be in an open fiscal period (rule R2).</summary>

@@ -37,4 +37,14 @@ button:disabled { opacity: .5; cursor: default; }
 .muted { color: #7b8794; }
 .small { font-size: .8rem; }
 .tr-scroll { overflow-x: auto; }
+.wide3 { grid-column: 1 / -1; }
+/* Note receipt form (owner's form «فرم دریافت سفته», 16 Nov 2026): tables of persons and notes inside a block, groups of ticks. */
+fieldset.tr-block { display: block; }
+.tr-group { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
+.tr-ticks { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; align-items: center; min-height: 2.3rem; }
+.tr-ticks label, .tr-table label.tick { flex-direction: row; align-items: center; gap: .35rem; }
+.tr-table td input:not([type=checkbox]):not([type=radio]) { width: 100%; min-width: 7rem; }
+.tr-box { display: block; padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; background: #eef1f5; color: #52606d; min-height: 2.3rem; }
+.tr-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr)); gap: .4rem 1.5rem; margin-top: .75rem; padding: .75rem; background: #fff;
+  border: 1px solid #e4e7eb; border-radius: 6px; font-size: .9rem; }
 @media (max-width: 720px) { .wide { grid-column: auto; } }

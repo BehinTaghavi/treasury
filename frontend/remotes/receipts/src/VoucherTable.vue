@@ -32,6 +32,8 @@ const fixedNames: Record<string, [string, string]> = {
   GuaranteeChequesForCompany: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
   GuaranteeCounterpart: ['طرف حساب انتظامی', 'Guarantee counterpart'],
   BadDebts: ['مطالبات سوخت شده', 'Bad debts written off'],
+  GuaranteeNotesForCompany: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
+  NotesInCollection: ['سفته‌های در جریان وصول', 'Notes in collection'],
 }
 const missingName = (k: string) => (fixedNames[k] ? (props.locale === 'fa' ? fixedNames[k][0] : fixedNames[k][1]) : k)
 const confirmed = computed(() => props.voucher.confirmedBy !== null)

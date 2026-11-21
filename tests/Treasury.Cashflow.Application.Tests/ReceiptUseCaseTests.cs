@@ -66,6 +66,11 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
         _ => null,
     });
 
+    /// <summary>The signature rule of the note receipt set in Basic Information; null: none set.</summary>
+    public SignatureRuleFact? NoteReceiptRule { get; set; }
+
+    public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) => Check(document == "NoteReceipt" ? NoteReceiptRule : null);
+
     public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {
         _ = Check<object>(null);

@@ -52,8 +52,16 @@ company's account codes for the fixed accounts of this table: اسناد نزد 
 - One voucher for each receipt or operation (each step of a cheque); the treasurer confirms it. A voucher with an account not set
   cannot be confirmed; a confirmed voucher keeps its lines and its receipt can no longer be cancelled.
 
-Built so far: receipts (cash, bank, cheques, guarantee cheques) and the steps of a received cheque: deposit at the bank, collected,
-returned by the bank, bounced, replaced, cancelled, endorsed and its return (`received-cheque-steps.md`), and since 18 Nov 2026 the
-return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's receipt credited, confirmed by the owner, Q41) and the
-legal action (Dr «اسناد واخواست شده حقوقی شده», answer to Q38) (`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی» and
-«سررسید چک» have no voucher (answers to Q37 and Q39). On screens and in voucher texts the bank's paper is «گواهی عدم پرداخت». Next with their screens: payments, petty cash, notes and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
+Built so far: receipts (cash, bank, cheques, guarantee cheques, ordinary and guarantee promissory notes) and the steps of a received
+cheque: deposit at the bank, collected, returned by the bank, bounced, replaced, cancelled, endorsed and its return
+(`received-cheque-steps.md`), and since 18 Nov 2026 the return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's
+receipt credited, confirmed by the owner, Q41) and the legal action (Dr «اسناد واخواست شده حقوقی شده», answer to Q38)
+(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی» and «سررسید چک» have no voucher (answers to Q37 and Q39). On screens
+and in voucher texts the bank's paper is «گواهی عدم پرداخت». A guarantee note uses the fixed account «سفته انتظامی به نفع شرکت»; a
+note received in trust («امانی») is booked the same way (owner's answer to QN1, 16 Nov 2026). The steps of a received note (owner,
+16 Nov 2026) are built too: deposit at the bank with «سفته های در جریان وصول», collected, returned by the bank, protested, endorsed,
+cancelled, and handing a note back («استرداد»): a guarantee note reverses the off-balance entry; an ordinary note debits «بدهکاران»
+(the معین of its receipt's purpose group, obligor) and credits «اسناد نزد صندوق / اسناد دریافتنی» (owner's answer to QN14) — the same
+voucher as a cheque returned to its payer. A legal action on a guarantee note credits «سفته انتظامی به نفع شرکت», the account the
+note is in (for a guarantee cheque: «چک انتظامی به نفع شرکت»); a protested ordinary note in legal action follows the cheque's voucher.
+Next with their screens: payments, petty cash and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

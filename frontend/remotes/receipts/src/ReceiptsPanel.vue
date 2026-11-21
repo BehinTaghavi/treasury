@@ -10,7 +10,9 @@ import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import { depositMethodName, depositMethods } from './depositMethods'
 
-type Kind = 'Cash' | 'BankDeposit' | 'Instruments'
+type Kind = 'Cash' | 'BankDeposit' | 'Instruments' | 'Notes'
+/** Cheque and note receipts list their items and those items' latest status. */
+const hasItems = (k: Kind) => k === 'Instruments' || k === 'Notes'
 interface Receipt {
   id: string; kind: Kind; number: number; date: string; payerDetailCode: string; payerName: string; purposeGroupName: string; purpose: string
   accountKind: string | null; accountId: string | null; method: string | null; trackingNumber: string | null; payerSheba: string | null
@@ -28,7 +30,7 @@ const L = useLookups(api)
 
 const year = computed(() => props.fiscalYear ?? Number(todayJalali().slice(0, 4)))
 const kindNames: Record<Kind, [string, string]> = {
-  Instruments: ['چک و سفته', 'cheques and notes'], Cash: ['نقدی صندوق', 'cash'], BankDeposit: ['واریز مستقیم به حساب بانکی', 'direct bank deposits'],
+  Instruments: ['چک و سفته', 'cheques and notes'], Notes: ['سفته', 'promissory notes'], Cash: ['نقدی صندوق', 'cash'], BankDeposit: ['واریز مستقیم به حساب بانکی', 'direct bank deposits'],
 }
 const title = computed(() => t(`فهرست دریافت‌های ${kindNames[props.kind][0]} – سال مالی ${num(year.value)}`, `Receipts: ${kindNames[props.kind][1]} – fiscal year ${year.value}`))
 
@@ -65,7 +67,7 @@ function accountName(r: Receipt) {
 /** The latest status as text: of a cheque receipt its cheques' statuses, otherwise recorded or cancelled. */
 function statusText(r: Receipt) {
   if (r.state === 'Cancelled') return t('ابطال شده', 'Cancelled')
-  if (r.kind !== 'Instruments') return t('ثبت شده', 'Recorded')
+  if (!hasItems(r.kind)) return t('ثبت شده', 'Recorded')
   return groupChequeStatuses(r.chequeStatuses, props.locale)
     .map(g => `${r.instrumentCount > 1 ? t(`${num(g.count)} برگ: `, `${g.count} × `) : ''}${g.name}${g.due ? ` (${dueMark(props.locale)}${g.count > 1 ? ' ' + num(g.due) : ''})` : ''}`)
     .join(fa.value ? '، ' : ', ')
@@ -76,8 +78,8 @@ const shown = computed(() => {
     && (!key || searchKey(`${r.number} ${r.date} ${r.payerName} ${r.payerDetailCode} ${r.purpose} ${r.trackingNumber ?? ''} ${statusText(r)}`).includes(key)))
 })
 const total = computed(() => shown.value.filter(r => r.state !== 'Cancelled').reduce((s, r) => s + r.totalRial, 0))
-const where = (r: Receipt) => (r.kind === 'Instruments' ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
-const whereTitle = computed(() => (props.kind === 'Instruments' ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
+const where = (r: Receipt) => (hasItems(r.kind) ? t(`${num(r.instrumentCount)} برگ`, `${r.instrumentCount} items`) : accountName(r))
+const whereTitle = computed(() => (hasItems(props.kind) ? t('تعداد برگ', 'Items') : props.kind === 'Cash' ? t('صندوق', 'Cash desk') : t('حساب بانکی', 'Bank account')))
 
 // ---- print: the rows now shown, on a page of their own (a hidden frame, so no pop-up window is needed) ----
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!))
@@ -163,7 +165,7 @@ defineExpose({ printHtml, load })
               <td class="num">{{ money(r.totalRial) }}<span v-if="r.amount !== null && r.currency !== 'IRR'" class="muted small"> ({{ money(r.amount) }} {{ r.currency }})</span></td>
               <td>
                 <span v-if="r.state === 'Cancelled'" class="tr-tag cancelled">{{ t('ابطال شده', 'Cancelled') }}</span>
-                <template v-else-if="r.kind === 'Instruments'">
+                <template v-else-if="hasItems(r.kind)">
                   <div v-for="g in groupChequeStatuses(r.chequeStatuses, locale)" :key="g.state">
                     <span v-if="r.instrumentCount > 1" class="muted small">{{ t(`${num(g.count)} برگ:`, `${g.count} ×`) }}</span> {{ chequeStateName(g.state, locale) }}
                     <span v-if="g.due" class="tr-tag due">{{ dueMark(locale) }}<template v-if="g.count > 1"> ({{ num(g.due) }})</template></span>

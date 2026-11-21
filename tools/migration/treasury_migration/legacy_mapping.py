@@ -28,6 +28,9 @@ GUARANTEE_KINDS = {"GuaranteeCheque", "GuaranteeNote"}
 
 # Allowed steps — must stay identical to InstrumentLifecycle.All in the .NET domain (checked by test_lifecycle_matches_dotnet).
 TRANSITIONS = {
+    # Owner, 16 Nov 2026: an ordinary promissory note goes from the cash desk to the bank (a note is not in Sayad). The .NET table
+    # allows this step for notes only; a cheque needs «ثبت صیادی» first (rule N3, see LEGACY_TRANSITIONS).
+    (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "DepositedForCollection", "RecordCleared"): "Cleared",
     (RECEIVED, "DepositedForCollection", "RecordBounced"): "Bounced",
     (RECEIVED, "InCashDesk", "ReturnToIssuer"): "ReturnedToIssuer",
@@ -74,7 +77,8 @@ TRANSITIONS = {
 
 # Steps the old program allowed that new operations no longer do; old history is migrated as it was recorded.
 # Rule N3 (owner, 18 Nov 2026): a cheque is deposited at the bank only after «ثبت صیادی». The old program had no such step
-# (D_Check_Vag_m: 11 -> 12), and most old cheques are from before the Sayad system.
+# (D_Check_Vag_m: 11 -> 12), and most old cheques are from before the Sayad system. New operations keep this step for promissory
+# notes only (TRANSITIONS above); the migration does not look at the kind, so old cheques pass by this entry.
 LEGACY_TRANSITIONS = {
     (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
 }

@@ -21,16 +21,19 @@ public static class InstrumentLifecycle
     [
         // Received. The old program's D_Check_Vag_m sent a cheque from the cash desk straight to the bank (11 -> 12); since the owner's
         // rule of 18 Nov 2026 (N3) a cheque is deposited only after «ثبت صیادی», so that step starts at SayadRegistered (below). Old
-        // history is migrated as recorded (tools/migration: LEGACY_TRANSITIONS).
+        // history is migrated as recorded (tools/migration: LEGACY_TRANSITIONS). A promissory note is not in the Sayad system (the
+        // step «ثبت صیادی» is for cheques only), so an ordinary note still goes from the cash desk to the bank (owner, 16 Nov 2026:
+        // «مراحل سفته پس از دریافت: واگذاری به بانک»).
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k == InstrumentKind.PromissoryNote, "Owner, 16 Nov 2026: واگذاری سفته به بانک; notes only, a cheque needs ثبت صیادی first (rule N3)"),
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordCleared, InstrumentState.Cleared, AnyKind, "D_Check_vos_m: 12 -> 13"),
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "D_Check_vos_m / Checkbacked: 12 -> 14"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "D_Check_Od_m: 11 -> 15"),
-        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "D_Check_Kh_m: 11 -> 16, Checktype 0/2 only"),
+        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsNegotiable(), "D_Check_Kh_m: 11 -> 16, Checktype 0/2 only; ordinary notes too: خرج سفته (owner, 16 Nov 2026)"),
 
         // Received: the owner's item 14 (15 Nov 2026, answers Q30–Q35; docs/domain/received-cheque-steps.md). New-version manual
         // «ثبت وصول / برگشت / عودت چک‌های واگذاری» (return to the cash desk), «تعویض چک‌ها», «ابطال»; owner's voucher table.
         new(InstrumentDirection.Received, InstrumentState.DepositedForCollection, InstrumentAction.ReturnFromBank, InstrumentState.ReturnedFromBank, AnyKind, "Owner item 14 (c); manual: عودت به صندوق"),
-        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner item 14, answer Q33: deposited again"),
+        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsNegotiable(), "Owner item 14, answer Q33: deposited again"),
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "Owner item 14, answer Q33: bounce notice after the return"),
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Manual: عودت شده از نزد بانک → عودت"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d); manual: تعویض چک‌های نزد صندوق"),

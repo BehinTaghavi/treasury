@@ -134,8 +134,12 @@ def test_lifecycle_matches_dotnet():
 
 def test_old_cheques_went_to_the_bank_without_sayad_registration_n3():
     # Rule N3 (owner, 18 Nov 2026) is for new deposits; the old program sent a cheque straight from the cash desk (D_Check_Vag_m).
+    # New operations allow that step from the cash desk for promissory notes only (a note is not in Sayad; owner, 16 Nov 2026).
     from treasury_migration.legacy_mapping import LEGACY_TRANSITIONS
-    assert ("Received", "InCashDesk", "DepositForCollection") in LEGACY_TRANSITIONS and not (LEGACY_TRANSITIONS.keys() & TRANSITIONS.keys())
+    assert ("Received", "InCashDesk", "DepositForCollection") in LEGACY_TRANSITIONS
+    cs = Path(__file__).resolve().parents[3] / "src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/InstrumentLifecycle.cs"
+    row = next(line for line in cs.read_text().splitlines() if "InstrumentState.InCashDesk, InstrumentAction.DepositForCollection" in line)
+    assert "k => k == InstrumentKind.PromissoryNote" in row
     m = ok(map_cheque(received(12, d3="13860720"), SRC))
     assert m.state == "DepositedForCollection" and [s.action for s in m.steps] == ["Receive", "DepositForCollection"] and m.warnings == []
 
