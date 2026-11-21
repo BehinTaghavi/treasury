@@ -245,6 +245,13 @@ public sealed class TransferUseCaseTests : IDisposable
         var issued = (await _instruments.GetAsync(view.Cheque.IssuedChequeId, CancellationToken.None))!;
         Assert.Equal(("Issued", "PostDatedCheque", "Issued", "100500"), (issued.Direction, issued.Kind, issued.State, issued.Number));
 
+        // The issued cheque follows its transfer: it is not cancelled, delivered or marked paid on its own.
+        foreach (var action in new[] { InstrumentAction.Cancel, InstrumentAction.Deliver, InstrumentAction.RecordPaidByBank })
+        {
+            Assert.Equal("Transfer.IssuedChequeFollowsTransfer",
+                (await _instruments.ChangeStateAsync(new(Key(), issued.Id, action, Today, Note: "x"), CancellationToken.None)).ErrorCode);
+        }
+
         // The payer's voucher, as the owner wrote it: Dr «وجوه در راه» / Cr the source bank.
         var voucher = Assert.Single(await _transfers.VouchersAsync(id, CancellationToken.None));
         Assert.Equal([(true, "1109", null), (false, "1102", "600001")], voucher.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));

@@ -191,6 +191,15 @@ public sealed class InstrumentUseCases(
                 return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
             }
 
+            // The issued cheque of a transfer between the company's own accounts (owner's report no. 7) is the same sheet as the
+            // received one: its steps follow the transfer (collected on the receipts side, or deleted with the transfer), never by hand.
+            if (instrument.Direction == InstrumentDirection.Issued && transfers is not null && instrument.PaymentId is { } paymentId
+                && await transfers.GetAsync(paymentId, ct).ConfigureAwait(false) is not null)
+            {
+                return Result<Guid>.Fail("Transfer.IssuedChequeFollowsTransfer",
+                    "This cheque belongs to a transfer between the company's bank accounts; its steps are recorded on the receipts side of the transfer.");
+            }
+
             var date = FiscalDate.ParseJalali(command.Date);
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var user = currentUser.UserId;
