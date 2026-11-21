@@ -78,7 +78,7 @@ describe('transfers between the company\'s bank accounts (owner\'s report no. 7)
       payFromId: 'a', transferToAccountId: 'b', paidAmount: 0, remainingAmount: 3_000_000_000, beneficiaryName: 'ملی', ...over })
     expect(payableRequests([r(9), r(4), r(5, { method: 'Transfer' }), r(6, { state: 'Registered' }), r(7, { state: 'Paid', remainingAmount: 0 })]).map(x => x.number)).toEqual([4, 9])
     expect(requestLabel(r(4, { paidAmount: 1_000_000_000, remainingAmount: 2_000_000_000 }), 'ملت – 1', 'ملی – 2', 'fa'))
-      .toBe('از حساب ملت – 1 به حساب ملی – 2 – مبلغ ۳,۰۰۰,۰۰۰,۰۰۰ – مانده ۲,۰۰۰,۰۰۰,۰۰۰ – تأمین موجودی')
+      .toBe('مانده ۲٬۰۰۰٬۰۰۰٬۰۰۰ از مبلغ ۳٬۰۰۰٬۰۰۰٬۰۰۰ – از حساب ملت – 1 به حساب ملی – 2 – تأمین موجودی')
   })
   it('names each voucher of a transfer and knows which are confirmed', () => {
     expect([0, 1, 2, 3, 4].map(s => voucherTitle(s, true, 'fa'))).toEqual(

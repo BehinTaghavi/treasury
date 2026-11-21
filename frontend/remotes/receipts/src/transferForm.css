@@ -38,6 +38,9 @@
 .tr-actions button:not(.tr-link) { padding: .35rem .7rem; font-size: .85rem; }
 .tr-nowrap { white-space: nowrap; }
 .tr-status { min-width: 9rem; }
+/* In a list, a tag under the figure of its cell and a long tag of the status cell may break, so the table fits 1440 wide. */
+.tr-table td .tr-tag.tr-under { display: block; width: fit-content; margin-inline: 0; white-space: normal; }
+.tr-status .tr-tag { white-space: normal; }
 .tr-table td .small { display: block; }
 /* «از» and «به»: the two accounts of a transfer under each other in one column. */
 .tr-accounts { display: grid; grid-template-columns: auto 1fr; gap: .1rem .4rem; min-width: 13rem; }

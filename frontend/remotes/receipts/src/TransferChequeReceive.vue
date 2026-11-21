@@ -7,12 +7,15 @@
  * (بدهکار اسناد نزد صندوق، بستانکار وجوه در راه) with «تایید سند», and «برگرداندن ثبت دریافت» while no step is recorded on the cheque
  * and that voucher is not confirmed. The next steps — ثبت صیادی، واگذاری به بانک مقصد، وصول — are recorded in «عملیات چک‌های دریافتی»,
  * as for every received cheque.
+ * Owner, 21 Nov 2026 (answer to Q79): the payer's Sayad registration is a step of its own on the payment side. Until it is recorded
+ * the cheque is only «صادر شد», «ثبت صیادی» on the receipts side waits for it, and the cheque can be cancelled there («ابطال چک»): a
+ * cancelled cheque that was already received stays in «دریافت شده» as «ابطال شده», with the receiver's side of the cancellation voucher.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { createApi, dueMark, formatAmount, normaliseJalali, searchKey, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import { useLookups } from './lookups'
 import TransferVoucher from './TransferVoucher.vue'
-import { accountText, chequeTransferStatus, groupSayad, totalRial, type Transfer } from './transfers'
+import { accountText, chequeTransferStatus, groupSayad, isConfirmed, receiverSteps, totalRial, type Transfer } from './transfers'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -44,7 +47,11 @@ const matches = (x: Transfer) => {
   return !key || searchKey(`${x.number} ${x.date} ${x.cheque?.number ?? ''} ${x.cheque?.sayadId ?? ''} ${from(x)} ${to(x)} ${x.description ?? ''} ${chequeTransferStatus(x, props.locale)}`).includes(key)
 }
 const waiting = computed(() => transfers.value.filter(x => x.state === 'ChequeIssued' && matches(x)))
-const received = computed(() => transfers.value.filter(x => (x.state === 'ChequeReceived' || x.state === 'Collected') && matches(x)))
+/** On the receipts side now, or cancelled after it was received (answer to Q79). */
+const received = computed(() => transfers.value.filter(x =>
+  (x.state === 'ChequeReceived' || x.state === 'Collected' || (x.state === 'Cancelled' && !!x.cheque?.receivedChequeId)) && matches(x)))
+/** Every voucher the receipts side has of this transfer is confirmed (the receiver's, and the receiver's side of a cancellation). */
+const allConfirmed = (x: Transfer) => isConfirmed(x, 1) && (x.state !== 'Cancelled' || isConfirmed(x, 4))
 const receivedTotal = computed(() => totalRial(received.value))
 
 const busy = ref(false)
@@ -104,7 +111,7 @@ defineExpose({ load })
     <!-- Cheques that are only on the payment side: «پرداخت ثبت صیاد شد». -->
     <section class="tr-card tr-list">
       <div class="tr-list-head">
-        <h3>{{ t('در انتظار دریافت (پرداخت ثبت صیاد شد)', 'Waiting to be received (issued and registered in Sayad)') }}</h3>
+        <h3>{{ t('در انتظار دریافت (چک صادر شده در بخش پرداخت)', 'Waiting to be received (issued on the payment side)') }}</h3>
         <span class="tr-pill">{{ t(`${num(waiting.length)} چک`, `${waiting.length} cheque(s)`) }}</span>
       </div>
       <div class="tr-scroll">
@@ -123,7 +130,8 @@ defineExpose({ load })
               <td><span class="num" dir="ltr">{{ x.cheque?.number }}</span><span class="muted small num" dir="ltr">{{ groupSayad(x.cheque?.sayadId) }}</span></td>
               <td><dl class="tr-accounts"><dt>{{ t('از', 'from') }}</dt><dd>{{ from(x) }}</dd><dt>{{ t('به', 'to') }}</dt><dd>{{ to(x) }}</dd></dl><span v-if="x.description" class="muted small">{{ x.description }}</span></td>
               <td class="num">{{ money(x.amount) }} <span v-if="x.currency !== 'IRR'">{{ x.currency }}</span></td>
-              <td class="num">{{ x.cheque?.dueDate }}</td>
+              <td class="num">{{ x.cheque?.dueDate }}
+                <span :class="['tr-tag', 'tr-under', x.cheque?.payerSayadOn ? 'current' : 'later']">{{ x.cheque?.payerSayadOn ? t('پرداخت ثبت صیاد شد', 'registered in Sayad by the payer') : t('ثبت صیادی پرداخت نشده', 'not yet registered in Sayad by the payer') }}</span></td>
               <td><input v-model="dates[x.id]" dir="ltr" style="width: 8rem" :aria-label="t('تاریخ دریافت', 'Received on')" /></td>
               <td class="tr-actions"><button type="button" :disabled="busy" @click="receive(x)">{{ t('ثبت دریافت', 'Record the receipt') }}</button></td>
             </tr>
@@ -149,20 +157,30 @@ defineExpose({ load })
             </tr>
           </thead>
           <tbody>
-            <tr v-for="x in received" :key="x.id" :class="{ selected: voucherOf === x.id }">
+            <tr v-for="x in received" :key="x.id" :class="{ deleted: x.state === 'Cancelled', selected: voucherOf === x.id }">
               <td class="num">{{ num(x.number) }}</td>
               <td class="num">{{ x.cheque?.receivedOn }}</td>
               <td><span class="num" dir="ltr">{{ x.cheque?.number }}</span><span class="muted small num" dir="ltr">{{ groupSayad(x.cheque?.sayadId) }}</span></td>
               <td><dl class="tr-accounts"><dt>{{ t('از', 'from') }}</dt><dd>{{ from(x) }}</dd><dt>{{ t('به', 'to') }}</dt><dd>{{ to(x) }}</dd></dl><span v-if="x.description" class="muted small">{{ x.description }}</span></td>
               <td class="num">{{ money(x.amount) }} <span v-if="x.currency !== 'IRR'">{{ x.currency }}</span></td>
               <td class="num">{{ x.cheque?.dueDate }}</td>
-              <td class="tr-status">{{ chequeTransferStatus(x, locale) }}
-                <span v-if="x.cheque?.reachedDueDate" class="tr-tag due">{{ dueMark(locale) }}</span>
-                <span v-if="x.cheque?.collectedOn" class="muted small num">{{ x.cheque.collectedOn }}</span>
-                <span v-if="x.receiverVoucherConfirmed" class="tr-tag current">{{ t('سند تایید شد', 'Voucher confirmed') }}</span>
+              <td class="tr-status">
+                <template v-if="x.state === 'Cancelled'">
+                  <span class="tr-deleted">{{ t('ابطال شده', 'Cancelled') }}</span>
+                  <span class="muted small">{{ x.cheque?.cancelledOn }} – {{ x.cheque?.cancelReason }}</span>
+                </template>
+                <template v-else>
+                  {{ chequeTransferStatus(x, locale) }}
+                  <span v-if="x.cheque?.reachedDueDate" class="tr-tag due">{{ dueMark(locale) }}</span>
+                  <span v-if="x.cheque?.collectedOn" class="muted small num">{{ x.cheque.collectedOn }}</span>
+                  <!-- Answer to Q79: the receipts side registers the cheque in Sayad only after the payer did. -->
+                  <span v-if="x.state === 'ChequeReceived' && !x.cheque?.payerSayadOn" class="muted small">
+                    {{ t('«ثبت صیادی» این چک در بخش دریافت پس از «ثبت صیادی پرداخت» در «پرداخت‌ها» ممکن می‌شود.', "Its Sayad registration on the receipts side waits for the payer's Sayad registration under Payments.") }}</span>
+                </template>
+                <span v-if="allConfirmed(x)" class="tr-tag current">{{ t('سند تایید شد', 'Voucher confirmed') }}</span>
               </td>
               <td class="tr-actions">
-                <button type="button" class="tr-link" @click="voucherOf = voucherOf === x.id ? '' : x.id">{{ x.receiverVoucherConfirmed ? t('سند', 'Voucher') : t('تایید سند', 'Confirm voucher') }}</button>
+                <button type="button" class="tr-link" @click="voucherOf = voucherOf === x.id ? '' : x.id">{{ allConfirmed(x) ? t('سند', 'Voucher') : t('تایید سند', 'Confirm voucher') }}</button>
                 <button v-if="x.canUndoReceive" type="button" class="tr-link danger" :disabled="busy" @click="undo(x)">{{ t('برگرداندن ثبت دریافت', 'Take the receipt back') }}</button>
               </td>
             </tr>
@@ -170,7 +188,7 @@ defineExpose({ load })
           </tbody>
         </table>
       </div>
-      <TransferVoucher v-if="voucherOf" :key="voucherOf" :transfer-id="voucherOf" :step="1" :api-base="apiBase" :locale="locale" :token="token"
+      <TransferVoucher v-if="voucherOf" :key="voucherOf" :transfer-id="voucherOf" :steps="receiverSteps" cheque :api-base="apiBase" :locale="locale" :token="token"
                        :account-name="L.accountName" @confirmed="load" @close="voucherOf = ''" />
     </section>
   </div>

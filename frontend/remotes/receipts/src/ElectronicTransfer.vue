@@ -70,7 +70,8 @@ const requestChoices = computed<Choice[]>(() => requests.value.map(r => ({
   value: r.id, label: `${t('درخواست', 'Request')} ${num(r.number)} – ${requestLabel(r, accountOf(r.payFromId), accountOf(r.transferToAccountId), props.locale)}` })))
 /** The request names the two accounts: they are set from it and locked; what is left on it is proposed as the amount. */
 watch(chosenRequest, (r, before) => {
-  if (!r) return
+  // Without a request there are no accounts: they only ever come from it (a request paid in full leaves the list).
+  if (!r) { if (before) { form.sourceId = ''; form.destinationId = '' } return }
   form.sourceId = r.payFromId ?? ''
   form.destinationId = r.transferToAccountId ?? ''
   if (!form.amount || (before && before.id !== r.id)) form.amount = amountText(available.value)
@@ -407,10 +408,10 @@ watch(year, () => { void load(); void loadRequests() })
           </thead>
           <tbody>
             <tr v-for="x in shown" :key="x.id" :class="{ deleted: x.state === 'Deleted', selected: editing?.id === x.id || voucherOf === x.id }">
-              <td class="num">{{ num(x.number) }}<span v-if="x.paymentRequestNumber" class="muted small tr-nowrap">{{ t('درخواست', 'request') }} {{ num(x.paymentRequestNumber) }}</span></td>
+              <td class="num">{{ num(x.number) }}</td>
               <td class="num">{{ x.date }}</td>
               <td class="tr-nowrap" :title="`${methodName(x.method, locale)} – ${channelName(x.channel, locale)}`">{{ methodShortName(x.method, locale) }}<span class="muted small">{{ channelShortName(x.channel, locale) }}</span></td>
-              <td><dl class="tr-accounts"><dt>{{ t('از', 'from') }}</dt><dd>{{ from(x) }}</dd><dt>{{ t('به', 'to') }}</dt><dd>{{ to(x) }}</dd></dl></td>
+              <td><dl class="tr-accounts"><dt>{{ t('از', 'from') }}</dt><dd>{{ from(x) }}</dd><dt>{{ t('به', 'to') }}</dt><dd>{{ to(x) }}</dd></dl><span v-if="x.paymentRequestNumber" class="muted small">{{ t('درخواست وجه', 'payment request') }} {{ num(x.paymentRequestNumber) }}</span></td>
               <td class="num">{{ money(x.amount) }} <span v-if="x.currency !== 'IRR'">{{ x.currency }}</span>
                 <span v-if="x.fee" class="muted small tr-nowrap">{{ t('کارمزد', 'fee') }} {{ money(x.fee) }}</span></td>
               <td><span class="num" dir="ltr">{{ x.trackingNumber }}</span><span v-if="x.description" class="muted small">{{ x.description }}</span></td>

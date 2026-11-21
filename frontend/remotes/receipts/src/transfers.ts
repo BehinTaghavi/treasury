@@ -55,12 +55,12 @@ export const OWN_TRANSFER = 'OwnAccountTransfer'
 /** The requests a transfer may pay: approved ones of the kind «نقل و انتقال بین حساب‌های شرکت», lowest number first. */
 export const payableRequests = (all: readonly TransferRequest[]) =>
   all.filter(r => r.method === OWN_TRANSFER && r.state === 'Approved' && r.remainingAmount > 0).sort((a, b) => a.number - b.number)
-/** «از حساب … به حساب … – مبلغ … – مانده …»: a request as it is offered in the list box (its number is the hint). */
+/** «مانده … از مبلغ … – از حساب … به حساب …»: a request as it is offered in the list box; the figures come first because a narrow box cuts the end. */
 export function requestLabel(r: Pick<TransferRequest, 'amount' | 'remainingAmount' | 'purpose'>, from: string, to: string, locale: Locale): string {
   const n = (x: number) => formatAmount(x, locale)
   return locale === 'fa'
-    ? `از حساب ${from} به حساب ${to} – مبلغ ${n(r.amount)} – مانده ${n(r.remainingAmount)}${r.purpose ? ` – ${r.purpose}` : ''}`
-    : `from ${from} to ${to} – amount ${n(r.amount)} – left ${n(r.remainingAmount)}${r.purpose ? ` – ${r.purpose}` : ''}`
+    ? `مانده ${n(r.remainingAmount)} از مبلغ ${n(r.amount)} – از حساب ${from} به حساب ${to}${r.purpose ? ` – ${r.purpose}` : ''}`
+    : `${n(r.remainingAmount)} left of ${n(r.amount)} – from ${from} to ${to}${r.purpose ? ` – ${r.purpose}` : ''}`
 }
 
 /** The vouchers of a transfer by their step, in the owner's words. */
