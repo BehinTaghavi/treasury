@@ -219,6 +219,13 @@ public sealed class TransferUseCases(
                 throw new DomainException("Transfer.NotACheque", "Only a transfer by cheque has a cheque to receive.");
             }
 
+            if (transfer.State != TransferState.ChequeIssued)
+            {
+                throw transfer.State == TransferState.Deleted
+                    ? new DomainException("Transfer.Deleted", "The transfer was deleted.")
+                    : new DomainException("Transfer.ChequeAlreadyReceived", "The cheque of this transfer is already recorded on the receipts side.");
+            }
+
             var date = string.IsNullOrWhiteSpace(command.Date) ? transfer.Date : FiscalDate.ParseJalali(command.Date);
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var issued = await instruments.GetAsync(transfer.Cheque.IssuedChequeId, ct).ConfigureAwait(false)

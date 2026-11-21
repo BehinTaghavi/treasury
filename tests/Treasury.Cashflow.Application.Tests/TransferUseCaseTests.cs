@@ -362,6 +362,8 @@ public sealed class TransferUseCaseTests : IDisposable
         Assert.Null(await _instruments.GetAsync(issuedId, CancellationToken.None));
         Assert.Equal((0L, 100500L), ((await BookView(book)).UsedSheets, (await BookView(book)).NextSheet!.Value));
 
+        Assert.Equal("Transfer.Deleted", (await _transfers.ReceiveChequeAsync(new(Key(), id, 4), CancellationToken.None)).ErrorCode);
+
         // The same sheet is typed again, on the next number.
         var again = await View(await Issue(Cheque(book, amount: 6_500_000_000, sheet: 100500)));
         Assert.Equal((2, "100500", 6_500_000_000m), (again.Number, again.Cheque!.Number, again.Amount));
