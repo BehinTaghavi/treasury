@@ -136,7 +136,8 @@ async function save() {
     show('ok', old ? t(`ویرایش نقل و انتقال شمارهٔ ${no} ثبت شد.`, `Transfer no. ${no} corrected.`)
       : t(`نقل و انتقال شمارهٔ ${no} ثبت شد. سند آن را در فهرست زیر «تایید سند» کنید.`, `Transfer no. ${no} saved. Confirm its voucher in the list below.`))
     editing.value = null
-    Object.assign(form, { amount: '', rate: '', tracking: '', description: '' })
+    // After a correction the form is empty again; after a new transfer the accounts and the way stay for the next one.
+    Object.assign(form, old ? blank() : { amount: '', rate: '', tracking: '', description: '' })
     await load()
   } finally {
     saving.value = false
