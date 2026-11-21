@@ -16,6 +16,8 @@ export default defineConfig({
       dts: false,
       exposes: {
         './Receipts': './src/Receipts.vue',
+        // The Payments area (owner's report no. 7: the payment side of a bank transfer) belongs to cashflow-svc like the receipts.
+        './Payments': './src/Payments.vue',
       },
       shared: {
         vue: { singleton: true, requiredVersion: '^3.5.0' },

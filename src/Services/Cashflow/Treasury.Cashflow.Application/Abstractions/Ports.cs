@@ -93,6 +93,39 @@ public interface IReceiptRepository
     Task<IReadOnlyList<Receipt>> ListAsync(int fiscalYear, ReceiptKind? kind, CancellationToken cancellationToken);
 }
 
+/// <summary>Transfers between the company's own bank accounts (owner's report no. 7), numbered per fiscal year in one series.</summary>
+public interface IBankTransferRepository
+{
+    Task<Treasury.Cashflow.Domain.Transfers.BankTransfer?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>The next serial number of a transfer in <paramref name="fiscalYear"/>; taken numbers are never reused.</summary>
+    Task<int> NextNumberAsync(int fiscalYear, CancellationToken cancellationToken);
+
+    Task AddAsync(Treasury.Cashflow.Domain.Transfers.BankTransfer transfer, CancellationToken cancellationToken);
+
+    /// <summary>Saves a correction, a deletion («حذف شده») or a step of the transfer's cheque. Version-checked.</summary>
+    Task SaveAsync(Treasury.Cashflow.Domain.Transfers.BankTransfer transfer, CancellationToken cancellationToken);
+
+    /// <summary>Transfers of a year, newest first.</summary>
+    Task<IReadOnlyList<Treasury.Cashflow.Domain.Transfers.BankTransfer>> ListAsync(int fiscalYear, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What <paramref name="sourceAccountId"/> already sent on <paramref name="day"/> by <paramref name="method"/>: the Rial total of
+    /// the orders given through <paramref name="channel"/> and the number of orders whatever the channel. Deleted transfers and
+    /// <paramref name="exceptId"/> (the transfer being corrected) do not count.
+    /// </summary>
+    Task<Treasury.Cashflow.Domain.Transfers.TransferDayUsage> DayUsageAsync(Guid sourceAccountId, FiscalDate day, Treasury.Cashflow.Domain.Transfers.TransferMethod method,
+        Treasury.Cashflow.Domain.Transfers.TransferChannel channel, Guid? exceptId, CancellationToken cancellationToken);
+}
+
+/// <summary>The company's limits of the electronic ways of transfer (Basic Information page «سقف‌های انتقال الکترونیکی»).</summary>
+public interface ITransferLimitRepository
+{
+    Task<Treasury.Cashflow.Domain.Transfers.TransferLimits> GetAsync(CancellationToken cancellationToken);
+
+    Task SaveAsync(Treasury.Cashflow.Domain.Transfers.TransferLimits limits, CancellationToken cancellationToken);
+}
+
 /// <summary>The company's codes of the fixed accounts of the voucher template (owner's report no. 4, item 8).</summary>
 public interface IVoucherTemplateRepository
 {
@@ -139,6 +172,9 @@ public interface IReceiptReferenceLookup
 
     /// <summary>A ledger account of the chart (copy of the accounting system); null when unknown.</summary>
     Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>A تفصیل by its code, with its type; null when unknown (the تفصیل of a transfer's bank fee, owner's answer to Q83).</summary>
+    Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken);
 
     /// <summary>
     /// The entry of «ذینفعان / متعهدین / ضامنین» with this تفصیل, for the obligor and guarantors of a note receipt (owner's answer to Q54);
@@ -198,8 +234,10 @@ public interface IChequeFormatRepository
 
 /// <summary>What accounts-svc says about one of our bank accounts (asked over its API, ADR 0001); null: unknown.</summary>
 /// <param name="HasCheques">The kind of account has cheque books: current Qard-al-hasan only (owner's report no. 4, item 1).</param>
+/// <param name="BankId">The account's bank in the bank-names list; null when accounts-svc did not say.</param>
 public sealed record BankAccountFact(
-    Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true, string CurrencyCode = "IRR", string? LedgerAccountCode = null, string? Detail1Code = null);
+    Guid Id, string AccountNumber, bool IsActive, bool HasCheques = true, string CurrencyCode = "IRR", string? LedgerAccountCode = null, string? Detail1Code = null,
+    Guid? BankId = null, string? BranchName = null, string? BranchCode = null);
 
 /// <summary>Answered by accounts-svc. Failure to reach it: DomainException "Accounts.Unavailable".</summary>
 public interface IBankAccountLookup
@@ -235,12 +273,17 @@ public interface ICurrentUser
 
 /// <summary>What requests-svc says about a payment request (answer to Q36: an endorsed cheque pays an approved request).</summary>
 /// <param name="TransferChequeId">A request of the kind «ثبت انتقال (خرج چک)»: the received cheque it names (owner, 19 Nov 2026).</param>
+/// <param name="Method">The request's kind of payment; "OwnAccountTransfer" is «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026).</param>
+/// <param name="PayFromId">The bank account (or cash desk) the request is paid from; for a transfer the account the money leaves.</param>
+/// <param name="TransferToAccountId">A transfer between the company's accounts: the account the money reaches.</param>
 public sealed record PaymentRequestFact(
     Guid Id, int Number, string State, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string Purpose, decimal Amount,
-    string Currency, decimal PaidAmount, Guid? TransferChequeId = null);
+    string Currency, decimal PaidAmount, Guid? TransferChequeId = null, string? Method = null, Guid? PayFromId = null, Guid? TransferToAccountId = null);
 
 /// <summary>A payment made by a received cheque on a request; <see cref="Key"/> makes a repeated call harmless.</summary>
-public sealed record RequestPaymentInput(string Key, Guid InstrumentId, string Reference, decimal Amount, string Currency, string Date);
+/// <param name="InstrumentId">The cheque or note that paid; null for a transfer between the company's accounts.</param>
+/// <param name="Kind">"EndorsedCheque" for a received cheque or note handed on; "BankTransfer" for a transfer between the company's accounts.</param>
+public sealed record RequestPaymentInput(string Key, Guid? InstrumentId, string Reference, decimal Amount, string Currency, string Date, string Kind = "EndorsedCheque");
 
 /// <summary>Payment requests in requests-svc, over its API (ADR 0001).</summary>
 public interface IPaymentRequestLookup

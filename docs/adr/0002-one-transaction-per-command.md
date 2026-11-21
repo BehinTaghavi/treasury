@@ -31,3 +31,29 @@ Amendment (19 and 20 Nov 2026, the owner's answers to Q59, Q60 and Q67): **delet
 notes on it in one transaction, with `ReceiptDeleted` and `ReceivedInstrumentRemoved` in the outbox; a deleted receipt whose cheques
 are still in the cash desk never stays. A cheque on which a step was recorded is not
 touched by a correction and stops the deletion, so both commands still only change cheques nothing else is working on.
+
+Amendment (20 Nov 2026, transfers between the company's own bank accounts, owner's report no. 7): three commands of
+`TransferUseCases` and one of `InstrumentUseCases` save more than one aggregate in one transaction, each for the reason of the first
+amendment — what the user sees as one act must never be half-done. (1) **Issuing the transfer cheque** saves the cheque book (locked,
+rule R5), the new issued cheque and the new transfer, as `IssueChequeAsync` of Phase 0 already saved book and cheque together. (2) **The
+button to the receipts side** creates the received cheque and saves the transfer (version-checked) that now names it; a transfer
+without its received cheque, or a received cheque no transfer knows, would show the same sheet in two states. (3) **Recording the
+collection** of the received transfer cheque also marks the issued cheque «وصول شده» and finishes the transfer: the two instruments
+are the same sheet of paper, and nothing else works on the issued one (it has no screen of its own steps). (4) **Deleting** a cheque
+transfer (only before its cheque is on the receipts side) marks the transfer «حذف شده», removes the issued cheque and frees its sheet;
+**taking back** a receipts-side record removes the received cheque while it has no step. Every existing aggregate is saved with its
+version check; the events (`TransferChequeIssued`, `TransferChequeReceived`, `TransferChequeCollected`, `BankTransferDeleted`,
+`IssuedInstrumentRemoved`, `ChequeSheetReleased`…) go to the outbox in the same transaction.
+
+Amendment (21 Nov 2026, the owner's answers to Q79, Q81 and Q82): three more commands of `TransferUseCases` save the transfer with the
+cheque it owns, for the same reason. **«ابطال چک»** cancels the issued cheque, voids its sheet (cheque book locked), cancels the
+received cheque when the cheque is already on the receipts side, and marks the transfer «ابطال شده»; **«ثبت سررسید»** marks the issued
+cheque matured with the transfer (the collection of the received cheque does the same when it was not recorded); a transfer and its
+cheque in two different states would show the same sheet as both open and cancelled, or post two maturity vouchers. Every aggregate is
+version-checked. **The payment request is in another service** (requests-svc, ADR 0001), so it cannot be in the transaction: the
+transfer is recorded on its request over HTTP under a key the transfer keeps (`transfer:{id}:{version}`), after every rule of the
+transfer passed and just before it is saved, and taken back under the same key when the transfer is deleted, corrected or its cheque
+cancelled — as the endorsement of a received cheque has paid its request since 15 Nov 2026 (answer to Q36). A crash between the two
+leaves a payment on the request without its transfer; the key names the transfer, so it is found and taken back by hand until the
+outbox-driven reconciliation of Phase F exists. A refusal by requests-svc (not approved, over-paid) fails the command before anything
+is saved.

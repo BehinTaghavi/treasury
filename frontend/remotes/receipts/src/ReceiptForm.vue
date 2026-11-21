@@ -22,9 +22,14 @@
  * money is paid onto the bank card of a petty-cash holder of the company or onto a company bank card that has no bank account, card
  * to card, with a deposit slip or through the company's payment gateway; always in Rial. Its voucher debits the petty cash's account
  * with the holder's تفصیل, or the company card's own معین and تفصیل.
+ * Owner, 20 Nov 2026 (the design he approved, because the form had become crowded): the form is three numbered cards — the receipt,
+ * what was received, the voucher — with a summary beside them that carries the total in figures and words and the save button. On
+ * a cheque receipt only the cheque being entered is open; the others fold into one line each (bank, number, due date, amount) and
+ * open again with «ویرایش». A required field is marked by a red dot at its label and its box turns red only when it was left empty
+ * at a save attempt (this replaces the red frames of report no. 2, item 12). No field was removed.
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { chequeStateName, createApi, formatAmount, instrumentKindName, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { amountTextInWords, chequeStateName, createApi, formatAmount, instrumentKindName, markMissing, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import ComboInput from '@treasury/ui-kit/ComboInput.vue'
@@ -33,6 +38,7 @@ import { cardValue, useLookups, type Detail, type Purpose } from './lookups'
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import { depositMethods, forCard, forForeignCurrency, needsSheba } from './depositMethods'
 import { amountText, type SavedReceipt } from './savedReceipt'
+import { isCheque, isGuarantee, lineIncomplete, lineTiming, rialOf, summariseLines } from './chequeLines'
 
 type Kind = 'Cash' | 'BankDeposit' | 'Instruments' | 'CardDeposit'
 type LineKind = 'OrdinaryCheque' | 'BankCheque' | 'GuaranteeCheque'
@@ -68,7 +74,6 @@ const lineKinds: { value: LineKind; fa: string; en: string }[] = [
   { value: 'GuaranteeCheque', fa: 'چک تضمینی (انتظامی)', en: 'Guarantee cheque' },
   // Promissory notes have a form of their own (owner's report no. 4, item 13).
 ]
-const isCheque = (k: LineKind) => k.endsWith('Cheque')
 /**
  * The kinds of deposit the chosen account can take: a foreign-currency account takes cash deposits and bank transfers only (owner's
  * report no. 4, item 7); card to card needs an account with a bank card (owner, 18 Nov 2026).
@@ -80,7 +85,6 @@ const methodChoices = computed<Choice[]>(() => depositMethods
     ? forCard(m.value)
     : (accountCurrency.value === 'IRR' || forForeignCurrency(m.value)) && (m.value !== 'CardToCard' || accountHasCard.value)))
   .map(m => ({ value: m.value, label: fa.value ? m.fa : m.en })))
-const isGuarantee = (k: LineKind) => k.startsWith('Guarantee')
 /** The name of a currency for the words under an amount box: «ریال», or the currency's name from Basic Information. */
 const unitOf = (code: string) => (code === 'IRR' ? 'ریال' : L.currencies.value.find(c => c.code === code)?.name ?? code)
 
@@ -146,13 +150,6 @@ const accountCurrency = computed(() => props.kind === 'CardDeposit' ? 'IRR' :
   (props.kind === 'Cash' ? L.desks.value.find(d => d.id === money1.accountId)?.currencyCode : L.bankAccounts.value.find(a => a.id === money1.accountId)?.currencyCode) ?? 'IRR')
 // The kind of deposit is chosen by the user (no default); a kind the newly chosen account cannot take is cleared.
 watch(methodChoices, () => { if (money1.method && !methodChoices.value.some(c => c.value === money1.method)) money1.method = '' })
-const rialOf = (amount: string, currency: string, rate: string) => {
-  const a = parseAmount(amount)
-  if (a === null) return null
-  if (currency === 'IRR') return a
-  const r = parseAmount(rate)
-  return r === null ? null : Math.round(a * r)
-}
 
 // ---- cheques and notes ----
 let nextKey = 1
@@ -174,6 +171,13 @@ function savedLines(r: SavedReceipt): Line[] {
   })
 }
 const lines = ref<Line[]>(e0?.kind === 'Instruments' && e0.instruments?.length ? savedLines(e0) : [blankLine()])
+/**
+ * The line whose boxes are shown; the others are folded into one line each. A receipt with one cheque opens on it; a saved receipt
+ * with several cheques opens with all of them folded, so the whole receipt is seen at a glance.
+ */
+const openKey = ref<number | null>(lines.value.length === 1 ? lines.value[0]!.key : null)
+const lineKindName = (k: LineKind) => { const x = lineKinds.find(c => c.value === k); return x ? (fa.value ? x.fa : x.en) : k }
+const amountShown = (l: Line) => { const a = parseAmount(l.amount); return a === null ? '—' : `${money(a)}${l.currency === 'IRR' ? '' : ` ${l.currency}`}` }
 const bankChoices = computed<Choice[]>(() => L.banks.value.filter(b => b.isActive !== false).map(b => ({ value: b.id, label: b.name })))
 const currencyChoices = computed<Choice[]>(() => L.currencies.value.filter(c => c.code).map(c => ({ value: c.code!, label: c.name, hint: c.code! })))
 const cityChoices = computed<Choice[]>(() => L.cities.value.map(c => ({ value: c.name, label: c.name })))
@@ -192,28 +196,53 @@ const kindChoices = computed<Choice[]>(() => lineKinds.filter(k => !props.replac
 /** «ثبت چک بعدی»: the next line starts as a copy of the last one (same bank, account, due date…), with the next cheque number. */
 function nextLine() {
   const last = lines.value[lines.value.length - 1]
-  if (!last) return void lines.value.push(blankLine())
+  if (!last) { lines.value.push(blankLine()); openKey.value = lines.value[0]!.key; return }
   const digits = toLatinDigits(last.number)
   const next = /^\d+$/.test(digits) ? String(Number(digits) + 1).padStart(digits.length, '0') : ''
   lines.value.push({ ...last, id: undefined, locked: false, state: undefined, key: nextKey++, number: next, sayadId: '' })
+  openKey.value = lines.value[lines.value.length - 1]!.key
 }
 function removeLine(i: number) {
-  lines.value.splice(i, 1)
+  const removed = lines.value.splice(i, 1)[0]
   if (!lines.value.length) lines.value.push(blankLine())
+  if (lines.value.length === 1 || removed?.key === openKey.value) openKey.value = lines.value.length === 1 ? lines.value[0]!.key : null
 }
 /** Current (روز) when due on or before the receipt date; post-dated (مدت‌دار) after it. Manual: «چک روز … به صورت اتوماتیک تیک می خورد». */
-function timing(l: Line): 'current' | 'later' | null {
-  const due = normaliseJalali(l.dueDate)
-  const date = normaliseJalali(header.date)
-  if (!due || !date) return null
-  return due > date ? 'later' : 'current'
-}
+const timing = (l: Line) => lineTiming(l.dueDate, header.date)
 const linesRial = computed(() => lines.value.map(l => rialOf(l.amount, l.currency, l.rate)))
 const total = computed(() => props.kind === 'Instruments'
   ? linesRial.value.reduce<number>((s, v) => s + (v ?? 0), 0)
   : rialOf(money1.amount, accountCurrency.value, money1.rate) ?? 0)
 
+// ---- the summary beside the form ----
+const payerName = computed(() => payers.value.find(d => d.code === header.payer)?.name ?? '')
+const summary = computed(() => summariseLines(lines.value, header.date))
+const totalWords = computed(() => (total.value > 0 ? amountTextInWords(String(total.value), 'ریال') : ''))
+/** Where the money went, for the summary of a cash receipt or a deposit. */
+const accountShown = computed(() => {
+  if (!money1.accountId) return ''
+  if (props.kind === 'Cash') return L.desks.value.find(d => d.id === money1.accountId)?.name ?? ''
+  if (props.kind === 'CardDeposit') return chosenCard.value ? L.cardTitle(chosenCard.value, fa.value) : ''
+  const a = L.bankAccounts.value.find(x => x.id === money1.accountId)
+  return a ? L.accountTitle(a) : ''
+})
+const methodShown = computed(() => methodChoices.value.find(c => c.value === money1.method)?.label ?? '')
+const n = (x: number) => (fa.value ? x.toLocaleString('fa-IR') : String(x))
+
 // ---- save ----
+const formEl = ref<HTMLFormElement | null>(null)
+/** A save that is refused: the first folded cheque that lacks something is opened, and the empty required boxes on the screen turn red. */
+async function showMissing() {
+  if (props.kind === 'Instruments') {
+    const open = lines.value.find(l => l.key === openKey.value)
+    if (!open || !lineIncomplete(open)) {
+      const first = lines.value.find(l => !l.locked && lineIncomplete(l))
+      if (first) openKey.value = first.key
+    }
+  }
+  await nextTick()
+  markMissing(formEl.value)
+}
 const saving = ref(false)
 /** The receipt just saved, for «چاپ رسید» beside the message (report no. 6, item 21). */
 const lastSaved = ref<{ id: string; number: string } | null>(null)
@@ -304,6 +333,8 @@ const noPreview = computed(() => !!props.edit?.replacedInstrumentId)
 let previewTimer: ReturnType<typeof setTimeout> | undefined
 let previewRun = 0
 watch([header, money1, lines], () => {
+  // A refusal shown beside the form is about the form as it was; it goes when the user changes something.
+  if (message.value?.kind === 'error' && !saving.value) message.value = null
   clearTimeout(previewTimer)
   previewTimer = setTimeout(refreshPreview, 400)
 }, { deep: true })
@@ -322,7 +353,8 @@ async function save() {
   message.value = null
   lastSaved.value = null
   const req = request()
-  if ('error' in req) return show('error', translate(req.error, props.locale))
+  if ('error' in req) { void showMissing(); return show('error', translate(req.error, props.locale)) }
+  markMissing(formEl.value)
   const { path, body, put } = req
 
   saving.value = true
@@ -339,6 +371,7 @@ async function save() {
     Object.assign(money1, { amount: '', rate: '', tracking: '', sheba: '' })
     Object.assign(header, { purpose: '', ref1: '', ref2: '', note: '' })
     lines.value = [blankLine()]
+    openKey.value = lines.value[0]!.key
     emit('saved', r.value)
   } finally {
     saving.value = false
@@ -376,161 +409,300 @@ onMounted(async () => {
 </script>
 
 <template>
-  <form class="tr-form" @keydown="onKey" @submit.prevent="save">
-    <fieldset>
-      <legend>{{ edit ? t(`ویرایش رسید شمارهٔ ${edit.number.toLocaleString('fa-IR', { useGrouping: false })}`, `Correct receipt no. ${edit.number}`) : t('مشخصات دریافت', 'Receipt') }}</legend>
-      <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" :disabled="anyLocked" :class="{ ro: anyLocked }"
-        :title="anyLocked ? t('روی یکی از چک‌های این رسید مرحله‌ای ثبت شده است؛ تاریخ و پرداخت‌کنندهٔ رسید تغییر نمی‌کند.', 'A cheque of this receipt has a step recorded on it; the date and payer stay.') : undefined" /></label>
-      <label v-if="payerTypeChoices.length && !payerFixed">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
-        <SearchSelect v-model="payerType" :options="payerTypeChoices" :empty-label="t('— همه —', '— all —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')" />
-      </label>
-      <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
-        <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="payerFixed" :aria-label="t('پرداخت کننده', 'Payer')"
-                      :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
-      </label>
-      <label>{{ t('گروه بابت', 'Purpose group') }}
-        <SearchSelect v-model="header.groupId" :options="groupChoices" required :aria-label="t('گروه بابت', 'Purpose group')"
-                      :none-text="t('گروه بابت دریافتی تعریف نشده است', 'No receipt purpose group')" />
-      </label>
-      <label class="wide">{{ t('بابت', 'Purpose') }}
-        <ComboInput v-model="header.purpose" :options="purposeNames" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
-                    :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
-                    :none-text="header.groupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
-                    :new-hint="header.groupId ? t('بابت تازه: با ثبت رسید به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the receipt adds it to this group\'s list.') : ''" />
-      </label>
-      <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="header.ref1" /></label>
-      <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="header.ref2" /></label>
-      <!-- «واحد سازمانی دریافت کننده» (owner, 15 Nov 2026: keep it, with this title): the department that received the money (manual, form «دریافت چک و اسناد دریافتنی»). Shown only when departments are
-           defined in Basic Information; Iran Nazho Co. defines none (owner, 13 Nov 2026). -->
-      <label v-if="departmentChoices.length">{{ t('واحد سازمانی دریافت کننده', 'Receiving department') }}
-        <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('واحد سازمانی دریافت کننده', 'Receiving department')" />
-      </label>
-      <label class="tr-check"><input v-model="header.salesProceeds" type="checkbox" /> {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</label>
-      <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="header.note" maxlength="500" /></label>
-    </fieldset>
-
-    <fieldset v-if="kind !== 'Instruments'">
-      <legend>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : kind === 'CardDeposit' ? t('واریز به کارت بانک', 'Paid onto a bank card') : t('واریز به بانک', 'Paid into a bank account') }}</legend>
-      <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }}
-        <SearchSelect v-model="money1.accountId" :options="deskChoices" required :aria-label="t('صندوق', 'Cash desk')" :none-text="t('صندوقی تعریف نشده است', 'No cash desk')" />
-      </label>
-      <!-- «واریز به کارت بانک» (report no. 6, item 12): the card of a petty-cash holder, or a company card without a bank account. -->
-      <template v-else-if="kind === 'CardDeposit'">
-        <label class="wide">{{ t('کارت بانک (تنخواه‌گردان یا کارت شرکت)', 'Bank card (petty-cash holder or company card)') }}
-          <SearchSelect v-model="money1.accountId" :options="cardChoices" required :aria-label="t('کارت بانک', 'Bank card')" :none-text="t('کارت بانکی تعریف نشده است', 'No bank card')" />
-        </label>
-        <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
-          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
-        </label>
-        <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
-          <input v-model="money1.tracking" dir="ltr" />
-        </label>
-        <p v-if="!cardChoices.length" class="muted small wide">
-          {{ t('کارت بانکی تعریف نشده است. کارت تنخواه‌گردان در «اطلاعات پایه ← تنخواه گردان‌ها» (نحوهٔ نگهداری وجوه: کارت بانک) و کارت بانک شرکت که حساب بانکی ندارد در «اطلاعات پایه ← کارت‌های بانک شرکت (بدون حساب بانکی)» تعریف می‌شود.',
-            'No bank card is defined. A petty-cash holder\'s card is entered in Basic Information → Petty cash (kept on a bank card), a company card without a bank account in Basic Information → Company bank cards.') }}
-        </p>
-        <p v-else-if="chosenCard" class="muted small wide">
-          {{ chosenCard.kind === 'PettyCashCard'
-            ? t('این وجه به تنخواهِ همین تنخواه‌گردان اضافه می‌شود: سند، حساب تنخواه گردان را با تفصیل او بدهکار می‌کند.', "This money is added to this holder's petty cash: the voucher debits the petty-cash account with the holder's detail account.")
-            : t('سند، حساب معین و تفصیلِ همین کارت را بدهکار می‌کند.', "The voucher debits this card's ledger and detail account.") }}
-        </p>
-      </template>
-      <template v-else>
-        <label class="wide">{{ t('حساب بانکی', 'Bank account') }}
-          <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />
-        </label>
-        <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
-          <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
-        </label>
-        <label v-if="needsSheba(money1.method)" class="wide req">{{ t('شماره شبای واریزکننده (حساب مبدأ حواله)', "Payer's Sheba (the transfer's source account)") }}
-          <!-- Owner's report no. 6, item 16: «IR» is fixed in the box; the 24 digits are typed after it. -->
-          <ShebaInput v-model="money1.sheba" :locale="locale" :aria-label="t('شماره شبای واریزکننده', 'Payer\'s Sheba')" />
-        </label>
-        <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
-          <input v-model="money1.tracking" dir="ltr" />
-        </label>
-        <p v-if="money1.accountId && accountCurrency === 'IRR' && !accountHasCard" class="muted small wide">
-          {{ t('این حساب کارت بانک ندارد؛ برای ثبت «کارت به کارت» ابتدا کارت بانک را در اطلاعات پایه ← حساب‌های بانکی تعریف کنید.',
-            'This account has no bank card; define one in Basic Information → Bank accounts to record card-to-card deposits.') }}
-        </p>
-      </template>
-      <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" :unit="unitOf(accountCurrency)" /></label>
-      <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" unit="ریال" /></label>
-      <label v-if="accountCurrency !== 'IRR'">{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="money(total)" readonly /></label>
-    </fieldset>
-
-    <template v-else>
-      <!-- A cheque on which a step was recorded is shown locked: it is not corrected or removed (owner's answer to Q60). -->
-      <fieldset v-for="(l, i) in lines" :key="l.key" :disabled="l.locked" :class="{ locked: l.locked }">
-        <legend>
-          {{ t(`ردیف ${(i + 1).toLocaleString('fa-IR')}`, `Line ${i + 1}`) }}
-          <span v-if="timing(l) === 'current'" class="tr-tag current">{{ t('روز', 'Current') }}</span>
-          <span v-else-if="timing(l) === 'later'" class="tr-tag later">{{ t('مدت‌دار', 'Post-dated') }}</span>
-          <span v-if="l.locked" class="tr-tag cancelled">{{ t(`قفل – ${chequeStateName(l.state, locale)}: این چک ویرایش یا حذف نمی‌شود`, `Locked – ${chequeStateName(l.state, locale)}: not corrected or removed`) }}</span>
-          <button v-else type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف ردیف', 'Remove') }}</button>
-        </legend>
-        <label>{{ t('نوع', 'Kind') }}
-          <SearchSelect v-model="l.kind" :options="kindChoices" required :aria-label="t('نوع', 'Kind')" />
-        </label>
-        <label class="req">{{ t('شماره چک', 'Cheque no.') }} <input v-model="l.number" dir="ltr" /></label>
-        <label :class="{ req: !isGuarantee(l.kind) }">{{ t('سررسید', 'Due date') }} <input v-model="l.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
-        <label>{{ t('ارز', 'Currency') }}
-          <SearchSelect v-model="l.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
-        </label>
-        <label class="req">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <AmountInput v-model="l.amount" :decimals="l.currency === 'IRR' ? 0 : 2" :unit="unitOf(l.currency)" /></label>
-        <template v-if="l.currency !== 'IRR'">
-          <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="l.rate" :decimals="4" unit="ریال" /></label>
-          <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="linesRial[i] === null ? '' : money(linesRial[i]!)" readonly /></label>
-        </template>
-        <template v-if="isCheque(l.kind)">
-          <label>{{ t('بانک', 'Bank') }}
-            <SearchSelect v-model="l.bankId" :options="bankChoices" required :aria-label="t('بانک', 'Bank')" />
+  <form ref="formEl" class="tr-form tr-rf" novalidate @keydown="onKey" @submit.prevent="save">
+    <div class="tr-rf-main">
+      <!-- 1. the receipt -->
+      <section class="tr-card">
+        <header class="tr-card-head">
+          <span class="tr-step" aria-hidden="true">{{ n(1) }}</span>
+          <h3>{{ edit ? t(`ویرایش رسید شمارهٔ ${edit.number.toLocaleString('fa-IR', { useGrouping: false })}`, `Correct receipt no. ${edit.number}`) : t('مشخصات دریافت', 'Receipt') }}</h3>
+          <span class="tr-req-note"><span class="tr-req-dot" aria-hidden="true" />{{ t('پر کردن الزامی است', 'must be filled in') }}</span>
+        </header>
+        <fieldset class="tr-fields">
+          <label class="req">{{ t('تاریخ دریافت', 'Date') }} <input v-model="header.date" placeholder="1405/08/23" dir="ltr" :disabled="anyLocked" :class="{ ro: anyLocked }"
+            :title="anyLocked ? t('روی یکی از چک‌های این رسید مرحله‌ای ثبت شده است؛ تاریخ و پرداخت‌کنندهٔ رسید تغییر نمی‌کند.', 'A cheque of this receipt has a step recorded on it; the date and payer stay.') : undefined" /></label>
+          <label v-if="payerTypeChoices.length && !payerFixed">{{ t('نوع حساب تفصیل', 'Type of detail account') }}
+            <SearchSelect v-model="payerType" :options="payerTypeChoices" :empty-label="t('— همه —', '— all —')" :aria-label="t('نوع حساب تفصیل', 'Type of detail account')" />
           </label>
-          <label>{{ t('شعبه', 'Branch') }} <input v-model="l.branchName" /></label>
-          <label>{{ t('کد شعبه', 'Branch code') }} <input v-model="l.branchCode" dir="ltr" /></label>
-          <label>{{ t('شماره حساب', 'Account no.') }} <input v-model="l.accountNumber" dir="ltr" /></label>
-          <label class="req">{{ t('شناسهٔ صیاد (۱۶ رقم)', 'Sayad ID (16 digits)') }} <input v-model="l.sayadId" maxlength="16" dir="ltr" inputmode="numeric" /></label>
-          <label>{{ t('نام دارندهٔ حساب', 'Account holder') }} <input v-model="l.accountHolder" :placeholder="t('اگر چک شخص دیگری است', 'If someone else\'s cheque')" /></label>
-          <label>{{ t('شهر', 'City') }}
-            <SearchSelect :model-value="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" @update:model-value="setCity(l, $event)" />
+          <label class="wide">{{ t('پرداخت کننده (حساب تفصیلی)', 'Payer (detail account)') }}
+            <SearchSelect v-model="header.payer" :options="payerChoices" remote required :disabled="payerFixed" :aria-label="t('پرداخت کننده', 'Payer')"
+                          :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="onPayerSearch" />
           </label>
-          <label class="tr-check" :title="outOfTownIsAutomatic(l) ? t(`خودکار: شهر شرکت «${L.companyCity.value}» است.`, `Automatic: the company is in ${L.companyCity.value}.`) : undefined">
-            <input v-model="l.outOfTown" type="checkbox" :disabled="outOfTownIsAutomatic(l)" /> {{ t('خارج از مرکز', 'Out of town') }}
-            <span v-if="outOfTownIsAutomatic(l)" class="muted small">{{ t('(خودکار)', '(automatic)') }}</span>
+          <label>{{ t('گروه بابت', 'Purpose group') }}
+            <SearchSelect v-model="header.groupId" :options="groupChoices" required :aria-label="t('گروه بابت', 'Purpose group')"
+                          :none-text="t('گروه بابت دریافتی تعریف نشده است', 'No receipt purpose group')" />
           </label>
-          <p v-if="!L.companyCity.value" class="muted small wide">
-            {{ t('شهر شرکت در اطلاعات پایه ← مشخصات شرکت ثبت نشده است؛ تا آن زمان «خارج از مرکز» دستی تیک می‌خورد.',
-              'The company\'s city is not entered in Basic Information → Company particulars; until then tick "out of town" by hand.') }}
-          </p>
-        </template>
-      </fieldset>
-      <div class="tr-buttons">
-        <button type="button" class="tr-secondary" @click="nextLine">{{ t('+ ثبت چک بعدی', '+ Next cheque') }}</button>
-        <span class="muted">{{ t(`${lines.length.toLocaleString('fa-IR')} ردیف`, `${lines.length} lines`) }}</span>
-      </div>
-    </template>
+          <label class="wide">{{ t('بابت', 'Purpose') }}
+            <ComboInput v-model="header.purpose" :options="purposeNames" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
+                        :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
+                        :none-text="header.groupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
+                        :new-hint="header.groupId ? t('بابت تازه: با ثبت رسید به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the receipt adds it to this group\'s list.') : ''" />
+          </label>
+          <label v-if="group?.reference1Id">{{ refTitle(group.reference1Id) ?? t('عطف ۱', 'Reference 1') }} <input v-model="header.ref1" /></label>
+          <label v-if="group?.reference2Id">{{ refTitle(group.reference2Id) ?? t('عطف ۲', 'Reference 2') }} <input v-model="header.ref2" /></label>
+          <!-- «واحد سازمانی دریافت کننده» (owner, 15 Nov 2026: keep it, with this title): the department that received the money (manual, form «دریافت چک و اسناد دریافتنی»). Shown only when departments are
+               defined in Basic Information; Iran Nazho Co. defines none (owner, 13 Nov 2026). -->
+          <label v-if="departmentChoices.length">{{ t('واحد سازمانی دریافت کننده', 'Receiving department') }}
+            <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('واحد سازمانی دریافت کننده', 'Receiving department')" />
+          </label>
+          <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="header.note" maxlength="500" :placeholder="t('اختیاری', 'Optional')" /></label>
+          <label class="tr-check"><input v-model="header.salesProceeds" type="checkbox" /> {{ t('وجوه حاصل فروش', 'Sales proceeds') }}</label>
+        </fieldset>
+      </section>
 
-    <div class="tr-buttons">
-      <strong>{{ t('جمع (ریال):', 'Total (Rial):') }} <span class="num">{{ money(total) }}</span></strong>
-      <span v-if="replaces" class="muted">{{ t(`چک قبلی: ${money(replaces.amount)} – تفاوت: ${money(total - replaces.amount)}`,
-        `Old cheque: ${money(replaces.amount)} – difference: ${money(total - replaces.amount)}`) }}</span>
-      <button type="submit" :disabled="saving">{{ edit ? t('ثبت ویرایش (Ctrl+Enter)', 'Save the correction (Ctrl+Enter)') : t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
-      <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
+      <!-- 2. what was received: cash, a deposit, or the cheques -->
+      <section v-if="kind !== 'Instruments'" class="tr-card">
+        <header class="tr-card-head">
+          <span class="tr-step" aria-hidden="true">{{ n(2) }}</span>
+          <h3>{{ kind === 'Cash' ? t('دریافت نقدی', 'Cash') : kind === 'CardDeposit' ? t('واریز به کارت بانک', 'Paid onto a bank card') : t('واریز به بانک', 'Paid into a bank account') }}</h3>
+        </header>
+        <fieldset class="tr-fields">
+          <label v-if="kind === 'Cash'" class="wide">{{ t('صندوق', 'Cash desk') }}
+            <SearchSelect v-model="money1.accountId" :options="deskChoices" required :aria-label="t('صندوق', 'Cash desk')" :none-text="t('صندوقی تعریف نشده است', 'No cash desk')" />
+          </label>
+          <!-- «واریز به کارت بانک» (report no. 6, item 12): the card of a petty-cash holder, or a company card without a bank account. -->
+          <template v-else-if="kind === 'CardDeposit'">
+            <label class="wide">{{ t('کارت بانک (تنخواه‌گردان یا کارت شرکت)', 'Bank card (petty-cash holder or company card)') }}
+              <SearchSelect v-model="money1.accountId" :options="cardChoices" required :aria-label="t('کارت بانک', 'Bank card')" :none-text="t('کارت بانکی تعریف نشده است', 'No bank card')" />
+            </label>
+            <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
+              <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
+            </label>
+            <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
+              <input v-model="money1.tracking" dir="ltr" />
+            </label>
+            <p v-if="!cardChoices.length" class="muted small wide3">
+              {{ t('کارت بانکی تعریف نشده است. کارت تنخواه‌گردان در «اطلاعات پایه ← تنخواه گردان‌ها» (نحوهٔ نگهداری وجوه: کارت بانک) و کارت بانک شرکت که حساب بانکی ندارد در «اطلاعات پایه ← کارت‌های بانک شرکت (بدون حساب بانکی)» تعریف می‌شود.',
+                'No bank card is defined. A petty-cash holder\'s card is entered in Basic Information → Petty cash (kept on a bank card), a company card without a bank account in Basic Information → Company bank cards.') }}
+            </p>
+            <p v-else-if="chosenCard" class="muted small wide3">
+              {{ chosenCard.kind === 'PettyCashCard'
+                ? t('این وجه به تنخواهِ همین تنخواه‌گردان اضافه می‌شود: سند، حساب تنخواه گردان را با تفصیل او بدهکار می‌کند.', "This money is added to this holder's petty cash: the voucher debits the petty-cash account with the holder's detail account.")
+                : t('سند، حساب معین و تفصیلِ همین کارت را بدهکار می‌کند.', "The voucher debits this card's ledger and detail account.") }}
+            </p>
+          </template>
+          <template v-else>
+            <label class="wide">{{ t('حساب بانکی', 'Bank account') }}
+              <SearchSelect v-model="money1.accountId" :options="bankAccountChoices" required :aria-label="t('حساب بانکی', 'Bank account')" />
+            </label>
+            <label class="wide">{{ t('نوع واریز', 'Kind of deposit') }}
+              <SearchSelect v-model="money1.method" :options="methodChoices" required :aria-label="t('نوع واریز', 'Kind of deposit')" />
+            </label>
+            <label v-if="needsSheba(money1.method)" class="wide req">{{ t('شماره شبای واریزکننده (حساب مبدأ حواله)', "Payer's Sheba (the transfer's source account)") }}
+              <!-- Owner's report no. 6, item 16: «IR» is fixed in the box; the 24 digits are typed after it. -->
+              <ShebaInput v-model="money1.sheba" :locale="locale" :aria-label="t('شماره شبای واریزکننده', 'Payer\'s Sheba')" />
+            </label>
+            <label>{{ money1.method === 'DepositSlip' ? t('شماره فیش', 'Slip no.') : t('شماره پیگیری / مرجع', 'Tracking / reference no.') }}
+              <input v-model="money1.tracking" dir="ltr" />
+            </label>
+            <p v-if="money1.accountId && accountCurrency === 'IRR' && !accountHasCard" class="muted small wide3">
+              {{ t('این حساب کارت بانک ندارد؛ برای ثبت «کارت به کارت» ابتدا کارت بانک را در اطلاعات پایه ← حساب‌های بانکی تعریف کنید.',
+                'This account has no bank card; define one in Basic Information → Bank accounts to record card-to-card deposits.') }}
+            </p>
+          </template>
+          <label class="req">{{ t('مبلغ', 'Amount') }} ({{ accountCurrency }}) <AmountInput v-model="money1.amount" :decimals="accountCurrency === 'IRR' ? 0 : 2" :unit="unitOf(accountCurrency)" /></label>
+          <label v-if="accountCurrency !== 'IRR'" class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="money1.rate" :decimals="4" unit="ریال" /></label>
+          <label v-if="accountCurrency !== 'IRR'">{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="money(total)" readonly /></label>
+        </fieldset>
+      </section>
+
+      <section v-else class="tr-card">
+        <header class="tr-card-head">
+          <span class="tr-step" aria-hidden="true">{{ n(2) }}</span>
+          <h3>{{ t('چک‌ها', 'Cheques') }}</h3>
+          <span class="tr-pill">{{ t(`${n(lines.length)} چک`, `${lines.length} cheque(s)`) }}</span>
+        </header>
+        <div class="tr-lines">
+          <div v-if="lines.length > 1" class="tr-line tr-line-cap" aria-hidden="true">
+            <span>{{ t('ردیف', 'Line') }}</span><span>{{ t('بانک و شمارهٔ چک', 'Bank and cheque no.') }}</span><span>{{ t('سررسید', 'Due date') }}</span>
+            <span class="tr-line-amount">{{ t('مبلغ', 'Amount') }}</span><span />
+          </div>
+          <template v-for="(l, i) in lines" :key="l.key">
+            <!-- A cheque that was entered folds into one line; «ویرایش» opens it again. -->
+            <div v-if="l.key !== openKey" class="tr-line" :class="{ locked: l.locked }">
+              <span class="tr-line-no">{{ n(i + 1) }}</span>
+              <div class="tr-line-what">
+                <strong>{{ L.bankName(l.bankId) || lineKindName(l.kind) }}<template v-if="l.branchName"> – {{ l.branchName }}</template></strong>
+                <small>{{ lineKindName(l.kind) }} · {{ t('شمارهٔ', 'no.') }} <span class="num" dir="ltr">{{ l.number || '—' }}</span></small>
+              </div>
+              <div class="tr-line-due">
+                <span class="num" dir="ltr">{{ l.dueDate || '—' }}</span>
+                <span v-if="timing(l) === 'current'" class="tr-tag current">{{ t('روز', 'Current') }}</span>
+                <span v-else-if="timing(l) === 'later'" class="tr-tag later">{{ t('مدت‌دار', 'Post-dated') }}</span>
+                <span v-if="l.locked" class="tr-tag cancelled">{{ t(`قفل – ${chequeStateName(l.state, locale)}`, `Locked – ${chequeStateName(l.state, locale)}`) }}</span>
+                <span v-else-if="lineIncomplete(l)" class="tr-tag due">{{ t('ناقص', 'Incomplete') }}</span>
+              </div>
+              <span class="tr-line-amount num">{{ amountShown(l) }}</span>
+              <div class="tr-line-acts">
+                <button type="button" class="tr-link" @click="openKey = l.key">{{ l.locked ? t('نمایش', 'Show') : t('ویرایش', 'Edit') }}</button>
+                <button v-if="!l.locked" type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف', 'Remove') }}</button>
+              </div>
+            </div>
+            <!-- The cheque being entered. One on which a step was recorded is shown locked: it is not corrected or removed (owner's answer to Q60). -->
+            <div v-else class="tr-line-open" :class="{ locked: l.locked }">
+              <div class="tr-line-head">
+                <strong>{{ t(`ردیف ${n(i + 1)}`, `Line ${i + 1}`) }}</strong>
+                <span v-if="timing(l) === 'current'" class="tr-tag current">{{ t('روز', 'Current') }}</span>
+                <span v-else-if="timing(l) === 'later'" class="tr-tag later">{{ t('مدت‌دار', 'Post-dated') }}</span>
+                <span v-if="l.locked" class="tr-tag cancelled">{{ t(`قفل – ${chequeStateName(l.state, locale)}: این چک ویرایش یا حذف نمی‌شود`, `Locked – ${chequeStateName(l.state, locale)}: not corrected or removed`) }}</span>
+                <span class="tr-line-head-acts">
+                  <button v-if="lines.length > 1" type="button" class="tr-link" @click="openKey = null">{{ t('بستن ردیف', 'Fold') }}</button>
+                  <button v-if="!l.locked" type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف ردیف', 'Remove') }}</button>
+                </span>
+              </div>
+              <fieldset class="tr-fields" :disabled="l.locked">
+                <label>{{ t('نوع', 'Kind') }}
+                  <SearchSelect v-model="l.kind" :options="kindChoices" required :aria-label="t('نوع', 'Kind')" />
+                </label>
+                <label class="req">{{ t('شماره چک', 'Cheque no.') }} <input v-model="l.number" dir="ltr" /></label>
+                <label :class="{ req: !isGuarantee(l.kind) }">{{ t('سررسید', 'Due date') }} <input v-model="l.dueDate" placeholder="1405/09/30" dir="ltr" /></label>
+                <label>{{ t('ارز', 'Currency') }}
+                  <SearchSelect v-model="l.currency" :options="currencyChoices" required :aria-label="t('ارز', 'Currency')" />
+                </label>
+                <label class="req wide">{{ t('مبلغ', 'Amount') }} ({{ l.currency }}) <AmountInput v-model="l.amount" :decimals="l.currency === 'IRR' ? 0 : 2" :unit="unitOf(l.currency)" /></label>
+                <template v-if="l.currency !== 'IRR'">
+                  <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="l.rate" :decimals="4" unit="ریال" /></label>
+                  <label>{{ t('هم‌ارز ریالی', 'Rial equivalent') }} <input class="ro num" :value="linesRial[i] === null ? '' : money(linesRial[i]!)" readonly /></label>
+                </template>
+                <label v-if="isCheque(l.kind)" class="req wide">{{ t('شناسهٔ صیاد (۱۶ رقم)', 'Sayad ID (16 digits)') }} <input v-model="l.sayadId" class="tr-sayad" maxlength="16" dir="ltr" inputmode="numeric" /></label>
+              </fieldset>
+              <template v-if="isCheque(l.kind)">
+                <div class="tr-sub"><span>{{ t('بانک و حساب صادرکننده', 'Bank and account of the drawer') }}</span></div>
+                <fieldset class="tr-fields" :disabled="l.locked">
+                  <label>{{ t('بانک', 'Bank') }}
+                    <SearchSelect v-model="l.bankId" :options="bankChoices" required :aria-label="t('بانک', 'Bank')" />
+                  </label>
+                  <label>{{ t('شعبه', 'Branch') }} <input v-model="l.branchName" /></label>
+                  <label>{{ t('کد شعبه', 'Branch code') }} <input v-model="l.branchCode" dir="ltr" /></label>
+                  <label>{{ t('شماره حساب', 'Account no.') }} <input v-model="l.accountNumber" dir="ltr" /></label>
+                  <label class="wide">{{ t('نام دارندهٔ حساب', 'Account holder') }} <input v-model="l.accountHolder" :placeholder="t('اگر چک شخص دیگری است', 'If someone else\'s cheque')" /></label>
+                  <label>{{ t('شهر', 'City') }}
+                    <SearchSelect :model-value="l.city" :options="cityChoices" :empty-label="t('—', '—')" :aria-label="t('شهر', 'City')" @update:model-value="setCity(l, $event)" />
+                  </label>
+                  <label class="tr-check" :title="outOfTownIsAutomatic(l) ? t(`خودکار: شهر شرکت «${L.companyCity.value}» است.`, `Automatic: the company is in ${L.companyCity.value}.`) : undefined">
+                    <input v-model="l.outOfTown" type="checkbox" :disabled="outOfTownIsAutomatic(l)" /> {{ t('خارج از مرکز', 'Out of town') }}
+                    <span v-if="outOfTownIsAutomatic(l)" class="muted small">{{ t('(خودکار)', '(automatic)') }}</span>
+                  </label>
+                  <p v-if="!L.companyCity.value" class="muted small wide3">
+                    {{ t('شهر شرکت در اطلاعات پایه ← مشخصات شرکت ثبت نشده است؛ تا آن زمان «خارج از مرکز» دستی تیک می‌خورد.',
+                      'The company\'s city is not entered in Basic Information → Company particulars; until then tick "out of town" by hand.') }}
+                  </p>
+                </fieldset>
+              </template>
+            </div>
+          </template>
+          <button type="button" class="tr-add" @click="nextLine">{{ t('+ ثبت چک بعدی', '+ Next cheque') }}</button>
+        </div>
+      </section>
+
+      <!-- 3. the voucher the receipt will make (nothing is saved) -->
+      <section class="tr-card">
+        <header class="tr-card-head">
+          <span class="tr-step" aria-hidden="true">{{ n(3) }}</span>
+          <h3>{{ t('سند حسابداری', 'Voucher') }}</h3>
+          <span class="tr-pill">{{ t('پیش‌نمایش', 'Preview') }}</span>
+        </header>
+        <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
+        <p v-else-if="noPreview" class="muted small">{{ t('این رسید، رسید تعویض چک است؛ سند آن پس از ثبت ویرایش در «فهرست دریافت‌ها» دیده می‌شود.',
+          'This receipt replaced a cheque; its voucher is shown in the receipts list after the correction is saved.') }}</p>
+        <p v-else class="muted small">{{ t('سند حسابداری این رسید پس از تکمیل فرم اینجا نمایش داده می‌شود.', 'The voucher of this receipt is shown here once the form is filled in.') }}
+          <template v-if="previewHint"> ({{ previewHint }})</template></p>
+      </section>
     </div>
-    <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}
-      <!-- report no. 6, item 21: the saved receipt is shown and printed -->
-      <button v-if="lastSaved && message.kind !== 'error'" type="button" class="tr-secondary" style="margin-inline-start: .75rem" @click="emit('print', lastSaved.id)">
-        {{ t(`چاپ رسید شمارهٔ ${lastSaved.number}`, `Print receipt no. ${lastSaved.number}`) }}</button>
-    </p>
-    <VoucherTable v-if="preview" :voucher="preview" :locale="locale" :account-name="L.accountName" />
-    <p v-else-if="noPreview" class="muted small">{{ t('این رسید، رسید تعویض چک است؛ سند آن پس از ثبت ویرایش در «فهرست دریافت‌ها» دیده می‌شود.',
-      'This receipt replaced a cheque; its voucher is shown in the receipts list after the correction is saved.') }}</p>
-    <p v-else class="muted small">{{ t('سند حسابداری این رسید پس از تکمیل فرم اینجا نمایش داده می‌شود.', 'The voucher of this receipt is shown here once the form is filled in.') }}
-      <template v-if="previewHint"> ({{ previewHint }})</template></p>
+
+    <!-- The summary beside the form: who, what, the total in figures and words, and the save button. -->
+    <aside class="tr-rf-side" :aria-label="t('خلاصهٔ رسید', 'Summary of the receipt')">
+      <div class="tr-card tr-summary">
+        <h3>{{ t('خلاصهٔ رسید', 'Summary') }}</h3>
+        <dl>
+          <div><dt>{{ t('پرداخت‌کننده', 'Payer') }}</dt><dd>{{ payerName || '—' }}</dd></div>
+          <div><dt>{{ t('تاریخ دریافت', 'Date') }}</dt><dd class="num" dir="ltr">{{ header.date || '—' }}</dd></div>
+          <template v-if="kind === 'Instruments'">
+            <div v-if="summary.current.count"><dt>{{ t(`چک روز (${n(summary.current.count)} فقره)`, `Current (${summary.current.count})`) }}</dt><dd class="num">{{ money(summary.current.rial) }}</dd></div>
+            <div v-if="summary.later.count"><dt>{{ t(`چک مدت‌دار (${n(summary.later.count)} فقره)`, `Post-dated (${summary.later.count})`) }}</dt><dd class="num">{{ money(summary.later.rial) }}</dd></div>
+            <div v-if="summary.undated.count && lines.length > 1"><dt>{{ t(`بدون سررسید (${n(summary.undated.count)} فقره)`, `No due date (${summary.undated.count})`) }}</dt><dd class="num">{{ money(summary.undated.rial) }}</dd></div>
+          </template>
+          <template v-else>
+            <div><dt>{{ kind === 'Cash' ? t('به صندوق', 'Cash desk') : kind === 'CardDeposit' ? t('به کارت', 'Card') : t('به حساب', 'Account') }}</dt><dd>{{ accountShown || '—' }}</dd></div>
+            <div v-if="kind !== 'Cash'"><dt>{{ t('نوع واریز', 'Kind of deposit') }}</dt><dd>{{ methodShown || '—' }}</dd></div>
+          </template>
+        </dl>
+        <div class="tr-total">
+          <span>{{ t('جمع (ریال)', 'Total (Rial)') }}</span>
+          <strong class="num">{{ total ? money(total) : '—' }}</strong>
+          <small v-if="totalWords && fa">{{ totalWords }}</small>
+        </div>
+        <p v-if="replaces" class="muted small tr-old">{{ t(`چک قبلی: ${money(replaces.amount)} – تفاوت: ${money(total - replaces.amount)}`,
+          `Old cheque: ${money(replaces.amount)} – difference: ${money(total - replaces.amount)}`) }}</p>
+        <button type="submit" class="tr-save" :disabled="saving">{{ edit ? t('ثبت ویرایش', 'Save the correction') : t('ثبت رسید', 'Save receipt') }}</button>
+        <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
+        <p class="tr-kbd">{{ t('میان‌بر صفحه‌کلید:', 'Keyboard shortcut:') }} <kbd dir="ltr">Ctrl + Enter</kbd></p>
+      </div>
+      <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}
+        <!-- report no. 6, item 21: the saved receipt is shown and printed -->
+        <button v-if="lastSaved && message.kind !== 'error'" type="button" class="tr-secondary tr-print" @click="emit('print', lastSaved.id)">
+          {{ t(`چاپ رسید شمارهٔ ${lastSaved.number}`, `Print receipt no. ${lastSaved.number}`) }}</button>
+      </p>
+    </aside>
   </form>
 </template>
 
 <style scoped src="./receipts.css"></style>
 <style scoped>
-fieldset.locked { background: #f5f7fa; }
+/* The form and the summary beside it; in a narrow place (a small window, the replacement form on the cheque steps screen) the summary goes under the form. */
+.tr-rf { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1.25rem; margin: 0 0 1rem; }
+.tr-rf-main { flex: 999 1 34rem; min-width: 0; display: grid; gap: 1rem; }
+.tr-rf-side { flex: 1 1 17rem; min-width: 0; display: grid; gap: .75rem; position: sticky; top: 1rem; }
+.tr-req-note { margin-inline-start: auto; font-size: .78rem; color: #5b6779; }
+/* Four boxes on a line at the usual width, fewer in a narrow place. */
+.tr-rf .tr-fields { grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); }
+
+/* The cheques: a folded line each, and the open one. */
+.tr-lines { display: grid; gap: .5rem; }
+.tr-line { display: grid; grid-template-columns: 2.2rem minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1.1fr) auto; gap: .75rem; align-items: center; padding: .45rem .9rem; border: 1px solid #dfe4ec; border-radius: 10px; background: #fff; }
+.tr-line-cap { padding-block: 0; border-color: transparent; background: transparent; font-size: .78rem; color: #5b6779; }
+.tr-line.locked { background: #f5f7fa; }
+.tr-line-no { font-weight: 700; color: #445066; }
+.tr-line-what { min-width: 0; display: flex; flex-direction: column; line-height: 1.6; }
+.tr-line-what strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-line-what small { font-size: .78rem; color: #5b6779; }
+.tr-line-due { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .4rem; }
+.tr-line-amount { text-align: end; font-weight: 600; }
+.tr-line-cap .tr-line-amount { font-weight: 400; }
+.tr-line-acts { display: flex; justify-content: flex-end; min-width: 6.5rem; }
+.tr-line-open { border: 2px solid #2a5bd7; border-radius: 12px; background: #f7f9fe; padding: .75rem 1.1rem 1.1rem; }
+.tr-line-open.locked { border-color: #c9d1dd; background: #f5f7fa; }
+.tr-line-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .6rem; color: #1b2f55; }
+.tr-line-head-acts { margin-inline-start: auto; display: flex; }
+.tr-sub { display: flex; align-items: center; gap: .6rem; margin: 1rem 0 .7rem; font-size: .78rem; font-weight: 600; color: #5b6779; }
+.tr-sub::after { content: ''; flex: 1; height: 1px; background: #d5dce8; }
+.tr-sayad { font-size: 1rem; letter-spacing: .12em; font-variant-numeric: tabular-nums; }
+.tr-add { min-height: 2.9rem; border: 1px dashed #8fa3c7; border-radius: 10px; background: transparent; color: #2a5bd7; font-weight: 600; }
+.tr-add:hover { background: #f1f5fd; }
+
+/* The summary. */
+.tr-summary { display: grid; gap: .9rem; }
+.tr-summary h3 { margin: 0; font-size: .95rem; }
+.tr-summary dl { margin: 0; display: grid; gap: .45rem; font-size: .85rem; }
+.tr-summary dl > div { display: flex; justify-content: space-between; gap: .75rem; }
+.tr-summary dt { color: #5b6779; white-space: nowrap; }
+.tr-summary dd { margin: 0; font-weight: 600; text-align: end; min-width: 0; overflow-wrap: anywhere; }
+.tr-total { display: flex; flex-direction: column; border-top: 1px solid #dfe4ec; padding-top: .8rem; }
+.tr-total span { font-size: .85rem; color: #5b6779; }
+.tr-total strong { font-size: 1.85rem; line-height: 1.5; color: #1b2f55; }
+.tr-total small { font-size: .85rem; color: #445066; line-height: 1.8; }
+.tr-old { margin: 0; }
+.tr-save { min-height: 3.1rem; border-radius: 10px; font-size: 1.05rem; font-weight: 700; }
+.tr-kbd { margin: 0; text-align: center; font-size: .78rem; color: #5b6779; }
+.tr-kbd kbd { display: inline-block; padding: 0 .5rem; border: 1px solid #c9d1dd; border-radius: 6px; background: #f3f5f9; color: #445066; font: inherit; }
+.tr-rf-side .tr-msg { margin: 0; }
+/* The voucher sits in a card of its own here, so it needs no second frame. */
+.tr-card :deep(.tr-voucher) { border: 0; padding: 0; margin: 0; background: transparent; }
+.tr-print { display: block; margin-top: .5rem; }
+@media (max-width: 640px) {
+  .tr-line { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+  .tr-line-cap { display: none; }
+  .tr-line-due, .tr-line-acts { grid-column: 2 / -1; justify-content: flex-start; }
+  .tr-rf-side { position: static; }
+}
 </style>

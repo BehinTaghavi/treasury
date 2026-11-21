@@ -6,6 +6,7 @@
  * foreign-currency account also has its Rial equivalent. Saved by accounts-svc; no voucher is sent.
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import '@treasury/ui-kit/required.css'
 import { createApi, formatAmount, normaliseJalali, parseAmount, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect from '@treasury/ui-kit/SearchSelect.vue'

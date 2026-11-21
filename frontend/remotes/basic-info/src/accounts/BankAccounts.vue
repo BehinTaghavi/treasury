@@ -446,7 +446,6 @@ fieldset:disabled { opacity: .55; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 input, select { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 /* Owner, item 12: required fields have a red frame. */
-.req > input, .req > select { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 small { color: #52606d; min-height: 1em; }
 .small { font-size: .8rem; margin: 0; }

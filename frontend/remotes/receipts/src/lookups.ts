@@ -13,6 +13,8 @@ export interface Purpose { id: string; groupId: string; name: string; isActive: 
 export interface Department { id: string; number: number; name: string; isActive: boolean }
 export interface CashDesk { id: string; name: string; currencyCode: string; isActive: boolean }
 export interface BankAccount { id: string; accountNumber: string; bankId: string; branchName: string | null; currencyCode: string; isActive: boolean
+  /** The kind of account has cheque books (current Qard-al-hasan; owner's report no. 4, item 1). */
+  hasCheques?: boolean
   /** The company's bank cards on the account; card-to-card deposits need one. */
   cards?: { number: string; holderName?: string | null }[] | null }
 export interface Detail { code: string; name: string; type: string | null; isActive: boolean }

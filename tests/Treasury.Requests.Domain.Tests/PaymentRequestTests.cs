@@ -279,4 +279,53 @@ public sealed class PaymentRequestTests
         var guarantor = Beneficiary with { IsBeneficiary = false };
         Assert.Equal("PaymentRequest.NotABeneficiary", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form() with { Beneficiary = guarantor }, User)));
     }
+
+    // ----- «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026, answer to Q82) -------------------------------------------------------
+
+    private static readonly PayFromFact OtherBank = new(PayFromKind.BankAccount, Guid.NewGuid(), "بانک ملی – 0303-9911", "IRR", true);
+
+    private static PaymentRequestForm OwnTransfer(decimal amount = 3_000_000_000) =>
+        new(D("1405/08/30"), Requester, null, null, "تأمین موجودی حساب ملی", amount, "IRR", PaymentMethod.OwnAccountTransfer, PayFrom: Bank, TransferTo: OtherBank);
+
+    [Fact]
+    public void A_request_for_a_transfer_between_the_companys_accounts_names_both_accounts_instead_of_a_beneficiary()
+    {
+        var r = PaymentRequest.Register(Guid.NewGuid(), 9, OwnTransfer(), User);
+        Assert.Equal((PaymentMethod.OwnAccountTransfer, (Guid?)Bank.Id, (Guid?)OtherBank.Id), (r.Method, r.PayFromId, r.TransferToAccountId));
+        Assert.Equal((OtherBank.Id, string.Empty, "بانک ملی – 0303-9911", Guid.Empty, PaymentRequest.OwnTransferGroupName),
+            (r.BeneficiaryId, r.BeneficiaryDetailCode, r.BeneficiaryName, r.PurposeGroupId, r.PurposeGroupName));
+
+        Assert.Equal("PaymentRequest.TransferFromRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { PayFrom = null }, User)));
+        Assert.Equal("PaymentRequest.TransferToRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { TransferTo = null }, User)));
+        Assert.Equal("PaymentRequest.TransferSameAccount", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { TransferTo = Bank }, User)));
+        Assert.Equal("PaymentRequest.PayFromCurrency",
+            Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { TransferTo = OtherBank with { CurrencyCode = "USD" } }, User)));
+        Assert.Equal("PaymentRequest.PayFromInactive",
+            Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { TransferTo = OtherBank with { IsActive = false } }, User)));
+        Assert.Equal("PaymentRequest.PurposeRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, OwnTransfer() with { Purpose = "" }, User)));
+
+        // Another kind of request keeps its beneficiary and has no receiving company account.
+        Assert.Null(PaymentRequest.Register(Guid.NewGuid(), 1, Form() with { TransferTo = OtherBank }, User).TransferToAccountId);
+        Assert.Equal("PaymentRequest.BeneficiaryRequired", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form() with { Beneficiary = null }, User)));
+    }
+
+    [Fact]
+    public void A_transfer_request_is_paid_only_by_a_transfer_and_a_transfer_pays_only_such_a_request()
+    {
+        RequestPayment ByTransfer(string key, decimal amount) => new(key, PaymentRequest.OwnTransferPaymentKind, null, "نقل و انتقال شماره 4 (پایا)", amount, D("1405/08/30"), User);
+        var r = PaymentRequest.Register(Guid.NewGuid(), 9, OwnTransfer(), User);
+        Assert.Equal("PaymentRequest.NotApproved", Code(() => r.RecordPayment(ByTransfer("t1", 1_000_000_000), "IRR")));
+        r.Approve("manager", DateTimeOffset.UnixEpoch);
+        Assert.Equal("PaymentRequest.PaymentKindMismatch", Code(() => r.RecordPayment(new("e1", "EndorsedCheque", Guid.NewGuid(), "چک", 1_000_000_000, D("1405/08/30"), User), "IRR")));
+        r.RecordPayment(ByTransfer("t1", 1_000_000_000), "IRR");
+        Assert.Equal("PaymentRequest.Overpaid", Code(() => r.RecordPayment(ByTransfer("t2", 2_000_000_001), "IRR")));
+        r.RecordPayment(ByTransfer("t2", 2_000_000_000), "IRR");
+        Assert.Equal(PaymentRequestState.Paid, r.State);
+        r.ReversePayment("t2", User); // the transfer was deleted or its cheque cancelled
+        Assert.Equal((PaymentRequestState.Approved, 2_000_000_000m), (r.State, r.RemainingAmount));
+
+        var other = PaymentRequest.Register(Guid.NewGuid(), 10, Form(), User);
+        other.Approve("manager", DateTimeOffset.UnixEpoch);
+        Assert.Equal("PaymentRequest.PaymentKindMismatch", Code(() => other.RecordPayment(ByTransfer("t3", 1_000), "IRR")));
+    }
 }

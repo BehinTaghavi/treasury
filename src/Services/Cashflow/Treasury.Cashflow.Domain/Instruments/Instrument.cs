@@ -194,7 +194,26 @@ public sealed class Instrument : AggregateRoot<Guid>
     public IReadOnlyList<InstrumentHistoryEntry> History => _history;
 
     public IReadOnlyList<InstrumentAction> AllowedActions() =>
-        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured);
+        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured).Where(a => !IsTransferCheque || TransferChequeSteps.Contains(a)).ToList();
+
+    /// <summary>
+    /// A received cheque of a transfer between two bank accounts of the company (owner's report no. 7, 20 Nov 2026, «نقل و انتقال
+    /// (انتقال گیرنده)»): the company's own cheque, issued from the source account and recorded here with one button.
+    /// </summary>
+    public bool IsTransferCheque => Direction == InstrumentDirection.Received && Details.TransferId is not null;
+
+    /// <summary>
+    /// The steps of a transfer cheque on the receipts side. Owner's report no. 7: «در مورد چک‌های نقل و انتقال در بخش دریافت مراحل بعدی
+    /// واگذاری به بانک و ثبت صیادی مانند سایر چک‌های دریافتی انجام می‌گردد» — so: ثبت صیادی, واگذاری به بانک (the destination account),
+    /// وصول, and عودت از بانک with a new deposit. The steps that settle with an outside payer (برگشت, عودت به پرداخت‌کننده, تعویض,
+    /// اقدام حقوقی, ثبت انتقال / خرج) do not apply to the company's own cheque. Owner, 21 Nov 2026 (answer to Q79): there is no
+    /// replacement, and «ابطال» is recorded through the transfer, while the cheque is not registered in Sayad
+    /// (<see cref="CancelTransferCheque"/>), not on the cheque screens.
+    /// </summary>
+    public static readonly IReadOnlySet<InstrumentAction> TransferChequeSteps = new HashSet<InstrumentAction>
+    {
+        InstrumentAction.RegisterSayad, InstrumentAction.DepositForCollection, InstrumentAction.RecordCleared, InstrumentAction.ReturnFromBank,
+    };
 
     /// <summary>A cheque or note received into a cash desk (old Stcode 11, form D_Check; rule R1).</summary>
     public static Instrument Receive(
@@ -263,6 +282,51 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
             "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
         return checkedDetails;
+    }
+
+    /// <summary>
+    /// The receipts side of a cheque transfer («نقل و انتقال (انتقال گیرنده)», owner's report no. 7): the cheque the company issued from
+    /// its source account, recorded as a received cheque «نزد صندوق» with the same number, amount and due date. It names its transfer
+    /// and the destination account instead of a receipt.
+    /// </summary>
+    /// <param name="issued">The cheque as issued for the transfer (payment side).</param>
+    /// <param name="drawer">The company's source account, with the bank account's تفصیل.</param>
+    /// <param name="details">What is written on the cheque: the source account's bank, branch, account number and the Sayad ID.</param>
+    public static Instrument ReceiveTransferCheque(
+        Guid id, Instrument issued, Guid transferId, Guid destinationAccountId, CounterpartyRef drawer, string bankName, ReceivedInstrumentDetails details,
+        FiscalDate receivedOn, string userId)
+    {
+        ArgumentNullException.ThrowIfNull(issued);
+        ArgumentNullException.ThrowIfNull(details);
+        Require(transferId != Guid.Empty && issued.Direction == InstrumentDirection.Issued && issued.State == InstrumentState.Issued && issued.PaymentId == transferId,
+            "Transfer.ChequeMismatch", "The received cheque must be the cheque issued for this transfer.");
+        Require(receivedOn >= issued.IssueDate, "Transfer.ReceivedBeforeIssue", "The cheque cannot be received before the day it was issued.");
+        Require(details.SayadId is not null, "Transfer.SayadIdRequired", "A transfer cheque carries its 16-digit Sayad ID.");
+        return Receive(id, InstrumentKind.OrdinaryCheque, issued.Number ?? string.Empty, bankName, issued.Amount, receivedOn, issued.DueDate, drawer, issued.Purpose, userId,
+            details with { TransferId = transferId, TransferAccountId = destinationAccountId }, null);
+    }
+
+    /// <summary>
+    /// «ابطال» of a transfer cheque on the receipts side, with its transfer (<c>BankTransfer.CancelCheque</c>; owner, 21 Nov 2026, answer
+    /// to Q79): only while it is «نزد صندوق» and not registered in Sayad. It needs no order of management: the cheque is the company's own.
+    /// </summary>
+    public void CancelTransferCheque(Guid transferId, FiscalDate date, string userId, string reason)
+    {
+        Require(IsTransferCheque && Details.TransferId == transferId, "Transfer.ChequeMismatch", "The cheque does not belong to this transfer.");
+        Require(!string.IsNullOrWhiteSpace(reason), "Transfer.CancelReasonRequired", "Give the reason for cancelling the cheque.");
+        Apply(InstrumentAction.Cancel, date, userId, null, reason.Trim(), byTransfer: true);
+    }
+
+    /// <summary>
+    /// The issued cheque of a transfer recorded by mistake is taken away with its transfer (<c>BankTransfer.Delete</c>); the caller then
+    /// deletes it and frees its sheet. Only while it is as it was issued: no later step, not on the receipts side.
+    /// </summary>
+    public void RemoveIssuedForTransfer(Guid transferId, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(Direction == InstrumentDirection.Issued && State == InstrumentState.Issued && PaymentId == transferId && _history[^1].Action == InstrumentAction.Issue,
+            "Transfer.ChequeMovedOn", "A step is recorded on the cheque; its transfer can no longer be deleted.");
+        Raise(new IssuedInstrumentRemoved(Id, transferId, Kind, Number, userId));
     }
 
     /// <summary>
@@ -354,6 +418,8 @@ public sealed class Instrument : AggregateRoot<Guid>
     {
         ArgumentNullException.ThrowIfNull(account);
         RequireSayadRegistration();
+        Require(Details.TransferAccountId is not { } destination || destination == account.Id, "Instrument.TransferChequeOtherAccount",
+            "A transfer cheque is deposited at the destination account of its transfer.");
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -367,6 +433,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
+        Require(!IsTransferCheque, "Instrument.TransferChequeOtherAccount", "A transfer cheque is deposited at the destination account of its transfer.");
         RequireSayadRegistration();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
     }
@@ -649,8 +716,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     }
 
     /// <param name="validate">Extra rule of this action, checked after the transition and date rules, before anything changes.</param>
+    /// <param name="byTransfer">The step is recorded by the cheque's transfer itself (its cancellation), not on the cheque screens.</param>
     private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null,
-        StepDetails? details = null)
+        StepDetails? details = null, bool byTransfer = false)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         var transition = InstrumentLifecycle.Find(Direction, State, action)
@@ -662,6 +730,10 @@ public sealed class Instrument : AggregateRoot<Guid>
         {
             throw new DomainException("Instrument.KindNotAllowedForAction", $"'{action}' is not allowed for {Kind}."); // R3
         }
+
+        // Owner's report no. 7: a transfer cheque goes on with ثبت صیادی, واگذاری به بانک and وصول only (see TransferChequeSteps).
+        Require(!IsTransferCheque || byTransfer || TransferChequeSteps.Contains(action), "Instrument.NotForTransferCheque",
+            $"'{action}' is not recorded on a cheque of a transfer between the company's own bank accounts.");
 
         var lastDate = _history[^1].Date;
         if (date < lastDate)
@@ -733,6 +805,9 @@ public sealed record InstrumentStateChanged(
 public sealed record ReceivedInstrumentCorrected(
     Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, FiscalDate ReceivedOn, FiscalDate? DueDate, Money Amount, Guid CounterpartyId,
     string UserId) : DomainEvent;
+
+/// <summary>The issued cheque of a transfer recorded by mistake was deleted with it, and its sheet freed (owner's report no. 7).</summary>
+public sealed record IssuedInstrumentRemoved(Guid InstrumentId, Guid TransferId, InstrumentKind Kind, string? Number, string UserId) : DomainEvent;
 
 /// <summary>A cheque or note typed by mistake was taken off its receipt and deleted, before the receipt's voucher was confirmed.</summary>
 public sealed record ReceivedInstrumentRemoved(Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, string UserId) : DomainEvent;

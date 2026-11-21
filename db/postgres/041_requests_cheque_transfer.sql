@@ -11,7 +11,8 @@ ALTER TABLE requests.payment_request ADD COLUMN IF NOT EXISTS cheque_sayad_id te
 -- The whole list of payment methods (every start re-runs every script; a later script that adds a method must carry the whole list too).
 ALTER TABLE requests.payment_request DROP CONSTRAINT IF EXISTS payment_request_method_check;
 ALTER TABLE requests.payment_request ADD CONSTRAINT payment_request_method_check
-    CHECK (method IN ('CurrentCheque', 'PostDatedCheque', 'GuaranteeCheque', 'Cash', 'PromissoryNote', 'GuaranteeNote', 'Transfer', 'CardToCard', 'ChequeTransfer'));
+    CHECK (method IN ('CurrentCheque', 'PostDatedCheque', 'GuaranteeCheque', 'Cash', 'PromissoryNote', 'GuaranteeNote', 'Transfer', 'CardToCard', 'ChequeTransfer',
+                      'OwnAccountTransfer'));
 
 ALTER TABLE requests.payment_request DROP CONSTRAINT IF EXISTS payment_request_cheque;
 ALTER TABLE requests.payment_request ADD CONSTRAINT payment_request_cheque

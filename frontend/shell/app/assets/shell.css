@@ -1,23 +1,44 @@
-:root { --c-menu: #1d3557; --c-bg: #f5f7fa; --c-ink: #1f2933; --c-primary: #2563eb; --c-muted: #616e7c; }
+/* Vazirmatn (SIL Open Font License, public/fonts/Vazirmatn-OFL.txt) is served with the shell: the client's server has no internet,
+   and without the file every screen fell back to Tahoma. One variable file holds every weight. */
+@font-face { font-family: Vazirmatn; src: url('/fonts/Vazirmatn.woff2') format('woff2'); font-weight: 100 900; font-style: normal; font-display: swap; }
+:root { --c-menu: #1b2f55; --c-bg: #f3f5f9; --c-ink: #18233a; --c-primary: #2a5bd7; --c-muted: #5b6779; --c-line: #dfe4ec; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Vazirmatn, Tahoma, sans-serif; background: var(--c-bg); color: var(--c-ink); }
-.shell { display: grid; grid-template-columns: 13rem 1fr; grid-template-rows: auto 1fr; min-height: 100vh; }
-.bar { grid-column: 1 / -1; display: flex; gap: 1.5rem; align-items: center; padding: .75rem 1.25rem; background: #fff; border-bottom: 1px solid #e4e7eb; }
+/* The design the owner approved on 20 Nov 2026: the bar on top, the main menu as a narrow dark-blue rail of icons with their names,
+   and each area's sub-menu as a white column beside it (ui-kit SectionMenu). */
+.shell { display: grid; grid-template-columns: 5.75rem minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100vh; }
+.bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: .5rem 1.25rem; align-items: center; padding: .6rem 1.5rem; background: #fff; border-bottom: 1px solid var(--c-line); }
 /* The company's logo and name (Basic Information → «مشخصات شرکت») lead the bar of every screen; the system's name sits under them. */
 .brand { display: flex; align-items: center; gap: .75rem; min-width: 0; }
 .brand .logo { height: 2.75rem; width: auto; max-width: 9rem; object-fit: contain; }
-.brand .names { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
-.brand .company { font-size: 1.1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brand .system { font-size: .8rem; color: var(--c-muted); }
+.brand .names { display: flex; flex-direction: column; line-height: 1.4; min-width: 0; }
+.brand .company { font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand .system { font-size: .78rem; color: var(--c-muted); }
 .brand .system.alone { font-size: 1rem; font-weight: 700; color: var(--c-ink); }
-.bar .version { margin-inline-start: auto; color: #7b8794; font-size: .8rem; direction: ltr; }
-.bar .version + .lang { margin-inline-start: .75rem; }
-.bar .lang { margin-inline-start: auto; background: transparent; border: 1px solid #cbd2d9; border-radius: 6px; padding: .35rem .75rem; cursor: pointer; }
+.bar .year { display: flex; align-items: center; gap: .5rem; margin-inline-start: auto; font-size: .85rem; color: #445066; }
+.bar .year select { height: 2.5rem; padding: 0 .6rem; border: 1px solid #c9d1dd; border-radius: 8px; background: #fff; color: var(--c-ink); font: inherit; font-weight: 600; }
+.bar .version { color: var(--c-muted); font-size: .78rem; direction: ltr; }
+.bar .lang { height: 2.5rem; background: #fff; color: var(--c-menu); border: 1px solid #c9d1dd; border-radius: 8px; padding: 0 .9rem; font: inherit; font-size: .85rem; cursor: pointer; }
+.bar .lang:hover { background: #f0f3f8; }
 /* Main menu: dark blue so it stands apart from the page (owner's suggestion, 11 Nov 2026). */
-.menu { display: flex; flex-direction: column; gap: .15rem; padding: 1rem .5rem; background: var(--c-menu); }
-.menu a { padding: .6rem .8rem; border-radius: 6px; color: #e6edf7; text-decoration: none; }
+.menu { background: var(--c-menu); }
+.menu-in { position: sticky; top: 0; display: flex; flex-direction: column; gap: .25rem; padding: .75rem .5rem; }
+.menu a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; min-height: 4rem; padding: .5rem .25rem; border-radius: 10px; color: #c9d5ea;
+  text-decoration: none; font-size: .75rem; line-height: 1.35; text-align: center; }
+.menu a svg { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .menu a:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+.menu a:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
 .menu a.router-link-active:not([href="/"]), .menu a.router-link-exact-active { background: #fff; color: var(--c-menu); font-weight: 700; }
-.content { padding: 1.5rem; }
+/* An area with a sub-menu reaches over this padding (--shell-pad) so its column touches the main menu, and fills the height. */
+.content { --shell-pad: 1.5rem; min-width: 0; padding: var(--shell-pad); display: flex; flex-direction: column; }
+.content > * { flex: 1 0 auto; }
 .muted { color: var(--c-muted); }
 .error { color: #8a1c1c; }
+/* Narrow screen: the main menu lies across the top and scrolls sideways. */
+@media (max-width: 720px) {
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto 1fr; }
+  .menu-in { position: static; flex-direction: row; overflow-x: auto; padding: .4rem .5rem; }
+  .menu a { flex: 0 0 4.75rem; min-height: 3.5rem; }
+  .content { --shell-pad: 1rem; }
+}
+@media print { .bar, .menu { display: none; } .shell { display: block; } .content { --shell-pad: 0px; display: block; } }
