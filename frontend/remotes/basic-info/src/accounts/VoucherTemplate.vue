@@ -67,7 +67,7 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
   // Owner's answers of 21 Nov 2026: the bank's fee of a transfer (Q77) and a post-dated issued cheque until its due date (Q81).
   BankFees: {
     title: ['هزینه کارمزد خدمات بانکی', 'Bank service fees'],
-    use: ['حساب عمومی هزینه‌های مالی (معین یا معین در معین): بدهکار هنگام ثبت کارمزد نقل و انتقال؛ بستانکار آن بانک انتقال دهنده است',
+    use: ['حساب عمومی هزینه‌های مالی (معین یا معین در معین): بدهکار هنگام ثبت کارمزد نقل و انتقال؛ بستانکار آن بانک انتقال دهنده است. اگر این حساب تفصیل‌دار باشد (مثلاً مرکز هزینهٔ امور مالی)، تفصیل آن هنگام ثبت کارمزد پرسیده می‌شود',
       'One general account of the financial expenses: debited with the fee of a transfer; credited to the source bank'],
   },
   NotesPayable: {

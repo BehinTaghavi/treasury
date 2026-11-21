@@ -10,11 +10,20 @@ using Treasury.Cashflow.Domain.Vouchers;
 namespace Treasury.Cashflow.Application.Transfers;
 
 /// <summary>The form of an electronic transfer; dates are Jalali text at this edge.</summary>
-/// <param name="PaymentRequestId">The approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت» the transfer pays (answer to Q82).</param>
+/// <param name="PaymentRequestId">The approved payment request of the kind «نقل و انتقال بین بانک‌های شرکت» the transfer pays (answer to Q82).</param>
 /// <param name="Fee">The bank's fee of the order in Rial («کارمزد خدمات بانکی»), when there is one (answer to Q77).</param>
+/// <param name="FeeDetailCode">The تفصیل of the fee, asked only when the fee account takes one (answer to Q83).</param>
 public sealed record ElectronicTransferInput(
     string Date, Guid SourceAccountId, Guid DestinationAccountId, TransferMethod Method, TransferChannel? Channel, decimal Amount, decimal? RateToRial = null,
-    string? TrackingNumber = null, string? Description = null, Guid? PaymentRequestId = null, decimal? Fee = null);
+    string? TrackingNumber = null, string? Description = null, Guid? PaymentRequestId = null, decimal? Fee = null, string? FeeDetailCode = null);
+
+/// <summary>Whether the fee line of a transfer asks for a تفصیل, for the form (answer to Q83).</summary>
+/// <param name="AccountCode">The company's account «هزینه کارمزد خدمات بانکی»; null: not set in the voucher template yet.</param>
+/// <param name="DetailTypes">The تفصیل types the account takes; empty: the fee has no تفصیل.</param>
+public sealed record FeeAccountView(string? AccountCode, string? AccountName, IReadOnlyList<string> DetailTypes);
+
+/// <summary>What a source account already sent on a day by one way (answer to Q84: the orders of the day are counted and shown).</summary>
+public sealed record TransferDayUsageView(decimal TotalRialSameChannel, int Count);
 
 public sealed record RecordElectronicTransferCommand(string IdempotencyKey, ElectronicTransferInput Form);
 
@@ -80,7 +89,7 @@ public sealed record TransferView(
     decimal Amount, string Currency, decimal? RateToRial, decimal AmountRial, string? TrackingNumber, string? Description, string State, string RecordedBy,
     string? DeletedBy, DateTimeOffset? DeletedAt, TransferChequeView? Cheque, bool PayerVoucherConfirmed, bool ReceiverVoucherConfirmed,
     string? WhyNotCorrectable, string? WhyNotDeletable, bool CanUndoReceive, long Version, decimal? Fee = null, Guid? PaymentRequestId = null,
-    int? PaymentRequestNumber = null, IReadOnlyList<int>? ConfirmedSteps = null);
+    int? PaymentRequestNumber = null, IReadOnlyList<int>? ConfirmedSteps = null, string? FeeDetailCode = null);
 
 /// <summary>
 /// Transfers between the company's own bank accounts («نقل و انتقال بین بانکی», owner's report no. 7 of 20 Nov 2026): the electronic
@@ -138,6 +147,27 @@ public sealed class TransferUseCases(
             await limits.SaveAsync(table, ct).ConfigureAwait(false);
             return Result<string>.Ok(method.ToString());
         }, s => s, s => s, cancellationToken);
+
+    /// <summary>The account of bank fees as the voucher template names it, and whether it takes a تفصیل (answer to Q83).</summary>
+    public Task<FeeAccountView> FeeAccountAsync(CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct =>
+        {
+            var code = (await templates.GetAsync(ct).ConfigureAwait(false)).CodeOf(FixedAccount.BankFees);
+            var account = code is null ? null : await reference.LedgerAccountAsync(code, ct).ConfigureAwait(false);
+            return new FeeAccountView(code, account?.Name, account?.Detail1Types ?? []);
+        }, cancellationToken);
+
+    /// <summary>
+    /// What the source account already sent on a day by one way: the Rial total through the same channel and the number of orders
+    /// (answer to Q84: «لازم است در طی روز تعدد پرداخت … در سیستم کنترل شود»). The limits are checked against the same figures.
+    /// </summary>
+    public Task<TransferDayUsageView> DayUsageAsync(Guid sourceAccountId, string date, TransferMethod method, TransferChannel channel, Guid? exceptId,
+        CancellationToken cancellationToken) =>
+        unitOfWork.ExecuteAsync(async ct =>
+        {
+            var usage = await transfers.DayUsageAsync(sourceAccountId, FiscalDate.ParseJalali(date), method, channel, exceptId, ct).ConfigureAwait(false);
+            return new TransferDayUsageView(usage.TotalRialSameChannel, usage.Count);
+        }, cancellationToken);
 
     // ----- electronic transfers ---------------------------------------------------------------------------------------------------
 
@@ -513,7 +543,7 @@ public sealed class TransferUseCases(
             t.Destination.Id, t.Destination.AccountNumber, t.Destination.BankId, t.Destination.BankName,
             t.Amount.Amount, t.Amount.Currency, t.Amount.RateToRial, t.Amount.ToRial(), t.TrackingNumber, t.Description, t.State.ToString(), t.RecordedBy,
             t.DeletedBy, t.DeletedAt, cheque, payerConfirmed, receiverConfirmed, t.WhyNotCorrectable(payerConfirmed), t.WhyNotDeletable(payerConfirmed), canUndo, t.Version,
-            t.FeeRial, t.Request?.Id, t.Request?.Number, [.. confirmed.Order()]);
+            t.FeeRial, t.Request?.Id, t.Request?.Number, [.. confirmed.Order()], t.FeeDetailCode);
     }
 
     /// <param name="correcting">The transfer being corrected; null for a new one.</param>
@@ -527,7 +557,21 @@ public sealed class TransferUseCases(
         var destination = await AccountAsync(input.DestinationAccountId, ct).ConfigureAwait(false);
         var amount = ToMoney(input.Amount, source.CurrencyCode, input.RateToRial);
         var request = await RequestAsync(input.PaymentRequestId, correcting, ct).ConfigureAwait(false);
-        var form = new ElectronicTransferForm(date, source, destination, input.Method, input.Channel, amount, input.TrackingNumber, input.Description, request, input.Fee);
+        // The fee line asks for a تفصیل only when the company's fee account takes one (answer to Q83).
+        FeeAccountFact? feeAccount = null;
+        FeeDetailFact? feeDetail = null;
+        if (input.Fee is > 0 && (await templates.GetAsync(ct).ConfigureAwait(false)).CodeOf(FixedAccount.BankFees) is { } feeCode)
+        {
+            feeAccount = new FeeAccountFact((await reference.LedgerAccountAsync(feeCode, ct).ConfigureAwait(false))?.Detail1Types ?? []);
+            if (feeAccount.TakesDetail && !string.IsNullOrWhiteSpace(input.FeeDetailCode))
+            {
+                feeDetail = await reference.DetailAsync(input.FeeDetailCode.Trim(), ct).ConfigureAwait(false)
+                    ?? throw new DomainException("Transfer.FeeDetailNotFound", "The تفصیل of the fee was not found.");
+            }
+        }
+
+        var form = new ElectronicTransferForm(date, source, destination, input.Method, input.Channel, amount, input.TrackingNumber, input.Description, request, input.Fee,
+            feeAccount, feeDetail);
         var usage = input.Channel is { } channel && Enum.IsDefined(input.Method)
             ? await transfers.DayUsageAsync(source.Id, date, input.Method, channel, correcting?.Id, ct).ConfigureAwait(false)
             : TransferDayUsage.None;

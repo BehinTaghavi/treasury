@@ -328,6 +328,12 @@ public static class Endpoints
         api.MapGet("/transfers/{id:guid}", async (Guid id, TransferUseCases u, CancellationToken ct) =>
             await u.GetAsync(id, ct).ConfigureAwait(false) is { } view ? Results.Ok(view) : Results.NotFound());
 
+        // The owner's answers of 21 Nov 2026 to Q83 and Q84: whether the fee line asks for a تفصیل, and the day's orders of an account.
+        api.MapGet("/transfers/fee-account", async (TransferUseCases u, CancellationToken ct) => Results.Ok(await u.FeeAccountAsync(ct).ConfigureAwait(false)));
+
+        api.MapGet("/transfers/day-usage", async (Guid sourceAccountId, string date, TransferMethod method, TransferChannel channel, Guid? except, TransferUseCases u,
+            CancellationToken ct) => Results.Ok(await u.DayUsageAsync(sourceAccountId, date, method, channel, except, ct).ConfigureAwait(false)));
+
         api.MapPost("/transfers/electronic", async (ElectronicTransferInput r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
             ToHttp(await u.RecordElectronicAsync(new RecordElectronicTransferCommand(Key(http), r), ct).ConfigureAwait(false), id => $"/api/cashflow/transfers/{id}"));
 

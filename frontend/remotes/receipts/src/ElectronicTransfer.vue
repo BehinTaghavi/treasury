@@ -10,7 +10,7 @@
  * report no. 6), and «تایید سند». A deleted transfer stays in the list, light red, marked «حذف شده», so its number is seen to be taken.
  * The same screen stands in «دریافت‌ها» and in «پرداخت‌ها»: a transfer is a payment of the source bank and a receipt of the destination bank.
  * The form follows the receipt form the owner approved on 20 Nov 2026 (numbered cards, summary beside them, required fields marked by a dot).
- * Owner, 21 Nov 2026 (answers to Q76–Q82): every transfer pays an approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت»
+ * Owner, 21 Nov 2026 (answers to Q76–Q82): every transfer pays an approved payment request of the kind «نقل و انتقال بین بانک‌های شرکت»
  * («برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود») — the request is chosen first, it sets the two accounts
  * and proposes what is left to pay on it; and the bank's fee («کارمزد خدمات بانکی») is typed with the transfer and debited to the
  * company's fee account in the same voucher.
@@ -24,7 +24,7 @@ import VoucherTable, { type Voucher } from './VoucherTable.vue'
 import TransferVoucher from './TransferVoucher.vue'
 import { amountText } from './savedReceipt'
 import { accountText, channelName, channelShortName, channels, limitFor, limitLines, methodName, methodShortName, methodUse, payableRequests, requestLabel, totalRial, waysFor,
-  type Transfer, type TransferChannel, type TransferLimit, type TransferRequest } from './transfers'
+  type DayUsage, type FeeAccount, type Transfer, type TransferChannel, type TransferLimit, type TransferRequest } from './transfers'
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number }>(),
   { apiBase: '', locale: 'fa', token: undefined, fiscalYear: undefined })
@@ -38,7 +38,7 @@ const year = computed(() => props.fiscalYear ?? Number(todayJalali().slice(0, 4)
 
 // ---- the form ----
 const blank = () => ({
-  date: todayJalali(), requestId: '', sourceId: '', destinationId: '', method: '', channel: '' as TransferChannel | '', amount: '', rate: '', fee: '', tracking: '', description: '' })
+  date: todayJalali(), requestId: '', sourceId: '', destinationId: '', method: '', channel: '' as TransferChannel | '', amount: '', rate: '', fee: '', feeDetail: '', tracking: '', description: '' })
 const form = reactive(blank())
 /** The saved transfer being corrected («ویرایش»). */
 const editing = ref<Transfer | null>(null)
@@ -108,6 +108,64 @@ const applied = computed(() => (form.method && source.value ? limitFor(limits.va
 const appliedLines = computed(() => limitLines(applied.value, form.channel, props.locale))
 const ownLimit = computed(() => applied.value?.bankId != null)
 
+/**
+ * Owner, 21 Nov 2026 (answer to Q84): «لازم است در طی روز تعدد پرداخت و مانده پرداخت نشده درخواست در سیستم کنترل شود» — what this
+ * source account already sent that day by the chosen way is shown under the limits (the server checks the limits against the same figures).
+ */
+const usage = ref<DayUsage | null>(null)
+let usageRun = 0
+watch(() => [form.sourceId, form.date, form.method, form.channel, editing.value?.id], async () => {
+  const run = ++usageRun
+  usage.value = null
+  const date = normaliseJalali(form.date)
+  if (!form.sourceId || !form.method || !form.channel || !date) return
+  const q = new URLSearchParams({ sourceAccountId: form.sourceId, date, method: form.method, channel: form.channel })
+  if (editing.value) q.set('except', editing.value.id)
+  const r = await api.get<DayUsage>(`/api/cashflow/transfers/day-usage?${q}`)
+  if (run === usageRun && r.ok) usage.value = r.value
+})
+const usageLine = computed(() => {
+  const u = usage.value
+  if (!u || !form.channel) return ''
+  const day = u.count
+    ? t(`${num(u.count)} دستور ثبت شده است؛ جمع ${channelShortName(form.channel, 'fa')}: ${money(u.totalRialSameChannel)} ریال`,
+      `${u.count} order(s) recorded; ${channelShortName(form.channel, 'en')} total: ${money(u.totalRialSameChannel)} Rial`)
+    : t('هنوز دستوری ثبت نشده است', 'no order recorded yet')
+  return t(`از این حساب با این روش در تاریخ ${form.date}: ${day}.`, `From this account by this way on ${form.date}: ${day}.`)
+})
+
+/**
+ * Owner, 21 Nov 2026 (answer to Q83): the fee account usually has no تفصیل; when the company's account «هزینه کارمزد خدمات بانکی» is one
+ * "with تفصیل" (e.g. a general cost centre of the finance department), the fee asks for a تفصیل of a type the account takes.
+ */
+interface Detail { code: string; name: string; isActive: boolean }
+const feeAccount = ref<FeeAccount | null>(null)
+const feeNeedsDetail = computed(() => !!feeAccount.value?.detailTypes.length && !!parseAmount(form.fee))
+const feeDetails = ref<Detail[]>([])
+const feeDetailChoices = computed<Choice[]>(() => feeDetails.value.map(d => ({ value: d.code, label: d.name, hint: d.code, muted: !d.isActive })))
+let feeSearchRun = 0
+async function searchFeeDetails(text = '') {
+  const run = ++feeSearchRun
+  const found = await Promise.all((feeAccount.value?.detailTypes ?? []).map(type => {
+    const q = new URLSearchParams({ type, take: '50' })
+    if (text.trim()) q.set('search', text.trim())
+    return api.get<Detail[]>(`/api/reference/ledger/details?${q}`)
+  }))
+  if (run !== feeSearchRun) return
+  const list = found.flatMap(r => (r.ok ? r.value : []))
+  // The تفصیل already chosen stays in the list, whatever is searched for.
+  const current = form.feeDetail && !list.some(d => d.code === form.feeDetail) ? feeDetails.value.filter(d => d.code === form.feeDetail) : []
+  feeDetails.value = [...current, ...list]
+}
+watch(feeNeedsDetail, async needed => {
+  if (!needed) return
+  if (form.feeDetail && !feeDetails.value.some(d => d.code === form.feeDetail)) {
+    const r = await api.get<Detail>(`/api/reference/ledger/details/${encodeURIComponent(form.feeDetail)}`)
+    if (r.ok) feeDetails.value = [r.value]
+  }
+  await searchFeeDetails()
+})
+
 const amountRial = computed(() => {
   const a = parseAmount(form.amount)
   if (a === null) return 0
@@ -133,9 +191,11 @@ function request(): { body: Record<string, unknown> } | { error: string } {
   if (currency.value !== 'IRR' && rate === null) return { error: 'Money.InvalidRate' }
   const fee = form.fee.trim() ? parseAmount(form.fee) : null
   if (form.fee.trim() && (fee === null || fee < 0)) return { error: 'Transfer.FeeInvalid' }
+  if (feeNeedsDetail.value && !form.feeDetail) return { error: 'Transfer.FeeDetailRequired' }
   return { body: {
     date, sourceAccountId: form.sourceId, destinationAccountId: form.destinationId, method: form.method, channel: form.channel, amount, rateToRial: rate,
-    trackingNumber: form.tracking.trim() || null, description: form.description.trim() || null, paymentRequestId: form.requestId, fee: fee || null } }
+    trackingNumber: form.tracking.trim() || null, description: form.description.trim() || null, paymentRequestId: form.requestId, fee: fee || null,
+    feeDetailCode: feeNeedsDetail.value ? form.feeDetail : null } }
 }
 
 // ---- the voucher while the form is filled (nothing is saved) ----
@@ -183,7 +243,7 @@ async function save() {
     editing.value = null
     // After a correction the form is empty again; after a new transfer the request, the accounts and the way stay for the next one
     // (while something is left to pay on the request), with what is now left on the request as the amount.
-    Object.assign(form, old ? blank() : { amount: '', rate: '', fee: '', tracking: '', description: '' })
+    Object.assign(form, old ? blank() : { amount: '', rate: '', fee: '', feeDetail: '', tracking: '', description: '' })
     await Promise.all([load(), loadRequests()])
     if (!old && chosenRequest.value) form.amount = amountText(available.value)
   } finally {
@@ -218,7 +278,7 @@ function startEdit(x: Transfer) {
   editing.value = x
   Object.assign(form, {
     date: x.date, requestId: '', sourceId: x.sourceAccountId, destinationId: x.destinationAccountId, method: x.method, channel: x.channel ?? '', amount: amountText(x.amount),
-    rate: amountText(x.rateToRial), fee: amountText(x.fee ?? null), tracking: x.trackingNumber ?? '', description: x.description ?? '' })
+    rate: amountText(x.rateToRial), fee: amountText(x.fee ?? null), feeDetail: x.feeDetailCode ?? '', tracking: x.trackingNumber ?? '', description: x.description ?? '' })
   // Its own request is offered again, also when the transfer paid it in full; the amount stays the transfer's.
   void loadRequests().then(() => {
     if (editing.value?.id !== x.id || !x.paymentRequestId || !requests.value.some(r => r.id === x.paymentRequestId)) return
@@ -256,8 +316,9 @@ async function remove(x: Transfer) {
 const voucherOf = ref('')
 
 onMounted(async () => {
-  const [, l] = await Promise.all([L.load(), api.get<TransferLimit[]>('/api/cashflow/transfer-limits')])
+  const [, l, f] = await Promise.all([L.load(), api.get<TransferLimit[]>('/api/cashflow/transfer-limits'), api.get<FeeAccount>('/api/cashflow/transfers/fee-account')])
   if (l.ok) limits.value = l.value
+  if (f.ok) feeAccount.value = f.value
   await Promise.all([load(), loadRequests()])
 })
 watch(year, () => { void load(); void loadRequests() })
@@ -281,7 +342,7 @@ watch(year, () => { void load(); void loadRequests() })
                             :none-text="t('درخواست وجه تأییدشده‌ای برای نقل و انتقال نیست', 'No approved request for a transfer')" />
             </label>
             <p v-if="requestsLoaded && !requests.length" class="tr-msg warning wide3">
-              {{ t('برای هر نقل و انتقال ابتدا باید در «درخواست وجه» یک درخواست با نوع پرداخت «نقل و انتقال بین حساب‌های شرکت» ثبت و تایید شود؛ سپس همان درخواست در اینجا انتخاب می‌شود.',
+              {{ t('برای هر نقل و انتقال ابتدا باید در «درخواست وجه» یک درخواست با نوع پرداخت «نقل و انتقال بین بانک‌های شرکت» ثبت و تایید شود؛ سپس همان درخواست در اینجا انتخاب می‌شود.',
                 "Every transfer first needs a payment request of the kind \"transfer between the company's accounts\", written and approved under Payment requests; that request is then chosen here.") }}
             </p>
             <label class="req">{{ t('تاریخ انتقال', 'Date') }} <input v-model="form.date" placeholder="1405/08/29" dir="ltr" /></label>
@@ -324,6 +385,7 @@ watch(year, () => { void load(); void loadRequests() })
               <template v-else>{{ form.method === 'Internal'
                 ? t('برای «انتقال داخلی» سقفی ثبت نشده است؛ هر بانک ضوابط خود را دارد و سقف ویژهٔ آن بانک را می‌توان ثبت کرد.', 'No limit is kept for the internal transfer; every bank has its own rules, and a bank\'s own limit can be entered.')
                 : t('برای این روش سقفی ثبت نشده است.', 'No limit is kept for this way.') }}</template>
+              <p v-if="usageLine" class="tr-usage">{{ usageLine }}</p>
               <span class="muted"> {{ t('این سقف‌ها در «اطلاعات پایه ← سقف‌های انتقال الکترونیکی» تغییر می‌کنند.', 'These limits are changed in Basic Information → Electronic transfer limits.') }}</span>
             </div>
             <p v-else-if="source && destination" class="tr-limits">
@@ -334,7 +396,9 @@ watch(year, () => { void load(); void loadRequests() })
             </p>
             <label class="req wide">{{ t('مبلغ', 'Amount') }} ({{ currency }}) <AmountInput v-model="form.amount" :decimals="currency === 'IRR' ? 0 : 2" :unit="unit" />
               <small v-if="available !== null" class="muted">{{ t(`ماندهٔ درخواست وجه: ${money(available)} – مبلغ می‌تواند کمتر باشد، ولی بیشتر نه.`,
-                `Left on the request: ${money(available)} – the amount may be less, never more.`) }}</small>
+                `Left on the request: ${money(available)} – the amount may be less, never more.`) }}
+                <template v-if="chosenRequest?.payments?.length">{{ t(` تاکنون ${num(chosenRequest.payments.length)} پرداخت روی این درخواست ثبت شده است (${money(chosenRequest.paidAmount)}).`,
+                  ` ${chosenRequest.payments.length} payment(s) are recorded on this request so far (${money(chosenRequest.paidAmount)}).`) }}</template></small>
             </label>
             <template v-if="currency !== 'IRR'">
               <label class="req">{{ t('نرخ ارز (ریال)', 'Rate (Rial)') }} <AmountInput v-model="form.rate" :decimals="4" unit="ریال" /></label>
@@ -343,6 +407,13 @@ watch(year, () => { void load(); void loadRequests() })
             <!-- Owner, 21 Nov 2026 (answer to Q77): the bank's fee is debited to «هزینه کارمزد خدمات بانکی» in the same voucher. -->
             <label class="wide">{{ t('کارمزد بانک (ریال)', "Bank's fee (Rial)") }} <AmountInput v-model="form.fee" :decimals="0" unit="ریال" />
               <small class="muted">{{ t('اختیاری؛ در همین سند به حساب «هزینه کارمزد خدمات بانکی» بدهکار می‌شود.', 'Optional; debited to the bank-fee account in the same voucher.') }}</small>
+            </label>
+            <!-- Owner, 21 Nov 2026 (answer to Q83): asked only when the fee account is one "with تفصیل". -->
+            <label v-if="feeNeedsDetail" class="req wide">{{ t('تفصیل کارمزد', "Fee's detail account") }}
+              <SearchSelect v-model="form.feeDetail" :options="feeDetailChoices" remote required :aria-label="t('تفصیل کارمزد', 'Fee detail')"
+                            :none-text="t('تفصیلی پیدا نشد', 'No detail account found')" @search="searchFeeDetails" />
+              <small class="muted">{{ t(`حساب «هزینه کارمزد خدمات بانکی» (${feeAccount?.accountCode}) تفصیل‌دار است؛ نوع مجاز: ${feeAccount?.detailTypes.join('، ')}`,
+                `The fee account (${feeAccount?.accountCode}) takes a detail account; allowed: ${feeAccount?.detailTypes.join(', ')}`) }}</small>
             </label>
             <label>{{ t('شماره پیگیری', 'Tracking no.') }} <input v-model="form.tracking" dir="ltr" :placeholder="t('اختیاری', 'Optional')" /></label>
             <label class="wide3">{{ t('شرح', 'Description') }} <input v-model="form.description" maxlength="500" :placeholder="t('اختیاری', 'Optional')" /></label>

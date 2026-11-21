@@ -13,6 +13,6 @@ export const paymentsMenu: readonly MenuGroup<PaymentScreen>[] = [
     { id: 'transferCheque', title: ['پرداخت چک – نقل و انتقال (انتقال دهنده)', 'Cheque payment – transfer (the payer)'] },
   ] },
   { title: ['نقل و انتقال بانکی', 'Bank transfers'], items: [
-    { id: 'electronicTransfer', title: ['انتقال الکترونیکی بین حساب‌های شرکت', 'Electronic transfer between company accounts'] },
+    { id: 'electronicTransfer', title: ['انتقال الکترونیکی بین بانک‌های شرکت', 'Electronic transfer between company accounts'] },
   ] },
 ]

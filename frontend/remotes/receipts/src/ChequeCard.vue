@@ -116,7 +116,7 @@ function onCardClick(e: MouseEvent) {
           </tr>
         </tbody>
       </table>
-      <p v-if="isTransferCheque(cheque)" class="muted small">{{ t('این چک، چک نقل و انتقال بین حساب‌های شرکت است: سند دریافت آن (بدهکار اسناد نزد صندوق، بستانکار وجوه در راه) در «دریافت چک – نقل و انتقال (انتقال گیرنده)» تایید می‌شود و فقط ثبت صیادی، به بانک مقصد واگذار و وصول می‌شود.',
+      <p v-if="isTransferCheque(cheque)" class="muted small">{{ t('این چک، چک نقل و انتقال بین بانک‌های شرکت است: سند دریافت آن (بدهکار اسناد نزد صندوق، بستانکار وجوه در راه) در «دریافت چک – نقل و انتقال (انتقال گیرنده)» تایید می‌شود و فقط ثبت صیادی، به بانک مقصد واگذار و وصول می‌شود.',
         "This is a cheque of a transfer between the company's own accounts: its receipt voucher (debit cheques in the cash desk, credit funds in transit) is confirmed under «Cheque receipt – transfer (the receiver)», and it is only registered in Sayad, deposited at the destination bank and collected.") }}</p>
       <p v-else-if="!vouchers.length" class="muted small">{{ t('سند دریافت این چک در فهرست دریافت‌ها (رسید آن) است؛ مرحله‌ای که سند حسابداری داشته باشد هنوز ثبت نشده است.',
         "This cheque's receipt voucher is on its receipt in the receipts list; no step with a voucher yet.") }}</p>

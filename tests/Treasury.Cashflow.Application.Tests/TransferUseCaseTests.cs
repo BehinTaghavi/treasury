@@ -47,7 +47,7 @@ public sealed class TransferUseCaseTests : IDisposable
     }
 
     /// <summary>
-    /// An approved payment request «نقل و انتقال بین حساب‌های شرکت» in requests-svc for these two accounts (owner's answer to Q82), large
+    /// An approved payment request «نقل و انتقال بین بانک‌های شرکت» in requests-svc for these two accounts (owner's answer to Q82), large
     /// enough for every transfer of a test unless an amount is given.
     /// </summary>
     private Guid RequestFor(Guid source, Guid destination, decimal amount = 1_000_000 * Milliard, string state = "Approved", string method = "OwnAccountTransfer")
@@ -549,6 +549,50 @@ public sealed class TransferUseCaseTests : IDisposable
         // A new transfer by cheque is a new, independent cheque on the next sheet.
         var again = await View(await Issue(Cheque(book) with { PaymentRequestId = request }));
         Assert.Equal(("100501", "ChequeIssued"), (again.Cheque!.Number, again.State));
+    }
+
+    [Fact]
+    public async Task The_fee_asks_for_a_detail_when_the_companys_fee_account_takes_one_Q83()
+    {
+        // The account has no تفصیل: nothing is asked.
+        Assert.Equal(("8205", 0), ((await _transfers.FeeAccountAsync(CancellationToken.None)).AccountCode, (await _transfers.FeeAccountAsync(CancellationToken.None)).DetailTypes.Count));
+        Assert.Null((await View(await Record(Paya(Milliard) with { Fee = 35_000, FeeDetailCode = "810001" }))).FeeDetailCode);
+
+        // The accounting system gives the account the attribute "with تفصیل" (a cost centre): now the fee line needs one.
+        _reference.FeeAccountDetailTypes = ["مراکز هزینه"];
+        Assert.Equal(["مراکز هزینه"], (await _transfers.FeeAccountAsync(CancellationToken.None)).DetailTypes);
+        Assert.Equal("Transfer.FeeDetailRequired", await Refused(Paya(Milliard) with { Fee = 35_000 }));
+        Assert.Equal("Transfer.FeeDetailNotFound", await Refused(Paya(Milliard) with { Fee = 35_000, FeeDetailCode = "999999" }));
+        Assert.Equal("Transfer.FeeDetailInactive", await Refused(Paya(Milliard) with { Fee = 35_000, FeeDetailCode = "810002" }));
+        Assert.Equal("Transfer.FeeDetailTypeNotAllowed", await Refused(Paya(Milliard) with { Fee = 35_000, FeeDetailCode = "200015" }));
+        var id = await Record(Paya(Milliard) with { Fee = 35_000, FeeDetailCode = "810001" });
+        Assert.Equal("810001", (await View(id)).FeeDetailCode);
+        var voucher = Assert.Single(await _transfers.VouchersAsync(id, CancellationToken.None));
+        Assert.Equal((true, "8205", "810001", 35_000m), voucher.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)).ElementAt(2));
+        await Record(Paya(Milliard)); // without a fee no تفصیل is asked
+    }
+
+    [Fact]
+    public async Task The_orders_of_the_day_and_what_remains_on_the_request_are_counted_Q84()
+    {
+        // «اگر سقف مبلغ درخواستی طی چند مرحله تکمیل شود لازم است در طی روز تعدد پرداخت و مانده پرداخت نشده درخواست در سیستم کنترل شود»
+        var request = RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, amount: 14 * Milliard);
+        Task<TransferDayUsageView> Usage(TransferChannel channel = TransferChannel.Remote) =>
+            _transfers.DayUsageAsync(Banks.MellatCurrent, Today, TransferMethod.Paya, channel, null, CancellationToken.None);
+        Assert.Equal(new TransferDayUsageView(0, 0), await Usage());
+
+        for (var i = 1; i <= 4; i++) // 12 milliard in four Paya orders of 3 milliard, the most one remote order carries
+        {
+            await Record(Paya(3 * Milliard) with { PaymentRequestId = request });
+            Assert.Equal((i * 3 * Milliard, i, (14 - (i * 3)) * Milliard),
+                ((await Usage()).TotalRialSameChannel, (await Usage()).Count, _requests.Requests[request].Amount - _requests.Requests[request].PaidAmount));
+        }
+
+        Assert.Equal(new TransferDayUsageView(0, 4), await Usage(TransferChannel.InPerson)); // the count is over both channels
+        Assert.Equal("Transfer.RequestOverpaid", await Refused(Paya(3 * Milliard) with { PaymentRequestId = request })); // only 2 milliard remain
+        await Record(Paya(2 * Milliard) with { PaymentRequestId = request });                                              // the fifth order of the day
+        Assert.Equal("Paid", _requests.Requests[request].State);
+        Assert.Equal("Transfer.OverDailyCount", await Refused(Paya(Milliard)));                                           // a sixth is refused
     }
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

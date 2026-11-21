@@ -60,12 +60,15 @@ ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS fee_rial numeric(22,
 ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_request_id uuid;
 ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_request_number integer;
 ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_key text;
+-- The تفصیل of the fee line, kept only when the company's account of bank fees takes one (owner's answer to Q83, 21 Nov 2026).
+ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS fee_detail_code text;
 ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_state_check;
 ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_state_known;
 ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_state_known
     CHECK (state IN ('Recorded', 'ChequeIssued', 'ChequeReceived', 'Collected', 'Deleted', 'Cancelled'));
 ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_fee;
-ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_fee CHECK (fee_rial IS NULL OR fee_rial > 0 AND method <> 'Cheque');
+ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_fee
+    CHECK ((fee_rial IS NULL OR fee_rial > 0 AND method <> 'Cheque') AND (fee_detail_code IS NULL OR fee_rial IS NOT NULL AND btrim(fee_detail_code) <> ''));
 ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_request;
 ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_request
     CHECK ((payment_request_id IS NULL) = (payment_request_number IS NULL) AND (payment_request_id IS NULL) = (payment_key IS NULL));

@@ -33,13 +33,29 @@ public enum TransferState
 }
 
 /// <summary>
-/// The approved payment request («درخواست وجه») of the kind «نقل و انتقال بین حساب‌های شرکت» that a transfer pays, as requests-svc
+/// The approved payment request («درخواست وجه») of the kind «نقل و انتقال بین بانک‌های شرکت» that a transfer pays, as requests-svc
 /// describes it. Owner, 21 Nov 2026 (answer to Q82): «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود».
 /// </summary>
 /// <param name="IsForOwnTransfer">The request was written for a transfer between the company's own accounts.</param>
 /// <param name="RemainingAmount">What is not yet paid on the request (without the transfer being corrected).</param>
 public sealed record TransferRequestFact(
     Guid Id, int Number, bool IsApproved, bool IsForOwnTransfer, Guid? SourceAccountId, Guid? DestinationAccountId, decimal RemainingAmount);
+
+/// <summary>
+/// Whether the company's account «هزینه کارمزد خدمات بانکی» takes a تفصیل, and of which types (owner, 21 Nov 2026, answer to Q83: the
+/// account usually has none, but some companies keep a general cost centre of the finance department for it; when the account has the
+/// attribute "with تفصیل" the voucher asks for one, otherwise it is not asked).
+/// </summary>
+/// <param name="AllowedTypes">The تفصیل types the account takes; empty: no تفصیل. Null account: not set in the template yet.</param>
+public sealed record FeeAccountFact(IReadOnlyList<string> AllowedTypes)
+{
+    public static FeeAccountFact WithoutDetail { get; } = new([]);
+
+    public bool TakesDetail => AllowedTypes.Count > 0;
+}
+
+/// <summary>The تفصیل chosen for the fee line, as reference-svc describes it.</summary>
+public sealed record FeeDetailFact(string Code, string Name, string? Type, bool IsActive);
 
 /// <summary>The payment request a transfer paid, and the key of that payment on the request (so it can be taken back).</summary>
 public sealed record TransferRequest(Guid Id, int Number, string PaymentKey);
@@ -84,9 +100,12 @@ public sealed record TransferCheque(
 /// <param name="TrackingNumber">The bank's tracking number of the order (شماره پیگیری), when typed.</param>
 /// <param name="Request">The approved payment request the transfer pays (answer to Q82).</param>
 /// <param name="FeeRial">The bank's fee for the order («کارمزد خدمات بانکی»), in Rial, when there is one (answer to Q77).</param>
+/// <param name="FeeAccount">Whether the fee account takes a تفصیل (answer to Q83); null: the account is not set in the template yet.</param>
+/// <param name="FeeDetail">The تفصیل of the fee line, when the fee account takes one.</param>
 public sealed record ElectronicTransferForm(
     FiscalDate Date, TransferAccountFact Source, TransferAccountFact Destination, TransferMethod Method, TransferChannel? Channel, Money Amount,
-    string? TrackingNumber = null, string? Description = null, TransferRequestFact? Request = null, decimal? FeeRial = null);
+    string? TrackingNumber = null, string? Description = null, TransferRequestFact? Request = null, decimal? FeeRial = null, FeeAccountFact? FeeAccount = null,
+    FeeDetailFact? FeeDetail = null);
 
 /// <summary>
 /// A transfer between two bank accounts of the company («نقل و انتقال بین بانکی», owner's report no. 7 of 20 Nov 2026).
@@ -140,6 +159,12 @@ public sealed class BankTransfer : AggregateRoot<Guid>
     /// Q77): it is debited to one general expense account of the company, set in the voucher template like «مطالبات سوخت شده».
     /// </summary>
     public decimal? FeeRial { get; private set; }
+
+    /// <summary>
+    /// The تفصیل of the fee line, kept only when the fee account takes one (owner's answer to Q83: e.g. a general cost centre of the
+    /// finance department); null when the account has no تفصیل or there is no fee.
+    /// </summary>
+    public string? FeeDetailCode { get; private set; }
 
     /// <summary>
     /// The approved payment request the transfer paid (owner, 21 Nov 2026, answer to Q82). Null only for transfers recorded before that
@@ -391,7 +416,7 @@ public sealed class BankTransfer : AggregateRoot<Guid>
     public static BankTransfer Restore(
         Guid id, int number, int fiscalYear, FiscalDate date, TransferMethod method, TransferChannel? channel, TransferAccount source, TransferAccount destination,
         Money amount, string? trackingNumber, string? description, TransferCheque? cheque, TransferState state, string recordedBy, string? deletedBy,
-        DateTimeOffset? deletedAt, long version, decimal? feeRial = null, TransferRequest? request = null)
+        DateTimeOffset? deletedAt, long version, decimal? feeRial = null, TransferRequest? request = null, string? feeDetailCode = null)
     {
         var transfer = new BankTransfer(id, number, fiscalYear, method, recordedBy)
         {
@@ -407,6 +432,7 @@ public sealed class BankTransfer : AggregateRoot<Guid>
             DeletedBy = deletedBy,
             DeletedAt = deletedAt,
             FeeRial = feeRial,
+            FeeDetailCode = feeDetailCode,
             Request = request,
         };
         transfer.SetLoadedVersion(version);
@@ -423,6 +449,7 @@ public sealed class BankTransfer : AggregateRoot<Guid>
         TrackingNumber = Clean(form.TrackingNumber);
         Description = Clean(form.Description);
         FeeRial = form.FeeRial is > 0 ? form.FeeRial : null;
+        FeeDetailCode = FeeRial is not null && form.FeeAccount is { TakesDetail: true } ? form.FeeDetail?.Code.Trim() : null;
     }
 
     private static void CheckElectronic(ElectronicTransferForm form, int number, string userId, TransferLimits limits, TransferDayUsage usage)
@@ -435,6 +462,17 @@ public sealed class BankTransfer : AggregateRoot<Guid>
         CheckRequest(form.Request, form.Source, form.Destination, form.Amount);
         Require(form.FeeRial is null || (form.FeeRial >= 0 && decimal.Truncate(form.FeeRial.Value) == form.FeeRial), "Transfer.FeeInvalid",
             "The bank's fee is a whole Rial amount, or empty.");
+        // Owner's answer to Q83: when the fee account is one "with تفصیل", the fee line names a تفصیل of a type the account takes; when
+        // it has none, no تفصیل is asked (one that was sent is not kept).
+        if (form.FeeRial is > 0 && form.FeeAccount is { TakesDetail: true } feeAccount)
+        {
+            Require(form.FeeDetail is not null && !string.IsNullOrWhiteSpace(form.FeeDetail.Code), "Transfer.FeeDetailRequired",
+                "The account of bank fees takes a تفصیل; choose the تفصیل of the fee.");
+            Require(form.FeeDetail!.IsActive, "Transfer.FeeDetailInactive", "The تفصیل of the fee is switched off.");
+            Require(feeAccount.AllowedTypes.Contains(form.FeeDetail.Type ?? string.Empty, StringComparer.Ordinal), "Transfer.FeeDetailTypeNotAllowed",
+                "The تفصیل of the fee is not of a type the account of bank fees takes.");
+        }
+
         Require(form.Channel is { } c && Enum.IsDefined(c), "Transfer.ChannelRequired", "Choose whether the order was given at the branch or remotely.");
 
         // Owner's report no. 7: an internal transfer is between two accounts of the same bank (the same or another branch); Pol, Paya

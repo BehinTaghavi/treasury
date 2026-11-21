@@ -21,7 +21,7 @@ public enum PaymentMethod
     ChequeTransfer,
 
     /// <summary>
-    /// «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026, answer to Q82: «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن
+    /// «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026, answer to Q82: «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن
     /// اخذ شود»): money moved from one bank account of the company to another. The request names the two accounts instead of a
     /// beneficiary and a purpose group; treasury pays it with a transfer (electronic, or by Sayad cheque).
     /// </summary>
@@ -91,7 +91,7 @@ public sealed record PayFromFact(PayFromKind Kind, Guid Id, string Name, string 
 /// <param name="HasMainBeneficiaries">«پرداخت جمعی دارد / ذینفعان اصلی دارد»: the beneficiary passes the money on to others.</param>
 /// <param name="Attachments">Number of supporting documents («تعداد ضمائم»).</param>
 /// <param name="Cheque">«ثبت انتقال (خرج چک)» only: the received cheque to hand on.</param>
-/// <param name="TransferTo">«نقل و انتقال بین حساب‌های شرکت» only: the company bank account the money goes to («انتقال گیرنده»);
+/// <param name="TransferTo">«نقل و انتقال بین بانک‌های شرکت» only: the company bank account the money goes to («انتقال گیرنده»);
 /// <paramref name="PayFrom"/> is then the account it leaves («انتقال دهنده»), and no beneficiary or purpose group is asked.</param>
 public sealed record PaymentRequestForm(
     FiscalDate Date,
@@ -198,14 +198,15 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
     public TransferCheque? Cheque { get; private set; }
 
     /// <summary>
-    /// «نقل و انتقال بین حساب‌های شرکت» only: the company bank account the money goes to. Such a request has no beneficiary and no purpose
+    /// «نقل و انتقال بین بانک‌های شرکت» only: the company bank account the money goes to. Such a request has no beneficiary and no purpose
     /// group of Basic Information: <see cref="BeneficiaryName"/> shows the receiving account and <see cref="PurposeGroupName"/> the
-    /// words «نقل و انتقال بین حساب‌های شرکت», so every list and printout of requests reads the same way.
+    /// words «نقل و انتقال بین بانک‌های شرکت», so every list and printout of requests reads the same way.
     /// </summary>
     public Guid? TransferToAccountId { get; private set; }
 
     /// <summary>The name written in place of a purpose group on a request for a transfer between the company's own accounts.</summary>
-    public const string OwnTransferGroupName = "نقل و انتقال بین حساب‌های شرکت";
+    /// <remarks>Owner, 21 Nov 2026: «نقل و انتقال بین بانک‌های شرکت» is the name of this kind of request.</remarks>
+    public const string OwnTransferGroupName = "نقل و انتقال بین بانک‌های شرکت";
 
     public FiscalDate? DueDate { get; private set; }
 

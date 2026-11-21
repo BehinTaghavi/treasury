@@ -37,6 +37,7 @@ export interface Transfer {
   canUndoReceive: boolean; version: number
   /** The bank's fee of an electronic transfer («کارمزد خدمات بانکی», answer to Q77). */
   fee?: number | null
+  feeDetailCode?: string | null
   /** The approved payment request the transfer pays (answer to Q82). */
   paymentRequestId?: string | null; paymentRequestNumber?: number | null
   /** The voucher steps the treasurer confirmed: 0 payer / electronic, 1 receiver, 2 maturity, 3 and 4 the two sides of a cancellation. */
@@ -44,15 +45,21 @@ export interface Transfer {
 }
 
 /**
- * An approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026, answer to Q82: «برای نقل و انتقال از هر
+ * An approved payment request of the kind «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026, answer to Q82: «برای نقل و انتقال از هر
  * نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود»), as GET /api/requests/payment-requests answers it.
  */
 export interface TransferRequest {
   id: string; number: number; date: string; method: string; state: string; purpose: string; amount: number; currency: string
   payFromId: string | null; transferToAccountId: string | null; paidAmount: number; remainingAmount: number; beneficiaryName: string
+  /** The payments already recorded on the request (owner's answer to Q84: how many, and what is left, are shown with the request). */
+  payments?: readonly { key: string; amount: number; date: string }[] | null
 }
+/** Whether the fee line asks for a تفصیل: the company's fee account and the تفصیل types it takes (owner's answer to Q83). */
+export interface FeeAccount { accountCode: string | null; accountName: string | null; detailTypes: string[] }
+/** What the source account already sent on a day by one way (owner's answer to Q84). */
+export interface DayUsage { totalRialSameChannel: number; count: number }
 export const OWN_TRANSFER = 'OwnAccountTransfer'
-/** The requests a transfer may pay: approved ones of the kind «نقل و انتقال بین حساب‌های شرکت», lowest number first. */
+/** The requests a transfer may pay: approved ones of the kind «نقل و انتقال بین بانک‌های شرکت», lowest number first. */
 export const payableRequests = (all: readonly TransferRequest[]) =>
   all.filter(r => r.method === OWN_TRANSFER && r.state === 'Approved' && r.remainingAmount > 0).sort((a, b) => a.number - b.number)
 /** «مانده … از مبلغ … – از حساب … به حساب …»: a request as it is offered in the list box; the figures come first because a narrow box cuts the end. */

@@ -73,7 +73,13 @@ public enum FixedAccount
 public sealed record Replacement(Instrument Old, InstrumentState From);
 
 /// <summary>What reference-svc says about a ledger account (copy of the accounting system's chart).</summary>
-public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive);
+/// <param name="Detail1Types">The types of تفصیل the account takes as its first تفصیل (set in the accounting system or on the chart
+/// page); empty or null: the account has no تفصیل.</param>
+public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive, IReadOnlyList<string>? Detail1Types = null)
+{
+    /// <summary>The account is one "with تفصیل": a voucher line on it names a تفصیل of one of its types.</summary>
+    public bool TakesDetail => Detail1Types is { Count: > 0 };
+}
 
 /// <summary>An account side taken from a purpose group, cash desk or bank account: its معین and تفصیل.</summary>
 public sealed record LedgerSide(string? AccountCode, string? DetailCode);

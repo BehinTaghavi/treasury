@@ -73,10 +73,23 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Check(code switch
     {
         "1201" or "1202" or "1203" or "9101" or "9201" or "8101" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "حساب " + code, true, true),
+        "8205" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "هزینه کارمزد خدمات بانکی", true, true, FeeAccountDetailTypes),
         "12" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "کل", false, true),
         "1299" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "قدیمی", true, false),
         _ => null,
     });
+
+    /// <summary>تفصیل by code with its type: 810001 a cost centre of the finance department, 810002 one that is switched off, 200015 a customer.</summary>
+    public Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) => Check(detailCode switch
+    {
+        "810001" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("810001", "مرکز هزینه امور مالی", "مراکز هزینه", true),
+        "810002" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("810002", "مرکز هزینه قدیمی", "مراکز هزینه", false),
+        "200015" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("200015", "شرکت نمونه بازرگانی", "مشتریان", true),
+        _ => null,
+    });
+
+    /// <summary>The تفصیل types account 8205 («هزینه کارمزد خدمات بانکی») takes; empty: the account has no تفصیل.</summary>
+    public IReadOnlyList<string> FeeAccountDetailTypes { get; set; } = [];
 
     /// <summary>The signature rule of the note receipt set in Basic Information; null: none set.</summary>
     public SignatureRuleFact? NoteReceiptRule { get; set; }

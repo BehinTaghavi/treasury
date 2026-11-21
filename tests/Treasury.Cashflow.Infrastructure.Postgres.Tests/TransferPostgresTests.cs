@@ -53,7 +53,7 @@ public sealed class TransferPostgresTests : IDisposable
             new PostgresIdempotencyStore(_dataSource), new User(), _requests);
         _instruments = new InstrumentUseCases(uow, new PostgresInstrumentRepository(), new PostgresChequeBookRepository(), new PostgresIdempotencyStore(_dataSource),
             policies, policies, policies, new User(), accounts, transfers: new PostgresBankTransferRepository());
-        // An approved payment request «نقل و انتقال بین حساب‌های شرکت» for the two accounts (owner's answer to Q82).
+        // An approved payment request «نقل و انتقال بین بانک‌های شرکت» for the two accounts (owner's answer to Q82).
         _requests.Facts[_request] = new PaymentRequestFact(_request, 31, "Approved", string.Empty, "0202-1", Guid.Empty, "تأمین موجودی", 1_000_000_000_000_000, "IRR", 0,
             null, "OwnAccountTransfer", _source, _destination);
         _books = new ChequeBookUseCases(uow, new PostgresChequeBookRepository(), accounts, new PostgresIdempotencyStore(_dataSource), new PostgresChequeFormatRepository());
@@ -283,6 +283,10 @@ public sealed class TransferPostgresTests : IDisposable
         public Task<PayerFact?> PayerAsync(string detailCode, CancellationToken cancellationToken) => Task.FromResult<PayerFact?>(null);
 
         public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<PurposeGroupFact?>(null);
+
+
+        public Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) =>
+            Task.FromResult<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?>(null);
 
         public Task<LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Task.FromResult<LedgerAccountFact?>(null);
 

@@ -8,7 +8,7 @@ namespace Treasury.Requests.Application.PaymentRequests;
 /// <summary>The request form as typed. Dates are Jalali text; requester, beneficiary and purpose group come from Basic Information.</summary>
 /// <param name="PayFromId">Optional: a cash desk for cash, otherwise a bank account.</param>
 /// <param name="ChequeId">«ثبت انتقال (خرج چک)»: the received cheque to hand on (owner, 19 Nov 2026).</param>
-/// <param name="TransferToAccountId">«نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026): the receiving company bank account; the
+/// <param name="TransferToAccountId">«نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026): the receiving company bank account; the
 /// beneficiary and the purpose group are then left empty and <paramref name="PayFromId"/> is the account the money leaves.</param>
 public sealed record PaymentRequestInput(
     string Date,

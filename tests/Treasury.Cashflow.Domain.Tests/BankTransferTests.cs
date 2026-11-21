@@ -27,7 +27,7 @@ public sealed class BankTransferTests
     private static readonly TransferAccountFact MellatDollar = new(Guid.NewGuid(), "USD-1", Mellat, "بانک ملت", "USD", true, false, "1104", "600004");
     private static readonly TransferAccountFact MellatDollar2 = new(Guid.NewGuid(), "USD-2", Mellat, "بانک ملت", "USD", true, false, "1104", "600005");
 
-    /// <summary>An approved payment request «نقل و انتقال بین حساب‌های شرکت» for these two accounts (owner's answer to Q82).</summary>
+    /// <summary>An approved payment request «نقل و انتقال بین بانک‌های شرکت» for these two accounts (owner's answer to Q82).</summary>
     private static TransferRequestFact Request(TransferAccountFact source, TransferAccountFact destination, decimal remaining = 1000 * Milliard) =>
         new(Guid.NewGuid(), 12, IsApproved: true, IsForOwnTransfer: true, source.Id, destination.Id, remaining);
 
@@ -586,5 +586,28 @@ public sealed class BankTransferTests
         Assert.Equal("Instrument.NotForTransferCheque", Refused(() => received.CancelReceived(D("1405/08/30"), User, "M-1", D("1405/08/30"), "اشتباه")));
         Assert.Equal("Transfer.ChequeMismatch", Refused(() => received.CancelTransferCheque(Guid.NewGuid(), D("1405/08/30"), User, "اشتباه")));
         Assert.Equal("Transfer.ChequeMismatch", Refused(() => ReceivedCheque().CancelTransferCheque(t.Id, D("1405/08/30"), User, "اشتباه")));
+    }
+
+    [Fact]
+    public void The_fee_line_names_a_detail_only_when_the_fee_account_takes_one_Q83()
+    {
+        // Owner, 21 Nov 2026: «هزینه کارمزد خدمات بانکی غالباً فاقد حساب تفصیل است ولیکن در برخی از شرکت‌ها یک مرکز هزینه عمومی امور مالی برای
+        // آن ایجاد می‌شود … اگر … خصیصه تفصیل دارد انتخاب شده باشد در هنگام تعیین سند … درخواست می‌گردد».
+        var withDetail = new FeeAccountFact(["مراکز هزینه"]);
+        var centre = new FeeDetailFact("810001", "مرکز هزینه امور مالی", "مراکز هزینه", true);
+        var form = Form(TransferMethod.Paya, Milliard) with { FeeRial = 35_000, FeeAccount = withDetail, FeeDetail = centre };
+        var t = Record(form);
+        Assert.Equal("810001", t.FeeDetailCode);
+        var v = TransferVouchers.ForElectronic(t, new LedgerSide("1102", "600001"), new LedgerSide("1103", "600003"), Template());
+        Assert.Equal((true, "8205", "810001", 35_000m), Lines(v)[2]);
+
+        Assert.Equal("Transfer.FeeDetailRequired", Refused(() => Record(form with { FeeDetail = null })));
+        Assert.Equal("Transfer.FeeDetailInactive", Refused(() => Record(form with { FeeDetail = centre with { IsActive = false } })));
+        Assert.Equal("Transfer.FeeDetailTypeNotAllowed", Refused(() => Record(form with { FeeDetail = centre with { Type = "مشتریان" } })));
+
+        // An account without تفصیل: none is asked, and one that was sent is not kept. Without a fee nothing is asked either.
+        Assert.Null(Record(form with { FeeAccount = FeeAccountFact.WithoutDetail }).FeeDetailCode);
+        Assert.Null(Record(form with { FeeAccount = null }).FeeDetailCode);
+        Assert.Null(Record(form with { FeeRial = null, FeeDetail = null }).FeeDetailCode);
     }
 }

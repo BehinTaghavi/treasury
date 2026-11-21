@@ -8,7 +8,7 @@
  * only cheques whose latest status is «ثبت صیادی شد» are offered — and its number, due date and the name of who gave it to the company
  * are shown; the amount of the request is the amount of the cheque.
  * Owner, 21 Nov 2026 (answer to Q82: «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود»): with the payment
- * method «نقل و انتقال بین حساب‌های شرکت» the request names two bank accounts of the company — «حساب مبدأ (انتقال دهنده)» and «حساب
+ * method «نقل و انتقال بین بانک‌های شرکت» the request names two bank accounts of the company — «حساب مبدأ (انتقال دهنده)» and «حساب
  * مقصد (انتقال گیرنده)», both required — instead of a beneficiary and a purpose group; the references and «ذینفعان اصلی دارد» are
  * hidden with them. Treasury pays the approved request with an electronic transfer or a Sayad cheque in «پرداخت‌ها».
  */
@@ -105,7 +105,7 @@ const payFromChoices = computed<Choice[]>(() => form.method === 'Cash'
   ? L.desks.value.filter(d => d.isActive && d.currencyCode === form.currency).map(d => ({ value: d.id, label: d.name }))
   : L.bankAccounts.value.filter(a => a.isActive && a.currencyCode === form.currency).map(a => ({ value: a.id, label: L.accountTitle(a) })))
 
-// ---- «نقل و انتقال بین حساب‌های شرکت» (answer to Q82): two bank accounts of the company instead of a beneficiary ----
+// ---- «نقل و انتقال بین بانک‌های شرکت» (answer to Q82): two bank accounts of the company instead of a beneficiary ----
 const isOwn = computed(() => form.method === OWN_TRANSFER)
 /** The receiving account: another bank account of the company in the request's currency. */
 const transferToChoices = computed<Choice[]>(() => L.bankAccounts.value

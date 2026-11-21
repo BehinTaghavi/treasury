@@ -63,7 +63,7 @@ describe('menu of «دریافت‌ها»', () => {
     expect(new Set(items.map(i => i.id)).size).toBe(items.length)
   })
   it('names the payment side of a transfer cheque and the electronic transfer in «پرداخت‌ها» (report no. 7)', () => {
-    expect(menuItems(paymentsMenu).map(i => i.title[0])).toEqual(['پرداخت چک – نقل و انتقال (انتقال دهنده)', 'انتقال الکترونیکی بین حساب‌های شرکت'])
+    expect(menuItems(paymentsMenu).map(i => i.title[0])).toEqual(['پرداخت چک – نقل و انتقال (انتقال دهنده)', 'انتقال الکترونیکی بین بانک‌های شرکت'])
     for (const g of paymentsMenu) expect(g.title?.every(x => x.length > 0)).toBe(true)
   })
   it('names every group but the boxed list in both languages', () => {

@@ -44,13 +44,13 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | اقدام حقوقی چک / سفته تضمینی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد تضمینی حقوقی شده به نفع شرکت | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
 | عملیات | تحویل چک به صندوق پس از اقدام حقوقی (چک قابل وصول؛ تایید مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | اسناد واخواست شده حقوقی شده | ذینفع |
 | نقل و انتقال | نقل و انتقال بانکی با چک روز – انتقال دهنده (صدور چک؛ مدیرعامل، گزارش شمارهٔ ۷، ۲۹ آبان ۱۴۰۵) | وجوه در راه | — | بانک انتقال دهنده | بانک مربوطه |
-| نقل و انتقال | نقل و انتقال بانکی با چک مدت‌دار – انتقال دهنده (صدور چک؛ پاسخ مدیرعامل به Q81، ۳۰ آبان ۱۴۰۵) | وجوه در راه | — | اسناد پرداختنی | بانک انتقال دهنده (پیشنهادی، Q83) |
-| نقل و انتقال | سررسید چک پرداختنی نقل و انتقال (پاسخ Q81) | اسناد پرداختنی | بانک انتقال دهنده (پیشنهادی، Q83) | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | نقل و انتقال بانکی با چک مدت‌دار – انتقال دهنده (صدور چک؛ پاسخ مدیرعامل به Q81، ۳۰ آبان ۱۴۰۵) | وجوه در راه | — | اسناد پرداختنی | بانک انتقال دهنده (تایید ۳۰ آبان، Q83) |
+| نقل و انتقال | سررسید چک پرداختنی نقل و انتقال (پاسخ Q81) | اسناد پرداختنی | بانک انتقال دهنده (تایید ۳۰ آبان، Q83) | بانک انتقال دهنده | بانک مربوطه |
 | نقل و انتقال | نقل و انتقال بانکی با چک – انتقال گیرنده (دریافت چک؛ مدیرعامل، گزارش شمارهٔ ۷؛ تفصیل: تایید ۳۰ آبان، Q78) | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده | وجوه در راه | — |
 | نقل و انتقال | نقل و انتقال بانکی الکترونیکی: انتقال داخلی، پل، پایا، ساتنا (تایید مدیرعامل، ۳۰ آبان ۱۴۰۵، Q76) | بانک انتقال گیرنده | بانک مربوطه | بانک انتقال دهنده | بانک مربوطه |
-| نقل و انتقال | کارمزد بانک در نقل و انتقال الکترونیکی (پاسخ مدیرعامل به Q77، ۳۰ آبان ۱۴۰۵) | هزینه کارمزد خدمات بانکی | — (پیشنهادی، Q83) | بانک انتقال دهنده | بانک مربوطه |
-| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال دهنده (پاسخ Q79؛ سند پیشنهادی، Q85) | اسناد پرداختنی (چک روز: بانک انتقال دهنده) | بانک انتقال دهنده | وجوه در راه | — |
-| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال گیرنده (پاسخ Q79؛ سند پیشنهادی، Q85) | وجوه در راه | — | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده |
+| نقل و انتقال | کارمزد بانک در نقل و انتقال الکترونیکی (پاسخ مدیرعامل به Q77، ۳۰ آبان ۱۴۰۵) | هزینه کارمزد خدمات بانکی | فقط اگر این حساب تفصیل‌دار باشد: تفصیل کارمزد، مثلاً مرکز هزینهٔ امور مالی (پاسخ Q83) | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال دهنده (پاسخ Q79؛ سند: تایید ۳۰ آبان، Q85) | اسناد پرداختنی (چک روز: بانک انتقال دهنده) | بانک انتقال دهنده | وجوه در راه | — |
+| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال گیرنده (پاسخ Q79؛ سند: تایید ۳۰ آبان، Q85) | وجوه در راه | — | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده |
 
 Built (owner's report no. 4, item 8, and his answers of 15 Nov 2026): a Basic Information page «شابلون اسناد خزانه داری» holds the
 company's account codes for the fixed accounts of this table: اسناد نزد صندوق / اسناد دریافتنی، چک های در جریان وصول، اسناد واخواست
@@ -105,14 +105,15 @@ Since 20 Nov 2026 (owner's report no. 7, «نقل و انتقال بین بان�
 - **A post-dated transfer cheque** (answer to Q81): the payer's voucher credits **«اسناد پرداختنی»** (a fixed account of the template),
   not the bank, until the due date. «ثبت سررسید» on the payment side, on or after the due date, makes the maturity voucher Dr «اسناد
   پرداختنی» / Cr the source bank — "به محض سررسید شدن از حساب بانک خارج". If it was not recorded when the cheque is collected on the
-  receipts side, the collection records it on that day. «اسناد پرداختنی» is written with the source bank account's تفصیل (proposed, Q83).
+  receipts side, the collection records it on that day. «اسناد پرداختنی» is written with the source bank account's تفصیل (confirmed, Q83).
 - **Electronic transfer** (internal, Pol, Paya, Satna): one voucher on the day of the order, Dr the destination bank account / Cr the
   source bank account, each with its own معین and تفصیل (confirmed, Q76). **The bank's fee** (answer to Q77), when typed on the form:
   Dr «هزینه کارمزد خدمات بانکی» — one general account of the company among the financial expenses, set in the template like «مطالبات سوخت
-  شده», without تفصیل (proposed, Q83) — / Cr the source bank account, on the same voucher.
+  شده» — / Cr the source bank account, on the same voucher. The fee account usually has no تفصیل; when the company's account is one "with
+  تفصیل" (e.g. a general cost centre of the finance department), the form asks for the fee's تفصیل and the line carries it (answer to Q83).
 - **A cancelled transfer cheque** (answer to Q79: only while it is not registered in Sayad): two vouchers on the day of the cancellation
   take the first two back — Dr what the payer's voucher credited («اسناد پرداختنی», or the bank for a cheque of the day or one already
-  matured) / Cr «وجوه در راه», and, if the cheque was already on the receipts side, Dr «وجوه در راه» / Cr «اسناد نزد صندوق» (proposed, Q85).
+  matured) / Cr «وجوه در راه», and, if the cheque was already on the receipts side, Dr «وجوه در راه» / Cr «اسناد نزد صندوق» (confirmed, Q85).
 - Each voucher of a transfer is confirmed by the treasurer («تایید سند») like a receipt's; until then an electronic transfer is corrected
   or deleted and the voucher follows it.
 

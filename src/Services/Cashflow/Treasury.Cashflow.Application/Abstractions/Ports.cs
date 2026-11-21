@@ -173,6 +173,9 @@ public interface IReceiptReferenceLookup
     /// <summary>A ledger account of the chart (copy of the accounting system); null when unknown.</summary>
     Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken);
 
+    /// <summary>A تفصیل by its code, with its type; null when unknown (the تفصیل of a transfer's bank fee, owner's answer to Q83).</summary>
+    Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken);
+
     /// <summary>
     /// The entry of «ذینفعان / متعهدین / ضامنین» with this تفصیل, for the obligor and guarantors of a note receipt (owner's answer to Q54);
     /// null when there is none.
@@ -270,7 +273,7 @@ public interface ICurrentUser
 
 /// <summary>What requests-svc says about a payment request (answer to Q36: an endorsed cheque pays an approved request).</summary>
 /// <param name="TransferChequeId">A request of the kind «ثبت انتقال (خرج چک)»: the received cheque it names (owner, 19 Nov 2026).</param>
-/// <param name="Method">The request's kind of payment; "OwnAccountTransfer" is «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026).</param>
+/// <param name="Method">The request's kind of payment; "OwnAccountTransfer" is «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026).</param>
 /// <param name="PayFromId">The bank account (or cash desk) the request is paid from; for a transfer the account the money leaves.</param>
 /// <param name="TransferToAccountId">A transfer between the company's accounts: the account the money reaches.</param>
 public sealed record PaymentRequestFact(

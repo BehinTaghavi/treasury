@@ -524,7 +524,7 @@ onMounted(async () => { await L.load(); await load() })
               <div v-if="c.kind !== 'OrdinaryCheque'"><span class="tr-tag">{{ instrumentKindName(c.kind, locale) }}</span></div></td>
             <td>{{ c.counterparty }}
               <!-- Owner's report no. 7: the company's own cheque of a transfer between two of its bank accounts. -->
-              <span v-if="isTransferCheque(c)" class="tr-tag later" :title="t('چک نقل و انتقال بین حساب‌های شرکت (انتقال گیرنده): ثبت صیادی، واگذاری به بانک مقصد و وصول', 'Cheque of a transfer between the company\'s own accounts: Sayad registration, deposit at the destination bank, collection')">{{ transferChequeMark(locale) }}</span>
+              <span v-if="isTransferCheque(c)" class="tr-tag later" :title="t('چک نقل و انتقال بین بانک‌های شرکت (انتقال گیرنده): ثبت صیادی، واگذاری به بانک مقصد و وصول', 'Cheque of a transfer between the company\'s own accounts: Sayad registration, deposit at the destination bank, collection')">{{ transferChequeMark(locale) }}</span>
               <div v-if="c.purpose" class="muted small">{{ c.purpose }}</div></td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ stateName(c.state, c.kind) }}

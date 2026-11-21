@@ -280,7 +280,7 @@ public sealed class PaymentRequestTests
         Assert.Equal("PaymentRequest.NotABeneficiary", Code(() => PaymentRequest.Register(Guid.NewGuid(), 1, Form() with { Beneficiary = guarantor }, User)));
     }
 
-    // ----- «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026, answer to Q82) -------------------------------------------------------
+    // ----- «نقل و انتقال بین بانک‌های شرکت» (owner, 21 Nov 2026, answer to Q82) -------------------------------------------------------
 
     private static readonly PayFromFact OtherBank = new(PayFromKind.BankAccount, Guid.NewGuid(), "بانک ملی – 0303-9911", "IRR", true);
 

@@ -24,6 +24,8 @@
 /* The limits of the chosen way, and other notes inside a card. */
 .tr-limits { grid-column: 1 / -1; margin: 0; padding: .6rem .9rem; border: 1px solid #d5dff3; border-radius: 10px; background: #f1f5fd; color: #2b3850; font-size: .85rem; line-height: 1.9; }
 .tr-limits ul { margin: .1rem 0; padding-inline-start: 1.2rem; }
+/* What the account already sent that day by the chosen way (owner's answer to Q84). */
+.tr-limits .tr-usage { margin: .15rem 0; font-weight: 600; }
 .tr-limits .muted { color: #5b6779; }
 /* The list under the form. */
 .tr-list { margin-top: 1.25rem; }

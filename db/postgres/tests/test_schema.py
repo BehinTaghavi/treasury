@@ -1267,7 +1267,7 @@ def test_a_transfer_has_its_vouchers_and_the_company_keeps_changed_limits_when_t
         c.execute("""INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id, beneficiary_detail_code,
                          beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority, pay_from_kind, pay_from_id, transfer_to_account_id,
                          state, recorded_by)
-                     VALUES (1405, %s, 990047, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', '00000000-0000-0000-0000-000000000000', 'نقل و انتقال بین حساب‌های شرکت', 'تأمین موجودی',
+                     VALUES (1405, %s, 990047, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', '00000000-0000-0000-0000-000000000000', 'نقل و انتقال بین بانک‌های شرکت', 'تأمین موجودی',
                              1000, 'IRR', 'OwnAccountTransfer', 1, 'BankAccount', %s, %s, 'Registered', 'clerk')""",
                   (request, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
         c.execute("SELECT cashflow.close_fiscal_year(1404)")
@@ -1293,7 +1293,7 @@ def test_a_request_for_a_transfer_between_the_companys_accounts_names_both_accou
     add = """INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id, beneficiary_detail_code,
                  beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority, transfer_account, pay_from_kind, pay_from_id,
                  transfer_to_account_id, state, recorded_by)
-             VALUES (1405, %s, %s, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', %s, 'نقل و انتقال بین حساب‌های شرکت', 'تأمین موجودی', 1000, 'IRR', %s, 1, %s, %s, %s, %s,
+             VALUES (1405, %s, %s, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', %s, 'نقل و انتقال بین بانک‌های شرکت', 'تأمین موجودی', 1000, 'IRR', %s, 1, %s, %s, %s, %s,
                      'Registered', 'clerk')"""
     source, destination = uuid.uuid4(), uuid.uuid4()
     row = lambda n, method="OwnAccountTransfer", account=None, kind="BankAccount", pay_from=source, to=destination: (

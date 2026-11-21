@@ -91,11 +91,19 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
 
     private sealed record Group(Guid Id, string Name, string Direction, bool IsActive, string? LedgerAccountCode);
 
-    private sealed record Ledger(string Code, string Name, bool IsPostable, bool IsActive);
+    private sealed record Ledger(string Code, string Name, bool IsPostable, bool IsActive, IReadOnlyList<string>? Detail1Types = null);
+
+    private sealed record TypedDetail(string Code, string Name, string? Type, bool IsActive);
+
+    public async Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<TypedDetail>(http, $"api/reference/ledger/details/{Uri.EscapeDataString(detailCode)}", "Reference.Unavailable", cancellationToken)
+            .ConfigureAwait(false) is { } d
+            ? new Treasury.Cashflow.Domain.Transfers.FeeDetailFact(d.Code, d.Name, d.Type, d.IsActive)
+            : null;
 
     public async Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Ledger>(http, $"api/reference/ledger/accounts/{Uri.EscapeDataString(code)}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } l
-            ? new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(l.Code, l.Name, l.IsPostable, l.IsActive)
+            ? new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(l.Code, l.Name, l.IsPostable, l.IsActive, l.Detail1Types)
             : null;
 
     private sealed record Entry(Guid Id, string Name);

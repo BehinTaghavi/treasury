@@ -12,7 +12,7 @@
  * is not on the receipts side and the voucher is not confirmed (the sheet is freed, so it can be typed again).
  * The form follows the receipt form the owner approved on 20 Nov 2026.
  * Owner, 21 Nov 2026 (answers to Q76–Q82):
- * – every transfer pays an approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت»; it is chosen first and sets the two
+ * – every transfer pays an approved payment request of the kind «نقل و انتقال بین بانک‌های شرکت»; it is chosen first and sets the two
  *   accounts (Q82);
  * – the payer's Sayad registration is a step of its own: the tick «چک در سامانهٔ صیاد ثبت شد» is on by default («پرداخت ثبت صیاد شد»
  *   as the cheque is issued); unticked, the cheque is only «صادر شد», «ثبت صیادی پرداخت» is recorded later from the list, and until
@@ -349,7 +349,7 @@ watch(year, () => { void load(); void loadRequests() })
                             :none-text="t('درخواست وجه تأییدشده‌ای برای نقل و انتقال نیست', 'No approved request for a transfer')" />
             </label>
             <p v-if="requestsLoaded && !requests.length" class="tr-msg warning wide3">
-              {{ t('برای هر نقل و انتقال ابتدا باید در «درخواست وجه» یک درخواست با نوع پرداخت «نقل و انتقال بین حساب‌های شرکت» ثبت و تایید شود؛ سپس همان درخواست در اینجا انتخاب می‌شود.',
+              {{ t('برای هر نقل و انتقال ابتدا باید در «درخواست وجه» یک درخواست با نوع پرداخت «نقل و انتقال بین بانک‌های شرکت» ثبت و تایید شود؛ سپس همان درخواست در اینجا انتخاب می‌شود.',
                 "Every transfer first needs a payment request of the kind \"transfer between the company's accounts\", written and approved under Payment requests; that request is then chosen here.") }}
             </p>
             <p v-if="sourceWithoutCheques" class="tr-msg warning wide3">{{ translate('Transfer.SourceHasNoCheques', locale) }}</p>

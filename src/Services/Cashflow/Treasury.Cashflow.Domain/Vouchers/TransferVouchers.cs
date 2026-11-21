@@ -32,7 +32,8 @@ public static class TransferVouchers
 
     /// <summary>
     /// «نقل و انتقال بانکی» by an electronic way (confirmed by the owner, Q76): Dr destination bank (its معین and تفصیل) / Cr source bank
-    /// (its معین and تفصیل). With a fee (Q77): also Dr «هزینه کارمزد خدمات بانکی» / Cr source bank.
+    /// (its معین and تفصیل). With a fee (Q77): also Dr «هزینه کارمزد خدمات بانکی» — with its تفصیل when that account takes one (Q83) — /
+    /// Cr source bank.
     /// </summary>
     public static Voucher ForElectronic(BankTransfer transfer, LedgerSide source, LedgerSide destination, VoucherTemplate template)
     {
@@ -50,7 +51,7 @@ public static class TransferVouchers
         if (transfer.FeeRial is { } fee)
         {
             var feeText = $"کارمزد {text}";
-            lines.Add(Fixed(true, template, FixedAccount.BankFees, null, fee, feeText, null, null));
+            lines.Add(Fixed(true, template, FixedAccount.BankFees, transfer.FeeDetailCode, fee, feeText, null, null));
             lines.Add(new VoucherLine(false, source.AccountCode, source.DetailCode, fee, feeText));
         }
 

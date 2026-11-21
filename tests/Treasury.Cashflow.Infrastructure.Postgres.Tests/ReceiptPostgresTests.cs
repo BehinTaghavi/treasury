@@ -421,6 +421,10 @@ public sealed class ReceiptPostgresTests : IDisposable
 
         public Task<string?> CompanyCityAsync(CancellationToken cancellationToken) => Task.FromResult<string?>("تهران");
 
+
+        public Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) =>
+            Task.FromResult<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?>(null);
+
         public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
             Task.FromResult<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?>(new(code, "حساب " + code, true, true));
 
