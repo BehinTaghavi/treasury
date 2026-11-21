@@ -28,6 +28,9 @@ export const sections: readonly MenuGroup[] = [
     // Owner, 14 Nov 2026: cheque types first; cheque books choose from them.
     { id: 'cheque-formats', title: ['انواع چک و چاپ', 'Cheque types and printing'] },
     { id: 'cheque-books', title: ['دسته چک‌ها', 'Cheque books'] },
+    // Owner's report no. 7 (20 Nov 2026): the limits of the electronic ways of transfer between the company's bank accounts are
+    // the company's data, not code («فیلد محدودیت مبالغ را قابل کانفیگ نگهداشت»).
+    { id: 'transfer-limits', title: ['سقف‌های انتقال الکترونیکی', 'Electronic transfer limits'] },
   ] },
   { title: ['بابت‌ها', 'Purposes'], items: [
     { id: 'references', title: ['عطف‌ها', 'References'] },

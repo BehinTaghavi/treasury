@@ -23,8 +23,17 @@ export interface Cheque {
   allowedActions: string[]; receiptId: string | null; history: Step[]; counterpartyDetailCode: string | null
   /** «بابت» of the cheque's receipt, shown as the cheque's description (report no. 6, item 4). */
   purpose?: string | null
-  details: { branchName: string | null; sayadId: string | null; onDemand?: boolean; accountNumber?: string | null; accountHolder?: string | null } | null
+  details: { branchName: string | null; sayadId: string | null; onDemand?: boolean; accountNumber?: string | null; accountHolder?: string | null
+    /**
+     * A cheque of a transfer between two bank accounts of the company (owner's report no. 7, «نقل و انتقال (انتقال گیرنده)»): its
+     * transfer, and the destination account — the only account it is deposited at. Such a cheque came on no receipt.
+     */
+    transferId?: string | null; transferAccountId?: string | null } | null
 }
+
+/** A cheque the company issued from one of its own accounts for a transfer to another (owner's report no. 7). */
+export const isTransferCheque = (c: Pick<Cheque, 'details'> | null | undefined) => !!c?.details?.transferId
+export const transferChequeMark = (locale: Locale) => (locale === 'fa' ? 'نقل و انتقال' : 'Transfer')
 
 export const isNoteKind = (kind: string | null | undefined) => !!kind && kind.endsWith('Note')
 

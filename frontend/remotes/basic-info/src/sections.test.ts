@@ -6,7 +6,7 @@ describe('menu of «اطلاعات پایه»', () => {
   it('keeps the order of the new-version manual as the owner arranged it; the group titles do not move an item', () => {
     expect(menuItems(sections).map(i => i.id)).toEqual([
       'company', 'countries', 'provinces', 'cities', 'currencies', 'banks', 'chart', 'details', 'bank-accounts', 'cheque-formats', 'cheque-books',
-      'references', 'purposes', 'cash-desks', 'petty-cash', 'company-cards', 'departments', 'requesters', 'beneficiaries', 'signatories', 'voucher-template',
+      'transfer-limits', 'references', 'purposes', 'cash-desks', 'petty-cash', 'company-cards', 'departments', 'requesters', 'beneficiaries', 'signatories', 'voucher-template',
     ])
   })
   it('names every group and every item in both languages', () => {

@@ -11,7 +11,7 @@ export interface Beneficiary { id: string; detailCode: string; legalName: string
 /** A received cheque that may be transferred: in the cash desk with the status «ثبت صیادی شد» (cashflow-svc). */
 export interface TransferableCheque {
   id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; dueDate: string | null; counterparty: string
-  allowedActions: string[]; details: { sayadId: string | null } | null
+  allowedActions: string[]; details: { sayadId: string | null; transferId?: string | null } | null
 }
 export interface PurposeGroup { id: string; number: number; direction: 'Receipt' | 'Payment'; name: string; reference1Id: string | null; reference2Id: string | null; isActive: boolean }
 export interface Purpose { id: string; groupId: string; name: string; isActive: boolean }

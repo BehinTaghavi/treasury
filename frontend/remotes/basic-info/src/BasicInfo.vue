@@ -20,6 +20,7 @@ import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
 import CompanyCards from './accounts/CompanyCards.vue'
 import VoucherTemplate from './accounts/VoucherTemplate.vue'
+import TransferLimits from './accounts/TransferLimits.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import CompanyInfo from './organization/CompanyInfo.vue'
 import Departments from './organization/Departments.vue'
@@ -63,6 +64,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <BankAccounts v-else-if="selected === 'bank-accounts'" :key="'bank-accounts' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChequeBooks v-else-if="selected === 'cheque-books'" :key="'cheque-books' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <TransferLimits v-else-if="selected === 'transfer-limits'" :key="'transfer-limits' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <PurposeGroups v-else-if="selected === 'purposes'" :key="'purposes' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <CashDesks v-else-if="selected === 'cash-desks'" :key="'cash-desks' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChequeFormats v-else-if="selected === 'cheque-formats'" :key="'cheque-formats' + locale" :api-base="apiBase" :locale="locale" :token="token" />

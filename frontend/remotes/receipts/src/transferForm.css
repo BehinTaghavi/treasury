@@ -1,0 +1,51 @@
+/* The forms of «نقل و انتقال بانکی» (owner's report no. 7) follow the receipt form the owner approved on 20 Nov 2026 (ReceiptForm.vue):
+   numbered cards, and a summary beside them with the amount in figures and words and the save button. */
+.tr-rf { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 1.25rem; margin: 0 0 1rem; }
+.tr-rf-main { flex: 999 1 34rem; min-width: 0; display: grid; gap: 1rem; }
+.tr-rf-side { flex: 1 1 17rem; min-width: 0; display: grid; gap: .75rem; position: sticky; top: 1rem; }
+.tr-req-note { margin-inline-start: auto; font-size: .78rem; color: #5b6779; }
+.tr-rf .tr-fields { grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); }
+.tr-summary { display: grid; gap: .9rem; }
+.tr-summary h3 { margin: 0; font-size: .95rem; }
+.tr-summary dl { margin: 0; display: grid; gap: .45rem; font-size: .85rem; }
+.tr-summary dl > div { display: flex; justify-content: space-between; gap: .75rem; }
+.tr-summary dt { color: #5b6779; white-space: nowrap; }
+.tr-summary dd { margin: 0; font-weight: 600; text-align: end; min-width: 0; overflow-wrap: break-word; }
+.tr-total { display: flex; flex-direction: column; border-top: 1px solid #dfe4ec; padding-top: .8rem; }
+.tr-total span { font-size: .85rem; color: #5b6779; }
+.tr-total strong { font-size: 1.85rem; line-height: 1.5; color: #1b2f55; }
+.tr-total small { font-size: .85rem; color: #445066; line-height: 1.8; }
+.tr-save { min-height: 3.1rem; border-radius: 10px; font-size: 1.05rem; font-weight: 700; }
+.tr-kbd { margin: 0; text-align: center; font-size: .78rem; color: #5b6779; }
+.tr-kbd kbd { display: inline-block; padding: 0 .5rem; border: 1px solid #c9d1dd; border-radius: 6px; background: #f3f5f9; color: #445066; font: inherit; }
+.tr-rf-side .tr-msg { margin: 0; }
+/* The voucher sits in a card of its own here, so it needs no second frame. */
+.tr-card :deep(.tr-voucher) { border: 0; padding: 0; margin: 0; background: transparent; }
+/* The limits of the chosen way, and other notes inside a card. */
+.tr-limits { grid-column: 1 / -1; margin: 0; padding: .6rem .9rem; border: 1px solid #d5dff3; border-radius: 10px; background: #f1f5fd; color: #2b3850; font-size: .85rem; line-height: 1.9; }
+.tr-limits ul { margin: .1rem 0; padding-inline-start: 1.2rem; }
+.tr-limits .muted { color: #5b6779; }
+/* The list under the form. */
+.tr-list { margin-top: 1.25rem; }
+.tr-list-head { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem; }
+.tr-list-head h3 { margin: 0; font-size: 1rem; color: #18233a; }
+.tr-list-head .tr-list-total { margin-inline-start: auto; font-size: .85rem; color: #445066; }
+/* The lists are wide: smaller letters, headings on one line, and the buttons of a row may stand under each other. */
+.tr-list .tr-table { font-size: .88rem; }
+.tr-list .tr-table th { white-space: nowrap; }
+.tr-actions { white-space: normal; min-width: 8rem; }
+.tr-actions button { margin: .1rem 0; }
+.tr-actions button:not(.tr-link) { padding: .35rem .7rem; font-size: .85rem; }
+.tr-nowrap { white-space: nowrap; }
+.tr-status { min-width: 9rem; }
+.tr-table td .small { display: block; }
+/* «از» and «به»: the two accounts of a transfer under each other in one column. */
+.tr-accounts { display: grid; grid-template-columns: auto 1fr; gap: .1rem .4rem; min-width: 13rem; }
+.tr-accounts dt { color: #5b6779; font-size: .78rem; align-self: center; }
+.tr-accounts dd { margin: 0; }
+/* A Sayad ID in four boxes, as on the cheque books screen: the first is typed, the others come from the cheque book. */
+.tr-sayad4 { grid-column: span 2; display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; font-weight: 500; color: #445066; }
+.tr-sayad4-boxes { display: grid; grid-template-columns: repeat(4, 1fr); gap: .35rem; }
+.tr-sayad4-boxes input { text-align: center; letter-spacing: .15em; min-width: 0; font-variant-numeric: tabular-nums; }
+.tr-sayad4[data-missing] .tr-sayad4-boxes input:not(.ro) { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
+@media (max-width: 640px) { .tr-rf-side { position: static; } .tr-sayad4 { grid-column: auto; } }

@@ -26,6 +26,9 @@
  * Sayad by the company but checked there, so on its row the step is called «کنترل چک در صیاد»; the course of the cheque is the same.
  * Item 19 — a cheque in the cash desk that is «ثبت صیادی شد» is not cancelled: «ابطال» is shown switched off on its row, with the reason.
  * The cheque card is ChequeCard.vue, shared with the receipts lists (items 14 and 20).
+ * Owner's report no. 7 (20 Nov 2026): a cheque of a transfer between two bank accounts of the company («نقل و انتقال (انتقال گیرنده)»)
+ * is listed here with the mark «نقل و انتقال» and goes on like every received cheque — ثبت صیادی، واگذاری به بانک، وصول —; it is
+ * deposited only at the destination account of its transfer, which the deposit box then offers alone.
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { COMPANY_LOGO_PATH, COMPANY_PATH, createApi, dueMark, dueWaitsFor, formatAmount, instrumentKindName, normaliseJalali, searchKey, todayJalali, translate,
@@ -34,7 +37,7 @@ import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups } from './lookups'
 import ReceiptForm from './ReceiptForm.vue'
 import ChequeCard from './ChequeCard.vue'
-import { actionNameOf, noteWording, stateNameOf, type Cheque } from './cheque'
+import { actionNameOf, isTransferCheque, noteWording, stateNameOf, transferChequeMark, type Cheque } from './cheque'
 import ChequeTransferPrint from './ChequeTransferPrint.vue'
 import PrintRange from './PrintRange.vue'
 import { listPage, printPage, rangeText } from './printing'
@@ -122,8 +125,10 @@ const tickable = computed(() => shown.value.filter(c => c.allowedActions.include
 const selected = computed(() => tickable.value.filter(c => chosen[c.id]))
 const selectedCurrency = computed(() => selected.value[0]?.currency ?? 'IRR')
 const selectedTotal = computed(() => selected.value.reduce((s, c) => s + c.amount, 0))
+/** A transfer cheque is deposited only at the destination account of its transfer (owner's report no. 7). */
+const transferAccounts = computed(() => [...new Set(selected.value.map(c => c.details?.transferAccountId).filter((id): id is string => !!id))])
 const accountChoices = computed<Choice[]>(() => L.bankAccounts.value
-  .filter(a => a.isActive && a.currencyCode === selectedCurrency.value)
+  .filter(a => a.isActive && a.currencyCode === selectedCurrency.value && (!transferAccounts.value.length || transferAccounts.value.includes(a.id)))
   .map(a => ({ value: a.id, label: L.accountTitle(a), hint: a.currencyCode })))
 function toggleAll(on: boolean) { for (const c of tickable.value) chosen[c.id] = on }
 // Owner, 19 Nov 2026: the deposit seemed not to work because the account box was left empty. With one suitable account it is
@@ -517,7 +522,10 @@ onMounted(async () => { await L.load(); await load() })
             <td v-if="notes">{{ c.kind === 'GuaranteeNote' ? t('تضمینی / امانی', 'Guarantee / trust') : t('عادی', 'Ordinary') }}</td>
             <td v-else>{{ c.bankName }}<span v-if="c.details?.branchName" class="muted small"> – {{ c.details.branchName }}</span>
               <div v-if="c.kind !== 'OrdinaryCheque'"><span class="tr-tag">{{ instrumentKindName(c.kind, locale) }}</span></div></td>
-            <td>{{ c.counterparty }}<div v-if="c.purpose" class="muted small">{{ c.purpose }}</div></td>
+            <td>{{ c.counterparty }}
+              <!-- Owner's report no. 7: the company's own cheque of a transfer between two of its bank accounts. -->
+              <span v-if="isTransferCheque(c)" class="tr-tag later" :title="t('چک نقل و انتقال بین حساب‌های شرکت (انتقال گیرنده): ثبت صیادی، واگذاری به بانک مقصد و وصول', 'Cheque of a transfer between the company\'s own accounts: Sayad registration, deposit at the destination bank, collection')">{{ transferChequeMark(locale) }}</span>
+              <div v-if="c.purpose" class="muted small">{{ c.purpose }}</div></td>
             <td class="num">{{ money(c.amount) }} <span v-if="c.currency !== 'IRR'">{{ c.currency }}</span></td>
             <td>{{ stateName(c.state, c.kind) }}
               <span v-if="c.reachedDueDate" class="tr-tag due" :title="dueWaitsFor(c.state, locale)">{{ dueMark(locale) }}</span>
@@ -553,6 +561,9 @@ onMounted(async () => { await L.load(); await load() })
                       :none-text="t('حساب بانکی فعالی با ارز این چک‌ها نیست', 'No active account in this currency')" />
       </label>
       <label>{{ t('شماره فیش واگذاری', 'Deposit slip no.') }} <input v-model="deposit.slip" dir="ltr" /></label>
+      <p v-if="transferAccounts.length" class="wide muted small">{{ transferAccounts.length > 1
+        ? t('چک‌های نقل و انتقالِ تیک‌خورده به حساب‌های مقصد متفاوتی واگذار می‌شوند؛ چک‌های هر حساب مقصد را جداگانه واگذار کنید.', 'The ticked transfer cheques go to different destination accounts; deposit the cheques of each destination account separately.')
+        : t('چک نقل و انتقال فقط به حساب انتقال گیرنده (مقصد) همان نقل و انتقال واگذار می‌شود؛ حساب بانکی خودکار انتخاب شده است.', 'A transfer cheque is deposited only at the destination account of its transfer; the bank account is chosen for you.') }}</p>
       <p v-if="selected.length && !accountChoices.length" class="wide tr-msg warning">{{ t(
         'برای ارز این چک‌ها حساب بانکی فعالی تعریف نشده است. ابتدا در «اطلاعات پایه ← حساب‌های بانکی» حساب شرکت را تعریف یا فعال کنید.',
         'There is no active company bank account in this currency. Add or switch one on in Basic Information → Bank accounts first.') }}</p>

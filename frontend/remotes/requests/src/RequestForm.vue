@@ -106,7 +106,9 @@ const cheques = ref<TransferableCheque[]>([])
 const chequesLoaded = ref(false)
 async function loadCheques() {
   const r = await api.get<TransferableCheque[]>('/api/cashflow/instruments/received?state=SayadRegistered')
-  if (r.ok) cheques.value = r.value.filter(c => c.kind.endsWith('Cheque') && c.allowedActions.includes('Endorse'))
+  // A cheque of a transfer between the company's own bank accounts (owner's report no. 7) is not handed on to a beneficiary: it goes
+  // to its destination bank. cashflow-svc does not offer «ثبت انتقال» on it; it is left out here by its mark too.
+  if (r.ok) cheques.value = r.value.filter(c => c.kind.endsWith('Cheque') && c.allowedActions.includes('Endorse') && !c.details?.transferId)
   else show('error', translate(r.code, props.locale))
   chequesLoaded.value = true
 }
