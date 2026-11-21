@@ -66,7 +66,8 @@ public sealed class VoucherUseCases(
         unitOfWork.ExecuteAsync(async ct =>
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false);
-            if (receipt is null)
+            // A deleted receipt («حذف شده») has no voucher: it was deleted before one was confirmed.
+            if (receipt is null || receipt.State == ReceiptState.Deleted)
             {
                 return null;
             }
@@ -84,6 +85,11 @@ public sealed class VoucherUseCases(
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false)
                 ?? throw new DomainException("Receipt.NotFound", "The receipt was not found.");
+            if (receipt.State == ReceiptState.Deleted)
+            {
+                throw new DomainException("Receipt.Deleted", "The receipt was deleted.");
+            }
+
             if (receipt.State == ReceiptState.Cancelled)
             {
                 throw new DomainException("Voucher.SourceCancelled", "The receipt is cancelled.");
@@ -151,9 +157,13 @@ public sealed class VoucherUseCases(
         LedgerSide? side = null;
         if (receipt.AccountId is { } accountId)
         {
-            var fact = receipt.AccountKind == ReceiptAccountKind.CashDesk
-                ? await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false)
-                : await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false);
+            var fact = receipt.AccountKind switch
+            {
+                ReceiptAccountKind.CashDesk => await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false),
+                // «واریز به کارت بانک»: the petty cash's account with its holder's تفصیل, or the company card's own (answers to Q68, Q69).
+                { } kind when kind.IsCard() => await accounts.CardAsync(kind, accountId, ct).ConfigureAwait(false),
+                _ => await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false),
+            };
             side = new LedgerSide(fact?.LedgerAccountCode, fact?.DetailCode);
         }
 
@@ -161,7 +171,7 @@ public sealed class VoucherUseCases(
         if (receipt.ReplacedInstrumentId is { } oldId && await instruments.GetAsync(oldId, ct).ConfigureAwait(false) is { } old)
         {
             var step = old.History.LastOrDefault(h => h.Action == InstrumentAction.Replace && h.Details?.ReceiptId == receipt.Id);
-            replacement = new Replacement(old, step?.From ?? InstrumentState.InCashDesk);
+            replacement = new Replacement(old, step?.From ?? InstrumentState.Cancelled);
         }
 
         var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);

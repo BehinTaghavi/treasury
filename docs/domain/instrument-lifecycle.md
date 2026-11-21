@@ -21,9 +21,9 @@ Old program: dbo.Checks in the shared `Cashnajoo86` database, status in `Stcode`
 | 14 | Bounced | RecordBounced (bounce notice no. required; its date is the step's date) | DepositedForCollection, ReturnedFromBank | owner's item 14 (e), Q33 | all |
 | 14 | Bounced | RecordEndorsementReturned (bounce notice no.) | Endorsed | owner's item 14 (h) | all |
 | 15 | ReturnedToIssuer | ReturnToIssuer | ReturnedFromBank | manual | all |
-| — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (d), Q31; owner, 18 Nov 2026 | not guarantee |
-| — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal | owner's item 14 (f), Q30 | all |
-| — | SayadRegistered (ثبت صیادی شد) | RegisterSayad (date; tracking no. of the registration, optional) | InCashDesk | owner, 18 Nov 2026 | cheques |
+| — | Replaced (تعویض چک) | Replace (on a cheque receipt of the new cheques, same payer) | **Cancelled only** (owner's answer to Q62, 19 Nov 2026: cancelled first, for internal control; until then also InCashDesk, SayadRegistered, ReturnedFromBank, Bounced, InLegal) | owner's item 14 (d), Q31; answer to Q62 | not guarantee |
+| — | Cancelled (ابطال شده) | Cancel (management's order no. and date, reason) | InCashDesk, ReturnedFromBank, Bounced, InLegal — **not SayadRegistered** (owner's report no. 6, item 19, 19 Nov 2026: a cheque in the cash desk that is registered in Sayad is not cancelled; `Instrument.SayadRegisteredNotCancelled`) | owner's item 14 (f), Q30; report no. 6, item 19 | all |
+| — | SayadRegistered (ثبت صیادی شد; for a «چک تضمین شده صیاد»: کنترل چک در صیاد انجام شد) | RegisterSayad (date; tracking no. of the registration, optional). For a «چک تضمین شده صیاد» (BankCheque) the same step is named «کنترل چک در صیاد»: its bank registered it in Sayad, the company checks it there (owner's report no. 6, item 18) | InCashDesk | owner, 18 Nov 2026; report no. 6, item 18 | cheques |
 | 15 | ReturnedToIssuer | the other step of a cheque in the cash desk (ReturnToIssuer) | SayadRegistered | owner, 18 Nov 2026 | as from InCashDesk |
 | 14 + GoInlaw | InLegal (اقدام حقوقی) | SendToLegal (date and description of the action, on the screen «اقدام حقوقی»; scans attached afterwards) | Bounced | owner, 18 Nov 2026 | all |
 | — | InLegal (اقدام حقوقی) | SendToLegal: guarantee cheques and guarantee notes; ordinary cheques as the exceptional case | InCashDesk, SayadRegistered | owner's answer to Q38 and 18 Nov 2026 | cheques and guarantee notes (not an ordinary note that has not bounced) |
@@ -34,11 +34,31 @@ The bank's paper called "bounce notice" in this file and in the code is «گوا
 (owner, 18 Nov 2026); the legal action keeps its number, date and tracking code.
 
 Latest status as the owner described it on 18 Nov 2026 (`received-cheque-steps.md`, section 5): a cheque registered in Sayad stays in
-the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be replaced or cancelled.
+the cash desk, so every step of «نزد صندوق» stays open; a bounced cheque handed to the lawyer can still be cancelled (and, once cancelled, replaced: answer to Q62).
 **«سررسید چک» is not a state**: it is a mark on a post-dated cheque (due after the day it was received) that is still in the cash
 desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDueDate`); no step is recorded for it.
 
 **Promissory notes (owner, 16 Nov 2026: «مراحل سفته پس از دریافت شامل واگذاری به بانک، وصول، استرداد، خرج سفته (ظهرنویسی و انتقال به غیر) و …»).** A received note follows the same states and steps as a received cheque; no line of the table was added, only the kinds changed: an **ordinary** note (`PromissoryNote`) may now be deposited at the bank and endorsed (old rule R3 allowed ordinary and bank cheques only). A **guarantee or trust** note (`GuaranteeNote`) is only handed back («استرداد», ReturnToIssuer) or cancelled. For a note the bounce is its protest («واخواست», with the protest's number), the return to the payer is «استرداد به متعهد», and an endorsement has no Sayad transfer. A note payable on demand has no due date, so rule N2 does not hold it back. Screen: «عملیات سفته‌های دریافتی». Confirmed by the owner's answers to Q49–Q52; converting a guarantee note to an ordinary one and replacing a note are not needed.
+
+**Transfer cheques (owner's report no. 7, 20 Nov 2026: «نقل و انتقال بین بانکی»; his answers to Q79 and Q81, 21 Nov 2026).** A cheque
+the company issues from one of its own bank accounts to move money to another of its accounts is recorded twice: as an **issued** cheque
+on the payment side («انتقال دهنده»: PrepareIssue and Issue in one command, on a sheet of the source account's cheque book, with its
+Sayad ID) and, with one button, as a **received** cheque «نزد صندوق» on the receipts side («انتقال گیرنده»; it names its transfer
+instead of a receipt and its drawer is the source account). **«ثبت صیادی پرداخت»** — the payer's registration in Sayad, «پرداخت ثبت
+صیاد شد» — is kept on the transfer: ticked as the cheque is issued, or recorded later.
+The received cheque follows the table above, but **only these steps are open on the cheque screens** (`Instrument.TransferChequeSteps`,
+refusal `Instrument.NotForTransferCheque`): RegisterSayad («دریافت ثبت صیاد شد», still required before the bank, N3, and possible only
+after the payer's registration: `Transfer.PayerSayadRequired`), DepositForCollection — **only at the destination account of its
+transfer** (`Instrument.TransferChequeOtherAccount`) —, RecordCleared and ReturnFromBank (then a new deposit). RecordBounced,
+ReturnToIssuer, Replace, SendToLegal and Endorse are closed: they settle with an outside payer; there is **no replacement** (answer to
+Q79: a new transfer is a new, independent cheque). **Cancel** is recorded through the transfer only («ابطال چک»,
+`BankTransfer.CancelCheque`), **while the cheque is not registered in Sayad** (`Transfer.SayadRegisteredNotCancelled` afterwards, as
+report no. 6, item 19, says for received cheques): the received cheque goes InCashDesk → Cancelled without an order of management,
+the issued one Issued → Cancelled, and the sheet is void. No line of the table changed.
+On the issued cheque the steps follow the transfer too, never the cheque screens (`Transfer.IssuedChequeFollowsTransfer`):
+**RecordMatured** («ثبت سررسید» of a post-dated cheque, on or after its due date; answer to Q81) and, when the received cheque is
+cleared, RecordPaidByBank in the same command (which records the maturity too, if it was not recorded), finishing the transfer. A
+transfer deleted before its cheque is on the receipts side removes the issued cheque and frees its sheet (`ChequeBook.Release`).
 
 ## Issued (old Dp = 2)
 
@@ -58,7 +78,7 @@ desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDu
 |---|---|---|
 | 0 | OrdinaryCheque (چک عادی) | OrdinaryCheque (چک نقدی) |
 | 1 | GuaranteeCheque (چک انتظامی) | GuaranteeCheque |
-| 2 | BankCheque (چک رمزدار/بانکی) | PostDatedCheque (چک مدت دار) |
+| 2 | BankCheque (چک رمزدار/بانکی in the old program; **«چک تضمین شده صیاد»** on the screens since the owner's report no. 6, item 18) | PostDatedCheque (چک مدت دار) |
 | 3 | Instalment | Instalment |
 | 4 | PromissoryNote | PromissoryNote |
 | 5 | Other | Other |

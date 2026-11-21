@@ -8,6 +8,9 @@ BEGIN
     -- The check of 025 was written inline, so PostgreSQL named it; find it by what it checks.
     FOR c IN SELECT conname FROM pg_constraint
              WHERE conrelid = 'cashflow.receipt'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) LIKE '%deposit_method%DepositSlip%'
+               -- not the check of 033 that says which account each kind of receipt takes: since «واریز به کارت بانک» it names the kinds
+               -- of deposit onto a card too (20 Nov 2026)
+               AND conname <> 'receipt_kind_account'
     LOOP
         EXECUTE format('ALTER TABLE cashflow.receipt DROP CONSTRAINT %I', c);
     END LOOP;

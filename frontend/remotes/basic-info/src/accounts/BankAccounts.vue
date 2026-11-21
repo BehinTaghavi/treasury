@@ -12,7 +12,7 @@
  * - The list has a search box (item 16); typing a number that already exists opens that account (item 17).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, normaliseJalali, translate, type Locale, toLatinDigits } from '@treasury/ui-kit'
+import { cardNumberHint, createApi, normaliseJalali, translate, type Locale, toLatinDigits } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 
@@ -318,6 +318,8 @@ onMounted(async () => {
           <div v-for="(c, i) in form.cards" :key="i" class="tr-card">
             <label class="req"><span>{{ t('شماره ۱۶ رقمی کارت بانک', '16-digit card number') }}</span>
               <input v-model="c.number" dir="ltr" maxlength="19" inputmode="numeric" autocomplete="off" />
+              <!-- Owner's report no. 6, item 17: the digits are counted, and a wrong check digit is named as such. -->
+              <small v-if="cardNumberHint(c.number, locale)" :class="cardNumberHint(c.number, locale)!.bad ? 'tr-card-bad' : 'muted'">{{ cardNumberHint(c.number, locale)!.text }}</small>
             </label>
             <label class="req"><span>{{ t('عنوان دارندهٔ کارت', 'Name on the card') }}</span>
               <input v-model="c.holderName" :placeholder="t('نام شرکت یا دارندهٔ تنخواه', 'Company or petty-cash holder')" />
@@ -429,6 +431,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.tr-card-bad { color: #b42318; font-size: .78rem; }
 h3 { margin-top: 0; }
 .tr-form { display: grid; gap: 1rem; margin: 1rem 0; }
 fieldset { border: 1px solid #e4e7eb; border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); gap: .75rem; align-items: start; padding: .75rem; }
@@ -443,7 +446,6 @@ fieldset:disabled { opacity: .55; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 input, select { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
 /* Owner, item 12: required fields have a red frame. */
-.req > input, .req > select { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 small { color: #52606d; min-height: 1em; }
 .small { font-size: .8rem; margin: 0; }
@@ -472,6 +474,8 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-tag { background: #eef2f6; color: #52606d; border-radius: 4px; padding: 0 .3rem; font-size: .75rem; }
 .muted { color: #7b8794; }
 .tr-cards { display: grid; gap: .5rem; margin-top: .75rem; }
-.tr-card { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(12rem, 1fr) auto; gap: .75rem; align-items: end; }
+/* Lined up at the top: the hint under the card number makes that field taller than the others. */
+.tr-card { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(12rem, 1fr) auto; gap: .75rem; align-items: start; }
+.tr-card > button { margin-top: 1.5rem; }
 .type { min-width: 16rem; }
 </style>

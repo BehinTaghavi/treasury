@@ -27,6 +27,8 @@ public static class PostgresRegistration
         services.AddSingleton<IConfirmedVoucherRepository, PostgresConfirmedVoucherRepository>();
         services.AddSingleton<IChequeFormatRepository, PostgresChequeFormatRepository>();
         services.AddSingleton<IInstrumentAttachmentRepository, PostgresInstrumentAttachmentRepository>();
+        services.AddSingleton<IBankTransferRepository, PostgresBankTransferRepository>();
+        services.AddSingleton<ITransferLimitRepository, PostgresTransferLimitRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
     }
@@ -255,6 +257,70 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         instrument.MarkSaved(instrument.Version + 1);
     }
 
+    /// <summary>
+    /// A received cheque or note corrected with its receipt (owner's report no. 6, items 2 and 6): everything written on it, and the date
+    /// of its receipt step (its only step; the fiscal year stays, so the row stays in its partition).
+    /// </summary>
+    public async Task SaveCorrectionAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        var tx = PostgresUnitOfWork.Current;
+        var s = InstrumentSnapshot.From(instrument, instrument.Version + 1);
+        await using (var cmd = tx.Command(
+            "UPDATE cashflow.instrument SET kind = @kind, number = @number, bank_name = @bank, amount = @amount, currency = @currency, rate_to_rial = @rate, " +
+            "amount_rial = @rial, issue_date = @issue, due_date = @due, counterparty_id = @cp, counterparty_name = @cpname, counterparty_detail_code = @cpcode, " +
+            "purpose = @purpose, details = @details, version = version + 1, updated_at = now() " +
+            "WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
+        {
+            BindInstrument(cmd, s, instrument.Amount.ToRial());
+            cmd.Parameters.AddWithValue("expected", instrument.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Instrument {s.Id} was changed by someone else.");
+            }
+        }
+
+        await using (var cmd = tx.Command(
+            "UPDATE cashflow.instrument_event SET event_date = @date WHERE instrument_year = @year AND instrument_id = @id AND seq = 1"))
+        {
+            cmd.Parameters.AddWithValue("date", s.History[0].Date);
+            cmd.Parameters.AddWithValue("year", s.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", s.Id);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await PostgresOutbox.WriteAsync(tx, instrument.PendingEvents, cancellationToken).ConfigureAwait(false);
+        instrument.MarkSaved(instrument.Version + 1);
+    }
+
+    /// <summary>A cheque or note taken off its receipt while the receipt is corrected: its steps and the row itself are deleted.</summary>
+    public async Task RemoveAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        var tx = PostgresUnitOfWork.Current;
+        await using (var cmd = tx.Command("DELETE FROM cashflow.instrument_event WHERE instrument_year = @year AND instrument_id = @id"))
+        {
+            cmd.Parameters.AddWithValue("year", instrument.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", instrument.Id);
+            await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await using (var cmd = tx.Command("DELETE FROM cashflow.instrument WHERE origin_fiscal_year = @year AND id = @id AND version = @expected"))
+        {
+            cmd.Parameters.AddWithValue("year", instrument.OriginFiscalYear);
+            cmd.Parameters.AddWithValue("id", instrument.Id);
+            cmd.Parameters.AddWithValue("expected", instrument.Version);
+            if (await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) != 1)
+            {
+                throw new ConcurrencyConflictException($"Instrument {instrument.Id} was changed by someone else.");
+            }
+        }
+
+        await PostgresOutbox.WriteAsync(tx, instrument.PendingEvents, cancellationToken).ConfigureAwait(false);
+        tx.LoadedSteps.Remove(instrument.Id);
+        instrument.MarkSaved(instrument.Version + 1);
+    }
+
     private static async Task InsertStepsAsync(TransactionContext tx, InstrumentSnapshot s, int alreadyStored, CancellationToken ct)
     {
         for (var i = alreadyStored; i < s.History.Count; i++)
@@ -367,13 +433,14 @@ public sealed class PostgresInstrumentRepository : IInstrumentRepository
         }
 
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT receipt_id, state, issue_date, due_date FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
+            "SELECT receipt_id, state, issue_date, due_date, id, number, kind FROM cashflow.instrument WHERE receipt_id = ANY(@receipts) ORDER BY created_at, number");
         cmd.Parameters.Add(new NpgsqlParameter("receipts", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = receiptIds.ToArray() });
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         while (await r.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
             list.Add(new ReceiptChequeStatus(r.GetGuid(0), Enum.Parse<InstrumentState>(r.GetString(1)), new FiscalDate(r.GetFieldValue<DateOnly>(2)),
-                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3))));
+                await r.IsDBNullAsync(3, cancellationToken).ConfigureAwait(false) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(3)),
+                r.GetGuid(4), await r.IsDBNullAsync(5, cancellationToken).ConfigureAwait(false) ? null : r.GetString(5), Enum.Parse<InstrumentKind>(r.GetString(6))));
         }
 
         return list;
@@ -543,6 +610,26 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
             cmd.Parameters.AddWithValue("use", use.ToString());
             await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
             loaded.Add(sheet);
+        }
+
+        // A sheet that was issued and is now void (the cheque of a transfer cancelled before its Sayad registration, owner's answer to
+        // Q79): until 21 Nov 2026 only new sheets were written, so voiding an issued sheet was lost here.
+        foreach (var (sheet, _) in book.UsedSheets.Where(kv => kv.Value == SheetUse.Voided && loaded.Contains(kv.Key)))
+        {
+            await using var cmd = tx.Command("UPDATE cashflow.cheque_sheet SET sheet_use = 'Voided' WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use <> 'Voided'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        // A sheet freed by ChequeBook.Release (the cheque of a transfer deleted before its voucher was confirmed, schema 046).
+        foreach (var sheet in loaded.Where(sheet => !book.UsedSheets.ContainsKey(sheet)).ToList())
+        {
+            await using var cmd = tx.Command("DELETE FROM cashflow.cheque_sheet WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use = 'Issued'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            loaded.Remove(sheet);
         }
 
         tx.LoadedSheets[book.Id] = loaded;

@@ -16,6 +16,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createApi, toLatinDigits, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
+import ShebaInput from '@treasury/ui-kit/ShebaInput.vue'
 import { searchKey } from '../text'
 
 interface Beneficiary {
@@ -98,8 +99,6 @@ const shown = computed(() => {
 /** IR + 24 digits written in groups of four, as on bank papers. */
 const shebaText = (s: string | null) => (s ? s.replace(/(.{4})/g, '$1 ').trim() : '')
 const phoneText = (b: Beneficiary) => [b.phoneAreaCode, b.phone].filter(Boolean).join('-')
-/** The 24 digits after the fixed «IR»: a pasted "IR…", spaces and dashes are taken off. */
-const shebaDigits = computed(() => toLatinDigits(form.sheba).replace(/^\s*ir/i, '').replace(/[\s-]/g, ''))
 
 async function load() {
   const [b, k, y] = await Promise.all([
@@ -148,7 +147,7 @@ function open(b: Beneficiary | null) {
     Object.assign(form, {
       isBeneficiary: b.isBeneficiary, isObligor: b.isObligor, isGuarantor: b.isGuarantor,
       detailCode: b.detailCode, legalName: b.legalName, bankId: b.bankId ?? '', branchName: b.branchName ?? '', accountNumber: b.accountNumber ?? '',
-      sheba: (b.sheba ?? '').replace(/^IR/, ''), areaCode: b.phoneAreaCode ?? '', phone: b.phone ?? '', mobile: b.mobile ?? '',
+      sheba: b.sheba ?? '', areaCode: b.phoneAreaCode ?? '', phone: b.phone ?? '', mobile: b.mobile ?? '',
       kind: b.kind ?? 'Natural', nationalId: b.nationalId ?? '', postalAddress: b.postalAddress ?? '', postalCode: b.postalCode ?? '',
     })
   } else if (groupFilter.value) {
@@ -168,7 +167,7 @@ async function save() {
   const body = {
     isBeneficiary: form.isBeneficiary, isObligor: form.isObligor, isGuarantor: form.isGuarantor,
     detailCode: form.detailCode, legalName: form.legalName || null, bankId: form.bankId || null, branchName: form.branchName || null,
-    accountNumber: form.accountNumber || null, sheba: shebaDigits.value ? `IR${shebaDigits.value}` : null,
+    accountNumber: form.accountNumber || null, sheba: form.sheba || null,
     phoneAreaCode: form.areaCode || null, phone: form.phone || null, mobile: form.mobile || null,
     kind: form.kind, nationalId: form.nationalId || null, postalAddress: form.postalAddress || null, postalCode: form.postalCode || null,
   }
@@ -236,13 +235,9 @@ onMounted(load)
         <label>{{ t('نام شعبه', 'Branch') }}<input v-model="form.branchName" maxlength="100" /></label>
         <label :class="{ bad: wrong === 'account' }">{{ t('شماره حساب', 'Account number') }}<input v-model="form.accountNumber" dir="ltr" maxlength="40" /></label>
         <label :class="['wide', { bad: wrong === 'sheba' }]">{{ t('شماره شبا (۲۴ رقم پس از IR)', 'Sheba (24 digits after IR)') }}
-          <span class="joined" dir="ltr">
-            <span class="fixed" aria-hidden="true">IR</span>
-            <input v-model="form.sheba" dir="ltr" inputmode="numeric" placeholder="00 0000 0000 0000 0000 0000 00" maxlength="34" :aria-label="t('شماره شبا', 'Sheba')" />
-          </span>
-          <small :class="shebaDigits.length && shebaDigits.length !== 24 ? 'tr-warn' : 'muted'">{{ shebaDigits.length
-            ? t(`${num(shebaDigits.length)} رقم از ۲۴ رقم`, `${shebaDigits.length} of 24 digits`)
-            : t('وقتی بانک صادرکنندهٔ چک با بانک ذینفع متفاوت است، شبا روی حواله‌کرد چک می‌آید.', "Used on the cheque when the paying bank differs from the beneficiary's bank.") }}</small>
+          <!-- The shared Sheba box (owner's report no. 6, item 16): «IR» fixed inside the frame, the digits counted under it. -->
+          <ShebaInput v-model="form.sheba" :locale="locale" :aria-label="t('شماره شبا', 'Sheba')" />
+          <small class="muted">{{ t('وقتی بانک صادرکنندهٔ چک با بانک ذینفع متفاوت است، شبا روی حواله‌کرد چک می‌آید.', "Used on the cheque when the paying bank differs from the beneficiary's bank.") }}</small>
         </label>
         <label :class="{ bad: wrong === 'area' || wrong === 'phone' }">{{ t('شماره تلفن و پیش‌شماره', 'Phone and area code') }}
           <span class="joined" dir="ltr">

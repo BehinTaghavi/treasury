@@ -45,13 +45,41 @@ public enum FixedAccount
 
     /// <summary>«سفته های در جریان وصول»: notes at the bank for collection, with the bank account's تفصیل (owner's table «واگذاری سفته به بانک»).</summary>
     NotesInCollection,
+
+    /// <summary>
+    /// «وجوه در راه»: money on its way between two bank accounts of the company (owner's report no. 7, 20 Nov 2026): debited when the
+    /// transfer cheque is issued («بدهکار: وجوه در راه، بستانکار: بانک انتقال دهنده»), credited when it is received («بدهکار: چک نزد
+    /// صندوق، بستانکار: وجوه در راه»).
+    /// </summary>
+    FundsInTransit,
+
+    /// <summary>
+    /// «هزینه کارمزد خدمات بانکی»: one general expense account of the company (a معین or معین در معین among the financial expenses),
+    /// debited with the bank's fee of a transfer (owner, 21 Nov 2026, answer to Q77: «مانند مطالبات سوخت شده یک حساب عمومی»).
+    /// </summary>
+    BankFees,
+
+    /// <summary>
+    /// «اسناد پرداختنی»: post-dated cheques the company issued, until their due date (owner, 21 Nov 2026, answer to Q81: «حساب اسناد
+    /// پرداختنی بستانکار تا سررسید چک»; his voucher table, «پرداخت چک مدت دار»).
+    /// </summary>
+    NotesPayable,
 }
 
-/// <summary>A cheque receipt that replaces a cheque: the old cheque and where it was when replaced (owner's item 14 (d)).</summary>
+/// <summary>
+/// A cheque receipt that replaces a cheque: the old cheque and where it was when replaced. Since the owner's answer to Q62 (19 Nov
+/// 2026) that is always «ابطال شده»; replacements recorded before it came straight from the cash desk, a bounce or the legal action.
+/// </summary>
 public sealed record Replacement(Instrument Old, InstrumentState From);
 
 /// <summary>What reference-svc says about a ledger account (copy of the accounting system's chart).</summary>
-public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive);
+/// <param name="Detail1Types">The types of تفصیل the account takes as its first تفصیل (set in the accounting system or on the chart
+/// page); empty or null: the account has no تفصیل.</param>
+public sealed record LedgerAccountFact(string Code, string Name, bool IsPostable, bool IsActive, IReadOnlyList<string>? Detail1Types = null)
+{
+    /// <summary>The account is one "with تفصیل": a voucher line on it names a تفصیل of one of its types.</summary>
+    public bool TakesDetail => Detail1Types is { Count: > 0 };
+}
 
 /// <summary>An account side taken from a purpose group, cash desk or bank account: its معین and تفصیل.</summary>
 public sealed record LedgerSide(string? AccountCode, string? DetailCode);
@@ -126,9 +154,11 @@ public static class ReceiptVouchers
     /// نفع شرکت» for guarantee notes.
     /// </summary>
     /// <param name="account">The cash desk or bank account of a cash or bank receipt; null for cheques.</param>
-    /// <param name="replacement">A replacement (تعویض): Dr «اسناد نزد صندوق» for each new cheque / Cr the old cheque where it was («اسناد نزد
-    /// صندوق», if bounced «اسناد واخواست شده», in legal action «اسناد واخواست شده حقوقی شده»); a difference in amount (answer to Q31)
-    /// goes to the purpose group, with the payer.</param>
+    /// <param name="replacement">A replacement (تعویض). The old cheque was cancelled first (owner's answer to Q62, 19 Nov 2026), and its
+    /// cancellation moved it to «مطالبات سوخت شده» (his voucher table, «ابطال چک دریافتنی»), so the replacement takes it out of there:
+    /// Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده» for the old cheque; a difference in amount (answer to Q31) goes to
+    /// the purpose group, with the payer (confirmed by the owner, 20 Nov 2026, answer to Q64). A replacement recorded before that rule credits the
+    /// account the old cheque was in («اسناد نزد صندوق», «اسناد واخواست شده», «اسناد واخواست شده حقوقی شده»).</param>
     public static Voucher ForReceipt(Receipt receipt, IReadOnlyList<Instrument> instruments, LedgerSide? account, string? purposeGroupAccount, VoucherTemplate template,
         Replacement? replacement = null)
     {
@@ -144,7 +174,7 @@ public static class ReceiptVouchers
             {
                 var (foreign, currency) = Foreign(i);
                 lines.Add(Fixed(true, template, FixedAccount.ChequesInCashDesk, payer, i.Amount.ToRial(),
-                    $"چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – تعویض چک {old.Number} – {receipt.Payer.DisplayName}", foreign, currency));
+                    $"{receipt.Purpose} – چک {i.Number} {i.BankName} سررسید {i.DueDate?.ToJalaliString()} – تعویض چک {old.Number} – {receipt.Payer.DisplayName}", foreign, currency));
             }
 
             var (oldForeign, oldCurrency) = Foreign(old);
@@ -163,7 +193,8 @@ public static class ReceiptVouchers
         {
             foreach (var i in instruments)
             {
-                var text = $"{Name(i)} – {receipt.Payer.DisplayName}";
+                // Owner's report no. 6, item 4: the purpose chosen on the receipt is written, as it is, in the description of each cheque.
+                var text = $"{receipt.Purpose} – {Name(i)} – {receipt.Payer.DisplayName}";
                 var (foreign, currency) = Foreign(i);
                 if (i.Kind.IsGuarantee())
                 {
@@ -323,12 +354,14 @@ public static class ReceiptVouchers
     /// <summary>
     /// The fixed account a received cheque is kept in while the company holds it: «اسناد واخواست شده حقوقی شده» in legal action,
     /// «اسناد واخواست شده» once bounced, otherwise «اسناد نزد صندوق» (in the cash desk, registered in Sayad or back from the bank). The
-    /// next step that takes the cheque out (replacement, cancellation, legal action) credits it.
+    /// next step that takes the cheque out (cancellation, legal action) credits it. A cancelled cheque sits in «مطالبات سوخت شده»
+    /// (its cancellation's debit), which its replacement credits (owner's answer to Q62).
     /// </summary>
     public static FixedAccount AccountOf(InstrumentState? state) => state switch
     {
         InstrumentState.InLegal => FixedAccount.ProtestedChequesInLegal,
         InstrumentState.Bounced => FixedAccount.ProtestedCheques,
+        InstrumentState.Cancelled => FixedAccount.BadDebts,
         _ => FixedAccount.ChequesInCashDesk,
     };
 
@@ -380,6 +413,7 @@ public static class ReceiptVouchers
         ReceiptKind.Cash => "دریافت نقدی",
         ReceiptKind.BankDeposit => "واریز به حساب",
         ReceiptKind.Notes => "دریافت سفته",
+        ReceiptKind.CardDeposit => "واریز به کارت بانک",
         _ => "دریافت چک",
     };
 
@@ -391,6 +425,13 @@ public enum VoucherSource
 {
     Receipt,
     ChequeStep,
+
+    /// <summary>
+    /// A transfer between two bank accounts of the company: step 0 is the voucher of an electronic transfer, or of the payment side of
+    /// a cheque transfer («انتقال دهنده»); step 1 the voucher of its receipts side («انتقال گیرنده»); step 2 the maturity of a post-dated
+    /// cheque; steps 3 and 4 the payer's and the receiver's side of a cancelled cheque.
+    /// </summary>
+    Transfer,
 }
 
 /// <summary>

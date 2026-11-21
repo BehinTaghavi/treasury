@@ -48,6 +48,36 @@ public sealed class HttpReceiptAccountLookup(HttpClient http) : IReceiptAccountL
         return desks.Where(d => d.Id == id).Select(d => new ReceiptAccountFact(ReceiptAccountKind.CashDesk, d.Id, d.Name, d.CurrencyCode, d.IsActive, d.LedgerAccountCode, d.HolderDetailCode)).FirstOrDefault();
     }
 
+    private sealed record Keeping(bool Card, string? CardHolderName, string? CardNumber);
+
+    private sealed record PettyCash(Guid Id, string HolderDetailCode, string? HolderName, string? LedgerAccountCode, bool IsActive, Keeping? Keeping);
+
+    private sealed record CompanyCard(Guid Id, string CardNumber, string HolderName, string? LedgerAccountCode, string? DetailCode, bool IsActive);
+
+    /// <summary>The cards of «واریز به کارت بانک». accounts-svc lists petty cashes and company cards (a handful per company); there is no route for one.</summary>
+    public async Task<ReceiptAccountFact?> CardAsync(ReceiptAccountKind kind, Guid id, CancellationToken cancellationToken)
+    {
+        if (kind == ReceiptAccountKind.PettyCashCard)
+        {
+            var funds = await ServiceHttp.GetAsync<PettyCash[]>(http, "api/accounts/petty-cash?includeInactive=true", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) ?? [];
+
+            // Only a petty cash whose holder keeps the money on a bank card has a card to pay onto.
+            return funds.Where(f => f.Id == id && f.Keeping is { Card: true, CardNumber: not null })
+                .Select(f => new ReceiptAccountFact(kind, f.Id, $"{f.Keeping!.CardHolderName ?? f.HolderName} – {f.Keeping.CardNumber}", "IRR", f.IsActive, f.LedgerAccountCode, f.HolderDetailCode))
+                .FirstOrDefault();
+        }
+
+        if (kind == ReceiptAccountKind.CompanyCard)
+        {
+            var cards = await ServiceHttp.GetAsync<CompanyCard[]>(http, "api/accounts/company-cards?includeInactive=true", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) ?? [];
+            return cards.Where(c => c.Id == id)
+                .Select(c => new ReceiptAccountFact(kind, c.Id, $"{c.HolderName} – {c.CardNumber}", "IRR", c.IsActive, c.LedgerAccountCode, c.DetailCode))
+                .FirstOrDefault();
+        }
+
+        return null;
+    }
+
     public async Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Account>(http, $"api/accounts/bank-accounts/{id}", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) is { } a
             ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, a.Id, a.AccountNumber, a.CurrencyCode, a.IsActive, a.LedgerAccountCode, a.Detail1Code, a.Cards is { Count: > 0 })
@@ -61,11 +91,19 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
 
     private sealed record Group(Guid Id, string Name, string Direction, bool IsActive, string? LedgerAccountCode);
 
-    private sealed record Ledger(string Code, string Name, bool IsPostable, bool IsActive);
+    private sealed record Ledger(string Code, string Name, bool IsPostable, bool IsActive, IReadOnlyList<string>? Detail1Types = null);
+
+    private sealed record TypedDetail(string Code, string Name, string? Type, bool IsActive);
+
+    public async Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<TypedDetail>(http, $"api/reference/ledger/details/{Uri.EscapeDataString(detailCode)}", "Reference.Unavailable", cancellationToken)
+            .ConfigureAwait(false) is { } d
+            ? new Treasury.Cashflow.Domain.Transfers.FeeDetailFact(d.Code, d.Name, d.Type, d.IsActive)
+            : null;
 
     public async Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Ledger>(http, $"api/reference/ledger/accounts/{Uri.EscapeDataString(code)}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } l
-            ? new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(l.Code, l.Name, l.IsPostable, l.IsActive)
+            ? new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(l.Code, l.Name, l.IsPostable, l.IsActive, l.Detail1Types)
             : null;
 
     private sealed record Entry(Guid Id, string Name);

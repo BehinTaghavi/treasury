@@ -33,6 +33,8 @@ public sealed class ChequeStepTests
         Instrument.Receive(Guid.NewGuid(), kind, "445566", "بانک ملت", Money.Rials(amount), D("1405/08/01"), due is null ? null : D(due),
             CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User, new ReceivedInstrumentDetails(SayadId: "1234567890123456"), Guid.NewGuid());
 
+    private static readonly DateTimeOffset Stamp = new(2026, 11, 19, 9, 30, 0, TimeSpan.Zero);
+
     private static Instrument AtBank(Guid? account = null)
     {
         var c = Cheque();
@@ -51,7 +53,7 @@ public sealed class ChequeStepTests
         Assert.Equal(InstrumentState.ReturnedFromBank, c.State);
         Assert.Equal(BankA, c.History[^1].Details!.AccountId);
         Assert.Equal([(true, "1201", "200015"), (false, "1202", "600001")], Lines(ReceiptVouchers.ForStep(c, 4, SideA, null, Template())));
-        Assert.Equal([InstrumentAction.DepositForCollection, InstrumentAction.RecordBounced, InstrumentAction.ReturnToIssuer, InstrumentAction.Replace, InstrumentAction.Cancel],
+        Assert.Equal([InstrumentAction.DepositForCollection, InstrumentAction.RecordBounced, InstrumentAction.ReturnToIssuer, InstrumentAction.Cancel],
             c.AllowedActions());
     }
 
@@ -75,7 +77,7 @@ public sealed class ChequeStepTests
         var v = ReceiptVouchers.ForStep(c, 4, SideA, null, Template());
         Assert.Equal([(true, "1203", "200015"), (false, "1202", "600001")], Lines(v));
         Assert.Contains("BN-77", v!.Lines[0].Description, StringComparison.Ordinal);
-        Assert.Equal([InstrumentAction.Replace, InstrumentAction.Cancel, InstrumentAction.SendToLegal], c.AllowedActions());
+        Assert.Equal([InstrumentAction.Cancel, InstrumentAction.SendToLegal], c.AllowedActions());
     }
 
     [Fact]
@@ -223,7 +225,7 @@ public sealed class ChequeStepTests
         c.RecordEndorsementReturned(D("1405/09/05"), User, "BN-5");
         Assert.Equal((InstrumentState.Bounced, (string?)null), (c.State, c.Destination));
         Assert.Equal([(true, "1203", "200015"), (false, "2101", "300200")], Lines(ReceiptVouchers.ForStep(c, 4, SideA, new LedgerSide("2101", "300200"), Template())));
-        Assert.Contains(InstrumentAction.Replace, c.AllowedActions());
+        Assert.Contains(InstrumentAction.Cancel, c.AllowedActions()); // cancelled first, then replaced (Q62)
     }
 
     [Fact]
@@ -238,17 +240,58 @@ public sealed class ChequeStepTests
             D("1405/09/10"), D("1405/10/10"), CounterpartyRef.ForDetail("200015", "شرکت نمونه"), "فروش", User, new ReceivedInstrumentDetails(SayadId: "1234567890123456"), receiptId);
         var created = new[] { New(6_000_000, "1"), New(5_000_000, "2") };
         var receipt = Receipt.RecordInstruments(receiptId, 9, header, created, User, old);
+        // Owner, 19 Nov 2026 (answer to Q62): a cheque is replaced only after it was cancelled.
+        // The check the owner asked for (answer to Q66, 20 Nov 2026): the old cheque's cancellation must have been recorded.
+        Assert.Equal("Instrument.ReplaceNeedsCancellation", Assert.Throws<DomainException>(() => old.Replace(receipt.Id, receipt.Date, User)).Code);
+        old.CancelReceived(D("1405/09/09"), User, "م-12", D("1405/09/08"), "تعویض با دو چک", originalStamped: true, recordedAt: Stamp);
+        Assert.Equal([InstrumentAction.Replace], old.AllowedActions());
         old.Replace(receipt.Id, receipt.Date, User);
         Assert.Equal((InstrumentState.Replaced, (Guid?)old.Id, (Guid?)receiptId), (old.State, receipt.ReplacedInstrumentId, old.History[^1].Details!.ReceiptId));
+        Assert.Equal((InstrumentState?)InstrumentState.Cancelled, old.History[^1].From);
 
-        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Bounced));
-        Assert.Equal([(true, "1201", "200015"), (true, "1201", "200015"), (false, "1203", "200015"), (false, "4101", "200015")], Lines(v));
+        // The cancellation wrote the cheque off (Dr «مطالبات سوخت شده» / Cr «اسناد واخواست شده»); the replacement takes it out of there:
+        // Dr «اسناد نزد صندوق» for each new cheque / Cr «مطالبات سوخت شده», the difference to the purpose group (owner's answer to Q64, 20 Nov 2026).
+        Assert.Equal([(true, "8101", "200015"), (false, "1203", "200015")], Lines(ReceiptVouchers.ForStep(old, old.History.Count - 1, SideA, null, Template())));
+        Assert.Null(ReceiptVouchers.ForStep(old, old.History.Count, SideA, null, Template()));
+        var v = ReceiptVouchers.ForReceipt(receipt, created, null, "4101", Template(), new Replacement(old, InstrumentState.Cancelled));
+        Assert.Equal([(true, "1201", "200015"), (true, "1201", "200015"), (false, "8101", "200015"), (false, "4101", "200015")], Lines(v));
         Assert.Equal(1_000_000m, v.Lines[^1].AmountRial);
         Assert.True(v.IsComplete);
 
-        var less = Receipt.RecordInstruments(receiptId, 9, header, [New(8_000_000, "3")], User, Cheque());
-        var w = ReceiptVouchers.ForReceipt(less, [], null, "4101", Template(), new Replacement(Cheque(), InstrumentState.InCashDesk));
+        var smaller = Cheque();
+        smaller.CancelReceived(D("1405/09/09"), User, "م-13", D("1405/09/08"), "تعویض");
+        var less = Receipt.RecordInstruments(receiptId, 9, header, [New(8_000_000, "3")], User, smaller);
+        var w = ReceiptVouchers.ForReceipt(less, [], null, "4101", Template(), new Replacement(smaller, InstrumentState.Cancelled));
         Assert.Equal((true, "4101", 10_000_000m), (w.Lines[^1].IsDebit, w.Lines[^1].AccountCode, w.Lines[^1].AmountRial));
+    }
+
+    [Fact]
+    public void A_cancellation_records_the_stamp_on_the_original_with_the_user_and_the_time_owner_answer_Q62()
+    {
+        // «اصل چک ممهور به مهر ابطال شد», with the cancelling user and the computer's date and time beside it.
+        var c = Cheque();
+        c.CancelReceived(D("1405/08/10"), User, "م-1", D("1405/08/09"), "دستور مدیریت", originalStamped: true, recordedAt: Stamp);
+        var step = c.History[^1];
+        Assert.Equal((InstrumentAction.Cancel, User, true, (DateTimeOffset?)Stamp), (step.Action, step.UserId, step.Details!.OriginalStamped, step.Details.RecordedAt));
+        Assert.Equal([(true, "8101", "200015"), (false, "1201", "200015")], Lines(ReceiptVouchers.ForStep(c, 2, SideA, null, Template())));
+
+        var unstamped = Cheque();
+        unstamped.CancelReceived(D("1405/08/10"), User, "م-2", D("1405/08/09"), "دستور مدیریت");
+        Assert.False(unstamped.History[^1].Details!.OriginalStamped);
+    }
+
+    [Fact]
+    public void No_state_but_cancelled_leads_to_a_replacement_owner_answer_Q62()
+    {
+        Assert.DoesNotContain(InstrumentAction.Replace, Cheque().AllowedActions());
+        Assert.DoesNotContain(InstrumentAction.Replace, Registered().AllowedActions());
+        Assert.DoesNotContain(InstrumentAction.Replace, AtBank().AllowedActions());
+        Assert.All(InstrumentLifecycle.All.Where(t => t.Action == InstrumentAction.Replace),
+            t => Assert.Equal((InstrumentDirection.Received, InstrumentState.Cancelled, InstrumentState.Replaced), (t.Direction, t.From, t.To)));
+        // A guarantee cheque is cancelled but not replaced.
+        var guarantee = Cheque(InstrumentKind.GuaranteeCheque, due: null);
+        guarantee.CancelReceived(D("1405/08/10"), User, "م-3", D("1405/08/09"), "پایان قرارداد");
+        Assert.Empty(guarantee.AllowedActions());
     }
 
     [Fact]
@@ -258,6 +301,5 @@ public sealed class ChequeStepTests
         var header = new ReceiptHeader(D("1405/09/10"), other, new PurposeGroupFact(Guid.NewGuid(), "فروش", true, true), "تعویض");
         Assert.Equal("Receipt.ReplacementPayerDiffers", Assert.Throws<DomainException>(() =>
             Receipt.RecordInstruments(Guid.NewGuid(), 1, header, [], User, Cheque())).Code);
-        Assert.DoesNotContain(InstrumentAction.Replace, Cheque(InstrumentKind.GuaranteeCheque, due: null).AllowedActions());
     }
 }

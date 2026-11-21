@@ -108,6 +108,25 @@ public sealed class VoucherUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task The_voucher_of_a_deposit_onto_a_bank_card_is_shown_and_confirmed_answers_Q68_Q69()
+    {
+        // Owner, 20 Nov 2026: a deposit onto a petty-cash holder's card debits the petty cash's account with the holder's تفصیل (Q68);
+        // one onto a company card without a bank account debits the card's own معین and تفصیل (Q69).
+        var onHolder = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.CardToCard, null, 2_500_000), CancellationToken.None);
+        var v = (await _vouchers.ReceiptVoucherAsync(onHolder.Value, CancellationToken.None))!;
+        Assert.Equal([(true, "1104", "700002", 2_500_000m), (false, "4101", "200015", 2_500_000m)], v.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
+        Assert.True((await _vouchers.ConfirmReceiptVoucherAsync(Key(), onHolder.Value, CancellationToken.None)).IsSuccess);
+        Assert.Equal("Receipt.VoucherConfirmed", (await _receipts.CorrectCardDepositAsync(
+            new(Key(), onHolder.Value, 1, Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.CardToCard, null, 1), CancellationToken.None)).ErrorCode);
+
+        var onCompany = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.DepositSlip, "F-2", 900_000), CancellationToken.None);
+        var w = (await _vouchers.ReceiptVoucherAsync(onCompany.Value, CancellationToken.None))!;
+        Assert.Equal([(true, "1105", "600009"), (false, "4101", "200015")], w.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+    }
+
+    [Fact]
     public async Task A_confirmed_voucher_keeps_its_lines_when_the_template_changes()
     {
         await SetTemplate();
@@ -161,9 +180,10 @@ public sealed class VoucherUseCaseTests : IDisposable
     private async Task<Guid> ChequeOf(Guid receiptId) => (await _receipts.GetAsync(receiptId, CancellationToken.None))!.Instruments![0].Id;
 
     [Fact]
-    public async Task A_cheque_returned_by_the_bank_is_replaced_by_two_cheques_on_a_receipt_of_its_own_item_14()
+    public async Task A_cheque_returned_by_the_bank_is_cancelled_and_then_replaced_by_two_cheques_on_a_receipt_of_its_own_item_14_Q62()
     {
         await SetTemplate();
+        Assert.True((await _vouchers.SetTemplateAccountAsync(Key(), FixedAccount.BadDebts, "8101", CancellationToken.None)).IsSuccess);
         var cheque = await ChequeOf(await ChequeReceipt());
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3
         Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, LedgerBank.Id, "1405/08/25", "SLIP-1"), CancellationToken.None)).IsSuccess);
@@ -172,6 +192,19 @@ public sealed class VoucherUseCaseTests : IDisposable
         ReceivedInstrumentInput Line(string number, decimal amount) =>
             new(InstrumentKind.OrdinaryCheque, number, "1405/10/15", new MoneyInput(amount), FakeReceiptReference.Melli, SayadId: "6543210987654321");
         var header = new ReceiptHeaderInput("1405/08/29", "200015", FakeReceiptReference.SalesGroup, "تعویض چک 445566");
+
+        // Owner, 19 Nov 2026 (answer to Q62): the cheque is cancelled first; until then it is not replaced.
+        Assert.Equal("Instrument.ReplaceNeedsCancellation",
+            (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.ReplaceNeedsCancellation",
+            (await _receipts.PreviewReplacementAsync(new("preview", cheque, header, [Line("901", 6_000_000)]), CancellationToken.None)).ErrorCode);
+        var cancel = await _instruments.ChangeStateAsync(
+            new(Key(), cheque, InstrumentAction.Cancel, "1405/08/29", Note: "تعویض با دو چک", Reference: "م-21", DocumentDate: "1405/08/28", OriginalStamped: true), CancellationToken.None);
+        Assert.True(cancel.IsSuccess, cancel.ErrorCode);
+        var cancelled = (await _instruments.GetAsync(cheque, CancellationToken.None))!;
+        Assert.Equal(("Cancelled", true, true), (cancelled.State, cancelled.History[^1].Details!.OriginalStamped, cancelled.History[^1].Details!.RecordedAt is not null));
+        Assert.Equal(["Replace"], cancelled.AllowedActions);
+
         var preview = await _receipts.PreviewReplacementAsync(new("preview", cheque, header, [Line("901", 6_000_000), Line("902", 5_000_000)]), CancellationToken.None);
         Assert.True(preview.IsSuccess, preview.ErrorCode);
         Assert.Equal(("تعویض چک", 4), (preview.Value!.Operation, preview.Value.Lines.Count));
@@ -183,13 +216,21 @@ public sealed class VoucherUseCaseTests : IDisposable
         Assert.True(r.IsSuccess, r.ErrorCode);
         var receipt = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
         Assert.Equal(((Guid?)cheque, 2, 2), (receipt.ReplacedInstrumentId, receipt.Instruments!.Count, receipt.Number));
+        Assert.Equal("InCashDesk", receipt.Instruments[0].State); // the replacement cheques are «نزد صندوق»
         Assert.Equal("Replaced", (await _instruments.GetAsync(cheque, CancellationToken.None))!.State);
+        // The receipt of a replacement is corrected like any other, but it is not deleted: the old cheque names it.
+        Assert.Equal(((string?)null, "Receipt.ReplacementNotDeleted"), (receipt.NotCorrectable, receipt.NotDeletable));
 
+        // The cancellation wrote the old cheque off: Dr «مطالبات سوخت شده» / Cr «اسناد نزد صندوق» (it was back from the bank).
+        var steps = await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None);
+        Assert.Equal([3, 4, 5], steps.Select(x => x.Step)); // deposit, return from the bank, cancellation; the replacement is on its receipt
+        Assert.Equal([(true, "8101", 10_000_000m), (false, "1201", 10_000_000m)], steps[^1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.AmountRial)));
+        // The replacement takes it out of «مطالبات سوخت شده»; the difference of 1,000,000 goes to the purpose group (owner's answer to Q64).
         var v = (await _vouchers.ReceiptVoucherAsync(r.Value, CancellationToken.None))!;
-        Assert.Equal([(true, "1201"), (true, "1201"), (false, "1201"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.Equal([(true, "1201"), (true, "1201"), (false, "8101"), (false, "4101")], v.Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.Equal(1_000_000m, v.Lines[^1].AmountRial);
         Assert.True(v.IsComplete);
-        Assert.Equal([3, 4], (await _vouchers.ChequeVouchersAsync(cheque, CancellationToken.None)).Select(x => x.Step));
-        Assert.Equal("Instrument.InvalidTransition", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.ReplaceNeedsCancellation", (await _receipts.ReplaceAsync(new(Key(), cheque, header, [Line("904", 1)]), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]

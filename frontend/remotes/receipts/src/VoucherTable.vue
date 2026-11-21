@@ -34,6 +34,11 @@ const fixedNames: Record<string, [string, string]> = {
   BadDebts: ['مطالبات سوخت شده', 'Bad debts written off'],
   GuaranteeNotesForCompany: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
   NotesInCollection: ['سفته‌های در جریان وصول', 'Notes in collection'],
+  // Owner's report no. 7: a transfer by cheque between two bank accounts of the company.
+  FundsInTransit: ['وجوه در راه', 'Funds in transit'],
+  // Owner's answers of 21 Nov 2026: the bank's fee of a transfer (Q77) and a post-dated issued cheque until its due date (Q81).
+  BankFees: ['هزینه کارمزد خدمات بانکی', 'Bank service fees'],
+  NotesPayable: ['اسناد پرداختنی', 'Notes payable'],
 }
 const missingName = (k: string) => (fixedNames[k] ? (props.locale === 'fa' ? fixedNames[k][0] : fixedNames[k][1]) : k)
 const confirmed = computed(() => props.voucher.confirmedBy !== null)

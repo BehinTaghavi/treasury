@@ -7,7 +7,7 @@
  * money – bank account, cash and/or bank card (item 12) – and top-up onto a bank card (item 13).
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { cardNumberHint, createApi, normaliseJalali, todayJalali, translate, type Locale } from '@treasury/ui-kit'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
@@ -175,11 +175,11 @@ onMounted(async () => {
           <SearchSelect v-model="form.holderDetailCode" :options="holderChoices" remote required :aria-label="t('دارندهٔ تنخواه', 'Holder')"
                         :none-text="t('تفصیلی پیدا نشد؛ دارنده باید ابتدا در سیستم مالی تعریف شود', 'Not found; define the holder in the accounting system first')" @search="onSearch" />
         </label>
-        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.amount" :decimals="0" /></label>
-        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.settleLimit" :decimals="0" />
+        <label class="req"><span>{{ t('مبلغ تنخواه گردان (ریال)', 'Amount (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.amount" :decimals="0" unit="ریال" /></label>
+        <label class="req"><span>{{ t('مبلغ حد واریز (ریال)', 'Settlement limit (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.settleLimit" :decimals="0" unit="ریال" />
           <small class="muted">{{ t('کمتر از مبلغ تنخواه. وقتی جمع هزینه‌ها به این مبلغ رسید، تنخواه واریز و ترمیم می‌شود.', 'Below the amount. When expenses reach it, the petty cash is settled and topped up.') }}</small>
         </label>
-        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.payCeiling" :decimals="0" />
+        <label class="req"><span>{{ t('سقف پرداخت (ریال)', 'Payment ceiling (Rial)') }} <span class="star">*</span></span><AmountInput v-model="form.payCeiling" :decimals="0" unit="ریال" />
           <small class="muted">{{ t('بیشترین مبلغ یک پرداخت؛ حداکثر برابر حد واریز.', 'Largest single payment; at most the settlement limit.') }}</small>
         </label>
         <label class="req"><span>{{ t('تاریخ ایجاد', 'Created on') }} <span class="star">*</span></span><input v-model="form.createdOn" dir="ltr" placeholder="1405/08/22" /></label>
@@ -198,7 +198,8 @@ onMounted(async () => {
             <small v-if="form.keeping.bank && !form.keeping.card" class="muted">{{ t('اگر وجوه تنخواه در حساب بانکی روی کارت بانک است، «کارت بانک» را هم انتخاب کنید.', 'If the money is on a bank card, tick «Bank card» too.') }}</small>
             <template v-if="form.keeping.card">
               <label class="req"><span>{{ t('عنوان دارندهٔ کارت', 'Card holder') }}</span><input v-model="form.keeping.cardHolderName" /></label>
-              <label class="req"><span>{{ t('شماره کارت (۱۶ رقم)', 'Card number (16 digits)') }}</span><input v-model="form.keeping.cardNumber" dir="ltr" inputmode="numeric" maxlength="19" placeholder="6037-9900-0000-0000" /></label>
+              <label class="req"><span>{{ t('شماره کارت (۱۶ رقم)', 'Card number (16 digits)') }}</span><input v-model="form.keeping.cardNumber" dir="ltr" inputmode="numeric" maxlength="19" placeholder="6037-9900-0000-0000" />
+                <small v-if="cardNumberHint(form.keeping.cardNumber, locale)" :class="cardNumberHint(form.keeping.cardNumber, locale)!.bad ? 'tr-card-bad' : 'muted'">{{ cardNumberHint(form.keeping.cardNumber, locale)!.text }}</small></label>
             </template>
           </div>
         </div>
@@ -252,8 +253,10 @@ onMounted(async () => {
 
 <style scoped src="../organization/organization.css"></style>
 <style scoped>
+.tr-card-bad { color: #b42318; font-size: .78rem; }
 .lbl { display: block; font-size: .85rem; margin-bottom: .25rem; }
 .keeping { display: grid; gap: .5rem; }
-.keep-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: end; }
-.keep-row .tr-check { min-width: 7rem; }
+/* Lined up at the top: the hint under the card number makes that field taller than the others. */
+.keep-row { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: start; }
+.keep-row .tr-check { min-width: 7rem; align-self: start; padding-top: 1.6rem; }
 </style>

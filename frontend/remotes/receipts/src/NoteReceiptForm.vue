@@ -10,9 +10,14 @@
  * signatories who sign the receipt are chosen by the signature rule of «رسید دریافت سفته» in Basic Information (answers to Q41 and
  * Q45–Q47): the compulsory ones are always on it, the others are ticked until the number the rule needs is reached. The voucher the receipt will produce is shown at the bottom while the form is filled; Ctrl+Enter saves.
  * After saving, the receipt can be printed for the three signatures.
+ * With `edit` the form is «ویرایش» of a saved note receipt (owner's report no. 6, item 2): it opens with the receipt, its notes and
+ * guarantors as they were saved, and saves them back under the same receipt number while the voucher is not confirmed. «بابت» is
+ * chosen from the list, changed after it was chosen, or typed; a new one is added to the list on saving (report no. 6, item 4).
  */
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import { amountInWords, createApi, formatAmount, normaliseJalali, parseAmount, searchKey, toLatinDigits, todayJalali, translate, type Locale } from '@treasury/ui-kit'
+import ComboInput from '@treasury/ui-kit/ComboInput.vue'
+import { amountText, type SavedReceipt } from './savedReceipt'
 import AmountInput from '@treasury/ui-kit/AmountInput.vue'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { useLookups, type Purpose } from './lookups'
@@ -23,11 +28,12 @@ interface RuleSignatory { id: string; fullName: string; position: string }
 interface SignatureRule { required: number; compulsory: RuleSignatory[]; optional: RuleSignatory[] }
 import VoucherTable, { type Voucher } from './VoucherTable.vue'
 
-interface Line { key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
+interface Line { /** The saved note this line corrects. */ id?: string; /** A step was recorded on it: shown, not corrected or removed (answer to Q60). */ locked?: boolean; key: number; number: string; issueDate: string; dueDate: string; amount: string; checks: NoteChecks }
 interface Guarantor { key: number; detailCode: string; name: string; nationalCode: string; phone: string; noteNumber: string }
 
-const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined }>(), { apiBase: '', locale: 'fa', token: undefined })
-const emit = defineEmits<{ saved: [id: string] }>()
+const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; /** The saved receipt being corrected. */ edit?: SavedReceipt }>(),
+  { apiBase: '', locale: 'fa', token: undefined, edit: undefined })
+const emit = defineEmits<{ saved: [id: string]; cancelled: [] }>()
 const api = createApi({ baseUrl: props.apiBase, token: props.token })
 const fa = computed(() => props.locale === 'fa')
 const t = (f: string, e: string) => (fa.value ? f : e)
@@ -37,16 +43,21 @@ const pick = (m: Record<string, [string, string]>, k: string) => (fa.value ? m[k
 const L = useLookups(api)
 
 // ---- the receipt ----
-const header = reactive({ date: todayJalali(), issuer: '', groupId: '', purpose: '', ref1: '', ref2: '', departmentId: '', note: '' })
+const e0 = props.edit
+const t0 = e0?.noteTerms
+const header = reactive({ date: e0?.date ?? todayJalali(), issuer: e0?.payerDetailCode ?? '', groupId: e0?.purposeGroupId ?? '', purpose: e0?.purpose ?? '',
+  ref1: e0?.reference1 ?? '', ref2: e0?.reference2 ?? '', departmentId: e0?.departmentId ?? '', note: e0?.note ?? '' })
 const noAttachments = (): NoteAttachments => ({ noteImage: false, contract: false, representation: false, other: false })
 const terms = reactive({
-  reason: 'Debt', form: 'Paper', maturity: 'Fixed', issuerNationalCode: '', issuerPhone: '', commitmentSubject: '', returnTerms: '', custodyPlace: '',
-  originalReceived: false, originalReceivedOn: '', discrepancy: '', attachments: noAttachments(), deliveredBy: '',
+  reason: t0?.reason ?? 'Debt', form: t0?.form ?? 'Paper', maturity: t0?.maturity ?? 'Fixed', issuerNationalCode: t0?.issuerNationalCode ?? '', issuerPhone: t0?.issuerPhone ?? '',
+  commitmentSubject: t0?.commitmentSubject ?? '', returnTerms: t0?.returnTerms ?? '', custodyPlace: t0?.custodyPlace ?? '',
+  originalReceived: t0?.originalReceived ?? false, originalReceivedOn: t0?.originalReceivedOn ?? '', discrepancy: t0?.discrepancy ?? '',
+  attachments: t0 ? { ...noAttachments(), ...t0.attachments } : noAttachments(), deliveredBy: t0?.deliveredBy ?? '',
 })
 
 // ---- authorised signatories: the signature rule of the note receipt (Basic Information → دارندگان امضای مجاز) ----
 const rule = ref<SignatureRule>({ required: 0, compulsory: [], optional: [] })
-const optionalSigners = reactive<Record<string, boolean>>({})
+const optionalSigners = reactive<Record<string, boolean>>(Object.fromEntries((t0?.signers ?? []).map(x => [x.id, true])))
 const signerIds = computed(() => [...rule.value.compulsory.map(s => s.id), ...rule.value.optional.filter(s => optionalSigners[s.id]).map(s => s.id)])
 const hasRule = computed(() => rule.value.required > 0 || rule.value.compulsory.length + rule.value.optional.length > 0)
 async function loadRule() {
@@ -56,16 +67,18 @@ async function loadRule() {
 const purposes = ref<Purpose[]>([])
 const group = computed(() => L.groups.value.find(g => g.id === header.groupId))
 const refTitle = (id: string | null | undefined) => L.references.value.find(r => r.id === id)?.name
-const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && g.isActive).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
+const groupChoices = computed<Choice[]>(() => L.groups.value.filter(g => g.direction === 'Receipt' && (g.isActive || g.id === header.groupId)).map(g => ({ value: g.id, label: g.name, hint: String(g.number) })))
+const purposeNames = computed(() => purposes.value.filter(p => p.isActive).map(p => p.name))
 const departmentChoices = computed<Choice[]>(() => L.departments.value.filter(d => d.isActive).map(d => ({ value: d.id, label: d.name })))
 /** The group's معین is the other side of the voucher of a note that pays a debt (owner's table «دریافت سفته عادی»). */
 const groupAccount = computed(() => accountOf(group.value?.ledgerAccountCode))
-watch(() => header.groupId, async id => {
+async function loadPurposes(id: string) {
   purposes.value = []
   if (!id) return
   const r = await api.get<Purpose[]>(`/api/reference/purposes?groupId=${id}`)
-  if (r.ok) purposes.value = r.value
-})
+  if (r.ok && header.groupId === id) purposes.value = r.value
+}
+watch(() => header.groupId, id => void loadPurposes(id))
 const onDemand = computed(() => terms.maturity === 'OnDemand')
 /** A note payable on demand has no payment date written on it, so that item of article 308 is not asked. */
 const notAsked = (k: keyof NoteChecks) => k === 'paymentDate' && onDemand.value
@@ -99,6 +112,27 @@ watch(() => header.issuer, code => {
 // ---- guarantors and endorsers ----
 let nextKey = 1
 const guarantors = ref<Guarantor[]>([])
+/**
+ * The guarantors of a saved receipt as rows of the persons table: one who guarantees every note has no «شماره سفته مرتبط», the others
+ * one row for each note they guarantee.
+ */
+function savedGuarantors(r: SavedReceipt): Guarantor[] {
+  const notes = r.instruments ?? []
+  const rows: Guarantor[] = []
+  const seen = new Map<string, { g: NonNullable<NonNullable<(typeof notes)[number]['details']>['guarantors']>[number]; on: string[] }>()
+  for (const n of notes) for (const g of n.details?.guarantors ?? []) {
+    const k = `${g.detailCode ?? ''}|${g.name}|${g.nationalCode ?? ''}`
+    if (!seen.has(k)) seen.set(k, { g, on: [] })
+    seen.get(k)!.on.push(n.number ?? '')
+  }
+  for (const { g, on } of seen.values()) {
+    for (const noteNumber of on.length === notes.length ? [''] : on) {
+      rows.push({ key: nextKey++, detailCode: g.detailCode ?? '', name: g.name, nationalCode: g.nationalCode ?? '', phone: g.phone ?? '', noteNumber })
+    }
+  }
+  return rows
+}
+if (e0) guarantors.value = savedGuarantors(e0)
 const addGuarantor = () => guarantors.value.push({ key: nextKey++, detailCode: '', name: '', nationalCode: '', phone: '', noteNumber: '' })
 /** Choosing a guarantor fills the row from Basic Information. */
 function onGuarantor(g: Guarantor, code: string) {
@@ -110,20 +144,25 @@ function onGuarantor(g: Guarantor, code: string) {
 // ---- the notes ----
 const noChecks = (): NoteChecks => ({ signature: false, date: false, amountInWords: false, payee: false, paymentDate: false })
 const blankLine = (): Line => ({ key: nextKey++, number: '', issueDate: '', dueDate: '', amount: '', checks: noChecks() })
-const lines = ref<Line[]>([blankLine()])
+const lines = ref<Line[]>(e0?.instruments?.length
+  ? e0.instruments.map(i => ({ id: i.id, locked: i.asReceived === false, key: nextKey++, number: i.number ?? '', issueDate: i.noteIssueDate ?? '', dueDate: i.dueDate ?? '', amount: amountText(i.amount),
+      checks: { ...noChecks(), ...(i.details?.checks ?? {}) } }))
+  : [blankLine()])
 /** «ثبت سفتهٔ بعدی»: the next note starts as a copy of the last one (same dates and amount) with the next number. */
 function nextLine() {
   const last = lines.value[lines.value.length - 1]
   if (!last) return void lines.value.push(blankLine())
   const digits = toLatinDigits(last.number)
   const next = /^\d+$/.test(digits) ? String(BigInt(digits) + 1n).padStart(digits.length, '0') : ''
-  lines.value.push({ ...last, key: nextKey++, number: next, checks: noChecks() })
+  lines.value.push({ ...last, id: undefined, locked: false, key: nextKey++, number: next, checks: noChecks() })
 }
 function removeLine(i: number) {
   lines.value.splice(i, 1)
   if (!lines.value.length) lines.value.push(blankLine())
 }
 function tickAll(l: Line) { for (const [k] of checkNames) l.checks[k] = true }
+/** A note with a step recorded on it carries the receipt's date and obligor, so they stay (answer to Q60). */
+const anyLocked = computed(() => lines.value.some(l => l.locked))
 const total = computed(() => lines.value.reduce((s, l) => s + (parseAmount(l.amount) ?? 0), 0))
 const noteChoices = computed<Choice[]>(() => lines.value.map(l => toLatinDigits(l.number.trim())).filter(Boolean).map(n => ({ value: n, label: n })))
 const lineTitle = (l: Line, i: number) => t(`ردیف ${num(i + 1)}`, `Line ${i + 1}`) + (l.number.trim() ? ` – ${l.number.trim()}` : '')
@@ -137,11 +176,12 @@ const printing = ref(false)
 const savedGroup = computed(() => L.groups.value.find(g => g.id === saved.value?.purposeGroupId))
 const accountOf = (code: string | null | undefined) => (code ? `${code} – ${L.accountName(code) ?? ''}` : '')
 
-/** A purpose typed here that the group does not list yet is added to it (decision of 10 Nov 2026). */
+/** A purpose typed here, or chosen and then changed, that the group does not list yet is added to it (decision of 10 Nov 2026; report no. 6, item 4). */
 async function addPurposeIfNew(): Promise<boolean> {
   const name = header.purpose.trim()
-  if (!name || !header.groupId || purposes.value.some(p => p.name === name)) return true
+  if (!name || !header.groupId || purposes.value.some(p => searchKey(p.name) === searchKey(name))) return true
   const r = await api.post<string>('/api/reference/purposes', { groupId: header.groupId, name })
+  if (!r.ok && r.code === 'Purpose.NameTaken') return true
   if (!r.ok) { show('error', translate(r.code, props.locale)); return false }
   purposes.value.push({ id: r.value, groupId: header.groupId, name, isActive: true })
   return true
@@ -183,7 +223,7 @@ function request(): { body: Record<string, unknown> } | { error: string } {
       signerIds: signerIds.value,
       notes: lines.value.map(l => ({
         number: toLatinDigits(l.number.trim()), issueDate: date(l.issueDate), dueDate: onDemand.value ? null : date(l.dueDate), amount: parseAmount(l.amount) ?? 0,
-        checks: { ...l.checks, paymentDate: !onDemand.value && l.checks.paymentDate },
+        checks: { ...l.checks, paymentDate: !onDemand.value && l.checks.paymentDate }, id: l.id ?? null,
       })),
       guarantors: guarantors.value.map(g => ({
         name: text(g.name), nationalCode: text(toLatinDigits(g.nationalCode)), detailCode: g.detailCode || null, phone: text(g.phone), noteNumber: g.noteNumber || null,
@@ -218,11 +258,14 @@ async function save(thenPrint = false) {
   saving.value = true
   try {
     if (!(await addPurposeIfNew())) return
-    const r = await api.post<string>('/api/cashflow/receipts/notes', req.body)
+    const r = props.edit
+      ? await api.put<string>(`/api/cashflow/receipts/${props.edit.id}/notes`, { ...req.body, version: props.edit.version })
+      : await api.post<string>('/api/cashflow/receipts/notes', req.body)
     if (!r.ok) return show('error', translate(r.code, props.locale))
     const got = await api.get<NoteReceipt>(`/api/cashflow/receipts/${r.value}`)
     saved.value = got.ok ? got.value : null
-    show('ok', t(`رسید سفتهٔ شمارهٔ ${got.ok ? num(got.value.number) : ''} ثبت شد.`, `Note receipt no. ${got.ok ? got.value.number : ''} saved.`))
+    show('ok', props.edit ? t(`ویرایش رسید سفتهٔ شمارهٔ ${got.ok ? num(got.value.number) : ''} ثبت شد.`, `Note receipt no. ${got.ok ? got.value.number : ''} corrected.`)
+      : t(`رسید سفتهٔ شمارهٔ ${got.ok ? num(got.value.number) : ''} ثبت شد.`, `Note receipt no. ${got.ok ? got.value.number : ''} saved.`))
     Object.assign(header, { purpose: '', ref1: '', ref2: '', note: '' })
     Object.assign(terms, { issuerNationalCode: '', issuerPhone: '', commitmentSubject: '', returnTerms: '', custodyPlace: '', originalReceived: false, originalReceivedOn: '',
       discrepancy: '', attachments: noAttachments(), deliveredBy: '' })
@@ -246,15 +289,18 @@ function onKey(e: KeyboardEvent) {
   if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void save() }
 }
 
-onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()]) })
+onMounted(async () => {
+  await Promise.all([L.load(), loadRule(), loadParties()])
+  if (header.groupId) void loadPurposes(header.groupId)
+})
 </script>
 
 <template>
   <form class="tr-form" @keydown="onKey" @submit.prevent="save()">
     <fieldset>
       <legend>{{ t('مشخصات دریافت', 'Receipt') }}</legend>
-      <label>{{ t('شماره رسید دریافت', 'Receipt no.') }} <span class="tr-box">{{ t('خودکار – پس از ثبت', 'Given when saved') }}</span></label>
-      <label class="req">{{ t('تاریخ دریافت', 'Date received') }} <input v-model="header.date" placeholder="1405/08/25" dir="ltr" /></label>
+      <label>{{ t('شماره رسید دریافت', 'Receipt no.') }} <span class="tr-box">{{ edit ? num(edit.number) + t(' – در حال ویرایش', ' – being corrected') : t('خودکار – پس از ثبت', 'Given when saved') }}</span></label>
+      <label class="req">{{ t('تاریخ دریافت', 'Date received') }} <input v-model="header.date" placeholder="1405/08/25" dir="ltr" :disabled="anyLocked" :class="{ ro: anyLocked }" /></label>
       <label v-if="departmentChoices.length">{{ t('شعبه / واحد سازمانی', 'Department') }}
         <SearchSelect v-model="header.departmentId" :options="departmentChoices" :empty-label="t('— ندارد —', '— none —')" :aria-label="t('شعبه / واحد سازمانی', 'Department')" />
       </label>
@@ -263,9 +309,11 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
                       :none-text="t('گروه بابت دریافتی تعریف نشده است', 'No receipt purpose group')" />
       </label>
       <label class="wide">{{ t('حساب معین گروه بابت', "The group's ledger account") }} <span class="tr-box">{{ groupAccount || t('با انتخاب گروه بابت مشخص می‌شود', 'Follows the purpose group') }}</span></label>
-      <label class="wide req">{{ t('بابت', 'Purpose') }}
-        <input v-model="header.purpose" list="tr-note-purposes" :placeholder="t('از فهرست انتخاب کنید یا بنویسید', 'Choose or type')" />
-        <datalist id="tr-note-purposes"><option v-for="p in purposes.filter(x => x.isActive)" :key="p.id" :value="p.name" /></datalist>
+      <label class="wide">{{ t('بابت', 'Purpose') }}
+        <ComboInput v-model="header.purpose" :options="purposeNames" required :maxlength="150" :aria-label="t('بابت', 'Purpose')"
+                    :placeholder="t('از فهرست انتخاب کنید، آن را تغییر دهید یا بنویسید', 'Choose from the list, change it, or type')"
+                    :none-text="header.groupId ? t('این گروه هنوز بابتی ندارد؛ بابت را بنویسید', 'No purpose in this group yet; type one') : t('ابتدا گروه بابت را انتخاب کنید', 'Choose the purpose group first')"
+                    :new-hint="header.groupId ? t('بابت تازه: با ثبت رسید به فهرست بابت‌های این گروه اضافه می‌شود.', 'New purpose: saving the receipt adds it to this group\'s list.') : ''" />
       </label>
       <div class="tr-group wide">
         <span>{{ t('دلیل دریافت سفته', 'Why the notes are received') }}</span>
@@ -289,7 +337,7 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
             <tr>
               <td>{{ t('صادرکننده و متعهد سفته', 'Issuer and obligor') }}</td>
               <td style="min-width: 15rem">
-                <SearchSelect v-model="header.issuer" :options="issuerChoices" required :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
+                <SearchSelect v-model="header.issuer" :options="issuerChoices" required :disabled="anyLocked" :aria-label="t('صادرکننده و متعهد سفته', 'Issuer and obligor')"
                               :none-text="t('متعهدی پیدا نشد؛ ابتدا در اطلاعات پایه تعریف کنید', 'No obligor found; define it in Basic Information first')" />
               </td>
               <td class="num">{{ header.issuer }}</td>
@@ -360,14 +408,16 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
           <tbody>
             <tr v-for="(l, i) in lines" :key="l.key">
               <td class="num">{{ num(i + 1) }}</td>
-              <td class="req"><input v-model="l.number" dir="ltr" :aria-label="t(`شماره سفته ردیف ${num(i + 1)}`, `Number of note ${i + 1}`)" /></td>
-              <td><input v-model="l.issueDate" dir="ltr" placeholder="1405/08/25" :aria-label="t(`تاریخ صدور ردیف ${num(i + 1)}`, `Issue date of note ${i + 1}`)" /></td>
+              <td class="req"><input v-model="l.number" dir="ltr" :disabled="l.locked" :aria-label="t(`شماره سفته ردیف ${num(i + 1)}`, `Number of note ${i + 1}`)" /></td>
+              <td><input v-model="l.issueDate" dir="ltr" placeholder="1405/08/25" :disabled="l.locked" :aria-label="t(`تاریخ صدور ردیف ${num(i + 1)}`, `Issue date of note ${i + 1}`)" /></td>
               <td :class="{ req: !onDemand }">
-                <input v-if="!onDemand" v-model="l.dueDate" dir="ltr" placeholder="1405/11/30" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
+                <input v-if="!onDemand" v-model="l.dueDate" dir="ltr" placeholder="1405/11/30" :disabled="l.locked" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
                 <input v-else class="ro" disabled :value="t('عندالمطالبه', 'On demand')" :aria-label="t(`تاریخ سررسید ردیف ${num(i + 1)}`, `Due date of note ${i + 1}`)" />
               </td>
-              <td class="req"><AmountInput v-model="l.amount" :decimals="0" :aria-label="t(`مبلغ تعهد ردیف ${num(i + 1)}`, `Amount of note ${i + 1}`)" /></td>
-              <td><button type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف', 'Remove') }}</button></td>
+              <td class="req"><AmountInput v-model="l.amount" :decimals="0" unit="ریال" :disabled="l.locked" :aria-label="t(`مبلغ تعهد ردیف ${num(i + 1)}`, `Amount of note ${i + 1}`)" /></td>
+              <!-- A note on which a step was recorded is not corrected or removed (owner's answer to Q60). -->
+              <td><span v-if="l.locked" class="tr-tag cancelled">{{ t('قفل: مرحله‌ای ثبت شده', 'Locked: a step was recorded') }}</span>
+                <button v-else type="button" class="tr-link danger" @click="removeLine(i)">{{ t('حذف', 'Remove') }}</button></td>
             </tr>
           </tbody>
         </table>
@@ -426,9 +476,9 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
               <td>{{ lineTitle(l, i) }}</td>
               <td v-for="[k, f, e] in checkNames" :key="k">
                 <span v-if="notAsked(k)" class="muted small">{{ t('ندارد (عندالمطالبه)', 'none (on demand)') }}</span>
-                <input v-else v-model="l.checks[k]" type="checkbox" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" />
+                <input v-else v-model="l.checks[k]" type="checkbox" :disabled="l.locked" :aria-label="`${t(f, e)} – ${lineTitle(l, i)}`" />
               </td>
-              <td><button type="button" class="tr-link" @click="tickAll(l)">{{ t('همه کنترل شد', 'All checked') }}</button></td>
+              <td><button v-if="!l.locked" type="button" class="tr-link" @click="tickAll(l)">{{ t('همه کنترل شد', 'All checked') }}</button></td>
             </tr>
           </tbody>
         </table>
@@ -454,7 +504,8 @@ onMounted(async () => { await Promise.all([L.load(), loadRule(), loadParties()])
 
     <div class="tr-buttons">
       <strong>{{ t('جمع (ریال):', 'Total (Rial):') }} <span class="num">{{ money(total) }}</span></strong>
-      <button type="submit" :disabled="saving">{{ t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
+      <button type="submit" :disabled="saving">{{ edit ? t('ثبت ویرایش (Ctrl+Enter)', 'Save the correction (Ctrl+Enter)') : t('ثبت رسید (Ctrl+Enter)', 'Save receipt (Ctrl+Enter)') }}</button>
+      <button v-if="edit" type="button" class="tr-secondary" :disabled="saving" @click="emit('cancelled')">{{ t('انصراف از ویرایش', 'Leave without saving') }}</button>
       <button type="button" class="tr-secondary" :disabled="saving" @click="save(true)">{{ t('ثبت و چاپ رسید', 'Save and print') }}</button>
       <button v-if="saved" type="button" class="tr-secondary" @click="print">{{ t(`چاپ رسید شمارهٔ ${num(saved.number)}`, `Print receipt no. ${saved.number}`) }}</button>
     </div>

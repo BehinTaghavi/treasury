@@ -40,9 +40,6 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsNegotiable(), "Owner item 14, answer Q33: deposited again"),
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.RecordBounced, InstrumentState.Bounced, AnyKind, "Owner item 14, answer Q33: bounce notice after the return"),
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Manual: عودت شده از نزد بانک → عودت"),
-        new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d); manual: تعویض چک‌های نزد صندوق"),
-        new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d): replacement of a returned cheque"),
-        new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner item 14 (d)"),
         new(InstrumentDirection.Received, InstrumentState.InCashDesk, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f), answer Q30; manual: ابطال چک‌های نزد صندوق"),
         new(InstrumentDirection.Received, InstrumentState.ReturnedFromBank, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f)"),
         new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f)"),
@@ -55,10 +52,9 @@ public static class InstrumentLifecycle
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.DepositForCollection, InstrumentState.DepositedForCollection, k => k.IsCollectable(), "Owner, 18 Nov 2026: ثبت صیادی → واگذاری به بانک; D_Check_Vag_m, Checktype 0/2 only"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.ReturnToIssuer, InstrumentState.ReturnedToIssuer, AnyKind, "Owner, 18 Nov 2026: عودت از صندوق; D_Check_Od_m"),
         new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Endorse, InstrumentState.Endorsed, k => k.IsCollectable(), "Owner, 19 Nov 2026: ثبت انتقال (خرج چک) only after ثبت صیادی شد; item 14 (g); D_Check_Kh_m, Checktype 0/2 only"),
-        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک نزد صندوق"),
-        new(InstrumentDirection.Received, InstrumentState.SayadRegistered, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f) for a cheque in the cash desk"),
+        // Owner's report no. 6, item 19 (19 Nov 2026): «چک نزد صندوق "در صیادی ثبت شده" قابل ابطال نخواهد بود» — the step
+        // SayadRegistered -> Cancel of item 14 (f) is gone; such a cheque goes to the bank, is transferred, or is handed back to its payer.
         new(InstrumentDirection.Received, InstrumentState.Bounced, InstrumentAction.SendToLegal, InstrumentState.InLegal, AnyKind, "Owner, 18 Nov 2026: اقدام حقوقی (تحویل چک برگشتی به وکیل شرکت); old flag GoInlaw"),
-        new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 18 Nov 2026: تعویض چک در وضعیت اقدام حقوقی"),
         new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.Cancel, InstrumentState.Cancelled, AnyKind, "Owner item 14 (f): cancellation in any state by management's order"),
 
         // Owner's answer to Q38 (18 Nov 2026): "if, unlikely as it is, legal action is taken on a cheque that is «نزد صندوق»" — then
@@ -71,6 +67,13 @@ public static class InstrumentLifecycle
         // Owner's answer to Q38 (2), 18 Nov 2026: "if the cheque or note becomes collectable during or at the end of the legal action,
         // it is handed to the cash desk at the start of the cycle («نزد صندوق») and from there treated like a new cheque".
         new(InstrumentDirection.Received, InstrumentState.InLegal, InstrumentAction.ReturnFromLegal, InstrumentState.InCashDesk, AnyKind, "Owner, answer Q38 (2): تحویل به صندوق پس از اقدام حقوقی"),
+
+        // Replacement («تعویض چک»), owner, 19 Nov 2026 (answer to Q62): "چکی که میخواهد تعویض شود برای اصل رعایت کنترل داخلی در ابتدا بایستی
+        // باطل شود و سپس عمل تعویض انجام و دریافت چک تعویضی در وضعیت «نزد صندوق» ثبت میشود". A cheque is therefore replaced only once it
+        // is «ابطال شده»; the direct steps to «تعویض شده» of item 14 (d) (from the cash desk, back from the bank, bounced, legal action)
+        // are gone, and each of those states still has «ابطال». New-version manual, accounting operation 7: «ابتدا چک قبلی … باطل و سپس
+        // دریافت چک جدید». Replacements recorded before this rule keep their history as recorded.
+        new(InstrumentDirection.Received, InstrumentState.Cancelled, InstrumentAction.Replace, InstrumentState.Replaced, k => !k.IsGuarantee(), "Owner, 19 Nov 2026 (Q62): تعویض فقط پس از ابطال; manual operation 7"),
 
         // Issued
         new(InstrumentDirection.Issued, InstrumentState.BeingIssued, InstrumentAction.Issue, InstrumentState.Issued, AnyKind, "Check_Print_single: 20 -> 21"),
@@ -97,6 +100,7 @@ public static class InstrumentLifecycle
            .Select(t => t.Action)
            .ToList();
 
+    /// <summary>States with no further step. «ابطال شده» counts as final although a cancelled received cheque may still be replaced (Q62).</summary>
     public static bool IsFinal(InstrumentState state) =>
         state is InstrumentState.Cleared or InstrumentState.ReturnedToIssuer or InstrumentState.Replaced
               or InstrumentState.Cancelled or InstrumentState.PaidByBank or InstrumentState.BouncedAtBank;

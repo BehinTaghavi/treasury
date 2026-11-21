@@ -22,6 +22,7 @@ public static class PostgresRegistration
         services.AddSingleton<IBankAccountRepository, PostgresBankAccountRepository>();
         services.AddSingleton<ICashDeskRepository, PostgresCashDeskRepository>();
         services.AddSingleton<IPettyCashRepository, PostgresPettyCashRepository>();
+        services.AddSingleton<ICompanyCardRepository, PostgresCompanyCardRepository>();
         services.AddSingleton<IOpeningBalanceRepository, PostgresOpeningBalanceRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         return services;
@@ -61,6 +62,12 @@ public sealed class PostgresUnitOfWork(NpgsqlDataSource dataSource) : IUnitOfWor
         {
             await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
             throw new DomainException("BankAccount.CardTaken", "This bank card belongs to another bank account.");
+        }
+        catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "company_card")
+        {
+            // Two users saved the same card at the same moment: the index decides, the second gets the normal message.
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw new DomainException("CompanyCard.NumberTaken", "This card is already in the list.");
         }
         catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation && ex.TableName == "cash_desk")
         {

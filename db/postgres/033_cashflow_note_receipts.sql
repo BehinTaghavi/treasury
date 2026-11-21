@@ -21,11 +21,15 @@ BEGIN
 END
 $$;
 
-ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_kind_known CHECK (kind IN ('Cash', 'BankDeposit', 'Instruments', 'Notes'));
--- Cash goes into a cash desk, a deposit into a bank account; cheques and notes wait in the cash desk as instruments.
+-- The whole lists as they are now, not only the kinds known when this script was written: every start re-runs every script, and a
+-- shorter list here would refuse rows saved with later values. 'CardDeposit' and the two card account kinds came with
+-- 045_cashflow_card_deposits.sql (owner's report no. 6, item 12).
+ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_kind_known CHECK (kind IN ('Cash', 'BankDeposit', 'Instruments', 'Notes', 'CardDeposit'));
+-- Cash goes into a cash desk, a deposit into a bank account or onto a bank card; cheques and notes wait in the cash desk as instruments.
 ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_kind_account CHECK (
     kind = 'Cash' AND account_kind = 'CashDesk' AND deposit_method IS NULL
     OR kind = 'BankDeposit' AND account_kind = 'BankAccount' AND deposit_method IS NOT NULL
+    OR kind = 'CardDeposit' AND account_kind IN ('PettyCashCard', 'CompanyCard') AND deposit_method IS NOT NULL AND deposit_method IN ('CardToCard', 'DepositSlip', 'PaymentGateway')
     OR kind IN ('Instruments', 'Notes') AND account_kind IS NULL AND account_id IS NULL AND cardinality(instrument_ids) > 0);
 ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_kind_amount CHECK (
     kind IN ('Instruments', 'Notes') OR account_id IS NOT NULL AND amount > 0 AND currency IS NOT NULL
@@ -33,7 +37,7 @@ ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_kind_amount CHECK (
 -- Only a note receipt has note terms, and it always has them.
 ALTER TABLE cashflow.receipt DROP CONSTRAINT IF EXISTS receipt_note_terms;
 ALTER TABLE cashflow.receipt ADD CONSTRAINT receipt_note_terms CHECK ((kind = 'Notes') = (note_terms IS NOT NULL));
-ALTER TABLE cashflow.receipt_number ADD CONSTRAINT receipt_number_kind_known CHECK (kind IN ('Cash', 'BankDeposit', 'Instruments', 'Notes'));
+ALTER TABLE cashflow.receipt_number ADD CONSTRAINT receipt_number_kind_known CHECK (kind IN ('Cash', 'BankDeposit', 'Instruments', 'Notes', 'CardDeposit'));
 
 -- New fixed account of the voucher template: «سفته انتظامی به نفع شرکت» (owner's table «دریافت سفته انتظامی»).
 ALTER TABLE cashflow.voucher_account DROP CONSTRAINT IF EXISTS voucher_account_key_known;
@@ -41,4 +45,5 @@ ALTER TABLE cashflow.voucher_account DROP CONSTRAINT IF EXISTS voucher_account_k
 -- shorter list here would refuse rows saved with later values (19 Nov 2026: a cheque «ثبت صیادی شد» stopped db-init at this line).
 ALTER TABLE cashflow.voucher_account ADD CONSTRAINT voucher_account_key_known CHECK (account_key IN (
     'ChequesInCashDesk', 'ChequesInCollection', 'ProtestedCheques', 'GuaranteeChequesForCompany', 'GuaranteeCounterpart', 'BadDebts',
-    'ProtestedChequesInLegal', 'GuaranteeChequesInLegal', 'GuaranteeNotesForCompany', 'NotesInCollection'));
+    'ProtestedChequesInLegal', 'GuaranteeChequesInLegal', 'GuaranteeNotesForCompany', 'NotesInCollection', 'FundsInTransit', 'BankFees',
+    'NotesPayable'));

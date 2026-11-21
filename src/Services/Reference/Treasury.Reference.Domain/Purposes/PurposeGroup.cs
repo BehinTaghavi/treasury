@@ -69,7 +69,12 @@ public sealed class PurposeGroup : AggregateRoot<Guid>
         return group;
     }
 
-    /// <summary>Corrects the group. The direction can change only while no receipt or payment uses the group.</summary>
+    /// <summary>
+    /// Corrects the group. A group stays correctable after it was used (owner, 19 Nov 2026, answer to Q61: a group defined by mistake
+    /// "بهتر است قابل تغییر بماند"; a voucher already issued from it is put right by a correcting treasury voucher) — his report no. 6
+    /// (items 3 and 7) had asked for the opposite, which he withdrew. Only its kind, receipt or payment, is fixed once a receipt or
+    /// payment uses the group.
+    /// </summary>
     public void Edit(
         PurposeDirection direction, string name, string ledgerAccountCode, PurposeLedgerFact? ledger, CatalogueItem? reference1, CatalogueItem? reference2)
     {

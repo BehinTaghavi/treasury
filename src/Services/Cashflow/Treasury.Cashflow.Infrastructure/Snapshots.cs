@@ -5,6 +5,7 @@ using Treasury.Cashflow.Domain.ChequeBooks;
 using Treasury.Cashflow.Domain.Common;
 using Treasury.Cashflow.Domain.Instruments;
 using Treasury.Cashflow.Domain.Receipts;
+using Treasury.Cashflow.Domain.Transfers;
 
 namespace Treasury.Cashflow.Infrastructure;
 
@@ -59,19 +60,21 @@ public sealed record ReceiptSnapshot(
     Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1, string? Reference2, Guid? DepartmentId, bool SalesProceeds,
     string? Note, string RecordedBy, ReceiptAccountKind? AccountKind, Guid? AccountId, DepositMethod? Method, string? TrackingNumber,
     decimal? Amount, string? Currency, decimal? RateToRial, IReadOnlyList<Guid> InstrumentIds, decimal TotalRial, ReceiptState State,
-    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null, string? PayerSheba = null, NoteTermsSnapshot? NoteTerms = null)
+    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null, string? PayerSheba = null, NoteTermsSnapshot? NoteTerms = null,
+    string? DeletedBy = null, DateTimeOffset? DeletedAt = null)
 {
     public static ReceiptSnapshot From(Receipt r, long version) => new(
         r.Id, r.Kind, r.FiscalYear, r.Number, r.Date.Value, r.Payer.Id, r.Payer.DisplayName, r.Payer.DetailCode, r.PurposeGroupId, r.PurposeGroupName,
         r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note, r.RecordedBy, r.AccountKind, r.AccountId, r.Method,
         r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial, [.. r.InstrumentIds], r.TotalRial, r.State,
-        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId, r.PayerSheba, NoteTermsSnapshot.From(r.NoteTerms));
+        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId, r.PayerSheba, NoteTermsSnapshot.From(r.NoteTerms), r.DeletedBy, r.DeletedAt);
 
     public Receipt ToDomain() => Receipt.Restore(
         Id, Kind, Number, new FiscalDate(Date), new CounterpartyRef(PayerId, PayerName, PayerDetailCode), PurposeGroupId, PurposeGroupName, Purpose,
         Reference1, Reference2, DepartmentId, SalesProceeds, Note, RecordedBy, AccountKind, AccountId, Method, TrackingNumber,
         Amount is { } a ? (Currency == Money.Rial ? Money.Rials(a) : Money.Foreign(a, Currency!, RateToRial ?? 0)) : null,
-        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId, PayerSheba, NoteTerms?.ToDomain());
+        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId, PayerSheba, NoteTerms?.ToDomain(),
+        DeletedBy, DeletedAt);
 }
 
 /// <summary>Storable form of <see cref="NoteReceiptTerms"/> (JSON in cashflow.receipt.note_terms); the date is an ISO date.</summary>
@@ -96,15 +99,15 @@ public sealed record HistorySnapshot(
 public sealed record StepDetailsSnapshot(
     Guid? AccountId = null, string? PartyDetailCode = null, string? PartyName = null, DateOnly? DocumentDate = null, Guid? PurposeGroupId = null,
     string? Purpose = null, string? SayadTracking = null, Guid? ReceiptId = null, Guid? PaymentRequestId = null, string? TrackingCode = null,
-    int? SheetNumber = null, IReadOnlyList<ReceiptSigner>? Signers = null)
+    int? SheetNumber = null, IReadOnlyList<ReceiptSigner>? Signers = null, bool OriginalStamped = false, DateTimeOffset? RecordedAt = null)
 {
     public static StepDetailsSnapshot? From(StepDetails? d) => d is null ? null
         : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.Value, d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId, d.TrackingCode,
-            d.SheetNumber, d.Signers);
+            d.SheetNumber, d.Signers, d.OriginalStamped, d.RecordedAt);
 
     public StepDetails ToDomain() =>
         new(AccountId, PartyDetailCode, PartyName, DocumentDate is { } d ? new FiscalDate(d) : null, PurposeGroupId, Purpose, SayadTracking, ReceiptId, PaymentRequestId,
-            TrackingCode, SheetNumber, Signers);
+            TrackingCode, SheetNumber, Signers, OriginalStamped, RecordedAt);
 }
 
 public sealed record ChequeBookSnapshot(
@@ -117,6 +120,45 @@ public sealed record ChequeBookSnapshot(
 
     public ChequeBook ToDomain() => ChequeBook.Restore(Id, BankAccountId, Serial, FirstSheet, LastSheet, IsActive, UsedSheets, Version, FormatId,
         SayadMiddle is { } m && SayadFirstSerial is { } s ? ChequeBookSayad.Restore(m, s) : null, PartlyUsed, SerialDigits);
+}
+
+/// <summary>Flat, storable form of a transfer between two bank accounts of the company. Dates are ISO dates.</summary>
+public sealed record BankTransferSnapshot(
+    Guid Id, int FiscalYear, int Number, DateOnly Date, TransferMethod Method, TransferChannel? Channel,
+    Guid SourceAccountId, string SourceAccountNumber, Guid SourceBankId, string SourceBankName,
+    Guid DestinationAccountId, string DestinationAccountNumber, Guid DestinationBankId, string DestinationBankName,
+    decimal Amount, string Currency, decimal? RateToRial, decimal AmountRial, string? TrackingNumber, string? Description, TransferChequeSnapshot? Cheque,
+    TransferState State, string RecordedBy, string? DeletedBy, DateTimeOffset? DeletedAt, long Version, decimal? FeeRial = null, Guid? RequestId = null,
+    int? RequestNumber = null, string? RequestPaymentKey = null, string? FeeDetailCode = null)
+{
+    public static BankTransferSnapshot From(BankTransfer t, long version) => new(
+        t.Id, t.FiscalYear, t.Number, t.Date.Value, t.Method, t.Channel,
+        t.Source.Id, t.Source.AccountNumber, t.Source.BankId, t.Source.BankName,
+        t.Destination.Id, t.Destination.AccountNumber, t.Destination.BankId, t.Destination.BankName,
+        t.Amount.Amount, t.Amount.Currency, t.Amount.RateToRial, t.Amount.ToRial(), t.TrackingNumber, t.Description, TransferChequeSnapshot.From(t.Cheque),
+        t.State, t.RecordedBy, t.DeletedBy, t.DeletedAt, version, t.FeeRial, t.Request?.Id, t.Request?.Number, t.Request?.PaymentKey, t.FeeDetailCode);
+
+    public BankTransfer ToDomain() => BankTransfer.Restore(
+        Id, Number, FiscalYear, new FiscalDate(Date), Method, Channel,
+        new TransferAccount(SourceAccountId, SourceAccountNumber, SourceBankId, SourceBankName),
+        new TransferAccount(DestinationAccountId, DestinationAccountNumber, DestinationBankId, DestinationBankName),
+        Currency == Money.Rial ? Money.Rials(Amount) : Money.Foreign(Amount, Currency, RateToRial ?? 0),
+        TrackingNumber, Description, Cheque?.ToDomain(), State, RecordedBy, DeletedBy, DeletedAt, Version, FeeRial,
+        RequestId is { } requestId ? new TransferRequest(requestId, RequestNumber ?? 0, RequestPaymentKey ?? string.Empty) : null, FeeDetailCode);
+}
+
+/// <summary>Storable form of <see cref="TransferCheque"/> (JSON in cashflow.bank_transfer.cheque); dates are ISO dates.</summary>
+public sealed record TransferChequeSnapshot(
+    Guid IssuedChequeId, Guid ChequeBookId, long Sheet, string Number, string SayadId, DateOnly DueDate, Guid? ReceivedChequeId = null, DateOnly? ReceivedOn = null,
+    DateOnly? CollectedOn = null, DateOnly? PayerSayadOn = null, DateOnly? MaturedOn = null, DateOnly? CancelledOn = null, string? CancelReason = null)
+{
+    public static TransferChequeSnapshot? From(TransferCheque? c) => c is null ? null
+        : new(c.IssuedChequeId, c.ChequeBookId, c.Sheet, c.Number, c.SayadId, c.DueDate.Value, c.ReceivedChequeId, c.ReceivedOn?.Value, c.CollectedOn?.Value,
+            c.PayerSayadOn?.Value, c.MaturedOn?.Value, c.CancelledOn?.Value, c.CancelReason);
+
+    public TransferCheque ToDomain() => new(IssuedChequeId, ChequeBookId, Sheet, Number, SayadId, new FiscalDate(DueDate), ReceivedChequeId,
+        ReceivedOn is { } r ? new FiscalDate(r) : null, CollectedOn is { } c ? new FiscalDate(c) : null, PayerSayadOn is { } s ? new FiscalDate(s) : null,
+        MaturedOn is { } m ? new FiscalDate(m) : null, CancelledOn is { } x ? new FiscalDate(x) : null, CancelReason);
 }
 
 public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid? BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)

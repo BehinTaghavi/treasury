@@ -95,7 +95,7 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         view = (await _instruments.GetAsync(cheques[0], CancellationToken.None))!;
         Assert.Equal(("InLegal", "1405/08/27", "تحویل به وکیل شرکت جهت طرح دعوی"), (view.State, view.History[^1].Date, view.History[^1].Note));
         Assert.Equal(("BN-9", "1405/08/26", "9988776655443322"), (view.History[^1].Reference, view.History[^1].Details!.DocumentDate, view.History[^1].Details!.TrackingCode));
-        Assert.Equal(["Replace", "Cancel", "ReturnFromLegal"], view.AllowedActions);
+        Assert.Equal(["Cancel", "ReturnFromLegal"], view.AllowedActions); // replaced only once cancelled (owner's answer to Q62)
 
         // Registering in Sayad has no voucher (answer to Q37); deposit, bounce and the legal action have theirs (answer to Q38).
         var steps = await _vouchers.ChequeVouchersAsync(cheques[0], CancellationToken.None);
@@ -140,6 +140,11 @@ public sealed class ChequeStatusUseCaseTests : IDisposable
         Assert.Equal([("InCashDesk", true), ("InCashDesk", false), ("ReturnedToIssuer", false)], row.ChequeStatuses!.Select(s => (s.State, s.ReachedDueDate)));
         Assert.Null(row.Instruments);
         Assert.Null(list.Single(r => r.Id == cash.Value).ChequeStatuses);
+
+        // Owner's report no. 6, items 14 and 20: each status names its cheque (id, number, kind), so the list shows and searches the
+        // cheque number and opens the cheque card.
+        Assert.Equal([(cheques[0], "445560", "OrdinaryCheque"), (cheques[1], "445561", "OrdinaryCheque"), (cheques[2], "445562", "OrdinaryCheque")],
+            row.ChequeStatuses!.Select(s => (s.Id, s.Number!, s.Kind!)));
 
         // The same on the opened receipt and on the cheque itself; at the bank the mark stays until the bank answers.
         Assert.True((await _instruments.ChangeStateAsync(new(Key(), cheques[0], InstrumentAction.RegisterSayad, "1405/08/24"), CancellationToken.None)).IsSuccess); // rule N3

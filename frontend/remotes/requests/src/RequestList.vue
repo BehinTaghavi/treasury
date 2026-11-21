@@ -130,7 +130,9 @@ onMounted(async () => { await L.load(); await load() })
             <td class="num">{{ num(r.number) }}</td>
             <td class="num">{{ r.date }}</td>
             <td>{{ r.requesterName }}</td>
-            <td>{{ r.beneficiaryName }} <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
+            <!-- A transfer between the company's own accounts (answer to Q82) names the receiving bank account in place of a beneficiary. -->
+            <td><span v-if="r.method === 'OwnAccountTransfer'" class="muted small">{{ t('حساب مقصد (انتقال گیرنده):', 'Receiving account:') }} </span>{{ r.beneficiaryName }}
+              <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
             <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span> <span v-if="r.files?.length" class="tr-tag" :title="t('تصاویر ضمائم', 'Scans')">📎 {{ num(r.files.length) }}</span></td>
             <td>{{ methodName(r.method) }}
               <div v-if="r.cheque" class="muted small">{{ t('چک', 'cheque') }} <span class="num">{{ r.cheque.number }}</span> · {{ t('سررسید', 'due') }} <span class="num">{{ r.cheque.dueDate }}</span></div>
