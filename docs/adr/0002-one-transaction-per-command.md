@@ -44,3 +44,16 @@ transfer (only before its cheque is on the receipts side) marks the transfer «�
 **taking back** a receipts-side record removes the received cheque while it has no step. Every existing aggregate is saved with its
 version check; the events (`TransferChequeIssued`, `TransferChequeReceived`, `TransferChequeCollected`, `BankTransferDeleted`,
 `IssuedInstrumentRemoved`, `ChequeSheetReleased`…) go to the outbox in the same transaction.
+
+Amendment (21 Nov 2026, the owner's answers to Q79, Q81 and Q82): three more commands of `TransferUseCases` save the transfer with the
+cheque it owns, for the same reason. **«ابطال چک»** cancels the issued cheque, voids its sheet (cheque book locked), cancels the
+received cheque when the cheque is already on the receipts side, and marks the transfer «ابطال شده»; **«ثبت سررسید»** marks the issued
+cheque matured with the transfer (the collection of the received cheque does the same when it was not recorded); a transfer and its
+cheque in two different states would show the same sheet as both open and cancelled, or post two maturity vouchers. Every aggregate is
+version-checked. **The payment request is in another service** (requests-svc, ADR 0001), so it cannot be in the transaction: the
+transfer is recorded on its request over HTTP under a key the transfer keeps (`transfer:{id}:{version}`), after every rule of the
+transfer passed and just before it is saved, and taken back under the same key when the transfer is deleted, corrected or its cheque
+cancelled — as the endorsement of a received cheque has paid its request since 15 Nov 2026 (answer to Q36). A crash between the two
+leaves a payment on the request without its transfer; the key names the transfer, so it is found and taken back by hand until the
+outbox-driven reconciliation of Phase F exists. A refusal by requests-svc (not approved, over-paid) fails the command before anything
+is saved.

@@ -40,18 +40,25 @@ desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDu
 
 **Promissory notes (owner, 16 Nov 2026: «مراحل سفته پس از دریافت شامل واگذاری به بانک، وصول، استرداد، خرج سفته (ظهرنویسی و انتقال به غیر) و …»).** A received note follows the same states and steps as a received cheque; no line of the table was added, only the kinds changed: an **ordinary** note (`PromissoryNote`) may now be deposited at the bank and endorsed (old rule R3 allowed ordinary and bank cheques only). A **guarantee or trust** note (`GuaranteeNote`) is only handed back («استرداد», ReturnToIssuer) or cancelled. For a note the bounce is its protest («واخواست», with the protest's number), the return to the payer is «استرداد به متعهد», and an endorsement has no Sayad transfer. A note payable on demand has no due date, so rule N2 does not hold it back. Screen: «عملیات سفته‌های دریافتی». Confirmed by the owner's answers to Q49–Q52; converting a guarantee note to an ordinary one and replacing a note are not needed.
 
-**Transfer cheques (owner's report no. 7, 20 Nov 2026: «نقل و انتقال بین بانکی»).** A cheque the company issues from one of its own
-bank accounts to move money to another of its accounts is recorded twice: as an **issued** cheque on the payment side («انتقال دهنده»:
-PrepareIssue and Issue in one command, on a sheet of the source account's cheque book, with its Sayad ID — «پرداخت ثبت صیاد شد») and,
-with one button, as a **received** cheque «نزد صندوق» on the receipts side («انتقال گیرنده»; it names its transfer instead of a
-receipt and its drawer is the source account). The received one follows the table above, but **only these steps are open**
-(`Instrument.TransferChequeSteps`, refusal `Instrument.NotForTransferCheque`): RegisterSayad («دریافت ثبت صیاد شد», still required
-before the bank, N3), DepositForCollection — **only at the destination account of its transfer**
-(`Instrument.TransferChequeOtherAccount`) —, RecordCleared and ReturnFromBank (then a new deposit). RecordBounced, ReturnToIssuer,
-Cancel, Replace, SendToLegal and Endorse are closed: they settle with an outside payer (what happens to a transfer cheque that is not
-collected is open, Q79). No line of the table changed. When the received cheque is cleared, the same command marks the issued cheque
-PaidByBank and finishes the transfer. A transfer deleted before its cheque is on the receipts side removes the issued cheque and frees
-its sheet (`ChequeBook.Release`).
+**Transfer cheques (owner's report no. 7, 20 Nov 2026: «نقل و انتقال بین بانکی»; his answers to Q79 and Q81, 21 Nov 2026).** A cheque
+the company issues from one of its own bank accounts to move money to another of its accounts is recorded twice: as an **issued** cheque
+on the payment side («انتقال دهنده»: PrepareIssue and Issue in one command, on a sheet of the source account's cheque book, with its
+Sayad ID) and, with one button, as a **received** cheque «نزد صندوق» on the receipts side («انتقال گیرنده»; it names its transfer
+instead of a receipt and its drawer is the source account). **«ثبت صیادی پرداخت»** — the payer's registration in Sayad, «پرداخت ثبت
+صیاد شد» — is kept on the transfer: ticked as the cheque is issued, or recorded later.
+The received cheque follows the table above, but **only these steps are open on the cheque screens** (`Instrument.TransferChequeSteps`,
+refusal `Instrument.NotForTransferCheque`): RegisterSayad («دریافت ثبت صیاد شد», still required before the bank, N3, and possible only
+after the payer's registration: `Transfer.PayerSayadRequired`), DepositForCollection — **only at the destination account of its
+transfer** (`Instrument.TransferChequeOtherAccount`) —, RecordCleared and ReturnFromBank (then a new deposit). RecordBounced,
+ReturnToIssuer, Replace, SendToLegal and Endorse are closed: they settle with an outside payer; there is **no replacement** (answer to
+Q79: a new transfer is a new, independent cheque). **Cancel** is recorded through the transfer only («ابطال چک»,
+`BankTransfer.CancelCheque`), **while the cheque is not registered in Sayad** (`Transfer.SayadRegisteredNotCancelled` afterwards, as
+report no. 6, item 19, says for received cheques): the received cheque goes InCashDesk → Cancelled without an order of management,
+the issued one Issued → Cancelled, and the sheet is void. No line of the table changed.
+On the issued cheque the steps follow the transfer too, never the cheque screens (`Transfer.IssuedChequeFollowsTransfer`):
+**RecordMatured** («ثبت سررسید» of a post-dated cheque, on or after its due date; answer to Q81) and, when the received cheque is
+cleared, RecordPaidByBank in the same command (which records the maturity too, if it was not recorded), finishing the transfer. A
+transfer deleted before its cheque is on the receipts side removes the issued cheque and frees its sheet (`ChequeBook.Release`).
 
 ## Issued (old Dp = 2)
 

@@ -205,9 +205,10 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// The steps of a transfer cheque on the receipts side. Owner's report no. 7: «در مورد چک‌های نقل و انتقال در بخش دریافت مراحل بعدی
     /// واگذاری به بانک و ثبت صیادی مانند سایر چک‌های دریافتی انجام می‌گردد» — so: ثبت صیادی, واگذاری به بانک (the destination account),
-    /// وصول, and عودت از بانک with a new deposit. The steps that settle with an outside payer (برگشت, عودت به پرداخت‌کننده, ابطال,
-    /// تعویض, اقدام حقوقی, ثبت انتقال / خرج) do not apply to the company's own cheque; what happens to a transfer cheque that is not
-    /// collected is an open question (docs/domain/open-questions.md, Q79).
+    /// وصول, and عودت از بانک with a new deposit. The steps that settle with an outside payer (برگشت, عودت به پرداخت‌کننده, تعویض,
+    /// اقدام حقوقی, ثبت انتقال / خرج) do not apply to the company's own cheque. Owner, 21 Nov 2026 (answer to Q79): there is no
+    /// replacement, and «ابطال» is recorded through the transfer, while the cheque is not registered in Sayad
+    /// (<see cref="CancelTransferCheque"/>), not on the cheque screens.
     /// </summary>
     public static readonly IReadOnlySet<InstrumentAction> TransferChequeSteps = new HashSet<InstrumentAction>
     {
