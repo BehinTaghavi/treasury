@@ -253,6 +253,37 @@ public sealed class PostgresAdapterTests : IDisposable
     }
 
     [Fact]
+    public async Task The_sayad_tick_of_an_issued_cheque_is_stored_with_its_moment_and_user_and_can_be_removed_owner_15_Nov_2026()
+    {
+        // 042_cashflow_issued_cheque_sayad_tick.sql. A received cheque is registered with its step instead (rule N3).
+        var id = (await Issue(await RegisterBook(8001, 8003), Approved(), null)).Value!.InstrumentId;
+        Assert.Equal("Instrument.SayadNotRegistered",
+            (await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.Deliver, "1405/08/11", Note: "آقای رضایی"), CancellationToken.None)).ErrorCode);
+
+        var before = DateTimeOffset.UtcNow.AddSeconds(-5);
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
+        var ticked = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal("clerk-1", ticked.SayadRegisteredBy);
+        Assert.True(ticked.SayadRegisteredAt >= before && ticked.SayadRegisteredAt <= DateTimeOffset.UtcNow.AddSeconds(5));
+        Assert.Contains("Deliver", ticked.AllowedActions);
+        Assert.Equal(1L, await _db.ScalarAsync<long>(
+            "SELECT count(*) FROM cashflow.instrument WHERE id = @id AND sayad_registered_at IS NOT NULL AND sayad_registered_by = 'clerk-1'", ("id", id)));
+
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, false), CancellationToken.None)).IsSuccess);
+        var removed = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Null(removed.SayadRegisteredAt);
+        Assert.Null(removed.SayadRegisteredBy);
+        Assert.Equal(2L, await _db.ScalarAsync<long>(
+            "SELECT count(*) FROM cashflow.outbox WHERE type = 'InstrumentSayadRegistrationChanged' AND payload->>'InstrumentId' = @id", ("id", id.ToString())));
+
+        // Ticked again, the cheque goes to its beneficiary and keeps the tick.
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.Deliver, "1405/08/11", Note: "آقای رضایی"), CancellationToken.None)).IsSuccess);
+        var delivered = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("Delivered", "clerk-1"), (delivered.State, delivered.SayadRegisteredBy));
+    }
+
+    [Fact]
     public async Task The_last_sheet_closes_the_cheque_book()
     {
         var book = await RegisterBook(1, 1);

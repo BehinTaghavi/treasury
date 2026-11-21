@@ -734,6 +734,27 @@ def test_received_cheques_can_be_registered_in_sayad_and_handed_to_the_lawyer(db
         c.rollback()
 
 
+def test_an_issued_cheque_keeps_the_moment_and_user_of_its_sayad_tick(db):
+    # 042_cashflow_issued_cheque_sayad_tick.sql (owner, 15 Nov 2026: «ثبت صیادی شد» before an issued cheque goes to its beneficiary).
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE cashflow_svc")
+        iid = insert_instrument(c, 1405, state="Issued", direction="Issued")
+        assert c.execute("SELECT sayad_registered_at, sayad_registered_by FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone() == (None, None)
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = '2026-11-15 10:35+03:30', sayad_registered_by = 'treasurer' WHERE id = %s", (iid,))
+        at = c.execute("SELECT sayad_registered_at AT TIME ZONE 'UTC' FROM cashflow.instrument WHERE id = %s", (iid,)).fetchone()[0]
+        assert (at.hour, at.minute) == (7, 5)
+        # The moment and the user go together: neither is kept without the other.
+        for half in ("sayad_registered_at = NULL", "sayad_registered_by = NULL"):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(f"UPDATE cashflow.instrument SET {half} WHERE id = %s", (iid,))
+        c.execute("UPDATE cashflow.instrument SET sayad_registered_at = NULL, sayad_registered_by = NULL WHERE id = %s", (iid,))
+        # A received cheque is registered with its step and state (033), never ticked by a script.
+        received = insert_instrument(c, 1405, state="SayadRegistered")
+        assert c.execute("SELECT sayad_registered_at FROM cashflow.instrument WHERE id = %s", (received,)).fetchone() == (None,)
+        c.rollback()
+
+
 def test_scans_of_a_legal_action_are_kept_with_the_cheque(db):
     # 034_cashflow_legal_action_files.sql (owner, 18 Nov 2026: the screen «اقدام حقوقی» keeps the scans of the action's papers).
     add = """INSERT INTO cashflow.instrument_file (fiscal_year, file_id, instrument_id, step, file_name, content_type, size, uploaded_by, uploaded_at, content)

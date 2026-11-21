@@ -220,7 +220,7 @@ public sealed class IssuedInstrumentTests
         Assert.Equal(InstrumentState.Issued, cheque.State);
         Assert.Equal("765432", cheque.Number);
         Assert.Equal(book, cheque.ChequeBookId);
-        cheque.Deliver(D("1405/08/11"), User, "آقای رضایی");
+        cheque.Ticked().Deliver(D("1405/08/11"), User, "آقای رضایی");
         Assert.Equal(InstrumentState.Delivered, cheque.State);
     }
 
@@ -235,7 +235,7 @@ public sealed class IssuedInstrumentTests
 
         var delivered = ChequeBeingIssued();
         delivered.Issue(Guid.NewGuid(), "2", D("1405/08/10"), User);
-        delivered.Deliver(D("1405/08/10"), User);
+        delivered.Ticked().Deliver(D("1405/08/10"), User);
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => delivered.Cancel(D("1405/08/11"), User, "x")).Code);
     }
 
@@ -269,7 +269,7 @@ public sealed class IssuedChequeAtTheBankTests
     {
         var cheque = ChequeBeingIssued(InstrumentKind.PostDatedCheque, issue: "1405/08/10", due: "1405/10/01");
         cheque.Issue(Guid.NewGuid(), "300", D("1405/08/10"), User);
-        cheque.Deliver(D("1405/08/11"), User);
+        cheque.Ticked().Deliver(D("1405/08/11"), User);
         Assert.Contains(InstrumentAction.RecordMatured, cheque.AllowedActions());
         cheque.RecordMatured(D("1405/10/01"), User);
         Assert.True(cheque.IsMatured);

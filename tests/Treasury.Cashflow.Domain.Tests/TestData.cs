@@ -10,6 +10,16 @@ internal static class TestData
 
     public static FiscalDate D(string jalali) => FiscalDate.ParseJalali(jalali);
 
+    /// <summary>The moment «ثبت صیادی شد» is ticked in the tests: 15 Nov 2026, 10:35 in Tehran.</summary>
+    public static DateTimeOffset TickedAt { get; } = new(2026, 11, 15, 7, 5, 0, TimeSpan.Zero);
+
+    /// <summary>The issued cheque with «ثبت صیادی شد» ticked (owner, 15 Nov 2026), ready for its beneficiary.</summary>
+    public static Instrument Ticked(this Instrument cheque)
+    {
+        cheque.ConfirmSayadRegistration(TickedAt, User);
+        return cheque;
+    }
+
     public static CounterpartyRef Drawer { get; } = new(Guid.Parse("11111111-1111-1111-1111-111111111111"), "شرکت نمونه");
 
     public static Instrument ReceivedCheque(InstrumentKind kind = InstrumentKind.OrdinaryCheque, string receivedOn = "1405/08/01", string? due = "1405/09/01") =>

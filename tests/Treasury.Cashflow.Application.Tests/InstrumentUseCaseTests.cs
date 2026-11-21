@@ -16,6 +16,7 @@ public sealed class InstrumentUseCaseTests : IDisposable
     private readonly ChequeBookUseCases _books;
     private readonly Guid _account = Guid.NewGuid();
     private readonly FakeBankAccounts _bankAccounts = new();
+    private readonly FixedClock _clock = new(new DateTimeOffset(2026, 11, 15, 7, 5, 0, TimeSpan.Zero));
 
     public InstrumentUseCaseTests()
     {
@@ -28,7 +29,8 @@ public sealed class InstrumentUseCaseTests : IDisposable
             _policies,
             _policies,
             new FixedUser("clerk-1"),
-            _bankAccounts);
+            _bankAccounts,
+            _clock);
         _books = new ChequeBookUseCases(new InMemoryUnitOfWork(_db), new InMemoryChequeBookRepository(_db), new FakeBankAccounts(), new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
     }
 
@@ -198,6 +200,65 @@ public sealed class InstrumentUseCaseTests : IDisposable
         var book = await RegisterBook(1, 5);
         var result = await Issue(book, Approved(), Base + 99);
         Assert.Equal("ChequeBook.SheetOutOfRange", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task An_issued_cheque_is_not_handed_to_its_beneficiary_before_sabt_sayadi_is_ticked_owner_15_Nov_2026()
+    {
+        var issued = await Issue(await RegisterBook(1, 5), Approved(), null);
+        Assert.True(issued.IsSuccess, issued.ErrorCode);
+        var id = issued.Value!.InstrumentId;
+        var before = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((true, true, (DateTimeOffset?)null), (before.SayadRegistrationRequired, before.CanChangeSayadRegistration, before.SayadRegisteredAt));
+        Assert.DoesNotContain("Deliver", before.AllowedActions);
+        Assert.Equal("Instrument.SayadNotRegistered",
+            (await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.Deliver, "1405/08/11", Note: "آقای رضایی"), CancellationToken.None)).ErrorCode);
+
+        // The tick keeps the computer's date and time and the user; it is not a step of the cheque.
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
+        var ticked = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((_clock.GetUtcNow(), "clerk-1"), (ticked.SayadRegisteredAt!.Value, ticked.SayadRegisteredBy));
+        Assert.Contains("Deliver", ticked.AllowedActions);
+        Assert.Equal(before.History.Count, ticked.History.Count);
+        Assert.Contains(_db.OutboxMessages, m => m.Type == nameof(InstrumentSayadRegistrationChanged) && m.Payload.Contains("\"Registered\":true", StringComparison.Ordinal));
+        Assert.Equal("Instrument.SayadAlreadyRegistered", (await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).ErrorCode);
+
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.Deliver, "1405/08/11", Note: "آقای رضایی"), CancellationToken.None)).IsSuccess);
+        var delivered = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("Delivered", (DateTimeOffset?)_clock.GetUtcNow(), false), (delivered.State, delivered.SayadRegisteredAt, delivered.CanChangeSayadRegistration));
+        Assert.Equal("Instrument.SayadRegistrationClosed", (await _useCases.SetSayadRegistrationAsync(new(Key(), id, false), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_tick_set_by_mistake_is_removed_while_the_issued_cheque_is_not_delivered()
+    {
+        var id = (await Issue(await RegisterBook(1, 5), Approved(), null)).Value!.InstrumentId;
+        Assert.Equal("Instrument.SayadNotRegistered", (await _useCases.SetSayadRegistrationAsync(new(Key(), id, false), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.SetSayadRegistrationAsync(new(Key(), id, false), CancellationToken.None)).IsSuccess);
+        var view = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Null(view.SayadRegisteredAt);
+        Assert.Null(view.SayadRegisteredBy);
+        Assert.DoesNotContain("Deliver", view.AllowedActions);
+        Assert.Equal("Instrument.NotFound", (await _useCases.SetSayadRegistrationAsync(new(Key(), Guid.NewGuid(), true), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task A_received_cheque_is_registered_in_sayad_by_its_step_and_refuses_the_tick_N3()
+    {
+        // Owner, 18 Nov 2026 (rule N3): the step «ثبت صیادی» and its status are for received cheques; the tick of 15 Nov is for issued ones.
+        var id = (await _useCases.ReceiveAsync(Receive(Key(), "880001"), CancellationToken.None)).Value;
+        var view = (await _useCases.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((false, false), (view.SayadRegistrationRequired, view.CanChangeSayadRegistration));
+        Assert.Contains("RegisterSayad", view.AllowedActions);
+        Assert.Equal("Instrument.SayadRegistrationIsAStep", (await _useCases.SetSayadRegistrationAsync(new(Key(), id, true), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Instrument.SayadRegistrationRequired",
+            (await _useCases.DepositForCollectionAsync(new(Key(), id, Guid.NewGuid(), "1405/08/05", "SLIP-1"), CancellationToken.None)).ErrorCode);
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     private static string Key() => Guid.NewGuid().ToString();

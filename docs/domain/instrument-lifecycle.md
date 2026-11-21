@@ -45,7 +45,7 @@ desk or at the bank on or after its due date (`ReceivedChequeStatus.HasReachedDu
 |---|---|---|---|---|
 | 20 | BeingIssued | PrepareIssue (approved payment) | — | Porder |
 | 21 | Issued | Issue (reserves a sheet of the cheque book) | BeingIssued | Check_Print_single |
-| 22 | Delivered | Deliver | Issued | Check_deliv_m |
+| 22 | Delivered | Deliver (a cheque must be ticked «ثبت صیادی شد» first) | Issued | Check_deliv_m |
 | 26 | Cancelled | Cancel (needs reason) | BeingIssued, Issued | Check_Print_single |
 | 21/22 + Vos, RegVos | PaidByBank | RecordPaidByBank | Issued, Delivered | Check_p_vos_m |
 | 21/22 + Backed, RegVos | BouncedAtBank | RecordBouncedAtBank | Issued, Delivered | Check_p_vos_m |
@@ -78,4 +78,11 @@ Every step belongs to the fiscal year in which it happens; the instrument belong
   again without a new registration. Not in the old program, which sent a cheque straight from the cash desk (D_Check_Vag_m);
   migrated history is kept as recorded (`LEGACY_TRANSITIONS` in the migration tool, outside the table the two copies share).
 - **N2** (CEO, 10 Nov 2026): a received cheque cannot be **cleared** before its due date (`Instrument.ClearedBeforeDueDate`). Depositing it for collection before the due date stays allowed. Not in the old program. Migrated history that breaks it is kept as recorded and listed in the warnings report. The same applies to **bounces** (`Instrument.BouncedBeforeDueDate`; answer to Q11, 10 Nov 2026).
+
+## «ثبت صیادی شد» (owner, 15 and 18 Nov 2026)
+Every cheque is recorded in the banks' Sayad system before it goes to the bank or to its beneficiary. The two sides are built differently, each as the owner last described it:
+- **Received cheque**, current or post-dated (owner, 18 Nov 2026, rule N3): «ثبت صیادی» is **a step of its own** (`RegisterSayad`) with the status «ثبت صیادی شد» (`SayadRegistered`), recorded with its date; the cheque stays in the cash desk. `DepositForCollection` starts from that status only (`Instrument.SayadRegistrationRequired`). Only the deposit waits for it: an endorsement does not (answer to QS1). The first description (15 Nov) made it a tick on the cheque; the step replaced the tick.
+- **Issued cheque** (owner, 15 Nov 2026): a **tick**, not a state and not a step (the table of transitions is unchanged, no voucher). No `Deliver` before the tick (`Instrument.SayadNotRegistered`); the step is not offered until then. The tick is possible once the cheque has its number (state Issued), keeps the computer's date and time and the user, and can be removed only while the cheque is not yet delivered (answer to QS2). Its tick box comes with the payment form (Phase E). The tick is refused on a received cheque (`Instrument.SayadRegistrationIsAStep`).
+- Only cheques (ordinary, guarantee, bank, post-dated); notes and instalments are not in Sayad. An ordinary promissory note therefore goes to the bank straight from the cash desk.
+- Not in the old program (`Lcash.mdb` is older than Sayad). Old cheques that went to the bank are migrated with their own history. No cheque is marked as registered automatically; whether cheques already in the cash desk at go-live should count as registered is open (QS4 in `open-questions.md`).
 

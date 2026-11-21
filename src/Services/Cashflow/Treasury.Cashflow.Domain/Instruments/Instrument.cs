@@ -85,6 +85,12 @@ public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, str
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
 
 /// <summary>
+/// «ثبت صیادی شد»: the user's tick that an issued cheque has been recorded in the banks' Sayad system, with the computer's date and time
+/// and the user who ticked it (owner, 15 Nov 2026).
+/// </summary>
+public sealed record SayadRegistration(DateTimeOffset At, string UserId);
+
+/// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
 /// Old system: one row of dbo.Checks (kept in the shared Cashnajoo86 database). MVC system: Receipt_Detail + Receipt_Detail_PlanState.
 /// </summary>
@@ -177,8 +183,60 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     public IReadOnlyList<InstrumentHistoryEntry> History => _history;
 
+    /// <summary>
+    /// «ثبت صیادی شد» on an **issued** cheque (owner, 15 Nov 2026): every cheque is recorded in the banks' Sayad system before it is
+    /// handed to its beneficiary. Null until the user ticks it. Not in the old program (Lcash.mdb is older than Sayad).
+    /// A **received** cheque has no tick: since the owner's description of 18 Nov 2026 «ثبت صیادی» is a step of its own with the status
+    /// «ثبت صیادی شد» (<see cref="RegisterSayad"/>), required before the deposit at the bank (rule N3).
+    /// </summary>
+    public SayadRegistration? SayadRegistration { get; private set; }
+
+    /// <summary>The tick is for issued cheques; notes and instalments are not in the Sayad system, and received cheques have their step.</summary>
+    public bool RequiresSayadRegistration => Direction == InstrumentDirection.Issued && Kind.IsCheque();
+
+    /// <summary>The tick may be set or removed only while the step it guards, the delivery, is still ahead (issued and not delivered).</summary>
+    public bool CanChangeSayadRegistration =>
+        RequiresSayadRegistration && InstrumentLifecycle.Find(Direction, State, InstrumentAction.Deliver) is { } t && t.KindAllowed(Kind);
+
+    /// <summary>What the lifecycle table allows now, without the delivery of an issued cheque that still waits for «ثبت صیادی شد».</summary>
     public IReadOnlyList<InstrumentAction> AllowedActions() =>
-        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured);
+        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured)
+            .Where(a => !(a == InstrumentAction.Deliver && RequiresSayadRegistration && SayadRegistration is null))
+            .ToList();
+
+    /// <summary>The user ticks «ثبت صیادی شد» on an issued cheque; the computer's date and time and the user are kept with the cheque.</summary>
+    public void ConfirmSayadRegistration(DateTimeOffset at, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        RequireTickIsForThisInstrument();
+        Require(CanChangeSayadRegistration, "Instrument.SayadRegistrationClosed", $"The Sayad tick cannot be changed in state {State}.");
+        Require(SayadRegistration is null, "Instrument.SayadAlreadyRegistered", "The cheque is already marked as recorded in Sayad.");
+        SayadRegistration = new SayadRegistration(at, userId);
+        Raise(new InstrumentSayadRegistrationChanged(Id, Direction, Number, true, at, userId));
+    }
+
+    /// <summary>A tick set by mistake is removed, only before the cheque went to its beneficiary.</summary>
+    public void WithdrawSayadRegistration(DateTimeOffset at, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        RequireTickIsForThisInstrument();
+        Require(CanChangeSayadRegistration, "Instrument.SayadRegistrationClosed", $"The Sayad tick cannot be changed in state {State}.");
+        Require(SayadRegistration is not null, "Instrument.SayadNotRegistered", "The cheque is not marked as recorded in Sayad.");
+        SayadRegistration = null;
+        Raise(new InstrumentSayadRegistrationChanged(Id, Direction, Number, false, at, userId));
+    }
+
+    /// <summary>A received cheque is registered by its step («ثبت صیادی», rule N3), not by the tick; a note or instalment is not in Sayad.</summary>
+    private void RequireTickIsForThisInstrument()
+    {
+        Require(Direction == InstrumentDirection.Issued, "Instrument.SayadRegistrationIsAStep",
+            "A received cheque is registered in Sayad with its step «ثبت صیادی», not with the tick.");
+        Require(Kind.IsCheque(), "Instrument.SayadRegistrationOnlyForCheques", "Only a cheque is recorded in the Sayad system.");
+    }
+
+    private void RequireSayadTickBeforeDelivery() =>
+        Require(!RequiresSayadRegistration || SayadRegistration is not null, "Instrument.SayadNotRegistered",
+            "Record the cheque in the Sayad system and tick «ثبت صیادی شد» first.");
 
     /// <summary>A cheque or note received into a cash desk (old Stcode 11, form D_Check; rule R1).</summary>
     public static Instrument Receive(
@@ -284,7 +342,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
     {
         ArgumentNullException.ThrowIfNull(account);
-        RequireSayadRegistration();
+        RequireSayadStepBeforeDeposit();
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -298,7 +356,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
-        RequireSayadRegistration();
+        RequireSayadStepBeforeDeposit();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
     }
 
@@ -307,7 +365,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// registered in Sayad first. The old program had no such step (D_Check_Vag_m). A promissory note is not in Sayad: an ordinary note
     /// goes from the cash desk to the bank (owner, 16 Nov 2026), and the lifecycle table decides which notes may.
     /// </summary>
-    private void RequireSayadRegistration()
+    private void RequireSayadStepBeforeDeposit()
     {
         if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && Kind.IsCheque())
         {
@@ -468,8 +526,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         });
     }
 
+    /// <summary>
+    /// The cheque is handed to its beneficiary (old Check_deliv_m: 21 -> 22). A cheque is not handed over before «ثبت صیادی شد» is
+    /// ticked (owner, 15 Nov 2026); a note or instalment is not in Sayad.
+    /// </summary>
     public void Deliver(FiscalDate date, string userId, string? receivedBy = null) =>
-        Apply(InstrumentAction.Deliver, date, userId, null, receivedBy);
+        Apply(InstrumentAction.Deliver, date, userId, null, receivedBy, validate: RequireSayadTickBeforeDelivery);
 
     public void Cancel(FiscalDate date, string userId, string reason)
     {
@@ -520,7 +582,8 @@ public sealed class Instrument : AggregateRoot<Guid>
         long version,
         Guid? receiptId = null,
         ReceivedInstrumentDetails? details = null,
-        Guid? collectionAccountId = null)
+        Guid? collectionAccountId = null,
+        SayadRegistration? sayadRegistration = null)
     {
         var historyList = history.ToList();
         var instrument = new Instrument(id, direction, kind, amount, issueDate, dueDate, counterparty, purpose, bankName)
@@ -536,6 +599,7 @@ public sealed class Instrument : AggregateRoot<Guid>
             ReceiptId = receiptId,
             Details = details ?? ReceivedInstrumentDetails.None,
             CollectionAccountId = collectionAccountId,
+            SayadRegistration = sayadRegistration,
         };
         instrument._history.AddRange(historyList);
         instrument.SetLoadedVersion(version);
@@ -621,4 +685,13 @@ public sealed record InstrumentStateChanged(
     Guid CounterpartyId,
     string? Number,
     string? Destination,
+    string UserId) : DomainEvent;
+
+/// <summary>«ثبت صیادی شد» was ticked or removed on a cheque; kept in the outbox as the trail of who did it and when.</summary>
+public sealed record InstrumentSayadRegistrationChanged(
+    Guid InstrumentId,
+    InstrumentDirection Direction,
+    string? Number,
+    bool Registered,
+    DateTimeOffset At,
     string UserId) : DomainEvent;
