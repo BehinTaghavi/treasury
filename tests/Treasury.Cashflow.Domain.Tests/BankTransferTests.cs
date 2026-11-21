@@ -27,10 +27,18 @@ public sealed class BankTransferTests
     private static readonly TransferAccountFact MellatDollar = new(Guid.NewGuid(), "USD-1", Mellat, "بانک ملت", "USD", true, false, "1104", "600004");
     private static readonly TransferAccountFact MellatDollar2 = new(Guid.NewGuid(), "USD-2", Mellat, "بانک ملت", "USD", true, false, "1104", "600005");
 
+    /// <summary>An approved payment request «نقل و انتقال بین حساب‌های شرکت» for these two accounts (owner's answer to Q82).</summary>
+    private static TransferRequestFact Request(TransferAccountFact source, TransferAccountFact destination, decimal remaining = 1000 * Milliard) =>
+        new(Guid.NewGuid(), 12, IsApproved: true, IsForOwnTransfer: true, source.Id, destination.Id, remaining);
+
     private static ElectronicTransferForm Form(
         TransferMethod method, decimal amount, TransferChannel? channel = TransferChannel.Remote, TransferAccountFact? source = null, TransferAccountFact? destination = null,
-        string date = "1405/08/29") =>
-        new(D(date), source ?? MellatCurrent, destination ?? (method == TransferMethod.Internal ? MellatSaving : MelliCurrent), method, channel, Money.Rials(amount), "TRK-1", "تأمین موجودی");
+        string date = "1405/08/29")
+    {
+        source ??= MellatCurrent;
+        destination ??= method == TransferMethod.Internal ? MellatSaving : MelliCurrent;
+        return new(D(date), source, destination, method, channel, Money.Rials(amount), "TRK-1", "تأمین موجودی", Request(source, destination));
+    }
 
     private static BankTransfer Record(ElectronicTransferForm form, TransferLimits? limits = null, TransferDayUsage? usage = null) =>
         BankTransfer.RecordElectronic(Guid.NewGuid(), 1, form, limits ?? TransferLimits.OwnerDefaults(), usage ?? TransferDayUsage.None, User);
@@ -74,7 +82,8 @@ public sealed class BankTransferTests
     public void A_foreign_currency_transfer_is_internal_only()
     {
         var dollars = Money.Foreign(1_000, "USD", 600_000);
-        var form = new ElectronicTransferForm(D("1405/08/29"), MellatDollar, MellatDollar2, TransferMethod.Internal, TransferChannel.InPerson, dollars);
+        var form = new ElectronicTransferForm(D("1405/08/29"), MellatDollar, MellatDollar2, TransferMethod.Internal, TransferChannel.InPerson, dollars,
+            Request: Request(MellatDollar, MellatDollar2));
         Assert.Equal(600_000_000m, Record(form).Amount.ToRial());
         Assert.Equal("Transfer.MethodNotForForeignCurrency",
             Refused(() => Record(form with { Method = TransferMethod.Satna, Destination = MellatDollar2 with { BankId = Melli, BankName = "بانک ملی" } })));
@@ -191,7 +200,7 @@ public sealed class BankTransferTests
     private const string SayadId = "4821" + "12345678" + "0007";
 
     private static (BankTransfer Transfer, Instrument Issued) ChequeTransfer(string date = "1405/08/29", string due = "1405/10/15", decimal amount = 7_000_000_000,
-        TransferAccountFact? source = null, TransferAccountFact? destination = null)
+        TransferAccountFact? source = null, TransferAccountFact? destination = null, bool sayadRegistered = true)
     {
         var id = Guid.NewGuid();
         source ??= MellatCurrent;
@@ -199,7 +208,8 @@ public sealed class BankTransferTests
         var issued = Instrument.PrepareIssue(Guid.NewGuid(), due == date ? InstrumentKind.OrdinaryCheque : InstrumentKind.PostDatedCheque, Money.Rials(amount), D(date), D(due),
             new CounterpartyRef(destination.Id, "حساب 0202-1 بانک ملی"), "نقل و انتقال بانکی", source.Id, id, User);
         issued.Issue(Book, "000507", D(date), User);
-        return (BankTransfer.IssueCheque(id, 3, D(date), source, destination, issued, Book, 507, SayadId, "تأمین موجودی حساب ملی", User), issued);
+        return (BankTransfer.IssueCheque(id, 3, D(date), source, destination, issued, Book, 507, SayadId, "تأمین موجودی حساب ملی", User, Request(source, destination),
+            sayadRegistered), issued);
     }
 
     private static Instrument Receive(BankTransfer transfer, Instrument issued, string on = "1405/08/29")
@@ -229,13 +239,15 @@ public sealed class BankTransferTests
     {
         var (_, other) = ChequeTransfer();
         Assert.Equal("Transfer.ChequeMismatch",
-            Refused(() => BankTransfer.IssueCheque(Guid.NewGuid(), 4, D("1405/08/29"), MellatCurrent, MelliCurrent, other, Book, 507, SayadId, null, User)));
+            Refused(() => BankTransfer.IssueCheque(Guid.NewGuid(), 4, D("1405/08/29"), MellatCurrent, MelliCurrent, other, Book, 507, SayadId, null, User,
+                Request(MellatCurrent, MelliCurrent))));
         var id = Guid.NewGuid();
         var issued = Instrument.PrepareIssue(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, Money.Rials(1_000), D("1405/08/29"), D("1405/08/29"),
             new CounterpartyRef(MelliCurrent.Id, "حساب"), "نقل و انتقال", MellatCurrent.Id, id, User);
         issued.Issue(Book, "000508", D("1405/08/29"), User);
         Assert.Equal("Transfer.SayadIdRequired",
-            Refused(() => BankTransfer.IssueCheque(id, 4, D("1405/08/29"), MellatCurrent, MelliCurrent, issued, Book, 508, "1234", null, User)));
+            Refused(() => BankTransfer.IssueCheque(id, 4, D("1405/08/29"), MellatCurrent, MelliCurrent, issued, Book, 508, "1234", null, User,
+                Request(MellatCurrent, MelliCurrent))));
     }
 
     [Fact]
@@ -377,7 +389,10 @@ public sealed class BankTransferTests
 
     private static VoucherTemplate Template(bool inTransit = true)
     {
-        var accounts = new Dictionary<FixedAccount, string> { [FixedAccount.ChequesInCashDesk] = "1201", [FixedAccount.ChequesInCollection] = "1202" };
+        var accounts = new Dictionary<FixedAccount, string>
+        {
+            [FixedAccount.ChequesInCashDesk] = "1201", [FixedAccount.ChequesInCollection] = "1202", [FixedAccount.BankFees] = "8205", [FixedAccount.NotesPayable] = "2105",
+        };
         if (inTransit)
         {
             accounts[FixedAccount.FundsInTransit] = "1109";
@@ -392,7 +407,7 @@ public sealed class BankTransferTests
     public void An_electronic_transfer_debits_the_destination_bank_and_credits_the_source_bank()
     {
         var t = Record(Form(TransferMethod.Paya, Milliard));
-        var v = TransferVouchers.ForElectronic(t, new LedgerSide("1102", "600001"), new LedgerSide("1103", "600003"));
+        var v = TransferVouchers.ForElectronic(t, new LedgerSide("1102", "600001"), new LedgerSide("1103", "600003"), Template());
         Assert.Equal([(true, "1103", "600003", Milliard), (false, "1102", "600001", Milliard)], Lines(v));
         Assert.Equal(("نقل و انتقال بانکی (پایا) – شماره 1", D("1405/08/29"), true), (v.Operation, v.Date, v.IsComplete));
         Assert.Contains("TRK-1", v.Lines[0].Description, StringComparison.Ordinal);
@@ -401,11 +416,13 @@ public sealed class BankTransferTests
     [Fact]
     public void The_payer_of_a_transfer_cheque_debits_funds_in_transit_and_credits_the_source_bank()
     {
-        // «سند حسابداری انتقال دهنده (بدهکار: وجوه در راه، بستانکار: بانک انتقال دهنده)»
-        var (t, _) = ChequeTransfer();
+        // «سند حسابداری انتقال دهنده (بدهکار: وجوه در راه، بستانکار: بانک انتقال دهنده)» — a cheque of the day.
+        var (t, _) = ChequeTransfer(due: "1405/08/29");
         var v = TransferVouchers.ForChequeIssued(t, new LedgerSide("1102", "600001"), Template());
         Assert.Equal([(true, "1109", null, 7_000_000_000m), (false, "1102", "600001", 7_000_000_000m)], Lines(v));
         Assert.Equal((D("1405/08/29"), true), (v.Date, v.IsComplete));
+        Assert.Null(TransferVouchers.ForChequeMatured(t, new LedgerSide("1102", "600001"), Template())); // nothing to mature
+        Assert.Equal("Transfer.NotPostDated", Refused(() => t.RecordMatured(D("1405/08/29"), User)));
 
         var missing = TransferVouchers.ForChequeIssued(t, new LedgerSide("1102", "600001"), Template(inTransit: false));
         Assert.Equal((false, (FixedAccount?)FixedAccount.FundsInTransit), (missing.IsComplete, missing.Lines[0].Missing));
@@ -429,5 +446,145 @@ public sealed class BankTransferTests
         var destination = new LedgerSide("1103", "600003");
         Assert.Equal([(true, "1202", "600003", 7_000_000_000m), (false, "1201", "600001", 7_000_000_000m)], Lines(ReceiptVouchers.ForStep(cheque, 3, destination, null, Template())));
         Assert.Equal([(true, "1103", "600003", 7_000_000_000m), (false, "1202", "600003", 7_000_000_000m)], Lines(ReceiptVouchers.ForStep(cheque, 4, destination, null, Template())));
+    }
+
+    // ----- the owner's answers of 21 Nov 2026 to Q76–Q82 ----------------------------------------------------------------------------
+
+    [Fact]
+    public void Every_transfer_pays_an_approved_payment_request_written_for_its_two_accounts_Q82()
+    {
+        // «برای نقل و انتقال از هر نوع لازم است درخواست وجه صادر و مجوز آن اخذ شود»
+        var form = Form(TransferMethod.Paya, Milliard);
+        var request = form.Request!;
+        var t = Record(form);
+        Assert.Equal((request.Id, 12, $"transfer:{t.Id}:1"), (t.Request!.Id, t.Request.Number, t.Request.PaymentKey));
+
+        Assert.Equal("Transfer.RequestRequired", Refused(() => Record(form with { Request = null })));
+        Assert.Equal("Transfer.RequestNotApproved", Refused(() => Record(form with { Request = request with { IsApproved = false } })));
+        Assert.Equal("Transfer.RequestNotForTransfer", Refused(() => Record(form with { Request = request with { IsForOwnTransfer = false } })));
+        Assert.Equal("Transfer.RequestOtherAccounts", Refused(() => Record(form with { Request = Request(MelliCurrent, MellatCurrent) }))); // the other way round
+        Assert.Equal("Transfer.RequestOverpaid", Refused(() => Record(form with { Request = request with { RemainingAmount = Milliard - 1 } })));
+        Record(form with { Request = request with { RemainingAmount = Milliard } }); // in full; a part is allowed too (Q29)
+
+        // The cheque needs its request as well.
+        var id = Guid.NewGuid();
+        var issued = Instrument.PrepareIssue(Guid.NewGuid(), InstrumentKind.OrdinaryCheque, Money.Rials(1_000), D("1405/08/29"), D("1405/08/29"),
+            new CounterpartyRef(MelliCurrent.Id, "حساب"), "نقل و انتقال", MellatCurrent.Id, id, User);
+        issued.Issue(Book, "000509", D("1405/08/29"), User);
+        Assert.Equal("Transfer.RequestRequired",
+            Refused(() => BankTransfer.IssueCheque(id, 5, D("1405/08/29"), MellatCurrent, MelliCurrent, issued, Book, 509, SayadId, null, User, null)));
+
+        // A correction keeps or changes the request and takes a new payment key.
+        t.CorrectElectronic(form with { Amount = Money.Rials(2 * Milliard) }, TransferLimits.OwnerDefaults(), TransferDayUsage.None, User, false);
+        Assert.Equal($"transfer:{t.Id}:1", t.Request.PaymentKey); // the version changes when the transfer is saved; see the use-case tests
+    }
+
+    [Fact]
+    public void The_bank_fee_of_an_electronic_transfer_is_debited_to_the_fee_account_and_credited_to_the_source_bank_Q77()
+    {
+        // «از بابت هزینه‌های کارمزد خدمات بانکی در هنگام صدور سند آن را بدهکار نمود»
+        var t = Record(Form(TransferMethod.Paya, Milliard) with { FeeRial = 35_000 });
+        Assert.Equal(35_000m, t.FeeRial);
+        var source = new LedgerSide("1102", "600001");
+        var v = TransferVouchers.ForElectronic(t, source, new LedgerSide("1103", "600003"), Template());
+        Assert.Equal([(true, "1103", "600003", Milliard), (false, "1102", "600001", Milliard), (true, "8205", null, 35_000m), (false, "1102", "600001", 35_000m)], Lines(v));
+        Assert.True(v.IsComplete);
+
+        var noAccount = TransferVouchers.ForElectronic(t, source, new LedgerSide("1103", "600003"), new VoucherTemplate());
+        Assert.Equal((false, (FixedAccount?)FixedAccount.BankFees), (noAccount.IsComplete, noAccount.Lines[2].Missing));
+
+        Assert.Null(Record(Form(TransferMethod.Paya, Milliard) with { FeeRial = 0 }).FeeRial); // no fee, no lines
+        Assert.Equal(2, TransferVouchers.ForElectronic(Record(Form(TransferMethod.Paya, Milliard)), source, source, Template()).Lines.Count);
+        Assert.Equal("Transfer.FeeInvalid", Refused(() => Record(Form(TransferMethod.Paya, Milliard) with { FeeRial = -1 })));
+        Assert.Equal("Transfer.FeeInvalid", Refused(() => Record(Form(TransferMethod.Paya, Milliard) with { FeeRial = 10.5m })));
+    }
+
+    [Fact]
+    public void A_post_dated_transfer_cheque_is_credited_to_notes_payable_until_its_maturity_is_recorded_Q81()
+    {
+        // «حساب اسناد پرداختنی بستانکار تا سررسید چک … به محض سررسید شدن از حساب بانک خارج و سند حسابداری مربوط … صادر می‌گردد»
+        var (t, issued) = ChequeTransfer(); // issued 1405/08/29, due 1405/10/15
+        var source = new LedgerSide("1102", "600001");
+        Assert.True(t.IsPostDated);
+        Assert.Equal([(true, "1109", null, 7_000_000_000m), (false, "2105", "600001", 7_000_000_000m)], Lines(TransferVouchers.ForChequeIssued(t, source, Template())));
+        Assert.Null(TransferVouchers.ForChequeMatured(t, source, Template()));
+
+        Assert.Equal("Transfer.MaturedBeforeDueDate", Refused(() => t.RecordMatured(D("1405/10/14"), User)));
+        t.RecordMatured(D("1405/10/15"), User);
+        issued.RecordMatured(D("1405/10/15"), User);
+        Assert.Equal((D("1405/10/15"), true), (t.Cheque!.MaturedOn!.Value, issued.IsMatured));
+        Assert.IsType<TransferChequeMatured>(t.PendingEvents[^1]);
+        var matured = TransferVouchers.ForChequeMatured(t, source, Template());
+        Assert.Equal([(true, "2105", "600001", 7_000_000_000m), (false, "1102", "600001", 7_000_000_000m)], Lines(matured));
+        Assert.Equal(D("1405/10/15"), matured!.Date);
+        Assert.Equal("Transfer.AlreadyMatured", Refused(() => t.RecordMatured(D("1405/10/16"), User)));
+
+        // Without the account in the template the voucher names what is missing.
+        var missing = TransferVouchers.ForChequeIssued(t, source, new VoucherTemplate());
+        Assert.Equal((FixedAccount?)FixedAccount.NotesPayable, missing.Lines[1].Missing);
+    }
+
+    [Fact]
+    public void The_receipts_side_registers_the_cheque_in_sayad_only_after_the_payer_did_Q79()
+    {
+        var (t, _) = ChequeTransfer(sayadRegistered: false);
+        Assert.Null(t.Cheque!.PayerSayadOn);
+        Assert.Equal("Transfer.PayerSayadRequired", Refused(t.EnsureReceiverMayRegisterSayad));
+        Assert.Equal("Transfer.StepBeforeIssue", Refused(() => t.RegisterPayerSayad(D("1405/08/28"), User)));
+        t.RegisterPayerSayad(D("1405/08/30"), User);
+        Assert.Equal(D("1405/08/30"), t.Cheque.PayerSayadOn);
+        Assert.IsType<TransferChequeSayadRegistered>(t.PendingEvents[^1]);
+        t.EnsureReceiverMayRegisterSayad();
+        Assert.Equal("Transfer.PayerSayadAlreadyRegistered", Refused(() => t.RegisterPayerSayad(D("1405/08/30"), User)));
+
+        // Ticked on the form: registered on the day of issue.
+        Assert.Equal(D("1405/08/29"), ChequeTransfer().Transfer.Cheque!.PayerSayadOn);
+    }
+
+    [Fact]
+    public void A_transfer_cheque_not_yet_registered_in_sayad_can_be_cancelled_and_its_vouchers_are_taken_back_Q79()
+    {
+        // «آن چک اگر ثبت صیادی پرداخت کننده نشده باشد طبعاً ثبت صیادی دریافت کننده هم نشده است و می‌توان آن را باطل نمود»
+        var (t, issued) = ChequeTransfer(sayadRegistered: false);
+        var received = Receive(t, issued, on: "1405/08/30");
+        Assert.Null(t.WhyNotCancellable());
+        Assert.Equal("Transfer.CancelReasonRequired", Refused(() => t.CancelCheque(D("1405/09/01"), " ", User)));
+        Assert.Equal("Transfer.StepBeforeIssue", Refused(() => t.CancelCheque(D("1405/08/29"), "انصراف", User))); // before it was received
+
+        t.CancelCheque(D("1405/09/01"), "انصراف از انتقال", User);
+        issued.Cancel(D("1405/09/01"), User, "انصراف از انتقال");
+        received.CancelTransferCheque(t.Id, D("1405/09/01"), User, "انصراف از انتقال");
+        Assert.Equal((TransferState.Cancelled, D("1405/09/01"), "انصراف از انتقال"), (t.State, t.Cheque!.CancelledOn!.Value, t.Cheque.CancelReason));
+        Assert.Equal((InstrumentState.Cancelled, InstrumentState.Cancelled), (issued.State, received.State));
+        Assert.IsType<TransferChequeCancelled>(t.PendingEvents[^1]);
+        Assert.Equal("Transfer.ChequeCancelled", t.WhyNotDeletable(false));
+        Assert.Equal("Transfer.ChequeNotOpen", Refused(() => t.CancelCheque(D("1405/09/02"), "دوباره", User)));
+        Assert.Empty(received.AllowedActions()); // no «تعویض»: a new transfer is a new, independent cheque
+
+        // The two vouchers are taken back: the payer's (post-dated, not matured: «اسناد پرداختنی») and the receiver's.
+        var source = new LedgerSide("1102", "600001");
+        Assert.Equal([(true, "2105", "600001", 7_000_000_000m), (false, "1109", null, 7_000_000_000m)], Lines(TransferVouchers.ForChequeCancelledByPayer(t, source, Template())));
+        Assert.Equal([(true, "1109", null, 7_000_000_000m), (false, "1201", "600001", 7_000_000_000m)],
+            Lines(TransferVouchers.ForChequeCancelledByReceiver(t, received.Counterparty.DetailCode, Template())));
+
+        // A cheque of the day that never reached the receipts side: only the payer's side, against the bank.
+        var (day, _) = ChequeTransfer(due: "1405/08/29", sayadRegistered: false);
+        day.CancelCheque(D("1405/08/29"), "اشتباه در مبلغ", User);
+        Assert.Equal([(true, "1102", "600001", 7_000_000_000m), (false, "1109", null, 7_000_000_000m)], Lines(TransferVouchers.ForChequeCancelledByPayer(day, source, Template())));
+        Assert.Null(TransferVouchers.ForChequeCancelledByReceiver(day, "600001", Template()));
+    }
+
+    [Fact]
+    public void A_transfer_cheque_registered_in_sayad_is_not_cancelled_Q79()
+    {
+        var (t, issued) = ChequeTransfer(); // registered as it was issued
+        Assert.Equal("Transfer.SayadRegisteredNotCancelled", t.WhyNotCancellable());
+        Assert.Equal("Transfer.SayadRegisteredNotCancelled", Refused(() => t.CancelCheque(D("1405/08/30"), "انصراف", User)));
+
+        // And the received cheque is cancelled only through its transfer, never on the cheque screens.
+        var received = Receive(t, issued);
+        Assert.Equal("Instrument.NotForTransferCheque", Refused(() => received.CancelReceived(D("1405/08/30"), User, "M-1", D("1405/08/30"), "اشتباه")));
+        Assert.Equal("Transfer.ChequeMismatch", Refused(() => received.CancelTransferCheque(Guid.NewGuid(), D("1405/08/30"), User, "اشتباه")));
+        Assert.Equal("Transfer.ChequeMismatch", Refused(() => ReceivedCheque().CancelTransferCheque(t.Id, D("1405/08/30"), User, "اشتباه")));
     }
 }

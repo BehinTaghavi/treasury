@@ -306,6 +306,17 @@ public sealed class Instrument : AggregateRoot<Guid>
     }
 
     /// <summary>
+    /// «ابطال» of a transfer cheque on the receipts side, with its transfer (<c>BankTransfer.CancelCheque</c>; owner, 21 Nov 2026, answer
+    /// to Q79): only while it is «نزد صندوق» and not registered in Sayad. It needs no order of management: the cheque is the company's own.
+    /// </summary>
+    public void CancelTransferCheque(Guid transferId, FiscalDate date, string userId, string reason)
+    {
+        Require(IsTransferCheque && Details.TransferId == transferId, "Transfer.ChequeMismatch", "The cheque does not belong to this transfer.");
+        Require(!string.IsNullOrWhiteSpace(reason), "Transfer.CancelReasonRequired", "Give the reason for cancelling the cheque.");
+        Apply(InstrumentAction.Cancel, date, userId, null, reason.Trim(), byTransfer: true);
+    }
+
+    /// <summary>
     /// The issued cheque of a transfer recorded by mistake is taken away with its transfer (<c>BankTransfer.Delete</c>); the caller then
     /// deletes it and frees its sheet. Only while it is as it was issued: no later step, not on the receipts side.
     /// </summary>
@@ -704,8 +715,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     }
 
     /// <param name="validate">Extra rule of this action, checked after the transition and date rules, before anything changes.</param>
+    /// <param name="byTransfer">The step is recorded by the cheque's transfer itself (its cancellation), not on the cheque screens.</param>
     private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null,
-        StepDetails? details = null)
+        StepDetails? details = null, bool byTransfer = false)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         var transition = InstrumentLifecycle.Find(Direction, State, action)
@@ -719,7 +731,7 @@ public sealed class Instrument : AggregateRoot<Guid>
         }
 
         // Owner's report no. 7: a transfer cheque goes on with ثبت صیادی, واگذاری به بانک and وصول only (see TransferChequeSteps).
-        Require(!IsTransferCheque || TransferChequeSteps.Contains(action), "Instrument.NotForTransferCheque",
+        Require(!IsTransferCheque || byTransfer || TransferChequeSteps.Contains(action), "Instrument.NotForTransferCheque",
             $"'{action}' is not recorded on a cheque of a transfer between the company's own bank accounts.");
 
         var lastDate = _history[^1].Date;

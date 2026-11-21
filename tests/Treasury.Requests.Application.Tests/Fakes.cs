@@ -48,8 +48,14 @@ public sealed class FakeAccounts : IPayFromLookup
     public static readonly Guid Bank = Guid.NewGuid();
     public static readonly Guid Desk = Guid.NewGuid();
 
+    /// <summary>A second company bank account, and a dollar one, for transfers between the company's own accounts.</summary>
+    public static readonly Guid OtherBank = Guid.NewGuid();
+    public static readonly Guid DollarBank = Guid.NewGuid();
+
     public Task<PayFromFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
-        Task.FromResult(id == Bank ? new PayFromFact(PayFromKind.BankAccount, id, "0202-3572", "IRR", true) : null);
+        Task.FromResult(id == Bank ? new PayFromFact(PayFromKind.BankAccount, id, "0202-3572", "IRR", true)
+            : id == OtherBank ? new PayFromFact(PayFromKind.BankAccount, id, "0303-9911", "IRR", true)
+            : id == DollarBank ? new PayFromFact(PayFromKind.BankAccount, id, "USD-1", "USD", true) : null);
 
     public Task<PayFromFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(id == Desk ? new PayFromFact(PayFromKind.CashDesk, id, "صندوق مرکزی", "IRR", true) : null);

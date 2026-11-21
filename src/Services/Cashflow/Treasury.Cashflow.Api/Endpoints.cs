@@ -91,6 +91,12 @@ public sealed record ElectronicTransferCorrection(ElectronicTransferInput Form, 
 /// <summary>Deletion of a transfer or taking back its receipts-side record, with the version the user saw.</summary>
 public sealed record TransferVersion(long Version);
 
+/// <summary>A dated step of a transfer's cheque on the payment side («ثبت صیادی پرداخت», «سررسید»); empty date: today.</summary>
+public sealed record TransferChequeStepRequest(long Version, string? Date = null);
+
+/// <summary>«ابطال چک نقل و انتقال» with its reason; empty date: today.</summary>
+public sealed record CancelTransferChequeRequest(long Version, string? Date, string? Reason);
+
 /// <param name="Date">The day the cheque is received; empty: the day it was issued.</param>
 public sealed record ReceiveTransferChequeRequest(long Version, string? Date = null);
 
@@ -345,6 +351,20 @@ public static class Endpoints
         api.MapPost("/transfers/{id:guid}/undo-receive", async (Guid id, TransferVersion r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
             ToHttp(await u.UndoReceiveAsync(new UndoTransferReceiptCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), _ => $"/api/cashflow/transfers/{id}"));
 
+        // The owner's answers of 21 Nov 2026: the payer's Sayad registration and the cancellation of a cheque not yet registered (Q79),
+        // and the maturity of a post-dated cheque (Q81).
+        api.MapPost("/transfers/{id:guid}/register-sayad", async (Guid id, TransferChequeStepRequest r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.RegisterPayerSayadAsync(new TransferChequeStepCommand(Key(http), id, r.Version, r.Date), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/{id:guid}/mature", async (Guid id, TransferChequeStepRequest r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.MatureChequeAsync(new TransferChequeStepCommand(Key(http), id, r.Version, r.Date), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/transfers/{id}"));
+
+        api.MapPost("/transfers/{id:guid}/cancel-cheque", async (Guid id, CancelTransferChequeRequest r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
+            ToHttp(await u.CancelChequeAsync(new CancelTransferChequeCommand(Key(http), id, r.Version, r.Date, r.Reason), ct).ConfigureAwait(false),
+                _ => $"/api/cashflow/transfers/{id}"));
+
         api.MapPost("/transfers/{id:guid}/delete", async (Guid id, TransferVersion r, HttpRequest http, TransferUseCases u, CancellationToken ct) =>
             ToHttp(await u.DeleteAsync(new DeleteTransferCommand(Key(http), id, r.Version), ct).ConfigureAwait(false), _ => "/api/cashflow/transfers"));
 
@@ -402,6 +422,7 @@ public static class Endpoints
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
             "Instrument.NotFound" or "ChequeBook.NotFound" or "ChequeFormat.NotFound" or "Receipt.NotFound" or "Instrument.AttachmentNotFound" or "Transfer.NotFound"
                 => StatusCodes.Status404NotFound,
+            "Requests.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
             "Accounts.Unavailable" or "Reference.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,

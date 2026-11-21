@@ -15,7 +15,7 @@ public sealed class PostgresBankTransferRepository : IBankTransferRepository
     private const string Columns =
         "fiscal_year, id, number, transfer_date, method, channel, source_account_id, source_account_number, source_bank_id, source_bank_name, " +
         "destination_account_id, destination_account_number, destination_bank_id, destination_bank_name, amount, currency, rate_to_rial, amount_rial, " +
-        "tracking_number, description, cheque, state, recorded_by, deleted_by, deleted_at, version";
+        "tracking_number, description, cheque, state, recorded_by, deleted_by, deleted_at, version, fee_rial, payment_request_id, payment_request_number, payment_key";
 
     private static readonly JsonSerializerOptions ChequeJson = new(JsonSerializerDefaults.Web);
 
@@ -44,7 +44,7 @@ public sealed class PostgresBankTransferRepository : IBankTransferRepository
         await using (var cmd = tx.Command(
             $"INSERT INTO cashflow.bank_transfer ({Columns}) VALUES (@year, @id, @number, @date, @method, @channel, @source, @source_number, @source_bank, @source_bank_name, " +
             "@destination, @destination_number, @destination_bank, @destination_bank_name, @amount, @currency, @rate, @rial, @tracking, @description, @cheque, @state, " +
-            "@by, @deleted_by, @deleted_at, 1)"))
+            "@by, @deleted_by, @deleted_at, 1, @fee, @request, @request_number, @payment_key)"))
         {
             Bind(cmd, BankTransferSnapshot.From(transfer, 1));
             await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -65,7 +65,8 @@ public sealed class PostgresBankTransferRepository : IBankTransferRepository
             "source_account_number = @source_number, source_bank_id = @source_bank, source_bank_name = @source_bank_name, destination_account_id = @destination, " +
             "destination_account_number = @destination_number, destination_bank_id = @destination_bank, destination_bank_name = @destination_bank_name, " +
             "amount = @amount, currency = @currency, rate_to_rial = @rate, amount_rial = @rial, tracking_number = @tracking, description = @description, " +
-            "cheque = @cheque, state = @state, deleted_by = @deleted_by, deleted_at = @deleted_at, version = version + 1, updated_at = now() " +
+            "cheque = @cheque, state = @state, deleted_by = @deleted_by, deleted_at = @deleted_at, fee_rial = @fee, payment_request_id = @request, " +
+            "payment_request_number = @request_number, payment_key = @payment_key, version = version + 1, updated_at = now() " +
             "WHERE fiscal_year = @year AND id = @id AND number = @number AND version = @expected"))
         {
             Bind(cmd, BankTransferSnapshot.From(transfer, transfer.Version + 1));
@@ -132,6 +133,10 @@ public sealed class PostgresBankTransferRepository : IBankTransferRepository
         cmd.Parameters.AddWithValue("by", s.RecordedBy);
         cmd.Parameters.Add(new NpgsqlParameter("deleted_by", NpgsqlDbType.Text) { Value = Db(s.DeletedBy) });
         cmd.Parameters.Add(new NpgsqlParameter("deleted_at", NpgsqlDbType.TimestampTz) { Value = Db(s.DeletedAt?.ToUniversalTime()) });
+        cmd.Parameters.Add(new NpgsqlParameter("fee", NpgsqlDbType.Numeric) { Value = Db(s.FeeRial) });
+        cmd.Parameters.Add(new NpgsqlParameter("request", NpgsqlDbType.Uuid) { Value = Db(s.RequestId) });
+        cmd.Parameters.Add(new NpgsqlParameter("request_number", NpgsqlDbType.Integer) { Value = Db(s.RequestNumber) });
+        cmd.Parameters.Add(new NpgsqlParameter("payment_key", NpgsqlDbType.Text) { Value = Db(s.RequestPaymentKey) });
     }
 
     private static async Task<IReadOnlyList<BankTransfer>> ReadAsync(NpgsqlCommand cmd, CancellationToken ct)
@@ -167,7 +172,11 @@ public sealed class PostgresBankTransferRepository : IBankTransferRepository
                 RecordedBy: r.GetString(22),
                 DeletedBy: Text(23),
                 DeletedAt: r.IsDBNull(24) ? null : new DateTimeOffset(r.GetFieldValue<DateTime>(24), TimeSpan.Zero),
-                Version: r.GetInt64(25)).ToDomain());
+                Version: r.GetInt64(25),
+                FeeRial: r.IsDBNull(26) ? null : r.GetDecimal(26),
+                RequestId: r.IsDBNull(27) ? null : r.GetGuid(27),
+                RequestNumber: r.IsDBNull(28) ? null : r.GetInt32(28),
+                RequestPaymentKey: Text(29)).ToDomain());
         }
 
         return list;

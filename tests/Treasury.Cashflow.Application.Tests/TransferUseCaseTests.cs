@@ -23,6 +23,7 @@ public sealed class TransferUseCaseTests : IDisposable
     private readonly InMemoryVoucherStore _store = new();
     private readonly Banks _banks = new();
     private readonly FakeReceiptReference _reference = new();
+    private readonly FakePaymentRequests _requests = new();
     private readonly TransferUseCases _transfers;
     private readonly InstrumentUseCases _instruments;
     private readonly ChequeBookUseCases _books;
@@ -34,15 +35,40 @@ public sealed class TransferUseCaseTests : IDisposable
         var transfers = new InMemoryBankTransferRepository(_db);
         _transfers = new TransferUseCases(uow, transfers, new InMemoryTransferLimitRepository(_db), new InMemoryInstrumentRepository(_db),
             new InMemoryChequeBookRepository(_db), _banks, _reference, policies, new InMemoryVoucherTemplateRepository(_store),
-            new InMemoryConfirmedVoucherRepository(_store), new InMemoryIdempotencyStore(_db), new Treasurer());
+            new InMemoryConfirmedVoucherRepository(_store), new InMemoryIdempotencyStore(_db), new Treasurer(), _requests);
         _instruments = new InstrumentUseCases(uow, new InMemoryInstrumentRepository(_db), new InMemoryChequeBookRepository(_db), new InMemoryIdempotencyStore(_db),
             policies, policies, policies, new Treasurer(), _banks, transfers: transfers);
         _books = new ChequeBookUseCases(uow, new InMemoryChequeBookRepository(_db), _banks, new InMemoryIdempotencyStore(_db), new InMemoryChequeFormatRepository(_db));
         new InMemoryVoucherTemplateRepository(_store).SaveAsync(new VoucherTemplate(new Dictionary<FixedAccount, string>
         {
             [FixedAccount.ChequesInCashDesk] = "1201", [FixedAccount.ChequesInCollection] = "1202", [FixedAccount.FundsInTransit] = "1109",
+            [FixedAccount.BankFees] = "8205", [FixedAccount.NotesPayable] = "2105",
         }), CancellationToken.None).GetAwaiter().GetResult();
     }
+
+    /// <summary>
+    /// An approved payment request «نقل و انتقال بین حساب‌های شرکت» in requests-svc for these two accounts (owner's answer to Q82), large
+    /// enough for every transfer of a test unless an amount is given.
+    /// </summary>
+    private Guid RequestFor(Guid source, Guid destination, decimal amount = 1_000_000 * Milliard, string state = "Approved", string method = "OwnAccountTransfer")
+    {
+        var id = Guid.NewGuid();
+        _requests.Requests[id] = new PaymentRequestFact(id, 40 + _requests.Requests.Count, state, string.Empty, "حساب مقصد", Guid.Empty, "تأمین موجودی", amount, "IRR", 0,
+            null, method, source, destination);
+        return id;
+    }
+
+    private readonly Dictionary<(Guid, Guid), Guid> _standing = [];
+
+    private Guid StandingRequest(Guid source, Guid destination) =>
+        _standing.TryGetValue((source, destination), out var id) ? id : _standing[(source, destination)] = RequestFor(source, destination);
+
+    /// <summary>The form with the standing request of its two accounts, unless the test chose a request itself.</summary>
+    private ElectronicTransferInput R(ElectronicTransferInput form) =>
+        form.PaymentRequestId is null ? form with { PaymentRequestId = StandingRequest(form.SourceAccountId, form.DestinationAccountId) } : form;
+
+    private TransferChequeInput C(TransferChequeInput form) =>
+        form.PaymentRequestId is null ? form with { PaymentRequestId = StandingRequest(form.SourceAccountId, form.DestinationAccountId) } : form;
 
     public void Dispose() => _db.Dispose();
 
@@ -53,12 +79,12 @@ public sealed class TransferUseCaseTests : IDisposable
 
     private async Task<Guid> Record(ElectronicTransferInput form)
     {
-        var r = await _transfers.RecordElectronicAsync(new(Key(), form), CancellationToken.None);
+        var r = await _transfers.RecordElectronicAsync(new(Key(), R(form)), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         return r.Value;
     }
 
-    private async Task<string?> Refused(ElectronicTransferInput form) => (await _transfers.RecordElectronicAsync(new(Key(), form), CancellationToken.None)).ErrorCode;
+    private async Task<string?> Refused(ElectronicTransferInput form) => (await _transfers.RecordElectronicAsync(new(Key(), R(form)), CancellationToken.None)).ErrorCode;
 
     private async Task<TransferView> View(Guid id) => (await _transfers.GetAsync(id, CancellationToken.None))!;
 
@@ -84,7 +110,7 @@ public sealed class TransferUseCaseTests : IDisposable
     [Fact]
     public async Task A_repeated_command_records_the_transfer_once()
     {
-        var command = new RecordElectronicTransferCommand(Key(), Paya(Milliard));
+        var command = new RecordElectronicTransferCommand(Key(), R(Paya(Milliard)));
         var a = await _transfers.RecordElectronicAsync(command, CancellationToken.None);
         var b = await _transfers.RecordElectronicAsync(command, CancellationToken.None);
         Assert.Equal(a.Value, b.Value);
@@ -163,10 +189,10 @@ public sealed class TransferUseCaseTests : IDisposable
     [Fact]
     public async Task The_voucher_of_an_electronic_transfer_is_previewed_confirmed_and_then_closes_correction_and_deletion()
     {
-        var preview = await _transfers.PreviewElectronicAsync(Paya(Milliard), null, CancellationToken.None);
+        var preview = await _transfers.PreviewElectronicAsync(R(Paya(Milliard)), null, CancellationToken.None);
         Assert.True(preview.IsSuccess, preview.ErrorCode);
         Assert.Equal("نقل و انتقال بانکی (پایا)", preview.Value!.Operation);
-        Assert.Equal("Transfer.OverOrderLimit", (await _transfers.PreviewElectronicAsync(Paya(4 * Milliard), null, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Transfer.OverOrderLimit", (await _transfers.PreviewElectronicAsync(R(Paya(4 * Milliard)), null, CancellationToken.None)).ErrorCode);
         Assert.Empty(await _transfers.ListAsync(1405, null, CancellationToken.None)); // a preview saves nothing and takes no number
 
         var id = await Record(Paya(Milliard));
@@ -175,7 +201,7 @@ public sealed class TransferUseCaseTests : IDisposable
         Assert.Equal(("Transfer", 0, true, null), (voucher.Source, voucher.Step, voucher.IsComplete, voucher.ConfirmedBy));
 
         // Correction before «تایید سند»: the transfer itself is not counted against the day's limits.
-        var corrected = await _transfers.CorrectElectronicAsync(new(Key(), id, (await View(id)).Version, Paya(3 * Milliard, TransferChannel.InPerson)), CancellationToken.None);
+        var corrected = await _transfers.CorrectElectronicAsync(new(Key(), id, (await View(id)).Version, R(Paya(3 * Milliard, TransferChannel.InPerson))), CancellationToken.None);
         Assert.True(corrected.IsSuccess, corrected.ErrorCode);
         Assert.Equal((3 * Milliard, "InPerson", 1), ((await View(id)).Amount, (await View(id)).Channel, (await View(id)).Number));
 
@@ -185,7 +211,7 @@ public sealed class TransferUseCaseTests : IDisposable
         var view = await View(id);
         Assert.Equal((true, "Transfer.VoucherConfirmed", "Transfer.VoucherConfirmed"), (view.PayerVoucherConfirmed, view.WhyNotCorrectable, view.WhyNotDeletable));
         Assert.Equal("treasurer", (await _transfers.VouchersAsync(id, CancellationToken.None))[0].ConfirmedBy);
-        Assert.Equal("Transfer.VoucherConfirmed", (await _transfers.CorrectElectronicAsync(new(Key(), id, view.Version, Paya(Milliard)), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Transfer.VoucherConfirmed", (await _transfers.CorrectElectronicAsync(new(Key(), id, view.Version, R(Paya(Milliard))), CancellationToken.None)).ErrorCode);
         Assert.Equal("Transfer.VoucherConfirmed", (await _transfers.DeleteAsync(new(Key(), id, view.Version), CancellationToken.None)).ErrorCode);
     }
 
@@ -218,7 +244,7 @@ public sealed class TransferUseCaseTests : IDisposable
 
     private async Task<Guid> Issue(TransferChequeInput form)
     {
-        var r = await _transfers.IssueChequeAsync(new(Key(), form), CancellationToken.None);
+        var r = await _transfers.IssueChequeAsync(new(Key(), C(form)), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         return r.Value;
     }
@@ -252,9 +278,9 @@ public sealed class TransferUseCaseTests : IDisposable
                 (await _instruments.ChangeStateAsync(new(Key(), issued.Id, action, Today, Note: "x"), CancellationToken.None)).ErrorCode);
         }
 
-        // The payer's voucher, as the owner wrote it: Dr «وجوه در راه» / Cr the source bank.
+        // The payer's voucher: Dr «وجوه در راه» / Cr «اسناد پرداختنی» with the source bank's تفصیل, because the cheque is post-dated (Q81).
         var voucher = Assert.Single(await _transfers.VouchersAsync(id, CancellationToken.None));
-        Assert.Equal([(true, "1109", null), (false, "1102", "600001")], voucher.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.Equal([(true, "1109", null), (false, "2105", "600001")], voucher.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
         Assert.Equal("پرداخت چک – نقل و انتقال (انتقال دهنده) – شماره 1", voucher.Operation);
         Assert.Single(await _transfers.ListAsync(1405, cheque: true, CancellationToken.None));
     }
@@ -264,7 +290,7 @@ public sealed class TransferUseCaseTests : IDisposable
     {
         var book = await Book();
         var other = await Book(Banks.SaderatCurrent);
-        async Task<string?> Fails(TransferChequeInput form) => (await _transfers.IssueChequeAsync(new(Key(), form), CancellationToken.None)).ErrorCode;
+        async Task<string?> Fails(TransferChequeInput form) => (await _transfers.IssueChequeAsync(new(Key(), C(form)), CancellationToken.None)).ErrorCode;
 
         Assert.Equal("ChequeBook.WrongAccount", await Fails(Cheque(other)));
         Assert.Equal("ChequeBook.NotFound", await Fails(Cheque(Guid.NewGuid())));
@@ -274,9 +300,9 @@ public sealed class TransferUseCaseTests : IDisposable
         Assert.Equal("Instrument.DueDateRequired", await Fails(Cheque(book) with { DueDate = "" }));
         Assert.Equal("Transfer.SameAccount", await Fails(Cheque(book) with { DestinationAccountId = Banks.MellatCurrent }));
 
-        var preview = await _transfers.PreviewChequeAsync(Cheque(book), CancellationToken.None);
+        var preview = await _transfers.PreviewChequeAsync(C(Cheque(book)), CancellationToken.None);
         Assert.True(preview.IsSuccess, preview.ErrorCode);
-        Assert.Equal([(true, "1109"), (false, "1102")], preview.Value!.Lines.Select(l => (l.IsDebit, l.AccountCode)));
+        Assert.Equal([(true, "1109"), (false, "2105")], preview.Value!.Lines.Select(l => (l.IsDebit, l.AccountCode))); // post-dated: «اسناد پرداختنی»
         Assert.Equal(0, (await BookView(book)).UsedSheets); // nothing above took a sheet
         Assert.Empty(await _transfers.ListAsync(1405, null, CancellationToken.None));
     }
@@ -374,6 +400,160 @@ public sealed class TransferUseCaseTests : IDisposable
         // The same sheet is typed again, on the next number.
         var again = await View(await Issue(Cheque(book, amount: 6_500_000_000, sheet: 100500)));
         Assert.Equal((2, "100500", 6_500_000_000m), (again.Number, again.Cheque!.Number, again.Amount));
+    }
+
+    // ----- the owner's answers of 21 Nov 2026 --------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task A_transfer_needs_an_approved_payment_request_and_pays_it_Q82()
+    {
+        async Task<string?> Fails(Guid? request) => (await _transfers.RecordElectronicAsync(
+            new(Key(), Paya(Milliard) with { PaymentRequestId = request ?? Guid.Empty }), CancellationToken.None)).ErrorCode;
+        Assert.Equal("Transfer.RequestRequired", await Fails(null));
+        Assert.Equal("Transfer.RequestNotFound", await Fails(Guid.NewGuid()));
+        Assert.Equal("Transfer.RequestNotApproved", await Fails(RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, state: "Registered")));
+        Assert.Equal("Transfer.RequestNotForTransfer", await Fails(RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, method: "Transfer")));
+        Assert.Equal("Transfer.RequestOtherAccounts", await Fails(RequestFor(Banks.MelliCurrent, Banks.MellatCurrent)));
+        Assert.Equal("Transfer.RequestOverpaid", await Fails(RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, amount: Milliard - 1)));
+        Assert.Empty(_requests.Payments);
+
+        // Paid in two parts (Q29); the second transfer finishes the request.
+        var request = RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, amount: 3 * Milliard);
+        var first = await Record(Paya(Milliard) with { PaymentRequestId = request });
+        var view = await View(first);
+        Assert.Equal((request, _requests.Requests[request].Number), (view.PaymentRequestId!.Value, view.PaymentRequestNumber!.Value));
+        Assert.Equal((Milliard, "Approved"), (_requests.Requests[request].PaidAmount, _requests.Requests[request].State));
+        var second = await Record(Paya(2 * Milliard) with { PaymentRequestId = request });
+        Assert.Equal((3 * Milliard, "Paid"), (_requests.Requests[request].PaidAmount, _requests.Requests[request].State));
+        Assert.Equal("Transfer.RequestNotApproved", await Fails(request)); // nothing is left to pay on it
+
+        // A correction takes its own payment back first: 2 milliard → 1.5 milliard on the same, fully paid request.
+        var corrected = await _transfers.CorrectElectronicAsync(
+            new(Key(), second, 1, Paya(1_500_000_000) with { PaymentRequestId = request }), CancellationToken.None);
+        Assert.True(corrected.IsSuccess, corrected.ErrorCode);
+        Assert.Equal((2_500_000_000m, "Approved", 2), (_requests.Requests[request].PaidAmount, _requests.Requests[request].State, _requests.Payments.Count));
+        Assert.Equal("Transfer.RequestOverpaid",
+            (await _transfers.CorrectElectronicAsync(new(Key(), second, 2, Paya(2 * Milliard + 1) with { PaymentRequestId = request }), CancellationToken.None)).ErrorCode);
+
+        // A deleted transfer gives its payment back to the request.
+        Assert.True((await _transfers.DeleteAsync(new(Key(), first, 1), CancellationToken.None)).IsSuccess);
+        Assert.Equal((1_500_000_000m, 1), (_requests.Requests[request].PaidAmount, _requests.Payments.Count));
+    }
+
+    [Fact]
+    public async Task The_bank_fee_is_part_of_the_voucher_of_an_electronic_transfer_Q77()
+    {
+        var id = await Record(Paya(Milliard) with { Fee = 35_000 });
+        Assert.Equal(35_000m, (await View(id)).Fee);
+        var voucher = Assert.Single(await _transfers.VouchersAsync(id, CancellationToken.None));
+        Assert.Equal([(true, "1103", Milliard), (false, "1102", Milliard), (true, "8205", 35_000m), (false, "1102", 35_000m)],
+            voucher.Lines.Select(l => (l.IsDebit, l.AccountCode, l.AmountRial)));
+        Assert.Equal("Transfer.FeeInvalid", await Refused(Paya(Milliard) with { Fee = -5 }));
+        Assert.Null((await View(await Record(Paya(Milliard)))).Fee);
+    }
+
+    [Fact]
+    public async Task A_post_dated_cheque_leaves_notes_payable_at_its_maturity_or_at_the_latest_when_it_is_collected_Q81()
+    {
+        var clock = new FixedClock(new DateTimeOffset(2027, 1, 6, 8, 0, 0, TimeSpan.Zero)); // 1405/10/16 in Iran
+        var transfers = new TransferUseCases(new InMemoryUnitOfWork(_db), new InMemoryBankTransferRepository(_db), new InMemoryTransferLimitRepository(_db),
+            new InMemoryInstrumentRepository(_db), new InMemoryChequeBookRepository(_db), _banks, _reference, new DevelopmentPolicies().OpenYear(1405),
+            new InMemoryVoucherTemplateRepository(_store), new InMemoryConfirmedVoucherRepository(_store), new InMemoryIdempotencyStore(_db), new Treasurer(), _requests, clock);
+        var book = await Book();
+
+        // Recorded on the payment side («سررسید»), from the due date on.
+        var id = await Issue(Cheque(book)); // due 1405/10/15
+        var before = (await transfers.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((true, null, true), (before.Cheque!.IsPostDated, before.Cheque.MaturedOn, before.Cheque.CanMature));
+        Assert.Equal("Transfer.MaturedBeforeDueDate", (await transfers.MatureChequeAsync(new(Key(), id, 1, "1405/10/14"), CancellationToken.None)).ErrorCode);
+        Assert.True((await transfers.MatureChequeAsync(new(Key(), id, 1, "1405/10/15"), CancellationToken.None)).IsSuccess);
+        var after = (await transfers.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(("1405/10/15", false), (after.Cheque!.MaturedOn, after.Cheque.CanMature));
+        var vouchers = await transfers.VouchersAsync(id, CancellationToken.None);
+        Assert.Equal([0, 2], vouchers.Select(v => v.Step));
+        Assert.Equal([(true, "2105", "600001"), (false, "1102", "600001")], vouchers[1].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.Equal("سررسید چک پرداختنی – نقل و انتقال – شماره 1", vouchers[1].Operation);
+        Assert.True((await transfers.ConfirmVoucherAsync(Key(), id, 2, CancellationToken.None)).IsSuccess);
+        Assert.Equal([2], (await transfers.GetAsync(id, CancellationToken.None))!.ConfirmedSteps!);
+        var issued = (await _instruments.GetAsync(after.Cheque.IssuedChequeId, CancellationToken.None))!;
+        Assert.Equal("RecordMatured", issued.History[^1].Action);
+        Assert.Equal("Transfer.AlreadyMatured", (await transfers.MatureChequeAsync(new(Key(), id, 2, "1405/10/16"), CancellationToken.None)).ErrorCode);
+
+        // Not recorded on the payment side: the collection on the receipts side records it, in the same command.
+        var late = await Issue(Cheque(book));
+        Assert.True((await _transfers.ReceiveChequeAsync(new(Key(), late, 1), CancellationToken.None)).IsSuccess);
+        var cheque = (await View(late)).Cheque!.ReceivedChequeId!.Value;
+        await Step(cheque, InstrumentAction.RegisterSayad, Today);
+        Assert.True((await _instruments.DepositForCollectionAsync(new(Key(), cheque, Banks.MelliCurrent, Today), CancellationToken.None)).IsSuccess);
+        await Step(cheque, InstrumentAction.RecordCleared, "1405/10/17");
+        var done = await View(late);
+        Assert.Equal(("Collected", "1405/10/17", "1405/10/17"), (done.State, done.Cheque!.MaturedOn, done.Cheque.CollectedOn));
+        Assert.Equal(["PrepareIssue", "Issue", "RecordMatured", "RecordPaidByBank"],
+            (await _instruments.GetAsync(done.Cheque.IssuedChequeId, CancellationToken.None))!.History.Select(h => h.Action));
+        Assert.Equal([0, 1, 2], (await _transfers.VouchersAsync(late, CancellationToken.None)).Select(v => v.Step));
+    }
+
+    [Fact]
+    public async Task The_receipts_side_waits_for_the_payers_sayad_registration_Q79()
+    {
+        var id = await Issue(Cheque(await Book()) with { SayadRegistered = false });
+        Assert.Null((await View(id)).Cheque!.PayerSayadOn);
+        Assert.True((await _transfers.ReceiveChequeAsync(new(Key(), id, 1), CancellationToken.None)).IsSuccess); // «نزد صندوق» at once
+        var cheque = (await View(id)).Cheque!.ReceivedChequeId!.Value;
+        Assert.Equal("Transfer.PayerSayadRequired",
+            (await _instruments.ChangeStateAsync(new(Key(), cheque, InstrumentAction.RegisterSayad, Today), CancellationToken.None)).ErrorCode);
+
+        Assert.True((await _transfers.RegisterPayerSayadAsync(new(Key(), id, 2, Today), CancellationToken.None)).IsSuccess);
+        Assert.Equal((Today, "Transfer.SayadRegisteredNotCancelled"), ((await View(id)).Cheque!.PayerSayadOn, (await View(id)).Cheque!.WhyNotCancellable));
+        Assert.Equal("Transfer.PayerSayadAlreadyRegistered", (await _transfers.RegisterPayerSayadAsync(new(Key(), id, 3, Today), CancellationToken.None)).ErrorCode);
+        await Step(cheque, InstrumentAction.RegisterSayad, Today);
+        Assert.Equal("SayadRegistered", (await View(id)).Cheque!.ReceivedState);
+        Assert.Equal("Transfer.SayadRegisteredNotCancelled", (await _transfers.CancelChequeAsync(new(Key(), id, 3, Today, "انصراف"), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_cheque_not_registered_in_sayad_voids_its_sheet_and_takes_back_both_sides_and_the_payment_Q79()
+    {
+        var book = await Book();
+        var request = RequestFor(Banks.MellatCurrent, Banks.MelliCurrent, amount: 7_000_000_000);
+        var id = await Issue(Cheque(book) with { SayadRegistered = false, PaymentRequestId = request });
+        Assert.Equal("Paid", _requests.Requests[request].State);
+        Assert.True((await _transfers.ReceiveChequeAsync(new(Key(), id, 1), CancellationToken.None)).IsSuccess);
+        var open = await View(id);
+        Assert.Null(open.Cheque!.WhyNotCancellable);
+
+        Assert.Equal("Transfer.CancelReasonRequired", (await _transfers.CancelChequeAsync(new(Key(), id, 2, Today, ""), CancellationToken.None)).ErrorCode);
+        var cancelled = await _transfers.CancelChequeAsync(new(Key(), id, 2, Today, "انصراف از انتقال"), CancellationToken.None);
+        Assert.True(cancelled.IsSuccess, cancelled.ErrorCode);
+
+        var view = await View(id);
+        Assert.Equal(("Cancelled", Today, "انصراف از انتقال", "Transfer.ChequeCancelled"), (view.State, view.Cheque!.CancelledOn, view.Cheque.CancelReason, view.WhyNotDeletable));
+        Assert.Equal("Cancelled", (await _instruments.GetAsync(view.Cheque.IssuedChequeId, CancellationToken.None))!.State);
+        var received = (await _instruments.GetAsync(view.Cheque.ReceivedChequeId!.Value, CancellationToken.None))!;
+        Assert.Equal(("Cancelled", 0), (received.State, received.AllowedActions.Count)); // no «تعویض»
+        Assert.Empty(await _instruments.ListReceivedAsync(InstrumentState.InCashDesk, CancellationToken.None));
+
+        // The sheet is void — never offered again — and the request is to be paid again.
+        Assert.Equal((1L, 100501L), ((await BookView(book)).UsedSheets, (await BookView(book)).NextSheet!.Value));
+        Assert.Equal("ChequeBook.SheetAlreadyUsed",
+            (await _transfers.IssueChequeAsync(new(Key(), C(Cheque(book, sheet: 100500))), CancellationToken.None)).ErrorCode);
+        Assert.Equal(("Approved", 0m), (_requests.Requests[request].State, _requests.Requests[request].PaidAmount));
+
+        // Four vouchers: the two of the transfer and the two that take them back.
+        var vouchers = await _transfers.VouchersAsync(id, CancellationToken.None);
+        Assert.Equal([0, 1, 3, 4], vouchers.Select(v => v.Step));
+        Assert.Equal([(true, "2105", "600001"), (false, "1109", null)], vouchers[2].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.Equal([(true, "1109", null), (false, "1201", "600001")], vouchers[3].Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode)));
+        Assert.True((await _transfers.ConfirmVoucherAsync(Key(), id, 3, CancellationToken.None)).IsSuccess);
+
+        // A new transfer by cheque is a new, independent cheque on the next sheet.
+        var again = await View(await Issue(Cheque(book) with { PaymentRequestId = request }));
+        Assert.Equal(("100501", "ChequeIssued"), (again.Cheque!.Number, again.State));
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     /// <summary>accounts-svc stand-in: three banks, current accounts with cheque books, a savings account, a closed one.</summary>

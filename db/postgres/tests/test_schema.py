@@ -183,7 +183,7 @@ def test_the_scripts_run_again_over_rows_saved_with_the_newest_values(db):
                      VALUES (1405, %s, 'CardDeposit', 990077, '2026-11-20', %s, 'x', '200015', %s, 'y', 'y', 'test', 'PettyCashCard', %s, 'CardToCard', 10, 'IRR', 10, 'Recorded')""",
                   (card_receipt, uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
         # 20 Nov 2026 (046): «وجوه در راه» saved in the template; 031, 033, 035 and 038 rewrite the list of its keys at every start.
-        keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection", "FundsInTransit")
+        keys = ("ProtestedChequesInLegal", "GuaranteeChequesInLegal", "GuaranteeNotesForCompany", "NotesInCollection", "FundsInTransit", "BankFees", "NotesPayable")
         for k in keys:
             c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '9999') ON CONFLICT DO NOTHING", (k,))
         try:
@@ -1173,6 +1173,19 @@ def test_transfers_between_the_companys_accounts_have_their_numbers_ways_and_lim
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(add, bad)
+        # The owner's answers of 21 Nov 2026: a cancelled cheque transfer (Q79), the bank's fee of an electronic one (Q77), and the
+        # payment request a transfer paid, with the key of that payment (Q82).
+        c.execute("UPDATE cashflow.bank_transfer SET state = 'Cancelled' WHERE fiscal_year = 1405 AND number = 9003")
+        c.execute("""UPDATE cashflow.bank_transfer SET fee_rial = 35000, payment_request_id = %s, payment_request_number = 12, payment_key = 'transfer:x:1'
+                     WHERE fiscal_year = 1405 AND number = 9002""", (uuid.uuid4(),))
+        for bad in ("UPDATE cashflow.bank_transfer SET state = 'Cancelled' WHERE fiscal_year = 1405 AND number = 9002",       # only a cheque is cancelled
+                    "UPDATE cashflow.bank_transfer SET fee_rial = 0 WHERE fiscal_year = 1405 AND number = 9002",
+                    "UPDATE cashflow.bank_transfer SET fee_rial = 100 WHERE fiscal_year = 1405 AND number = 9004",             # a cheque has no fee
+                    "UPDATE cashflow.bank_transfer SET payment_key = NULL WHERE fiscal_year = 1405 AND number = 9002",         # request, number and key together
+                    "UPDATE cashflow.bank_transfer SET state = 'Returned' WHERE fiscal_year = 1405 AND number = 9004"):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(bad)
         # Deleted by mistake: the row stays, marked; the service never removes it.
         c.execute("UPDATE cashflow.bank_transfer SET state = 'Deleted', deleted_by = 'clerk', deleted_at = now() WHERE fiscal_year = 1405 AND number = 9001")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
@@ -1216,20 +1229,22 @@ def test_transfers_between_the_companys_accounts_have_their_numbers_ways_and_lim
 
 
 def test_a_transfer_has_its_vouchers_and_the_company_keeps_changed_limits_when_the_scripts_run_again(db):
-    # 046: confirmed vouchers of a transfer (source 'Transfer': step 0 the payer's or the electronic one, step 1 the receiver's), the
-    # closed-year guard on the transfers, and the seed of the limits, which must not bring back a figure the company changed.
+    # 046: confirmed vouchers of a transfer (source 'Transfer': step 0 the payer's or the electronic one, step 1 the receiver's, step 2
+    # the maturity of a post-dated cheque, steps 3 and 4 the two sides of a cancelled cheque), the closed-year guard on the transfers,
+    # and the seed of the limits, which must not bring back a figure the company changed.
     add = """INSERT INTO cashflow.voucher (fiscal_year, id, source, source_id, step, operation, voucher_date, lines, total_rial, confirmed_by, confirmed_at)
              VALUES (1405, %s, 'Transfer', %s, %s, 'نقل و انتقال بانکی', '2026-11-20', '[]', 1000, 'treasurer', now())"""
     transfer = uuid.uuid4()
     with psycopg.connect(db) as c:
         c.execute("SET ROLE cashflow_svc")
-        c.execute(add, (uuid.uuid4(), transfer, 0))
-        c.execute(add, (uuid.uuid4(), transfer, 1))
-        for step, error in ((1, psycopg.errors.UniqueViolation), (2, psycopg.errors.CheckViolation)):
+        for step in range(5):
+            c.execute(add, (uuid.uuid4(), transfer, step))
+        for step, error in ((1, psycopg.errors.UniqueViolation), (5, psycopg.errors.CheckViolation)):
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(add, (uuid.uuid4(), transfer, step))
-        c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES ('FundsInTransit', '1109') ON CONFLICT DO NOTHING")
+        for key in ("FundsInTransit", "BankFees", "NotesPayable"):
+            c.execute("INSERT INTO cashflow.voucher_account (account_key, ledger_account_code) VALUES (%s, '1109') ON CONFLICT DO NOTHING", (key,))
         c.rollback()
 
     params = psycopg.conninfo.conninfo_to_dict(db)
@@ -1241,6 +1256,20 @@ def test_a_transfer_has_its_vouchers_and_the_company_keeps_changed_limits_when_t
                          source_bank_name, destination_account_id, destination_account_number, destination_bank_id, destination_bank_name, amount, amount_rial, state, recorded_by)
                      VALUES (1404, %s, 9900, '2025-11-20', 'Paya', 'Remote', %s, 'a', %s, 'x', %s, 'b', %s, 'y', 10, 10, 'Recorded', 'clerk')""",
                   (old, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
+        # Rows with the newest values (a cancelled cheque transfer, a voucher of step 4, a request for a transfer between the company's
+        # accounts) must not stop the scripts, which rewrite those lists at every start.
+        newest, voucher, request = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        c.execute("""INSERT INTO cashflow.bank_transfer (fiscal_year, id, number, transfer_date, method, source_account_id, source_account_number, source_bank_id,
+                         source_bank_name, destination_account_id, destination_account_number, destination_bank_id, destination_bank_name, amount, amount_rial, cheque, state, recorded_by)
+                     VALUES (1405, %s, 9901, '2026-11-21', 'Cheque', %s, 'a', %s, 'x', %s, 'b', %s, 'y', 10, 10, '{}', 'Cancelled', 'clerk')""",
+                  (newest, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
+        c.execute(add, (voucher, uuid.uuid4(), 4))
+        c.execute("""INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id, beneficiary_detail_code,
+                         beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority, pay_from_kind, pay_from_id, transfer_to_account_id,
+                         state, recorded_by)
+                     VALUES (1405, %s, 990047, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', '00000000-0000-0000-0000-000000000000', 'نقل و انتقال بین حساب‌های شرکت', 'تأمین موجودی',
+                             1000, 'IRR', 'OwnAccountTransfer', 1, 'BankAccount', %s, %s, 'Registered', 'clerk')""",
+                  (request, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), uuid.uuid4()))
         c.execute("SELECT cashflow.close_fiscal_year(1404)")
         try:
             result = subprocess.run([str(HERE / "apply.sh"), params["dbname"]], env=env, capture_output=True, text=True)
@@ -1253,6 +1282,32 @@ def test_a_transfer_has_its_vouchers_and_the_company_keeps_changed_limits_when_t
             for t in ("cashflow.instrument_event_fy1404", "cashflow.receipt_fy1404", "cashflow.voucher_fy1404", "cashflow.instrument_file_fy1404", "cashflow.bank_transfer_fy1404",
                       "requests.payment_request_fy1404", "requests.request_file_fy1404"):
                 c.execute(f"DROP TRIGGER IF EXISTS closed_year_guard ON {t}")
-            c.execute("DELETE FROM cashflow.bank_transfer WHERE id = %s", (old,))
+            c.execute("DELETE FROM cashflow.bank_transfer WHERE id = ANY(%s)", ([old, newest],))
+            c.execute("DELETE FROM cashflow.voucher WHERE id = %s", (voucher,))
+            c.execute("DELETE FROM requests.payment_request WHERE id = %s", (request,))
             c.execute("UPDATE cashflow.transfer_limit SET max_per_order_remote = 3000000000, max_count_per_day = 5 WHERE method = 'Paya' AND bank_key = ''")
+
+
+def test_a_request_for_a_transfer_between_the_companys_accounts_names_both_accounts(db):
+    # 047_requests_own_account_transfer.sql (owner, 21 Nov 2026, answer to Q82: every transfer needs a payment request and its approval).
+    add = """INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id, beneficiary_detail_code,
+                 beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority, transfer_account, pay_from_kind, pay_from_id,
+                 transfer_to_account_id, state, recorded_by)
+             VALUES (1405, %s, %s, '2026-11-21', %s, 'r', %s, '', 'بانک ملی – 0202-1', %s, 'نقل و انتقال بین حساب‌های شرکت', 'تأمین موجودی', 1000, 'IRR', %s, 1, %s, %s, %s, %s,
+                     'Registered', 'clerk')"""
+    source, destination = uuid.uuid4(), uuid.uuid4()
+    row = lambda n, method="OwnAccountTransfer", account=None, kind="BankAccount", pay_from=source, to=destination: (
+        uuid.uuid4(), n, uuid.uuid4(), to or uuid.uuid4(), uuid.UUID(int=0), method, account, kind, pay_from, to)
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE requests_svc")
+        c.execute(add, row(990100))
+        for bad in (row(990101, to=None),                               # the receiving account is required
+                    row(990101, pay_from=None, kind=None),              # and the account the money leaves
+                    row(990101, to=source),                             # two different accounts
+                    row(990101, kind="CashDesk"),                       # between bank accounts
+                    row(990101, method="Transfer", account="IR1")):     # another kind of request has no receiving company account
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add, bad)
+        c.rollback()
 

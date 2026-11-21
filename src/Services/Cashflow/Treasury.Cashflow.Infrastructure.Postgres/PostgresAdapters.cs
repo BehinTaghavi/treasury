@@ -612,6 +612,16 @@ public sealed class PostgresChequeBookRepository : IChequeBookRepository
             loaded.Add(sheet);
         }
 
+        // A sheet that was issued and is now void (the cheque of a transfer cancelled before its Sayad registration, owner's answer to
+        // Q79): until 21 Nov 2026 only new sheets were written, so voiding an issued sheet was lost here.
+        foreach (var (sheet, _) in book.UsedSheets.Where(kv => kv.Value == SheetUse.Voided && loaded.Contains(kv.Key)))
+        {
+            await using var cmd = tx.Command("UPDATE cashflow.cheque_sheet SET sheet_use = 'Voided' WHERE cheque_book_id = @book AND sheet = @sheet AND sheet_use <> 'Voided'");
+            cmd.Parameters.AddWithValue("book", book.Id);
+            cmd.Parameters.AddWithValue("sheet", sheet);
+            await cmd.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
         // A sheet freed by ChequeBook.Release (the cheque of a transfer deleted before its voucher was confirmed, schema 046).
         foreach (var sheet in loaded.Where(sheet => !book.UsedSheets.ContainsKey(sheet)).ToList())
         {

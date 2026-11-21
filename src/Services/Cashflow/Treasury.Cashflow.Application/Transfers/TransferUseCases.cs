@@ -10,9 +10,11 @@ using Treasury.Cashflow.Domain.Vouchers;
 namespace Treasury.Cashflow.Application.Transfers;
 
 /// <summary>The form of an electronic transfer; dates are Jalali text at this edge.</summary>
+/// <param name="PaymentRequestId">The approved payment request of the kind «نقل و انتقال بین حساب‌های شرکت» the transfer pays (answer to Q82).</param>
+/// <param name="Fee">The bank's fee of the order in Rial («کارمزد خدمات بانکی»), when there is one (answer to Q77).</param>
 public sealed record ElectronicTransferInput(
     string Date, Guid SourceAccountId, Guid DestinationAccountId, TransferMethod Method, TransferChannel? Channel, decimal Amount, decimal? RateToRial = null,
-    string? TrackingNumber = null, string? Description = null);
+    string? TrackingNumber = null, string? Description = null, Guid? PaymentRequestId = null, decimal? Fee = null);
 
 public sealed record RecordElectronicTransferCommand(string IdempotencyKey, ElectronicTransferInput Form);
 
@@ -23,9 +25,12 @@ public sealed record DeleteTransferCommand(string IdempotencyKey, Guid TransferI
 /// <summary>The payment form «پرداخت چک – نقل و انتقال (انتقال دهنده)».</summary>
 /// <param name="Sheet">The sheet of the cheque book; null takes the lowest unused one.</param>
 /// <param name="SayadPrefix">The first four digits of the sheet's Sayad ID, which differ on every sheet and are typed when it is issued.</param>
+/// <param name="PaymentRequestId">The approved payment request the transfer pays (answer to Q82).</param>
+/// <param name="SayadRegistered">The cheque is registered in Sayad as it is issued («پرداخت ثبت صیاد شد»); false: it is registered later
+/// on the payment side, and until then it can be cancelled (answer to Q79).</param>
 public sealed record TransferChequeInput(
     string Date, Guid SourceAccountId, Guid DestinationAccountId, Guid ChequeBookId, long? Sheet, string SayadPrefix, decimal Amount, string DueDate,
-    string? Description = null, decimal? RateToRial = null);
+    string? Description = null, decimal? RateToRial = null, Guid? PaymentRequestId = null, bool SayadRegistered = true);
 
 public sealed record IssueTransferChequeCommand(string IdempotencyKey, TransferChequeInput Form);
 
@@ -34,6 +39,12 @@ public sealed record IssueTransferChequeCommand(string IdempotencyKey, TransferC
 public sealed record ReceiveTransferChequeCommand(string IdempotencyKey, Guid TransferId, long ExpectedVersion, string? Date = null);
 
 public sealed record UndoTransferReceiptCommand(string IdempotencyKey, Guid TransferId, long ExpectedVersion);
+
+/// <summary>A dated step of the transfer's cheque on the payment side: «ثبت صیادی پرداخت» or «سررسید». Empty date: today.</summary>
+public sealed record TransferChequeStepCommand(string IdempotencyKey, Guid TransferId, long ExpectedVersion, string? Date = null);
+
+/// <summary>«ابطال چک نقل و انتقال» with its reason (answer to Q79). Empty date: today.</summary>
+public sealed record CancelTransferChequeCommand(string IdempotencyKey, Guid TransferId, long ExpectedVersion, string? Date, string? Reason);
 
 /// <summary>One row of «سقف‌های انتقال الکترونیکی»; an empty value is "no limit".</summary>
 public sealed record TransferLimitView(
@@ -49,11 +60,16 @@ public sealed record SetTransferLimitCommand(
     decimal? MaxPerDayInPerson, decimal? MaxPerDayRemote, int? MaxCountPerDay);
 
 /// <param name="ReceivedState">The latest state of the cheque on the receipts side («نزد صندوق», «ثبت صیادی شد», «واگذار به بانک»…).</param>
+/// <param name="PayerSayadOn">The day the payer registered the cheque in Sayad («پرداخت ثبت صیاد شد»); null: not yet.</param>
+/// <param name="CanMature">A post-dated cheque whose due date has come and whose maturity («سررسید») is not recorded yet.</param>
+/// <param name="WhyNotCancellable">The code of the rule that closes «ابطال چک», or null.</param>
 public sealed record TransferChequeView(
     Guid IssuedChequeId, Guid ChequeBookId, string Number, string SayadId, string DueDate, Guid? ReceivedChequeId, string? ReceivedOn, string? CollectedOn,
-    string? ReceivedState, bool ReachedDueDate);
+    string? ReceivedState, bool ReachedDueDate, string? PayerSayadOn = null, bool IsPostDated = false, string? MaturedOn = null, bool CanMature = false,
+    string? CancelledOn = null, string? CancelReason = null, string? WhyNotCancellable = null);
 
-/// <param name="State">Recorded, ChequeIssued, ChequeReceived, Collected or Deleted.</param>
+/// <param name="State">Recorded, ChequeIssued, ChequeReceived, Collected, Deleted or Cancelled.</param>
+/// <param name="ConfirmedSteps">The voucher steps the treasurer confirmed (0 payer or electronic, 1 receiver, 2 maturity, 3 and 4 cancellation).</param>
 /// <param name="WhyNotCorrectable">The code of the rule that closes «ویرایش», or null.</param>
 /// <param name="WhyNotDeletable">The code of the rule that closes «حذف», or null.</param>
 /// <param name="CanUndoReceive">The receipts-side record can still be taken back.</param>
@@ -63,7 +79,8 @@ public sealed record TransferView(
     Guid DestinationAccountId, string DestinationAccountNumber, Guid DestinationBankId, string DestinationBankName,
     decimal Amount, string Currency, decimal? RateToRial, decimal AmountRial, string? TrackingNumber, string? Description, string State, string RecordedBy,
     string? DeletedBy, DateTimeOffset? DeletedAt, TransferChequeView? Cheque, bool PayerVoucherConfirmed, bool ReceiverVoucherConfirmed,
-    string? WhyNotCorrectable, string? WhyNotDeletable, bool CanUndoReceive, long Version);
+    string? WhyNotCorrectable, string? WhyNotDeletable, bool CanUndoReceive, long Version, decimal? Fee = null, Guid? PaymentRequestId = null,
+    int? PaymentRequestNumber = null, IReadOnlyList<int>? ConfirmedSteps = null);
 
 /// <summary>
 /// Transfers between the company's own bank accounts («نقل و انتقال بین بانکی», owner's report no. 7 of 20 Nov 2026): the electronic
@@ -83,6 +100,7 @@ public sealed class TransferUseCases(
     IConfirmedVoucherRepository vouchers,
     IIdempotencyStore idempotency,
     ICurrentUser currentUser,
+    IPaymentRequestLookup paymentRequests,
     TimeProvider? clock = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
@@ -130,6 +148,7 @@ public sealed class TransferUseCases(
             var number = await transfers.NextNumberAsync(form.Date.JalaliYear, ct).ConfigureAwait(false);
             var transfer = BankTransfer.RecordElectronic(Guid.NewGuid(), number, form, table, usage, currentUser.UserId);
             await MarkAccountsAsync(transfer, ct).ConfigureAwait(false);
+            await PayRequestAsync(transfer, ct).ConfigureAwait(false);
             await transfers.AddAsync(transfer, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(transfer.Id);
         }, cancellationToken);
@@ -140,10 +159,16 @@ public sealed class TransferUseCases(
         {
             var transfer = await LoadAsync(command.TransferId, command.ExpectedVersion, ct).ConfigureAwait(false);
             await EnsureOpenAsync(transfer.Date, ct).ConfigureAwait(false);
-            var (form, table, usage) = await ElectronicAsync(command.Form, transfer.Id, ct).ConfigureAwait(false);
+            var (form, table, usage) = await ElectronicAsync(command.Form, transfer, ct).ConfigureAwait(false);
             var confirmed = await ConfirmedAsync(transfer.Id, TransferVouchers.PayerStep, ct).ConfigureAwait(false);
+            var paid = transfer.Request;
             transfer.CorrectElectronic(form, table, usage, currentUser.UserId, confirmed);
             await MarkAccountsAsync(transfer, ct).ConfigureAwait(false);
+
+            // The payment the transfer made on its request is taken back and recorded again as the transfer now is (another amount,
+            // perhaps another request).
+            await TakeBackPaymentAsync(paid, ct).ConfigureAwait(false);
+            await PayRequestAsync(transfer, ct).ConfigureAwait(false);
             await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(transfer.Id);
         }, cancellationToken);
@@ -155,9 +180,10 @@ public sealed class TransferUseCases(
         {
             return await unitOfWork.ExecuteAsync(async ct =>
             {
-                var (form, table, usage) = await ElectronicAsync(input, correctingId, ct).ConfigureAwait(false);
+                var correcting = correctingId is { } id ? await transfers.GetAsync(id, ct).ConfigureAwait(false) : null;
+                var (form, table, usage) = await ElectronicAsync(input, correcting, ct).ConfigureAwait(false);
                 var transfer = BankTransfer.RecordElectronic(Guid.NewGuid(), 1, form, table, usage, currentUser.UserId);
-                var voucher = TransferVouchers.ForElectronic(transfer, Side(form.Source), Side(form.Destination));
+                var voucher = TransferVouchers.ForElectronic(transfer, Side(form.Source), Side(form.Destination), await templates.GetAsync(ct).ConfigureAwait(false));
                 return Result<VoucherView>.Ok(VoucherView.From(voucher with { Operation = TransferVouchers.OperationName(form.Method) }, "Transfer", TransferVouchers.PayerStep));
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -179,6 +205,7 @@ public sealed class TransferUseCases(
         {
             var (transfer, issued, book) = await BuildChequeAsync(command.Form, preview: false, ct).ConfigureAwait(false);
             await MarkAccountsAsync(transfer, ct).ConfigureAwait(false);
+            await PayRequestAsync(transfer, ct).ConfigureAwait(false);
             await chequeBooks.SaveAsync(book, ct).ConfigureAwait(false);
             await instruments.AddAsync(issued, ct).ConfigureAwait(false);
             await transfers.AddAsync(transfer, ct).ConfigureAwait(false);
@@ -285,6 +312,76 @@ public sealed class TransferUseCases(
                 await instruments.RemoveAsync(issued, ct).ConfigureAwait(false);
             }
 
+            await TakeBackPaymentAsync(transfer.Request, ct).ConfigureAwait(false);
+            await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(transfer.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// «ثبت صیادی پرداخت»: the payer's registration of the cheque in Sayad, when it was not done as the cheque was issued. From then on
+    /// the cheque is not cancelled and the receipts side may record its own «ثبت صیادی» (answer to Q79).
+    /// </summary>
+    public Task<Result<Guid>> RegisterPayerSayadAsync(TransferChequeStepCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var transfer = await LoadAsync(command.TransferId, command.ExpectedVersion, ct).ConfigureAwait(false);
+            var date = DateOrToday(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            transfer.RegisterPayerSayad(date, currentUser.UserId);
+            await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(transfer.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// «سررسید» of a post-dated transfer cheque (answer to Q81): on or after its due date the cheque leaves «اسناد پرداختنی» for the
+    /// bank; the issued cheque is marked matured and the transfer gets its maturity voucher.
+    /// </summary>
+    public Task<Result<Guid>> MatureChequeAsync(TransferChequeStepCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var transfer = await LoadAsync(command.TransferId, command.ExpectedVersion, ct).ConfigureAwait(false);
+            var date = DateOrToday(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            transfer.RecordMatured(date, currentUser.UserId);
+            var issued = await instruments.GetAsync(transfer.Cheque!.IssuedChequeId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+            issued.RecordMatured(date, currentUser.UserId);
+            await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
+            await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+            return Result<Guid>.Ok(transfer.Id);
+        }, cancellationToken);
+
+    /// <summary>
+    /// «ابطال چک نقل و انتقال» (answer to Q79), only while the cheque is not registered in Sayad: the issued cheque is cancelled and its
+    /// sheet voided (it is never used again), the received cheque — if the cheque is already on the receipts side — is cancelled too,
+    /// and the payment is taken off the payment request, all in one transaction. A new transfer by cheque is a new cheque.
+    /// </summary>
+    public Task<Result<Guid>> CancelChequeAsync(CancelTransferChequeCommand command, CancellationToken cancellationToken) =>
+        Run(command.IdempotencyKey, async ct =>
+        {
+            var transfer = await LoadAsync(command.TransferId, command.ExpectedVersion, ct).ConfigureAwait(false);
+            var date = DateOrToday(command.Date);
+            await EnsureOpenAsync(date, ct).ConfigureAwait(false);
+            var user = currentUser.UserId;
+            transfer.CancelCheque(date, command.Reason, user);
+            var cheque = transfer.Cheque!;
+            var issued = await instruments.GetAsync(cheque.IssuedChequeId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+            issued.Cancel(date, user, cheque.CancelReason!);
+            var book = await chequeBooks.GetForUpdateAsync(cheque.ChequeBookId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("ChequeBook.NotFound", "Cheque book was not found.");
+            book.Void(cheque.Sheet, cheque.CancelReason!);
+            if (cheque.ReceivedChequeId is { } receivedId)
+            {
+                var received = await instruments.GetAsync(receivedId, ct).ConfigureAwait(false)
+                    ?? throw new DomainException("Instrument.NotFound", "The received cheque of the transfer was not found.");
+                received.CancelTransferCheque(transfer.Id, date, user, cheque.CancelReason!);
+                await instruments.SaveAsync(received, ct).ConfigureAwait(false);
+            }
+
+            await TakeBackPaymentAsync(transfer.Request, ct).ConfigureAwait(false);
+            await chequeBooks.SaveAsync(book, ct).ConfigureAwait(false);
+            await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
             await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
             return Result<Guid>.Ok(transfer.Id);
         }, cancellationToken);
@@ -326,7 +423,7 @@ public sealed class TransferUseCases(
             var confirmed = (await vouchers.ListBySourceAsync(transferId, ct).ConfigureAwait(false))
                 .Where(v => v.Source == VoucherSource.Transfer).ToDictionary(v => v.Step);
             var list = new List<VoucherView>();
-            foreach (var step in new[] { TransferVouchers.PayerStep, TransferVouchers.ReceiverStep })
+            foreach (var step in TransferVouchers.Steps)
             {
                 if (confirmed.TryGetValue(step, out var c))
                 {
@@ -366,24 +463,26 @@ public sealed class TransferUseCases(
 
     private async Task<Voucher?> ComputeAsync(BankTransfer transfer, int step, CancellationToken ct)
     {
-        if (step == TransferVouchers.PayerStep)
+        var template = await templates.GetAsync(ct).ConfigureAwait(false);
+        if (step is TransferVouchers.ReceiverStep or TransferVouchers.ReceiverCancelStep)
         {
-            var source = Side(await bankAccounts.GetAsync(transfer.Source.Id, ct).ConfigureAwait(false));
-            if (transfer.IsCheque)
-            {
-                return TransferVouchers.ForChequeIssued(transfer, source, await templates.GetAsync(ct).ConfigureAwait(false));
-            }
-
-            return TransferVouchers.ForElectronic(transfer, source, Side(await bankAccounts.GetAsync(transfer.Destination.Id, ct).ConfigureAwait(false)));
+            // The تفصیل of «اسناد نزد صندوق» is the one kept on the received cheque: the source bank account's (Q78).
+            var received = transfer.Cheque?.ReceivedChequeId is { } receivedId ? await instruments.GetAsync(receivedId, ct).ConfigureAwait(false) : null;
+            return received is null ? null
+                : step == TransferVouchers.ReceiverStep ? TransferVouchers.ForChequeReceived(transfer, received.Counterparty.DetailCode, template)
+                : TransferVouchers.ForChequeCancelledByReceiver(transfer, received.Counterparty.DetailCode, template);
         }
 
-        if (step == TransferVouchers.ReceiverStep && transfer.Cheque?.ReceivedChequeId is { } receivedId)
+        var source = Side(await bankAccounts.GetAsync(transfer.Source.Id, ct).ConfigureAwait(false));
+        return step switch
         {
-            var received = await instruments.GetAsync(receivedId, ct).ConfigureAwait(false);
-            return TransferVouchers.ForChequeReceived(transfer, received?.Counterparty.DetailCode, await templates.GetAsync(ct).ConfigureAwait(false));
-        }
-
-        return null;
+            TransferVouchers.PayerStep when transfer.IsCheque => TransferVouchers.ForChequeIssued(transfer, source, template),
+            TransferVouchers.PayerStep =>
+                TransferVouchers.ForElectronic(transfer, source, Side(await bankAccounts.GetAsync(transfer.Destination.Id, ct).ConfigureAwait(false)), template),
+            TransferVouchers.MaturityStep => TransferVouchers.ForChequeMatured(transfer, source, template),
+            TransferVouchers.PayerCancelStep => TransferVouchers.ForChequeCancelledByPayer(transfer, source, template),
+            _ => null,
+        };
     }
 
     // ----- helpers ----------------------------------------------------------------------------------------------------------------
@@ -399,8 +498,12 @@ public sealed class TransferUseCases(
         if (t.Cheque is { } c)
         {
             var received = c.ReceivedChequeId is { } id ? await instruments.GetAsync(id, ct).ConfigureAwait(false) : null;
+            var today = IranClock.Today(clock);
+            var open = t.State is TransferState.ChequeIssued or TransferState.ChequeReceived;
             cheque = new TransferChequeView(c.IssuedChequeId, c.ChequeBookId, c.Number, c.SayadId, c.DueDate.ToJalaliString(), c.ReceivedChequeId,
-                c.ReceivedOn?.ToJalaliString(), c.CollectedOn?.ToJalaliString(), received?.State.ToString(), received?.HasReachedDueDate(IranClock.Today(clock)) ?? false);
+                c.ReceivedOn?.ToJalaliString(), c.CollectedOn?.ToJalaliString(), received?.State.ToString(), received?.HasReachedDueDate(today) ?? false,
+                c.PayerSayadOn?.ToJalaliString(), t.IsPostDated, c.MaturedOn?.ToJalaliString(), open && t.IsPostDated && c.MaturedOn is null && today >= c.DueDate,
+                c.CancelledOn?.ToJalaliString(), c.CancelReason, t.WhyNotCancellable());
             canUndo = t.State == TransferState.ChequeReceived && received is { IsAsReceived: true } && !receiverConfirmed;
         }
 
@@ -409,11 +512,13 @@ public sealed class TransferUseCases(
             t.Source.Id, t.Source.AccountNumber, t.Source.BankId, t.Source.BankName,
             t.Destination.Id, t.Destination.AccountNumber, t.Destination.BankId, t.Destination.BankName,
             t.Amount.Amount, t.Amount.Currency, t.Amount.RateToRial, t.Amount.ToRial(), t.TrackingNumber, t.Description, t.State.ToString(), t.RecordedBy,
-            t.DeletedBy, t.DeletedAt, cheque, payerConfirmed, receiverConfirmed, t.WhyNotCorrectable(payerConfirmed), t.WhyNotDeletable(payerConfirmed), canUndo, t.Version);
+            t.DeletedBy, t.DeletedAt, cheque, payerConfirmed, receiverConfirmed, t.WhyNotCorrectable(payerConfirmed), t.WhyNotDeletable(payerConfirmed), canUndo, t.Version,
+            t.FeeRial, t.Request?.Id, t.Request?.Number, [.. confirmed.Order()]);
     }
 
+    /// <param name="correcting">The transfer being corrected; null for a new one.</param>
     private async Task<(ElectronicTransferForm Form, TransferLimits Limits, TransferDayUsage Usage)> ElectronicAsync(
-        ElectronicTransferInput input, Guid? correctingId, CancellationToken ct)
+        ElectronicTransferInput input, BankTransfer? correcting, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
         var date = ParseDate(input.Date);
@@ -421,9 +526,10 @@ public sealed class TransferUseCases(
         var source = await AccountAsync(input.SourceAccountId, ct).ConfigureAwait(false);
         var destination = await AccountAsync(input.DestinationAccountId, ct).ConfigureAwait(false);
         var amount = ToMoney(input.Amount, source.CurrencyCode, input.RateToRial);
-        var form = new ElectronicTransferForm(date, source, destination, input.Method, input.Channel, amount, input.TrackingNumber, input.Description);
+        var request = await RequestAsync(input.PaymentRequestId, correcting, ct).ConfigureAwait(false);
+        var form = new ElectronicTransferForm(date, source, destination, input.Method, input.Channel, amount, input.TrackingNumber, input.Description, request, input.Fee);
         var usage = input.Channel is { } channel && Enum.IsDefined(input.Method)
-            ? await transfers.DayUsageAsync(source.Id, date, input.Method, channel, correctingId, ct).ConfigureAwait(false)
+            ? await transfers.DayUsageAsync(source.Id, date, input.Method, channel, correcting?.Id, ct).ConfigureAwait(false)
             : TransferDayUsage.None;
         return (form, await limits.GetAsync(ct).ConfigureAwait(false), usage);
     }
@@ -472,9 +578,57 @@ public sealed class TransferUseCases(
         // The cheque number keeps the leading zeros of the printed serial (owner, 12 Nov 2026).
         issued.Issue(book.Id, book.SerialText(sheet), date, user);
         var number = preview ? 1 : await transfers.NextNumberAsync(date.JalaliYear, ct).ConfigureAwait(false);
-        var transfer = BankTransfer.IssueCheque(transferId, number, date, source, destination, issued, book.Id, sheet, sayadId, input.Description, user);
+        var request = await RequestAsync(input.PaymentRequestId, null, ct).ConfigureAwait(false);
+        var transfer = BankTransfer.IssueCheque(transferId, number, date, source, destination, issued, book.Id, sheet, sayadId, input.Description, user, request,
+            input.SayadRegistered);
         return (transfer, issued, book);
     }
+
+    /// <summary>
+    /// The payment request the transfer is to pay, as requests-svc describes it (answer to Q82); null when none was chosen (the domain
+    /// then asks for one). For a correction, what the transfer already paid on the same request counts as still to be paid.
+    /// </summary>
+    private async Task<TransferRequestFact?> RequestAsync(Guid? requestId, BankTransfer? correcting, CancellationToken ct)
+    {
+        if (requestId is not { } id || id == Guid.Empty)
+        {
+            return null;
+        }
+
+        var r = await paymentRequests.GetAsync(id, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Transfer.RequestNotFound", "The payment request of the transfer was not found.");
+        var own = correcting is { Request: { } paid } && paid.Id == r.Id ? correcting.Amount.Amount : 0;
+        return new TransferRequestFact(r.Id, r.Number, r.State == "Approved" || (own > 0 && r.State == "Paid"), r.Method == "OwnAccountTransfer", r.PayFromId,
+            r.TransferToAccountId, r.Amount - r.PaidAmount + own);
+    }
+
+    /// <summary>
+    /// Records the transfer as a payment on its request in requests-svc, under the key the transfer keeps; a refusal comes back as the
+    /// request's own error code and nothing of the transfer is saved.
+    /// </summary>
+    private async Task PayRequestAsync(BankTransfer transfer, CancellationToken ct)
+    {
+        if (transfer.Request is not { } request)
+        {
+            return;
+        }
+
+        var what = transfer.Cheque is { } c ? $"چک {c.Number} {transfer.Source.BankName}" : TransferVouchers.OperationName(transfer.Method);
+        await paymentRequests.RecordPaymentAsync(request.Id,
+            new RequestPaymentInput(request.PaymentKey, transfer.Cheque?.IssuedChequeId, $"نقل و انتقال شماره {transfer.Number} – {what}", transfer.Amount.Amount,
+                transfer.Amount.Currency, transfer.Date.ToJalaliString(), "BankTransfer"), ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Takes the transfer's payment off its request (a deleted or corrected transfer, a cancelled cheque): the request is to be paid again.</summary>
+    private async Task TakeBackPaymentAsync(TransferRequest? request, CancellationToken ct)
+    {
+        if (request is not null)
+        {
+            await paymentRequests.ReversePaymentAsync(request.Id, request.PaymentKey, ct).ConfigureAwait(false);
+        }
+    }
+
+    private FiscalDate DateOrToday(string? text) => string.IsNullOrWhiteSpace(text) ? IranClock.Today(clock) : FiscalDate.ParseJalali(text);
 
     /// <summary>The bank account as accounts-svc describes it, with its bank's name from reference-svc.</summary>
     private async Task<TransferAccountFact> AccountAsync(Guid id, CancellationToken ct)

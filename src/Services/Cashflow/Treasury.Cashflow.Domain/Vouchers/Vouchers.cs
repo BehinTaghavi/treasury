@@ -52,6 +52,18 @@ public enum FixedAccount
     /// صندوق، بستانکار: وجوه در راه»).
     /// </summary>
     FundsInTransit,
+
+    /// <summary>
+    /// «هزینه کارمزد خدمات بانکی»: one general expense account of the company (a معین or معین در معین among the financial expenses),
+    /// debited with the bank's fee of a transfer (owner, 21 Nov 2026, answer to Q77: «مانند مطالبات سوخت شده یک حساب عمومی»).
+    /// </summary>
+    BankFees,
+
+    /// <summary>
+    /// «اسناد پرداختنی»: post-dated cheques the company issued, until their due date (owner, 21 Nov 2026, answer to Q81: «حساب اسناد
+    /// پرداختنی بستانکار تا سررسید چک»; his voucher table, «پرداخت چک مدت دار»).
+    /// </summary>
+    NotesPayable,
 }
 
 /// <summary>
@@ -410,7 +422,8 @@ public enum VoucherSource
 
     /// <summary>
     /// A transfer between two bank accounts of the company: step 0 is the voucher of an electronic transfer, or of the payment side of
-    /// a cheque transfer («انتقال دهنده»); step 1 the voucher of its receipts side («انتقال گیرنده»).
+    /// a cheque transfer («انتقال دهنده»); step 1 the voucher of its receipts side («انتقال گیرنده»); step 2 the maturity of a post-dated
+    /// cheque; steps 3 and 4 the payer's and the receiver's side of a cancelled cheque.
     /// </summary>
     Transfer,
 }

@@ -128,33 +128,37 @@ public sealed record BankTransferSnapshot(
     Guid SourceAccountId, string SourceAccountNumber, Guid SourceBankId, string SourceBankName,
     Guid DestinationAccountId, string DestinationAccountNumber, Guid DestinationBankId, string DestinationBankName,
     decimal Amount, string Currency, decimal? RateToRial, decimal AmountRial, string? TrackingNumber, string? Description, TransferChequeSnapshot? Cheque,
-    TransferState State, string RecordedBy, string? DeletedBy, DateTimeOffset? DeletedAt, long Version)
+    TransferState State, string RecordedBy, string? DeletedBy, DateTimeOffset? DeletedAt, long Version, decimal? FeeRial = null, Guid? RequestId = null,
+    int? RequestNumber = null, string? RequestPaymentKey = null)
 {
     public static BankTransferSnapshot From(BankTransfer t, long version) => new(
         t.Id, t.FiscalYear, t.Number, t.Date.Value, t.Method, t.Channel,
         t.Source.Id, t.Source.AccountNumber, t.Source.BankId, t.Source.BankName,
         t.Destination.Id, t.Destination.AccountNumber, t.Destination.BankId, t.Destination.BankName,
         t.Amount.Amount, t.Amount.Currency, t.Amount.RateToRial, t.Amount.ToRial(), t.TrackingNumber, t.Description, TransferChequeSnapshot.From(t.Cheque),
-        t.State, t.RecordedBy, t.DeletedBy, t.DeletedAt, version);
+        t.State, t.RecordedBy, t.DeletedBy, t.DeletedAt, version, t.FeeRial, t.Request?.Id, t.Request?.Number, t.Request?.PaymentKey);
 
     public BankTransfer ToDomain() => BankTransfer.Restore(
         Id, Number, FiscalYear, new FiscalDate(Date), Method, Channel,
         new TransferAccount(SourceAccountId, SourceAccountNumber, SourceBankId, SourceBankName),
         new TransferAccount(DestinationAccountId, DestinationAccountNumber, DestinationBankId, DestinationBankName),
         Currency == Money.Rial ? Money.Rials(Amount) : Money.Foreign(Amount, Currency, RateToRial ?? 0),
-        TrackingNumber, Description, Cheque?.ToDomain(), State, RecordedBy, DeletedBy, DeletedAt, Version);
+        TrackingNumber, Description, Cheque?.ToDomain(), State, RecordedBy, DeletedBy, DeletedAt, Version, FeeRial,
+        RequestId is { } requestId ? new TransferRequest(requestId, RequestNumber ?? 0, RequestPaymentKey ?? string.Empty) : null);
 }
 
 /// <summary>Storable form of <see cref="TransferCheque"/> (JSON in cashflow.bank_transfer.cheque); dates are ISO dates.</summary>
 public sealed record TransferChequeSnapshot(
     Guid IssuedChequeId, Guid ChequeBookId, long Sheet, string Number, string SayadId, DateOnly DueDate, Guid? ReceivedChequeId = null, DateOnly? ReceivedOn = null,
-    DateOnly? CollectedOn = null)
+    DateOnly? CollectedOn = null, DateOnly? PayerSayadOn = null, DateOnly? MaturedOn = null, DateOnly? CancelledOn = null, string? CancelReason = null)
 {
     public static TransferChequeSnapshot? From(TransferCheque? c) => c is null ? null
-        : new(c.IssuedChequeId, c.ChequeBookId, c.Sheet, c.Number, c.SayadId, c.DueDate.Value, c.ReceivedChequeId, c.ReceivedOn?.Value, c.CollectedOn?.Value);
+        : new(c.IssuedChequeId, c.ChequeBookId, c.Sheet, c.Number, c.SayadId, c.DueDate.Value, c.ReceivedChequeId, c.ReceivedOn?.Value, c.CollectedOn?.Value,
+            c.PayerSayadOn?.Value, c.MaturedOn?.Value, c.CancelledOn?.Value, c.CancelReason);
 
     public TransferCheque ToDomain() => new(IssuedChequeId, ChequeBookId, Sheet, Number, SayadId, new FiscalDate(DueDate), ReceivedChequeId,
-        ReceivedOn is { } r ? new FiscalDate(r) : null, CollectedOn is { } c ? new FiscalDate(c) : null);
+        ReceivedOn is { } r ? new FiscalDate(r) : null, CollectedOn is { } c ? new FiscalDate(c) : null, PayerSayadOn is { } s ? new FiscalDate(s) : null,
+        MaturedOn is { } m ? new FiscalDate(m) : null, CancelledOn is { } x ? new FiscalDate(x) : null, CancelReason);
 }
 
 public sealed record ChequeFormatSnapshot(Guid Id, int Number, Guid? BankAccountId, ChequePrintType PrintType, string? ImageType, bool IsActive, long Version)

@@ -270,12 +270,17 @@ public interface ICurrentUser
 
 /// <summary>What requests-svc says about a payment request (answer to Q36: an endorsed cheque pays an approved request).</summary>
 /// <param name="TransferChequeId">A request of the kind «ثبت انتقال (خرج چک)»: the received cheque it names (owner, 19 Nov 2026).</param>
+/// <param name="Method">The request's kind of payment; "OwnAccountTransfer" is «نقل و انتقال بین حساب‌های شرکت» (owner, 21 Nov 2026).</param>
+/// <param name="PayFromId">The bank account (or cash desk) the request is paid from; for a transfer the account the money leaves.</param>
+/// <param name="TransferToAccountId">A transfer between the company's accounts: the account the money reaches.</param>
 public sealed record PaymentRequestFact(
     Guid Id, int Number, string State, string BeneficiaryDetailCode, string BeneficiaryName, Guid PurposeGroupId, string Purpose, decimal Amount,
-    string Currency, decimal PaidAmount, Guid? TransferChequeId = null);
+    string Currency, decimal PaidAmount, Guid? TransferChequeId = null, string? Method = null, Guid? PayFromId = null, Guid? TransferToAccountId = null);
 
 /// <summary>A payment made by a received cheque on a request; <see cref="Key"/> makes a repeated call harmless.</summary>
-public sealed record RequestPaymentInput(string Key, Guid InstrumentId, string Reference, decimal Amount, string Currency, string Date);
+/// <param name="InstrumentId">The cheque or note that paid; null for a transfer between the company's accounts.</param>
+/// <param name="Kind">"EndorsedCheque" for a received cheque or note handed on; "BankTransfer" for a transfer between the company's accounts.</param>
+public sealed record RequestPaymentInput(string Key, Guid? InstrumentId, string Reference, decimal Amount, string Currency, string Date, string Kind = "EndorsedCheque");
 
 /// <summary>Payment requests in requests-svc, over its API (ADR 0001).</summary>
 public interface IPaymentRequestLookup

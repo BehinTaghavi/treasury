@@ -222,6 +222,12 @@ public sealed class InstrumentUseCases(
                     instrument.ReturnFromBank(date, user, command.Note);
                     break;
                 case InstrumentAction.RegisterSayad:
+                    // A transfer cheque (owner, 21 Nov 2026, answer to Q79): the receipts side registers it in Sayad only after the payer did.
+                    if (transfers is not null && instrument.Details.TransferId is { } ofTransfer)
+                    {
+                        (await transfers.GetAsync(ofTransfer, ct).ConfigureAwait(false))?.EnsureReceiverMayRegisterSayad();
+                    }
+
                     // Owner, 18 Nov 2026: «ثبت صیادی شد»; the reference is the tracking number of the registration, when typed.
                     instrument.RegisterSayad(date, user, command.Reference, command.Note);
                     break;
@@ -290,9 +296,18 @@ public sealed class InstrumentUseCases(
 
         var transfer = await transfers.GetAsync(transferId, ct).ConfigureAwait(false)
             ?? throw new DomainException("Transfer.NotFound", "The transfer of this cheque was not found.");
-        transfer.MarkCollected(date);
         var issued = await instruments.GetAsync(transfer.Cheque!.IssuedChequeId, ct).ConfigureAwait(false)
             ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+
+        // A post-dated cheque whose maturity («سررسید») was not recorded on the payment side leaves «اسناد پرداختنی» now: it has been
+        // paid out of the bank account (owner's answer to Q81: «به محض سررسید شدن از حساب بانک خارج»).
+        if (transfer.IsPostDated && transfer.Cheque.MaturedOn is null)
+        {
+            transfer.RecordMatured(date, currentUser.UserId);
+            issued.RecordMatured(date, currentUser.UserId);
+        }
+
+        transfer.MarkCollected(date);
         issued.RecordPaidByBank(date, currentUser.UserId, reference);
         await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
         await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);

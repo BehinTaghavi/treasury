@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS cashflow.bank_transfer (
     tracking_number             text,
     description                 text,
     cheque                      jsonb,
-    state                       text           NOT NULL CHECK (state IN ('Recorded', 'ChequeIssued', 'ChequeReceived', 'Collected', 'Deleted')),
+    state                       text           NOT NULL,
     recorded_by                 text           NOT NULL,
     deleted_by                  text,
     deleted_at                  timestamptz,
@@ -51,6 +51,24 @@ CREATE TABLE IF NOT EXISTS cashflow.bank_transfer (
         OR method IN ('Pol', 'Paya', 'Satna') AND source_bank_id <> destination_bank_id AND currency = 'IRR'),
     CONSTRAINT bank_transfer_deleted CHECK ((state = 'Deleted') = (deleted_by IS NOT NULL) AND (state = 'Deleted') = (deleted_at IS NOT NULL))
 ) PARTITION BY LIST (fiscal_year);
+
+-- The owner's answers of 21 Nov 2026 (Q77, Q79, Q82): the bank's fee of an electronic transfer, the approved payment request every
+-- transfer pays (requests-svc; only its id, number and the key of the payment recorded on it are kept, ADR 0001), and the state
+-- 'Cancelled' of a cheque transfer whose cheque was cancelled before it was registered in Sayad. Added with ALTER so a database that
+-- already has the table of the first version of this script gets them too; the list of states is the whole list.
+ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS fee_rial numeric(22, 0);
+ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_request_id uuid;
+ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_request_number integer;
+ALTER TABLE cashflow.bank_transfer ADD COLUMN IF NOT EXISTS payment_key text;
+ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_state_check;
+ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_state_known;
+ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_state_known
+    CHECK (state IN ('Recorded', 'ChequeIssued', 'ChequeReceived', 'Collected', 'Deleted', 'Cancelled'));
+ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_fee;
+ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_fee CHECK (fee_rial IS NULL OR fee_rial > 0 AND method <> 'Cheque');
+ALTER TABLE cashflow.bank_transfer DROP CONSTRAINT IF EXISTS bank_transfer_request;
+ALTER TABLE cashflow.bank_transfer ADD CONSTRAINT bank_transfer_request
+    CHECK ((payment_request_id IS NULL) = (payment_request_number IS NULL) AND (payment_request_id IS NULL) = (payment_key IS NULL));
 
 CREATE INDEX IF NOT EXISTS bank_transfer_by_id ON cashflow.bank_transfer (id);
 -- The day's orders of one source account by one way, for the daily limits.
@@ -89,15 +107,19 @@ VALUES ('Internal', '', NULL, NULL, NULL, NULL, NULL, NULL),
        ('Satna',    '', 2000000000, NULL, NULL, NULL, NULL, NULL)
 ON CONFLICT (method, bank_key) DO NOTHING;
 
--- The voucher template gets «وجوه در راه» (FundsInTransit): debited when a transfer cheque is issued, credited when it is received.
--- The list is the whole list as it is now (038) plus the new account; it matches the enum FixedAccount of the .NET domain.
+-- The voucher template gets «وجوه در راه» (FundsInTransit): debited when a transfer cheque is issued, credited when it is received;
+-- «هزینه کارمزد خدمات بانکی» (BankFees, answer to Q77) and «اسناد پرداختنی» (NotesPayable, answer to Q81).
+-- The list is the whole list as it is now (038) plus the new accounts; it matches the enum FixedAccount of the .NET domain.
 ALTER TABLE cashflow.voucher_account DROP CONSTRAINT IF EXISTS voucher_account_key_known;
 ALTER TABLE cashflow.voucher_account ADD CONSTRAINT voucher_account_key_known CHECK (account_key IN (
     'ChequesInCashDesk', 'ChequesInCollection', 'ProtestedCheques', 'GuaranteeChequesForCompany', 'GuaranteeCounterpart', 'BadDebts',
-    'ProtestedChequesInLegal', 'GuaranteeChequesInLegal', 'GuaranteeNotesForCompany', 'NotesInCollection', 'FundsInTransit'));
+    'ProtestedChequesInLegal', 'GuaranteeChequesInLegal', 'GuaranteeNotesForCompany', 'NotesInCollection', 'FundsInTransit', 'BankFees',
+    'NotesPayable'));
 
 -- Confirmed vouchers of a transfer: source 'Transfer', step 0 for an electronic transfer or the payer's side of a cheque transfer
--- («انتقال دهنده»), step 1 for the receiver's side («انتقال گیرنده»). The two unnamed checks of 030 (the list of sources; a receipt's
+-- («انتقال دهنده»), step 1 for the receiver's side («انتقال گیرنده»), step 2 for the maturity of a post-dated cheque («سررسید»: Dr
+-- «اسناد پرداختنی» / Cr the bank; answer to Q81), steps 3 and 4 for the payer's and the receiver's side of a cancelled cheque (answer
+-- to Q79). The two unnamed checks of 030 (the list of sources; a receipt's
 -- voucher is step 0) are replaced by named ones.
 DO $$
 DECLARE c text;
@@ -114,7 +136,7 @@ ALTER TABLE cashflow.voucher DROP CONSTRAINT IF EXISTS voucher_source_known;
 ALTER TABLE cashflow.voucher ADD CONSTRAINT voucher_source_known CHECK (source IN ('Receipt', 'ChequeStep', 'Transfer'));
 ALTER TABLE cashflow.voucher DROP CONSTRAINT IF EXISTS voucher_step_of_source;
 ALTER TABLE cashflow.voucher ADD CONSTRAINT voucher_step_of_source CHECK (
-    source = 'Receipt' AND step = 0 OR source = 'ChequeStep' AND step >= 1 OR source = 'Transfer' AND step IN (0, 1));
+    source = 'Receipt' AND step = 0 OR source = 'ChequeStep' AND step >= 1 OR source = 'Transfer' AND step BETWEEN 0 AND 4);
 
 -- The functions of 034 with the new partitioned table (this script runs last, so its definitions stand).
 CREATE OR REPLACE FUNCTION cashflow.ensure_fiscal_year_partitions(p_year integer)
