@@ -114,16 +114,16 @@ const ownLimit = computed(() => applied.value?.bankId != null)
  */
 const usage = ref<DayUsage | null>(null)
 let usageRun = 0
-watch(() => [form.sourceId, form.date, form.method, form.channel, editing.value?.id], async () => {
+async function loadUsage() {
   const run = ++usageRun
-  usage.value = null
   const date = normaliseJalali(form.date)
-  if (!form.sourceId || !form.method || !form.channel || !date) return
+  if (!form.sourceId || !form.method || !form.channel || !date) { usage.value = null; return }
   const q = new URLSearchParams({ sourceAccountId: form.sourceId, date, method: form.method, channel: form.channel })
   if (editing.value) q.set('except', editing.value.id)
   const r = await api.get<DayUsage>(`/api/cashflow/transfers/day-usage?${q}`)
-  if (run === usageRun && r.ok) usage.value = r.value
-})
+  if (run === usageRun) usage.value = r.ok ? r.value : null
+}
+watch(() => [form.sourceId, form.date, form.method, form.channel, editing.value?.id], () => { usage.value = null; void loadUsage() })
 const usageLine = computed(() => {
   const u = usage.value
   if (!u || !form.channel) return ''
@@ -261,6 +261,8 @@ const search = ref('')
 async function load() {
   const r = await api.get<Transfer[]>(`/api/cashflow/transfers?year=${year.value}&cheque=false`)
   if (r.ok) { transfers.value = r.value; listError.value = '' } else listError.value = translate(r.code, props.locale)
+  // What the list holds changed (a save, a correction, a delete): the day's usage under the limits is read again.
+  void loadUsage()
 }
 const from = (x: Transfer) => accountText(x.sourceBankName, x.sourceAccountNumber)
 const to = (x: Transfer) => accountText(x.destinationBankName, x.destinationAccountNumber)
