@@ -1,6 +1,7 @@
 export * from './format'
 export * from './i18n'
 export * from './api'
+export * from './enterNext'
 export * from './words'
 export * from './chequeStatus'
 export * from './company'

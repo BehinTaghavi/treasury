@@ -2,6 +2,8 @@
 /**
  * A drop-down list you can type into (combo box). Opening it shows the whole list; typing narrows it by name or code,
  * comparing Persian letters the way the server does (ي/ك = ی/ک, spaces ignored). Keyboard: ↑ ↓ Enter Esc.
+ * Enter chooses the marked entry and nothing else: an empty box opened without typing has no entry marked, so Enter passes it
+ * without filling it (owner, 22 Nov 2026: Enter goes to the next field — enterNext.ts — and must not fill the boxes on its way).
  * Owner's report of 11 Nov 2026, items 3, 11 and 13: country, bank and ledger-account boxes must show the full list
  * and let the user find an entry by typing.
  *
@@ -67,12 +69,17 @@ const shown = computed<Choice[]>(() => {
   return props.emptyLabel !== undefined && !typed.value ? [{ value: '', label: props.emptyLabel }, ...list] : list
 })
 
-watch(shown, () => { active.value = Math.max(0, shown.value.findIndex(o => o.value === props.modelValue)) })
+/** The entry Enter would choose: the chosen one; while typing, the first that fits; in an empty box nothing (-1) until ↑ or ↓. */
+const marked = () => {
+  const at = shown.value.findIndex(o => o.value === props.modelValue)
+  return typed.value ? Math.max(0, at) : at
+}
+watch(shown, () => { active.value = marked() })
 
 function show() {
   if (props.disabled) return
   open.value = true
-  active.value = Math.max(0, shown.value.findIndex(o => o.value === props.modelValue))
+  active.value = marked()
   void nextTick(scrollToActive)
 }
 
@@ -111,12 +118,13 @@ function onKey(e: KeyboardEvent) {
     e.preventDefault()
     if (!open.value) return show()
     const n = shown.value.length
-    if (n) active.value = (active.value + (e.key === 'ArrowDown' ? 1 : n - 1)) % n
+    if (n) active.value = active.value < 0 ? (e.key === 'ArrowDown' ? 0 : n - 1) : (active.value + (e.key === 'ArrowDown' ? 1 : n - 1)) % n
     void nextTick(scrollToActive)
   } else if (e.key === 'Enter' && open.value) {
     e.preventDefault()
     const o = shown.value[active.value]
     if (o) pick(o)
+    else close(false) // nothing marked: nothing is chosen (a typed code or name that names one entry exactly is kept)
   } else if (e.key === 'Escape' && open.value) {
     e.preventDefault()
     typed.value = null
