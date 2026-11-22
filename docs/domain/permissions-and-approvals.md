@@ -150,7 +150,7 @@ Asked on 22 Nov 2026. The questions about what is already built (Q86–Q93) are 
 
 | # | Question | Proposed |
 |---|---|---|
-| QP1 | Is the **order of the steps** right: تهیه کننده → تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم) → «سایر»? Where do the roles under «سایر» stand? | **Answered 22 Nov 2026:** yes, that order; with steps missing, confirmation first, then approval; «سایر» gets its own order among the steps — built as «جایگاه در گردش کار» on the form. Still to confirm: is choosing the place (before / after a step) enough, or do you want to type a number? |
+| QP1 | Is the **order of the steps** right: تهیه کننده → تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم) → «سایر»? Where do the roles under «سایر» stand? | **Answered 22 Nov 2026:** yes, that order; with steps missing, confirmation first, then approval; «سایر» gets its own order among the steps — built as «جایگاه در گردش کار» on the form; choosing the place (before / after a step) instead of typing a number is enough (owner, the same day). |
 | QP2 | When **several persons hold the same role** in an operation: is one of them enough, or must all of them act? | One of them |
 | QP3 | **Receipts:** the money has already arrived when the form is filled. Is it right that a receipt is recorded at once and confirmed afterwards, and that only its accounting voucher waits for the last step? And for payment requests and payments: nothing leaves before the last approval? | Yes to both |
 | QP4 | Are **amount limits** needed — for example the second approver only above an amount — and a **substitute** («جانشین») for a holder who is away? | Both, set by the company; not in the first version |
