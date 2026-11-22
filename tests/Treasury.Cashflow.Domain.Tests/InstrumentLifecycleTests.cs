@@ -22,19 +22,20 @@ public sealed class ReceivedInstrumentTests
     [Fact]
     public void Full_collection_path_11_12_13()
     {
-        var cheque = ReceivedCheque();
+        // Since rule N3 (owner, 18 Nov 2026) the path is 11 -> «ثبت صیادی» -> 12 -> 13.
+        var cheque = RegisteredCheque();
         cheque.DepositForCollection("بانک ملت - حساب جاری ۱۲۳", D("1405/08/05"), User);
         Assert.Equal(InstrumentState.DepositedForCollection, cheque.State);
         cheque.RecordCleared(D("1405/09/01"), User);
         Assert.Equal(InstrumentState.Cleared, cheque.State);
-        Assert.Equal(3, cheque.History.Count);
+        Assert.Equal(4, cheque.History.Count);
         Assert.Empty(cheque.AllowedActions());
     }
 
     [Fact]
     public void A_deposited_cheque_can_bounce_12_14()
     {
-        var cheque = ReceivedCheque();
+        var cheque = RegisteredCheque();
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
         cheque.RecordBounced(D("1405/09/02"), User, "کسری موجودی", "B-1");
         Assert.Equal(InstrumentState.Bounced, cheque.State);
@@ -53,11 +54,12 @@ public sealed class ReceivedInstrumentTests
 
     [Theory]
     [InlineData(InstrumentKind.GuaranteeCheque)]
-    [InlineData(InstrumentKind.PromissoryNote)]
+    [InlineData(InstrumentKind.GuaranteeNote)]
     [InlineData(InstrumentKind.Instalment)]
-    public void Only_ordinary_and_bank_cheques_can_be_sent_for_collection(InstrumentKind kind)
+    public void Only_ordinary_and_bank_cheques_and_ordinary_notes_can_be_sent_for_collection(InstrumentKind kind)
     {
-        var item = ReceivedCheque(kind, due: kind == InstrumentKind.GuaranteeCheque ? null : "1405/09/01");
+        // Old rule R3 (Checktype 0/2 only); ordinary promissory notes were added by the owner on 16 Nov 2026 (NoteStepTests).
+        var item = ReceivedCheque(kind, due: kind.IsGuarantee() ? null : "1405/09/01");
         Assert.DoesNotContain(InstrumentAction.DepositForCollection, item.AllowedActions());
         var ex = Assert.Throws<DomainException>(() => item.DepositForCollection("حساب", D("1405/08/05"), User));
         Assert.Equal("Instrument.KindNotAllowedForAction", ex.Code);
@@ -65,7 +67,35 @@ public sealed class ReceivedInstrumentTests
 
     [Fact]
     public void A_bank_cheque_can_be_sent_for_collection() =>
-        ReceivedCheque(InstrumentKind.BankCheque).DepositForCollection("حساب", D("1405/08/05"), User);
+        RegisteredCheque(InstrumentKind.BankCheque).DepositForCollection("حساب", D("1405/08/05"), User);
+
+    [Fact]
+    public void A_cheque_is_deposited_at_the_bank_only_after_Sayad_registration_N3()
+    {
+        // Rule N3, CEO 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ یعنی چک بدون آن به بانک واگذار نمی‌شود". Not in the old program
+        // (D_Check_Vag_m sent a cheque straight from the cash desk).
+        var cheque = ReceivedCheque();
+        Assert.DoesNotContain(InstrumentAction.DepositForCollection, cheque.AllowedActions());
+        Assert.Equal("Instrument.SayadRegistrationRequired", Assert.Throws<DomainException>(() => cheque.DepositForCollection("حساب", D("1405/08/05"), User)).Code);
+        Assert.Equal("Instrument.SayadRegistrationRequired", Assert.Throws<DomainException>(() =>
+            cheque.DepositForCollection(new CollectionAccount(Guid.NewGuid(), "0101", "IRR", true), D("1405/08/05"), User)).Code);
+        Assert.Equal(InstrumentState.InCashDesk, cheque.State);
+
+        cheque.RegisterSayad(D("1405/08/02"), User);
+        Assert.Contains(InstrumentAction.DepositForCollection, cheque.AllowedActions());
+        cheque.DepositForCollection("حساب", D("1405/08/05"), User);
+        Assert.Equal(InstrumentState.DepositedForCollection, cheque.State);
+    }
+
+    [Fact]
+    public void A_cheque_back_from_the_bank_was_registered_before_and_is_deposited_again_without_a_new_registration_N3()
+    {
+        var cheque = RegisteredCheque();
+        cheque.DepositForCollection("حساب", D("1405/08/05"), User);
+        cheque.ReturnFromBank(D("1405/09/03"), User);
+        cheque.DepositForCollection("حساب", D("1405/09/04"), User);
+        Assert.Equal(InstrumentState.DepositedForCollection, cheque.State);
+    }
 
     [Fact]
     public void A_collection_account_is_required()
@@ -86,7 +116,7 @@ public sealed class ReceivedInstrumentTests
         Assert.Equal(InstrumentState.Endorsed, endorsed.State);
         Assert.Equal("شرکت پیمانکار ب", endorsed.Destination);
 
-        var deposited = ReceivedCheque();
+        var deposited = RegisteredCheque();
         deposited.DepositForCollection("حساب", D("1405/08/05"), User);
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => deposited.ReturnToIssuer(D("1405/08/06"), User)).Code);
     }
@@ -95,13 +125,14 @@ public sealed class ReceivedInstrumentTests
     public void A_guarantee_note_cannot_be_endorsed_or_replaced_but_can_be_returned_or_cancelled()
     {
         var note = ReceivedCheque(InstrumentKind.GuaranteeNote, due: null);
-        Assert.Equal([InstrumentAction.ReturnToIssuer, InstrumentAction.Cancel], note.AllowedActions());
+        // Owner, 18 Nov 2026: a guarantee note (like a guarantee cheque) may also get legal action.
+        Assert.Equal([InstrumentAction.ReturnToIssuer, InstrumentAction.Cancel, InstrumentAction.SendToLegal], note.AllowedActions());
     }
 
     [Fact]
     public void A_step_cannot_be_dated_before_the_previous_step()
     {
-        var cheque = ReceivedCheque(receivedOn: "1405/08/10");
+        var cheque = RegisteredCheque(receivedOn: "1405/08/10");
         Assert.Equal("Instrument.DateBeforePreviousStep", Assert.Throws<DomainException>(() => cheque.DepositForCollection("حساب", D("1405/08/09"), User)).Code);
     }
 
@@ -109,18 +140,18 @@ public sealed class ReceivedInstrumentTests
     public void A_cheque_cannot_be_cleared_before_its_due_date_N2()
     {
         // Rule N2, CEO 10 Nov 2026: "تاریخ وصول چک نمیتواند کوچکتر از تاریخ سررسید چک باشد"
-        var cheque = ReceivedCheque(due: "1405/09/01");
+        var cheque = RegisteredCheque(due: "1405/09/01");
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User); // depositing before the due date stays allowed
         var ex = Assert.Throws<DomainException>(() => cheque.RecordCleared(D("1405/08/30"), User));
         Assert.Equal("Instrument.ClearedBeforeDueDate", ex.Code);
         Assert.Equal(InstrumentState.DepositedForCollection, cheque.State);
-        Assert.Equal(2, cheque.History.Count);
+        Assert.Equal(3, cheque.History.Count);
     }
 
     [Fact]
     public void A_cheque_can_be_cleared_on_its_due_date_N2()
     {
-        var cheque = ReceivedCheque(due: "1405/09/01");
+        var cheque = RegisteredCheque(due: "1405/09/01");
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
         cheque.RecordCleared(D("1405/09/01"), User);
         Assert.Equal(InstrumentState.Cleared, cheque.State);
@@ -130,7 +161,7 @@ public sealed class ReceivedInstrumentTests
     public void A_cheque_cannot_bounce_before_its_due_date_N2_Q11()
     {
         // Answer to Q11 (CEO, 10 Nov 2026): rule N2 applies to bounces too.
-        var cheque = ReceivedCheque(due: "1405/09/01");
+        var cheque = RegisteredCheque(due: "1405/09/01");
         cheque.DepositForCollection("حساب واگذاری", D("1405/08/05"), User);
         Assert.Equal("Instrument.BouncedBeforeDueDate", Assert.Throws<DomainException>(() => cheque.RecordBounced(D("1405/08/30"), User, "کسری موجودی", "B-1")).Code);
         cheque.RecordBounced(D("1405/09/01"), User, "کسری موجودی", "B-1");
@@ -147,7 +178,7 @@ public sealed class ReceivedInstrumentTests
     [Fact]
     public void A_cheque_received_in_one_year_keeps_its_origin_year_when_cleared_in_the_next()
     {
-        var cheque = ReceivedCheque(receivedOn: "1404/12/20", due: "1405/01/15");
+        var cheque = RegisteredCheque(receivedOn: "1404/12/20", due: "1405/01/15");
         cheque.DepositForCollection("حساب", D("1404/12/25"), User);
         cheque.RecordCleared(D("1405/01/16"), User);
         Assert.Equal(1404, cheque.OriginFiscalYear);
@@ -168,12 +199,12 @@ public sealed class ReceivedInstrumentTests
     [Fact]
     public void Every_step_raises_an_event_with_the_destination()
     {
-        var cheque = ReceivedCheque();
+        var cheque = RegisteredCheque();
         cheque.DepositForCollection("حساب واگذاری ۱", D("1405/08/05"), User);
         var last = Assert.IsType<InstrumentStateChanged>(cheque.PendingEvents[^1]);
         Assert.Equal(InstrumentAction.DepositForCollection, last.Action);
         Assert.Equal("حساب واگذاری ۱", last.Destination);
-        Assert.Equal(InstrumentState.InCashDesk, last.From);
+        Assert.Equal(InstrumentState.SayadRegistered, last.From);
     }
 }
 
@@ -189,7 +220,7 @@ public sealed class IssuedInstrumentTests
         Assert.Equal(InstrumentState.Issued, cheque.State);
         Assert.Equal("765432", cheque.Number);
         Assert.Equal(book, cheque.ChequeBookId);
-        cheque.Deliver(D("1405/08/11"), User, "آقای رضایی");
+        cheque.Ticked().Deliver(D("1405/08/11"), User, "آقای رضایی");
         Assert.Equal(InstrumentState.Delivered, cheque.State);
     }
 
@@ -204,7 +235,7 @@ public sealed class IssuedInstrumentTests
 
         var delivered = ChequeBeingIssued();
         delivered.Issue(Guid.NewGuid(), "2", D("1405/08/10"), User);
-        delivered.Deliver(D("1405/08/10"), User);
+        delivered.Ticked().Deliver(D("1405/08/10"), User);
         Assert.Equal("Instrument.InvalidTransition", Assert.Throws<DomainException>(() => delivered.Cancel(D("1405/08/11"), User, "x")).Code);
     }
 
@@ -238,7 +269,7 @@ public sealed class IssuedChequeAtTheBankTests
     {
         var cheque = ChequeBeingIssued(InstrumentKind.PostDatedCheque, issue: "1405/08/10", due: "1405/10/01");
         cheque.Issue(Guid.NewGuid(), "300", D("1405/08/10"), User);
-        cheque.Deliver(D("1405/08/11"), User);
+        cheque.Ticked().Deliver(D("1405/08/11"), User);
         Assert.Contains(InstrumentAction.RecordMatured, cheque.AllowedActions());
         cheque.RecordMatured(D("1405/10/01"), User);
         Assert.True(cheque.IsMatured);
@@ -286,7 +317,8 @@ public sealed class LifecycleTableTests
     public void Received_and_issued_states_never_mix_except_cancelled()
     {
         InstrumentState[] received = [InstrumentState.InCashDesk, InstrumentState.DepositedForCollection, InstrumentState.Cleared, InstrumentState.Bounced,
-            InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed, InstrumentState.ReturnedFromBank, InstrumentState.Replaced];
+            InstrumentState.ReturnedToIssuer, InstrumentState.Endorsed, InstrumentState.ReturnedFromBank, InstrumentState.Replaced,
+            InstrumentState.SayadRegistered, InstrumentState.InLegal];
 
         // «ابطال شده» ends both lives: an issued cheque before delivery, a received one by management's order (owner's item 14 (f)).
         foreach (var t in InstrumentLifecycle.All)

@@ -58,6 +58,7 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="SayadTracking">Endorsement: tracking number of the transfer in the Sayad system (answer to Q32).</param>
 /// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
 /// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
+/// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -67,13 +68,27 @@ public sealed record StepDetails(
     string? Purpose = null,
     string? SayadTracking = null,
     Guid? ReceiptId = null,
-    Guid? PaymentRequestId = null);
+    Guid? PaymentRequestId = null,
+    string? TrackingCode = null);
+
+/// <summary>
+/// The bank's certificate of non-payment («گواهی عدم پرداخت», the owner's term of 18 Nov 2026 for what was called the bounce notice): its
+/// number, date and tracking code, as entered on the legal-action screen.
+/// </summary>
+public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, string? TrackingCode);
 
 /// <summary>
 /// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
-/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32).
+/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32). An endorsed promissory
+/// note («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026) has no Sayad transfer.
 /// </summary>
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
+
+/// <summary>
+/// «ثبت صیادی شد»: the user's tick that an issued cheque has been recorded in the banks' Sayad system, with the computer's date and time
+/// and the user who ticked it (owner, 15 Nov 2026).
+/// </summary>
+public sealed record SayadRegistration(DateTimeOffset At, string UserId);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -127,6 +142,10 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// </summary>
     public bool IsPostDated => Direction == InstrumentDirection.Received && DueDate is { } due && due > IssueDate;
 
+    /// <summary>«سررسید چک» (owner, 18 Nov 2026): see <see cref="ReceivedChequeStatus.HasReachedDueDate"/>.</summary>
+    public bool HasReachedDueDate(FiscalDate today) =>
+        Direction == InstrumentDirection.Received && ReceivedChequeStatus.HasReachedDueDate(State, IssueDate, DueDate, today);
+
     /// <summary>Our bank account for issued cheques.</summary>
     public Guid? BankAccountId { get; private set; }
 
@@ -140,7 +159,7 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Date written on the instrument (received side: date received).</summary>
     public FiscalDate IssueDate { get; }
 
-    /// <summary>Maturity (سررسید). Null only for guarantee items.</summary>
+    /// <summary>Maturity (سررسید). Null only for guarantee items and notes payable on demand («عندالمطالبه»).</summary>
     public FiscalDate? DueDate { get; }
 
     public CounterpartyRef Counterparty { get; }
@@ -164,8 +183,60 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     public IReadOnlyList<InstrumentHistoryEntry> History => _history;
 
+    /// <summary>
+    /// «ثبت صیادی شد» on an **issued** cheque (owner, 15 Nov 2026): every cheque is recorded in the banks' Sayad system before it is
+    /// handed to its beneficiary. Null until the user ticks it. Not in the old program (Lcash.mdb is older than Sayad).
+    /// A **received** cheque has no tick: since the owner's description of 18 Nov 2026 «ثبت صیادی» is a step of its own with the status
+    /// «ثبت صیادی شد» (<see cref="RegisterSayad"/>), required before the deposit at the bank (rule N3).
+    /// </summary>
+    public SayadRegistration? SayadRegistration { get; private set; }
+
+    /// <summary>The tick is for issued cheques; notes and instalments are not in the Sayad system, and received cheques have their step.</summary>
+    public bool RequiresSayadRegistration => Direction == InstrumentDirection.Issued && Kind.IsCheque();
+
+    /// <summary>The tick may be set or removed only while the step it guards, the delivery, is still ahead (issued and not delivered).</summary>
+    public bool CanChangeSayadRegistration =>
+        RequiresSayadRegistration && InstrumentLifecycle.Find(Direction, State, InstrumentAction.Deliver) is { } t && t.KindAllowed(Kind);
+
+    /// <summary>What the lifecycle table allows now, without the delivery of an issued cheque that still waits for «ثبت صیادی شد».</summary>
     public IReadOnlyList<InstrumentAction> AllowedActions() =>
-        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured);
+        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured)
+            .Where(a => !(a == InstrumentAction.Deliver && RequiresSayadRegistration && SayadRegistration is null))
+            .ToList();
+
+    /// <summary>The user ticks «ثبت صیادی شد» on an issued cheque; the computer's date and time and the user are kept with the cheque.</summary>
+    public void ConfirmSayadRegistration(DateTimeOffset at, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        RequireTickIsForThisInstrument();
+        Require(CanChangeSayadRegistration, "Instrument.SayadRegistrationClosed", $"The Sayad tick cannot be changed in state {State}.");
+        Require(SayadRegistration is null, "Instrument.SayadAlreadyRegistered", "The cheque is already marked as recorded in Sayad.");
+        SayadRegistration = new SayadRegistration(at, userId);
+        Raise(new InstrumentSayadRegistrationChanged(Id, Direction, Number, true, at, userId));
+    }
+
+    /// <summary>A tick set by mistake is removed, only before the cheque went to its beneficiary.</summary>
+    public void WithdrawSayadRegistration(DateTimeOffset at, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        RequireTickIsForThisInstrument();
+        Require(CanChangeSayadRegistration, "Instrument.SayadRegistrationClosed", $"The Sayad tick cannot be changed in state {State}.");
+        Require(SayadRegistration is not null, "Instrument.SayadNotRegistered", "The cheque is not marked as recorded in Sayad.");
+        SayadRegistration = null;
+        Raise(new InstrumentSayadRegistrationChanged(Id, Direction, Number, false, at, userId));
+    }
+
+    /// <summary>A received cheque is registered by its step («ثبت صیادی», rule N3), not by the tick; a note or instalment is not in Sayad.</summary>
+    private void RequireTickIsForThisInstrument()
+    {
+        Require(Direction == InstrumentDirection.Issued, "Instrument.SayadRegistrationIsAStep",
+            "A received cheque is registered in Sayad with its step «ثبت صیادی», not with the tick.");
+        Require(Kind.IsCheque(), "Instrument.SayadRegistrationOnlyForCheques", "Only a cheque is recorded in the Sayad system.");
+    }
+
+    private void RequireSayadTickBeforeDelivery() =>
+        Require(!RequiresSayadRegistration || SayadRegistration is not null, "Instrument.SayadNotRegistered",
+            "Record the cheque in the Sayad system and tick «ثبت صیادی شد» first.");
 
     /// <summary>A cheque or note received into a cash desk (old Stcode 11, form D_Check; rule R1).</summary>
     public static Instrument Receive(
@@ -186,7 +257,8 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// A cheque or note received on a receipt (رسید دریافت), with what is written on it. A cheque needs its bank (rule R1); a
-    /// promissory note has no bank and may name up to two guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»).
+    /// promissory note has no bank and may name up to three guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»; owner's
+    /// answer to QN3).
     /// </summary>
     public static Instrument Receive(
         Guid id,
@@ -206,8 +278,14 @@ public sealed class Instrument : AggregateRoot<Guid>
         Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
         Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
         Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
-        ValidateCommon(kind, drawer, purpose, dueDate);
         var checkedDetails = details.Validated(kind);
+
+        // Owner's note receipt form (16 Nov 2026): a note payable on demand («عندالمطالبه») has no due date; a dated note is not due
+        // before the day it was written (old rule R6, which the old program applied to cheques).
+        ValidateCommon(kind, drawer, purpose, dueDate, checkedDetails.OnDemand);
+        Require(!checkedDetails.OnDemand || dueDate is null, "Instrument.OnDemandHasDueDate", "A note payable on demand has no due date.");
+        Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
+            "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
 
         var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
             string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
@@ -259,11 +337,12 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// The cheque leaves the cash desk («در جریان وصول نزد صندوق») for one of our bank accounts («در جریان وصول نزد بانک»), owner's
     /// report no. 4, item 9; old form D_Check_Vag_m (account and deposit slip «شماره فیش واگذاری»). The account must be switched on and
-    /// in the cheque's currency.
+    /// in the cheque's currency. Rule N3 (owner, 18 Nov 2026): a cheque is deposited only after «ثبت صیادی».
     /// </summary>
     public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
     {
         ArgumentNullException.ThrowIfNull(account);
+        RequireSayadStepBeforeDeposit();
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -277,7 +356,22 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
+        RequireSayadStepBeforeDeposit();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
+    }
+
+    /// <summary>
+    /// Rule N3 (owner, 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ چک بدون آن به بانک واگذار نمی‌شود"): a cheque still «نزد صندوق» is
+    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m). A promissory note is not in Sayad: an ordinary note
+    /// goes from the cash desk to the bank (owner, 16 Nov 2026), and the lifecycle table decides which notes may.
+    /// </summary>
+    private void RequireSayadStepBeforeDeposit()
+    {
+        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && Kind.IsCheque())
+        {
+            Require(Kind.IsCollectable(), "Instrument.KindNotAllowedForAction", $"'{InstrumentAction.DepositForCollection}' is not allowed for {Kind}."); // R3
+            throw new DomainException("Instrument.SayadRegistrationRequired", "Register the cheque in Sayad before depositing it at the bank.");
+        }
     }
 
     /// <summary>
@@ -294,17 +388,57 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// (e)). From the bank, or after the bank returned the cheque (answer to Q33). Rule N2 also applies (answer to Q11): not before the due
     /// date. The step's date is the notice's date.
     /// </summary>
-    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber)
+    /// <param name="trackingCode">The tracking code of the certificate of non-payment (گواهی عدم پرداخت), when typed (owner, 18 Nov 2026).</param>
+    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber, string? trackingCode = null)
     {
         var fromBank = State == InstrumentState.DepositedForCollection;
+        var code = Clean(trackingCode);
         Apply(InstrumentAction.RecordBounced, date, userId, Clean(noticeNumber), reason,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
                 Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
             },
-            details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
+            details: fromBank || code is not null ? new StepDetails(AccountId: fromBank ? CollectionAccountId : null, TrackingCode: code) : null);
     }
+
+    /// <summary>
+    /// «ثبت صیادی شد» (owner, 18 Nov 2026): the cheque in the cash desk is registered in the banks' Sayad system. The tracking number of
+    /// the registration may be recorded. The cheque stays in the cash desk.
+    /// </summary>
+    public void RegisterSayad(FiscalDate date, string userId, string? trackingNumber = null, string? note = null) =>
+        Apply(InstrumentAction.RegisterSayad, date, userId, Clean(trackingNumber), Clean(note),
+            details: Clean(trackingNumber) is { } tracking ? new StepDetails(SayadTracking: tracking) : null);
+
+    /// <summary>
+    /// «اقدام حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal
+    /// action and collection; rarely the action is taken on a cheque still in the cash desk (answer to Q38). Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
+    /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
+    /// </summary>
+    /// <param name="certificate">The certificate of non-payment (گواهی عدم پرداخت): number, date and tracking code. Required for a bounced
+    /// ordinary cheque or note (owner, 18 Nov 2026); a guarantee item, or a cheque taken to law from the cash desk, may have none.</param>
+    public void SendToLegal(FiscalDate date, string userId, string? description, NonPaymentCertificate? certificate = null)
+    {
+        var (number, issued, code) = (Clean(certificate?.Number), certificate?.Date, Clean(certificate?.TrackingCode));
+        Apply(InstrumentAction.SendToLegal, date, userId, number, Clean(description),
+            validate: () =>
+            {
+                Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action.");
+                Require(State != InstrumentState.Bounced || Kind.IsGuarantee() || (number is not null && issued is not null && code is not null),
+                    "Instrument.NonPaymentCertificateRequired", "Enter the number, date and tracking code of the certificate of non-payment.");
+            },
+            details: issued is null && code is null ? null : new StepDetails(DocumentDate: issued, TrackingCode: code));
+    }
+
+    /// <summary>
+    /// The cheque or note in legal action became collectable, during the action or at its end: it is handed back to the cash desk, at the
+    /// start of the cycle («نزد صندوق»), and goes on like a new cheque (owner's answer to Q38 (2), 18 Nov 2026).
+    /// </summary>
+    public void ReturnFromLegal(FiscalDate date, string userId, string? note = null) =>
+        Apply(InstrumentAction.ReturnFromLegal, date, userId, null, Clean(note), () => Destination = null);
+
+    /// <summary>The step (1 = received) that put the cheque in legal action, while it is there; scans are attached to it.</summary>
+    public int? LegalActionStep => State == InstrumentState.InLegal ? _history.FindLastIndex(h => h.Action == InstrumentAction.SendToLegal) + 1 : null;
 
     /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
     public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>
@@ -324,11 +458,13 @@ public sealed class Instrument : AggregateRoot<Guid>
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
         Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        // Only cheques are transferred in the Sayad system; a note is endorsed on its back.
+        var sayad = Kind.IsCheque() ? Clean(endorsement.SayadTracking) : null;
+        Require(!Kind.IsCheque() || sayad is not null, "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
         Require(endorsement.PaymentRequestId != Guid.Empty, "Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
-        Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
+        Apply(InstrumentAction.Endorse, date, userId, sayad, note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
-                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim(),
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: sayad,
                 PaymentRequestId: endorsement.PaymentRequestId));
     }
 
@@ -343,8 +479,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// The receiver of an endorsed cheque brings it back bounced, with the bank's bounce notice (owner's item 14 (h)). The cheque becomes
     /// «برگشت شده» again in the company's hands; rule N2 applies.
     /// </summary>
-    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null) =>
+    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null, string? trackingCode = null) =>
         Apply(InstrumentAction.RecordEndorsementReturned, date, userId, Clean(noticeNumber), reason,
+            details: Clean(trackingCode) is { } code ? new StepDetails(TrackingCode: code) : null,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
@@ -389,8 +526,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         });
     }
 
+    /// <summary>
+    /// The cheque is handed to its beneficiary (old Check_deliv_m: 21 -> 22). A cheque is not handed over before «ثبت صیادی شد» is
+    /// ticked (owner, 15 Nov 2026); a note or instalment is not in Sayad.
+    /// </summary>
     public void Deliver(FiscalDate date, string userId, string? receivedBy = null) =>
-        Apply(InstrumentAction.Deliver, date, userId, null, receivedBy);
+        Apply(InstrumentAction.Deliver, date, userId, null, receivedBy, validate: RequireSayadTickBeforeDelivery);
 
     public void Cancel(FiscalDate date, string userId, string reason)
     {
@@ -441,7 +582,8 @@ public sealed class Instrument : AggregateRoot<Guid>
         long version,
         Guid? receiptId = null,
         ReceivedInstrumentDetails? details = null,
-        Guid? collectionAccountId = null)
+        Guid? collectionAccountId = null,
+        SayadRegistration? sayadRegistration = null)
     {
         var historyList = history.ToList();
         var instrument = new Instrument(id, direction, kind, amount, issueDate, dueDate, counterparty, purpose, bankName)
@@ -457,6 +599,7 @@ public sealed class Instrument : AggregateRoot<Guid>
             ReceiptId = receiptId,
             Details = details ?? ReceivedInstrumentDetails.None,
             CollectionAccountId = collectionAccountId,
+            SayadRegistration = sayadRegistration,
         };
         instrument._history.AddRange(historyList);
         instrument.SetLoadedVersion(version);
@@ -509,12 +652,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         }
     }
 
-    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate)
+    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate, bool onDemand = false)
     {
         ArgumentNullException.ThrowIfNull(counterparty);
         Require(!string.IsNullOrWhiteSpace(counterparty.DisplayName), "Instrument.CounterpartyRequired", "Drawer or payee is required.");
         Require(!string.IsNullOrWhiteSpace(purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(kind.IsGuarantee() || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+        Require(kind.IsGuarantee() || onDemand || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
     }
 
     private static void Require(bool condition, string code, string message)
@@ -542,4 +685,13 @@ public sealed record InstrumentStateChanged(
     Guid CounterpartyId,
     string? Number,
     string? Destination,
+    string UserId) : DomainEvent;
+
+/// <summary>«ثبت صیادی شد» was ticked or removed on a cheque; kept in the outbox as the trail of who did it and when.</summary>
+public sealed record InstrumentSayadRegistrationChanged(
+    Guid InstrumentId,
+    InstrumentDirection Direction,
+    string? Number,
+    bool Registered,
+    DateTimeOffset At,
     string UserId) : DomainEvent;

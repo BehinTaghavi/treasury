@@ -43,29 +43,72 @@ public sealed class ReceiptTests
 
     [Theory]
     [InlineData(DepositMethod.DepositSlip)]
-    [InlineData(DepositMethod.Transfer)]
+    [InlineData(DepositMethod.InternalTransfer)]
     [InlineData(DepositMethod.Pos)]
     [InlineData(DepositMethod.CardToCard)]
+    [InlineData(DepositMethod.PaymentGateway)]
     public void Money_paid_into_a_bank_account_D_variz_POS_card_to_card(DepositMethod method)
     {
-        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 7, Header(), Bank, method, " 998877 ", Money.Rials(3_000_000), User);
+        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 7, Header(), Bank with { HasCards = true }, method, " 998877 ", Money.Rials(3_000_000), User);
         Assert.Equal(method, r.Method);
         Assert.Equal("998877", r.TrackingNumber);
         Assert.Equal(7, r.Number);
+        Assert.Null(r.PayerSheba);
+    }
+
+    // Owner, 18 Nov 2026: the kinds of a direct deposit. A made-up Sheba with valid check digits.
+    private const string Sheba = "IR062960000000100324200001";
+
+    [Theory]
+    [InlineData(DepositMethod.Paya)]
+    [InlineData(DepositMethod.Satna)]
+    public void A_Paya_or_Satna_transfer_is_recorded_with_its_Sheba(DepositMethod method)
+    {
+        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, "T-1", Money.Rials(3_000_000), User, " ir06 2960 0000 0010 0324 2000 01 ");
+        Assert.Equal((method, Sheba), (r.Method!.Value, r.PayerSheba));
+
+        // The 24 digits alone are accepted too.
+        Assert.Equal(Sheba, Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, Sheba[2..]).PayerSheba);
+        Assert.Equal("Receipt.ShebaRequired", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, " ")).Code);
+        Assert.Equal("Receipt.ShebaInvalid", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "IR062960000000100324200002")).Code);
+        Assert.Equal("Receipt.ShebaInvalid", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, method, null, Money.Rials(1), User, "IR0629600000001003242")).Code);
+    }
+
+    [Fact]
+    public void Card_to_card_needs_a_bank_account_with_a_bank_card()
+    {
+        Assert.Equal("Receipt.AccountHasNoCard", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank with { HasCards = false }, DepositMethod.CardToCard, null, Money.Rials(1), User)).Code);
+        Assert.Equal(DepositMethod.CardToCard,
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank with { HasCards = true }, DepositMethod.CardToCard, null, Money.Rials(1), User).Method);
+    }
+
+    [Fact]
+    public void The_old_combined_transfer_kind_is_not_chosen_for_a_new_receipt_but_old_receipts_keep_it()
+    {
+        Assert.Equal("Receipt.DepositMethodRequired", Assert.Throws<DomainException>(() =>
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), Bank, DepositMethod.Transfer, null, Money.Rials(1), User)).Code);
+        var old = Receipt.Restore(Guid.NewGuid(), ReceiptKind.BankDeposit, 3, D("1405/08/20"), CounterpartyRef.ForDetail("200015", "شرکت نمونه"), Guid.NewGuid(), "فروش", "فروش",
+            null, null, null, false, null, User, ReceiptAccountKind.BankAccount, Guid.NewGuid(), DepositMethod.Transfer, "T-9", Money.Rials(5), [], 5, ReceiptState.Recorded, null, null, 1);
+        Assert.Equal(DepositMethod.Transfer, old.Method);
     }
 
     [Fact]
     public void A_foreign_currency_account_takes_its_own_currency_with_the_rial_equivalent()
     {
-        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.Transfer, null, Money.Foreign(1_000.50m, "USD", 600_000), User);
+        var r = Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.InternalTransfer, null, Money.Foreign(1_000.50m, "USD", 600_000), User);
         Assert.Equal(600_300_000m, r.TotalRial);
         Assert.Equal("Receipt.CurrencyMismatch", Assert.Throws<DomainException>(() =>
-            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.Transfer, null, Money.Rials(1_000), User)).Code);
+            Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, DepositMethod.InternalTransfer, null, Money.Rials(1_000), User)).Code);
     }
 
     [Theory]
     [InlineData(DepositMethod.Pos)]
     [InlineData(DepositMethod.CardToCard)]
+    [InlineData(DepositMethod.PaymentGateway)]
     public void A_foreign_currency_account_takes_cash_deposits_and_transfers_only_report_4_item_7(DepositMethod method) =>
         Assert.Equal("Receipt.MethodNotForForeignCurrency", Assert.Throws<DomainException>(() =>
             Receipt.RecordBankDeposit(Guid.NewGuid(), 1, Header(), DollarBank, method, null, Money.Foreign(10, "USD", 600_000), User)).Code);
@@ -193,10 +236,11 @@ public sealed class ReceivedInstrumentDetailsTests
     }
 
     [Fact]
-    public void A_note_has_at_most_two_guarantors_with_valid_national_codes()
+    public void A_note_has_at_most_three_guarantors_with_valid_national_codes_owner_answer_QN3()
     {
         Assert.Equal("Instrument.TooManyGuarantors", Assert.Throws<DomainException>(() =>
-            Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null)]))).Code);
+            Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null), new("د", null)]))).Code);
+        Assert.Equal(3, Receive(InstrumentKind.PromissoryNote, null, new(Guarantors: [new("الف", null), new("ب", null), new("ج", null)])).Details.GuarantorList.Count);
         Assert.Equal("Instrument.GuarantorNationalCodeInvalid", Assert.Throws<DomainException>(() =>
             Receive(InstrumentKind.GuaranteeNote, null, new(Guarantors: [new("الف", "0123456788")]))).Code);
         Assert.Equal("Instrument.GuarantorNameRequired", Assert.Throws<DomainException>(() =>
@@ -228,7 +272,7 @@ public sealed class DepositForCollectionTests
     [Fact]
     public void The_cheque_is_at_the_bank_account_with_its_slip_number()
     {
-        var cheque = ReceivedCheque();
+        var cheque = RegisteredCheque();
         cheque.DepositForCollection(Mellat, D("1405/08/05"), User, " 4455 ");
         Assert.Equal((InstrumentState.DepositedForCollection, (Guid?)Mellat.Id, "0202-3572"), (cheque.State, cheque.CollectionAccountId, cheque.Destination));
         Assert.Equal("4455", cheque.History[^1].Reference);
@@ -239,9 +283,9 @@ public sealed class DepositForCollectionTests
     public void Only_at_a_switched_on_account_in_the_cheque_currency()
     {
         Assert.Equal("Instrument.CollectionAccountInactive", Assert.Throws<DomainException>(() =>
-            ReceivedCheque().DepositForCollection(Mellat with { IsActive = false }, D("1405/08/05"), User)).Code);
+            RegisteredCheque().DepositForCollection(Mellat with { IsActive = false }, D("1405/08/05"), User)).Code);
         Assert.Equal("Instrument.CollectionAccountCurrency", Assert.Throws<DomainException>(() =>
-            ReceivedCheque().DepositForCollection(Mellat with { CurrencyCode = "USD" }, D("1405/08/05"), User)).Code);
+            RegisteredCheque().DepositForCollection(Mellat with { CurrencyCode = "USD" }, D("1405/08/05"), User)).Code);
     }
 
     [Fact]

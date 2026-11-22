@@ -34,7 +34,9 @@ public sealed record InstrumentSnapshot(
     Guid? ReceiptId = null,
     ReceivedInstrumentDetails? Details = null,
     string? CounterpartyDetailCode = null,
-    Guid? CollectionAccountId = null)
+    Guid? CollectionAccountId = null,
+    DateTimeOffset? SayadRegisteredAt = null,
+    string? SayadRegisteredBy = null)
 {
     public static InstrumentSnapshot From(Instrument i, long version) => new(
         i.Id, i.Direction, i.Kind, i.Number, i.BankName, i.BankAccountId, i.ChequeBookId, i.PaymentId,
@@ -42,7 +44,8 @@ public sealed record InstrumentSnapshot(
         i.IssueDate.Value, i.DueDate?.Value, i.Counterparty.Id, i.Counterparty.DisplayName, i.Purpose, i.Destination,
         i.State, i.OriginFiscalYear,
         i.History.Select(h => new HistorySnapshot(h.Action, h.From, h.To, h.Date.Value, h.UserId, h.Reference, h.Note, StepDetailsSnapshot.From(h.Details))).ToList(),
-        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode, i.CollectionAccountId);
+        version, i.ReceiptId, i.Direction == InstrumentDirection.Received ? i.Details : null, i.Counterparty.DetailCode, i.CollectionAccountId,
+        i.SayadRegistration?.At, i.SayadRegistration?.UserId);
 
     public Instrument ToDomain() => Instrument.Restore(
         Id, Direction, Kind, Number, BankName, BankAccountId, ChequeBookId, PaymentId,
@@ -50,7 +53,8 @@ public sealed record InstrumentSnapshot(
         new FiscalDate(IssueDate), DueDate is { } d ? new FiscalDate(d) : null,
         new CounterpartyRef(CounterpartyId, CounterpartyName, CounterpartyDetailCode), Purpose, Destination, State, OriginFiscalYear,
         History.Select(h => new InstrumentHistoryEntry(h.Action, h.From, h.To, new FiscalDate(h.Date), h.UserId, h.Reference, h.Note, h.Details?.ToDomain())),
-        Version, ReceiptId, Details, CollectionAccountId);
+        Version, ReceiptId, Details, CollectionAccountId,
+        SayadRegisteredAt is { } at && SayadRegisteredBy is { } by ? new SayadRegistration(at, by) : null);
 }
 
 /// <summary>Flat, storable form of a receipt. Dates are ISO dates.</summary>
@@ -59,19 +63,35 @@ public sealed record ReceiptSnapshot(
     Guid PurposeGroupId, string PurposeGroupName, string Purpose, string? Reference1, string? Reference2, Guid? DepartmentId, bool SalesProceeds,
     string? Note, string RecordedBy, ReceiptAccountKind? AccountKind, Guid? AccountId, DepositMethod? Method, string? TrackingNumber,
     decimal? Amount, string? Currency, decimal? RateToRial, IReadOnlyList<Guid> InstrumentIds, decimal TotalRial, ReceiptState State,
-    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null)
+    DateOnly? CancelledOn, string? CancelReason, long Version, Guid? ReplacedInstrumentId = null, string? PayerSheba = null, NoteTermsSnapshot? NoteTerms = null)
 {
     public static ReceiptSnapshot From(Receipt r, long version) => new(
         r.Id, r.Kind, r.FiscalYear, r.Number, r.Date.Value, r.Payer.Id, r.Payer.DisplayName, r.Payer.DetailCode, r.PurposeGroupId, r.PurposeGroupName,
         r.Purpose, r.Reference1, r.Reference2, r.DepartmentId, r.SalesProceeds, r.Note, r.RecordedBy, r.AccountKind, r.AccountId, r.Method,
         r.TrackingNumber, r.Amount?.Amount, r.Amount?.Currency, r.Amount?.RateToRial, [.. r.InstrumentIds], r.TotalRial, r.State,
-        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId);
+        r.CancelledOn?.Value, r.CancelReason, version, r.ReplacedInstrumentId, r.PayerSheba, NoteTermsSnapshot.From(r.NoteTerms));
 
     public Receipt ToDomain() => Receipt.Restore(
         Id, Kind, Number, new FiscalDate(Date), new CounterpartyRef(PayerId, PayerName, PayerDetailCode), PurposeGroupId, PurposeGroupName, Purpose,
         Reference1, Reference2, DepartmentId, SalesProceeds, Note, RecordedBy, AccountKind, AccountId, Method, TrackingNumber,
         Amount is { } a ? (Currency == Money.Rial ? Money.Rials(a) : Money.Foreign(a, Currency!, RateToRial ?? 0)) : null,
-        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId);
+        InstrumentIds, TotalRial, State, CancelledOn is { } c ? new FiscalDate(c) : null, CancelReason, Version, ReplacedInstrumentId, PayerSheba,
+        NoteTerms?.ToDomain());
+}
+
+/// <summary>Storable form of <see cref="NoteReceiptTerms"/> (JSON in cashflow.receipt.note_terms); the date is an ISO date.</summary>
+public sealed record NoteTermsSnapshot(
+    NoteReason Reason, NoteForm Form, NoteMaturity Maturity, string? IssuerNationalCode = null, string? IssuerPhone = null, string? CommitmentSubject = null,
+    string? ReturnTerms = null, string? CustodyPlace = null, bool OriginalReceived = false, DateOnly? OriginalReceivedOn = null, string? Discrepancy = null,
+    NoteAttachments? Attachments = null, string? DeliveredBy = null, IReadOnlyList<ReceiptSigner>? Signers = null)
+{
+    public static NoteTermsSnapshot? From(NoteReceiptTerms? t) => t is null ? null
+        : new(t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
+            t.OriginalReceivedOn?.Value, t.Discrepancy, t.Attachments, t.DeliveredBy, t.Signers);
+
+    public NoteReceiptTerms ToDomain() => new(
+        Reason, Form, Maturity, IssuerNationalCode, IssuerPhone, CommitmentSubject, ReturnTerms, CustodyPlace, OriginalReceived,
+        OriginalReceivedOn is { } d ? new FiscalDate(d) : null, Discrepancy, Attachments, DeliveredBy, Signers);
 }
 
 public sealed record HistorySnapshot(
@@ -80,13 +100,14 @@ public sealed record HistorySnapshot(
 /// <summary>Storable form of <see cref="StepDetails"/> (JSON in cashflow.instrument_event.details); dates are ISO dates.</summary>
 public sealed record StepDetailsSnapshot(
     Guid? AccountId = null, string? PartyDetailCode = null, string? PartyName = null, DateOnly? DocumentDate = null, Guid? PurposeGroupId = null,
-    string? Purpose = null, string? SayadTracking = null, Guid? ReceiptId = null, Guid? PaymentRequestId = null)
+    string? Purpose = null, string? SayadTracking = null, Guid? ReceiptId = null, Guid? PaymentRequestId = null, string? TrackingCode = null)
 {
     public static StepDetailsSnapshot? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.Value, d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.Value, d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId, d.TrackingCode);
 
     public StepDetails ToDomain() =>
-        new(AccountId, PartyDetailCode, PartyName, DocumentDate is { } d ? new FiscalDate(d) : null, PurposeGroupId, Purpose, SayadTracking, ReceiptId, PaymentRequestId);
+        new(AccountId, PartyDetailCode, PartyName, DocumentDate is { } d ? new FiscalDate(d) : null, PurposeGroupId, Purpose, SayadTracking, ReceiptId, PaymentRequestId,
+            TrackingCode);
 }
 
 public sealed record ChequeBookSnapshot(

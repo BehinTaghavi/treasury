@@ -2,7 +2,7 @@
 /**
  * Basic Information (اطلاعات پایه), in the order of the new-version manual.
  * The simple lists share one editor (CatalogueList). All 14 items of the manual's Basic Information are here (owner, 12 Nov 2026:
- * finish Basic Information so it is reviewed at once).
+ * finish Basic Information so it is reviewed at once), after «مشخصات شرکت» (the company's name, logo and addresses; owner, 16 and 18 Nov 2026).
  */
 import { computed, ref } from 'vue'
 import type { Locale } from '@treasury/ui-kit'
@@ -15,9 +15,11 @@ import ChequeBooks from './accounts/ChequeBooks.vue'
 import ChequeFormats from './accounts/ChequeFormats.vue'
 import PettyCash from './accounts/PettyCash.vue'
 import VoucherTemplate from './accounts/VoucherTemplate.vue'
+import CompanyProfile from './company/CompanyProfile.vue'
 import Beneficiaries from './organization/Beneficiaries.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
+import Signatories from './organization/Signatories.vue'
 import PurposeGroups from './purposes/PurposeGroups.vue'
 import type { ListSpec } from './types'
 
@@ -44,6 +46,9 @@ const lists: ListSpec[] = [
 
 /** The menu, in the order of the new-version manual ("اطلاعات پایه" items 1–10), with the copy of the accounting system's accounts. */
 const sections: { id: string; title: [string, string] }[] = [
+  // Owner, 16 Nov 2026: the company's name and logo, shown at the top of every screen. First, as the system is set up with it.
+  // Owner, 18 Nov 2026: its address and legal address (the city decides «خارج از مرکز» on received cheques). One page for both.
+  { id: 'company', title: ['مشخصات شرکت', 'Company particulars'] },
   ...lists.filter(l => l.list !== 'references').map(l => ({ id: l.list, title: l.title })),
   { id: 'chart', title: ['کدینگ حساب‌ها', 'Chart of accounts'] },
   { id: 'details', title: ['حساب‌های تفصیل', 'Detail accounts'] },
@@ -59,6 +64,8 @@ const sections: { id: string; title: [string, string] }[] = [
   { id: 'departments', title: ['واحدهای سازمانی', 'Departments'] },
   { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
   { id: 'beneficiaries', title: ['ذینفعان', 'Beneficiaries'] },
+  // Owner, 16 Nov 2026: the holders of authorised signatures and the signature rule of each valuable document.
+  { id: 'signatories', title: ['دارندگان امضای مجاز', 'Authorised signatories'] },
   // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.
   { id: 'voucher-template', title: ['شابلون اسناد خزانه داری', 'Treasury voucher template'] },
 ]
@@ -82,6 +89,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
         >{{ fa ? s.title[0] : s.title[1] }}</button>
       </nav>
       <CatalogueList v-if="current" :key="current.list + locale" :spec="current" :api-base="apiBase" :locale="locale" :token="token" />
+      <CompanyProfile v-else-if="selected === 'company'" :key="'company' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <ChartAccounts v-else-if="selected === 'chart'" :key="'chart' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <DetailAccounts v-else-if="selected === 'details'" :key="'details' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <BankAccounts v-else-if="selected === 'bank-accounts'" :key="'bank-accounts' + locale" :api-base="apiBase" :locale="locale" :token="token" />
@@ -93,6 +101,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <Departments v-else-if="selected === 'departments'" :key="'departments' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <Signatories v-else-if="selected === 'signatories'" :key="'signatories' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <VoucherTemplate v-else-if="selected === 'voucher-template'" :key="'voucher-template' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </section>

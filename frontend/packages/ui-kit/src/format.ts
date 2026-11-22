@@ -41,6 +41,22 @@ export function toPersianDigits(text: string): string {
 }
 
 /**
+ * A moment sent by the server (ISO, UTC) as the Jalali date and the time in Iran: "۱۴۰۵/۰۸/۲۴ ۱۰:۳۵" (fa) or "1405/08/24 10:35" (en).
+ * Used where the system keeps the computer's date and time of a tick, e.g. «ثبت صیادی شد» on an issued cheque (shown with the
+ * payment form, Phase E).
+ */
+export function formatJalaliDateTime(iso: string, locale: Locale = 'fa'): string {
+  const moment = new Date(iso)
+  if (Number.isNaN(moment.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US-u-ca-persian-nu-latn', {
+    timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(moment)
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? ''
+  const text = `${get('year').replace(/\D/g, '')}/${get('month')}/${get('day')} ${get('hour')}:${get('minute')}`
+  return locale === 'fa' ? toPersianDigits(text) : text
+}
+
+/**
  * Comparison key for searching, the same letters as the server's PersianText.Key: Arabic ي/ى/ك = Persian ی/ک,
  * Persian and Arabic digits = 0-9, spaces and half-spaces ignored, Latin letters lower-cased.
  */

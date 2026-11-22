@@ -30,6 +30,18 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['اسناد واخواست شده (چک برگشتی)', 'Protested (bounced) cheques'],
     use: ['بدهکار هنگام برگشت چک از بانک؛ تفصیل: پرداخت کننده', 'Debited when the bank returns a cheque; detail: the payer'],
   },
+  // Owner's answer of 18 Nov 2026: the voucher of the legal action («اقدام حقوقی»).
+  ProtestedChequesInLegal: {
+    title: ['اسناد واخواست شده حقوقی شده', 'Protested cheques in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی، در مقابل بستانکار «اسناد واخواست شده» (یا «اسناد نزد صندوق» برای چکی که هنوز نزد صندوق است)؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action, against a credit of «Protested cheques» (or «Cheques in the cash desk» for a cheque still there); detail: the payer'],
+  },
+  // Owner's answer of 18 Nov 2026 (Q42): the legal action on guarantee cheques and notes.
+  GuaranteeChequesInLegal: {
+    title: ['اسناد تضمینی حقوقی شده به نفع شرکت', 'Guarantee items in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی چک یا سفتهٔ تضمینی، در مقابل بستانکار «چک انتظامی به نفع شرکت»؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action on a guarantee cheque or note, against a credit of «Guarantee cheques for the company»; detail: the payer'],
+  },
   GuaranteeChequesForCompany: {
     title: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
     use: ['بدهکار هنگام دریافت چک تضمینی', 'Debited when a guarantee cheque is received'],
@@ -41,6 +53,14 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
   BadDebts: {
     title: ['مطالبات سوخت شده', 'Bad debts written off'],
     use: ['بدهکار هنگام ابطال چک دریافتی به دستور مدیریت؛ تفصیل: پرداخت کننده', "Debited when a received cheque is cancelled by management's order; detail: the payer"],
+  },
+  GuaranteeNotesForCompany: {
+    title: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
+    use: ['بدهکار هنگام دریافت سفتهٔ تضمینی یا امانی؛ بستانکار آن «طرف حساب انتظامی» است', 'Debited when a guarantee or trust note is received; credited to the guarantee counterpart'],
+  },
+  NotesInCollection: {
+    title: ['سفته‌های در جریان وصول', 'Notes in collection'],
+    use: ['بدهکار هنگام واگذاری سفته به بانک، بستانکار هنگام وصول، واخواست یا عودت؛ تفصیل: تفصیل حساب بانکی', "Debited when a note goes to the bank, credited when collected, protested or returned; detail: the bank account's detail"],
   },
 }
 
