@@ -70,6 +70,19 @@ CREATE TABLE IF NOT EXISTS reference.permission_holder_role (
     PRIMARY KEY (holder_id, role)
 );
 
+-- Owner, 22 Nov 2026: the fixed roles follow each other in the approval flow (first and second confirmer, first and second approver);
+-- a role under «سایر» is given its place among them, and only such a role has one. Rows written before the column come last.
+ALTER TABLE reference.permission_holder_role ADD COLUMN IF NOT EXISTS place text
+    CHECK (place IN ('BeforeFirstConfirmer', 'AfterFirstConfirmer', 'AfterSecondConfirmer', 'AfterFirstApprover', 'AfterSecondApprover'));
+UPDATE reference.permission_holder_role SET place = 'AfterSecondApprover' WHERE role = 'Other' AND place IS NULL;
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'permission_holder_role_place_of_other') THEN
+        ALTER TABLE reference.permission_holder_role ADD CONSTRAINT permission_holder_role_place_of_other CHECK ((role = 'Other') = (place IS NOT NULL));
+    END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS reference.permission_holder_signature (
     holder_id  uuid   PRIMARY KEY REFERENCES reference.permission_holder (id) ON DELETE CASCADE,
     data       bytea  NOT NULL CHECK (octet_length(data) BETWEEN 1 AND 1048576)

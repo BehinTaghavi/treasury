@@ -926,7 +926,7 @@ def test_signatories_are_unique_and_say_what_they_sign_and_the_signature_rule_is
 def test_a_permission_holder_has_roles_each_with_its_operations(db):
     # 048_reference_signatories_and_permission_holders.sql (owner's report no. 8): «دارندگان مجوزها (فرم‌ها)».
     add = "INSERT INTO reference.permission_holder (id, full_name, name_key, job_title, national_code, extension) VALUES (%s, %s, %s, %s, %s, %s)"
-    role = "INSERT INTO reference.permission_holder_role (holder_id, role, title, operations) VALUES (%s, %s, %s, %s)"
+    role = "INSERT INTO reference.permission_holder_role (holder_id, role, title, operations, place) VALUES (%s, %s, %s, %s, %s)"
     with psycopg.connect(db) as c:
         c.execute("SET ROLE reference_svc")
         cfo = uuid.uuid4()
@@ -939,16 +939,22 @@ def test_a_permission_holder_has_roles_each_with_its_operations(db):
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(add, row)
-        c.execute(role, (cfo, "FirstApprover", "تصویب کننده (اول)", ["PaymentRequest", "ChequePayment"]))
-        c.execute(role, (cfo, "Other", "ناظر", ["PettyCash"]))
+        c.execute(role, (cfo, "FirstApprover", "تصویب کننده (اول)", ["PaymentRequest", "ChequePayment"], None))
+        # Owner, 22 Nov 2026: a role under «سایر» has its place among the fixed steps of the approval flow; a fixed role has none.
+        c.execute(role, (cfo, "Other", "ناظر", ["PettyCash"], "AfterSecondConfirmer"))
         for row, error in (
-                ((cfo, "FirstApprover", "تصویب کننده (اول)", ["CashReceipt"]), psycopg.errors.UniqueViolation),       # a role is ticked once
-                ((cfo, "Treasurer", "خزانه دار", ["CashReceipt"]), psycopg.errors.CheckViolation),                   # not a role of the form
-                ((cfo, "SecondApprover", "تصویب کننده (دوم)", []), psycopg.errors.CheckViolation),                    # a role without an operation
-                ((uuid.uuid4(), "FirstConfirmer", "تایید کننده (اول)", ["CashReceipt"]), psycopg.errors.ForeignKeyViolation)):
+                ((cfo, "FirstApprover", "تصویب کننده (اول)", ["CashReceipt"], None), psycopg.errors.UniqueViolation),  # a role is ticked once
+                ((cfo, "Treasurer", "خزانه دار", ["CashReceipt"], None), psycopg.errors.CheckViolation),              # not a role of the form
+                ((cfo, "SecondApprover", "تصویب کننده (دوم)", [], None), psycopg.errors.CheckViolation),               # a role without an operation
+                ((cfo, "SecondApprover", "تصویب کننده (دوم)", ["CashReceipt"], "AfterFirstApprover"), psycopg.errors.CheckViolation),  # a fixed role has no place
+                ((cfo, "SecondConfirmer", "تایید کننده (دوم)", ["CashReceipt"], "Middle"), psycopg.errors.CheckViolation),            # not a place
+                ((uuid.uuid4(), "FirstConfirmer", "تایید کننده (اول)", ["CashReceipt"], None), psycopg.errors.ForeignKeyViolation)):
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(role, row)
+        with pytest.raises(psycopg.errors.CheckViolation):                                            # «سایر» always has a place
+            with c.transaction():
+                c.execute("UPDATE reference.permission_holder_role SET place = NULL WHERE holder_id = %s AND role = 'Other'", (cfo,))
         c.execute("UPDATE reference.permission_holder SET signature_type = 'image/jpeg' WHERE id = %s", (cfo,))
         c.execute("INSERT INTO reference.permission_holder_signature (holder_id, data) VALUES (%s, %s)", (cfo, b"\xff\xd8\xff"))
         c.execute("DELETE FROM reference.permission_holder WHERE id = %s", (cfo,))                    # roles and scan go with the holder

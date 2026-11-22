@@ -25,6 +25,20 @@ export const ROLES: readonly Named[] = [
   { code: 'Other', fa: 'سایر', en: 'Other' },
 ]
 
+/**
+ * Where a role under «سایر» stands in the approval flow (owner, 22 Nov 2026). The fixed roles follow each other – تایید کننده (اول)،
+ * تایید کننده (دوم)، تصویب کننده (اول)، تصویب کننده (دوم) – and a step nobody holds is left out; «سایر» is put before the first step or
+ * after one of the four.
+ */
+export const OTHER_PLACES: readonly Named[] = [
+  { code: 'BeforeFirstConfirmer', fa: 'پیش از تایید کننده (اول)', en: 'Before the first confirmer' },
+  { code: 'AfterFirstConfirmer', fa: 'پس از تایید کننده (اول)', en: 'After the first confirmer' },
+  { code: 'AfterSecondConfirmer', fa: 'پس از تایید کننده (دوم) – پیش از تصویب', en: 'After the second confirmer – before approval' },
+  { code: 'AfterFirstApprover', fa: 'پس از تصویب کننده (اول)', en: 'After the first approver' },
+  { code: 'AfterSecondApprover', fa: 'پس از تصویب کننده (دوم) – آخرین مرحله', en: 'After the second approver – last step' },
+]
+export const DEFAULT_OTHER_PLACE = 'AfterSecondApprover'
+
 export interface OperationGroup { fa: string; en: string; operations: readonly Named[] }
 
 /** «فهرست عملیات خزانه داری», grouped like the menus of the system (payment requests, receipts, payments, vouchers). */
@@ -65,23 +79,30 @@ const pick = (list: readonly Named[], code: string, fa: boolean) => {
 export const positionTitle = (code: string, fa: boolean) => pick(POSITIONS, code, fa)
 export const roleTitle = (code: string, fa: boolean) => pick(ROLES, code, fa)
 export const operationTitle = (code: string, fa: boolean) => pick(OPERATIONS, code, fa)
+export const placeTitle = (code: string, fa: boolean) => pick(OTHER_PLACES, code, fa)
 
-/** A role as the form holds it: ticked or not, the title typed for «سایر», and the operations ticked under it. */
-export interface RoleDraft { ticked: boolean; title: string; operations: string[] }
+/** A role as the form holds it: ticked or not, the title typed for «سایر» and its place in the flow, and the operations ticked under it. */
+export interface RoleDraft { ticked: boolean; title: string; operations: string[]; place: string }
 
 /** What the form sends: the ticked roles in the order of the tick boxes, each with its operations in the order of the list. */
-export function rolesToSend(drafts: Record<string, RoleDraft>): { kind: string; title: string | null; operations: string[] }[] {
+export function rolesToSend(drafts: Record<string, RoleDraft>): { kind: string; title: string | null; operations: string[]; place: string | null }[] {
   return ROLES.filter(r => drafts[r.code]?.ticked).map(r => ({
     kind: r.code,
     title: r.code === 'Other' ? drafts[r.code]!.title.trim() || null : null,
     operations: OPERATIONS.map(o => o.code).filter(o => drafts[r.code]!.operations.includes(o)),
+    place: r.code === 'Other' ? drafts[r.code]!.place || DEFAULT_OTHER_PLACE : null,
   }))
 }
 
 /** The form's roles from a stored holder; every role of the list is present, unticked when the holder does not have it. */
-export function rolesToEdit(stored: readonly { kind: string; title: string; operations: readonly string[] }[]): Record<string, RoleDraft> {
+export function rolesToEdit(stored: readonly { kind: string; title: string; operations: readonly string[]; place?: string | null }[]): Record<string, RoleDraft> {
   return Object.fromEntries(ROLES.map(r => {
     const s = stored.find(x => x.kind === r.code)
-    return [r.code, { ticked: !!s, title: s && r.code === 'Other' ? s.title : '', operations: s ? [...s.operations] : [] }]
+    return [r.code, { ticked: !!s, title: s && r.code === 'Other' ? s.title : '', operations: s ? [...s.operations] : [], place: s?.place ?? DEFAULT_OTHER_PLACE }]
   }))
+}
+
+/** The roles of a holder in the order of the approval flow (the service's `step`), for lists. */
+export function inFlowOrder<T extends { step?: number }>(roles: readonly T[]): T[] {
+  return [...roles].sort((a, b) => (a.step ?? 0) - (b.step ?? 0))
 }

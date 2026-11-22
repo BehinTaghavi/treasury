@@ -5,18 +5,22 @@
  * The upper part is the form of «دارندگان امضای مجاز» with «سمت سازمانی / شغل» in place of «سمت» and the scan of the signature. Under
  * «نقش» there are five tick boxes – first and second confirmer, first and second approver, and «سایر» with a typed title; ticking a
  * role opens «فهرست عملیات خزانه داری» with a tick box beside each operation. A person may have several roles, each in several
- * operations. The forms of an operation list its holders as the persons who sign; the approval workflow the owner asks about is
- * proposed in docs/domain/permissions-and-approvals.md and not built yet.
+ * operations. Owner, 22 Nov 2026: in the approval flow the roles follow each other naturally – first confirmer, second confirmer, first
+ * approver, second approver; a step nobody holds is left out – and a role under «سایر» is given its place among them («جایگاه در
+ * گردش کار»). The tag beside a ticked role counts the operations ticked under it («… عملیات انتخاب شده»); it is not the order.
+ * The forms of an operation list its holders as the persons who sign, in that order; the approval workflow itself is proposed in
+ * docs/domain/permissions-and-approvals.md and not built yet.
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createApi, toLatinDigits, translate, type Locale } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
 import { searchKey } from '../text'
 import SignatureBox from './SignatureBox.vue'
-import { OPERATION_GROUPS, ROLES, operationTitle, roleTitle, rolesToEdit, rolesToSend, type RoleDraft } from './persons'
+import { OPERATION_GROUPS, OTHER_PLACES, ROLES, inFlowOrder, operationTitle, placeTitle, roleTitle, rolesToEdit, rolesToSend, type RoleDraft } from './persons'
 import { uploadSignature } from './signatureScan'
 
-interface Role { kind: string; title: string; operations: string[] }
+/** `place`: «سایر» only, where the role stands in the approval flow; `step`: the role's order in the flow (owner, 22 Nov 2026). */
+interface Role { kind: string; title: string; operations: string[]; place: string | null; step: number }
 interface Holder {
   id: string; fullName: string; jobTitle: string; roles: Role[]; detailCode: string | null; nationalCode: string | null; mobile: string | null; phone: string | null
   extension: string | null; email: string | null; hasSignature: boolean; isActive: boolean; version: number
@@ -186,13 +190,22 @@ onMounted(load)
       <fieldset class="tr-roles">
         <legend>{{ t('نقش', 'Role') }} <span class="star">*</span></legend>
         <p class="muted small tr-roles-hint">{{ t('هر نقش را که تیک بزنید، فهرست عملیات خزانه‌داری برای همان نقش باز می‌شود. یک شخص می‌تواند چند نقش داشته باشد.',
-          'Ticking a role opens the list of treasury operations for that role. A person may have several roles.') }}</p>
+          'Ticking a role opens the list of treasury operations for that role. A person may have several roles.') }}
+          <br />{{ t('ترتیب در گردش کار: تایید کننده (اول) ← تایید کننده (دوم) ← تصویب کننده (اول) ← تصویب کننده (دوم). مرحله‌ای که برای یک عملیات کسی ندارد حذف می‌شود؛ جایگاه نقش «سایر» را خودتان تعیین می‌کنید.',
+            'Order in the flow: first confirmer → second confirmer → first approver → second approver. A step nobody holds in an operation is left out; you set the place of an "Other" role.') }}</p>
         <section v-for="r in ROLES" :key="r.code" :class="['tr-role', { on: roles[r.code]!.ticked }]">
           <label class="tr-check tr-role-name"><input v-model="roles[r.code]!.ticked" type="checkbox" />{{ fa ? r.fa : r.en }}
-            <span v-if="roles[r.code]!.ticked" class="tr-tag">{{ t(`${num(roles[r.code]!.operations.length)} عملیات`, `${roles[r.code]!.operations.length} operations`) }}</span></label>
+            <span v-if="roles[r.code]!.ticked" class="tr-tag">{{ t(`${num(roles[r.code]!.operations.length)} عملیات انتخاب شده`, `${roles[r.code]!.operations.length} operations ticked`) }}</span></label>
           <template v-if="roles[r.code]!.ticked">
-            <label v-if="r.code === 'Other'" class="req tr-role-title"><span>{{ t('عنوان نقش', 'Title of the role') }} <span class="star">*</span></span>
-              <input v-model="roles[r.code]!.title" maxlength="60" :placeholder="t('مثلاً ناظر مالی', 'e.g. Financial supervisor')" /></label>
+            <div v-if="r.code === 'Other'" class="tr-other">
+              <label class="req"><span>{{ t('عنوان نقش', 'Title of the role') }} <span class="star">*</span></span>
+                <input v-model="roles[r.code]!.title" maxlength="60" :placeholder="t('مثلاً ناظر مالی', 'e.g. Financial supervisor')" /></label>
+              <!-- Owner, 22 Nov 2026: a role that stands between the fixed steps is given its place in the flow. -->
+              <label><span>{{ t('جایگاه در گردش کار', 'Place in the approval flow') }}</span>
+                <select v-model="roles[r.code]!.place" :aria-label="t('جایگاه نقش سایر در گردش کار', 'Place of the Other role in the flow')">
+                  <option v-for="p in OTHER_PLACES" :key="p.code" :value="p.code">{{ fa ? p.fa : p.en }}</option>
+                </select></label>
+            </div>
             <div class="tr-ops">
               <div v-for="g in OPERATION_GROUPS" :key="g.en" class="tr-ops-group">
                 <label class="tr-check tr-ops-title"><input type="checkbox" :checked="allTicked(r.code, g)" :aria-label="t(`همهٔ ${g.fa}`, `All ${g.en}`)"
@@ -215,20 +228,24 @@ onMounted(load)
         <label>{{ t('جستجو', 'Search') }}<input v-model="search" type="search" autocomplete="off" /></label>
         <button type="button" class="tr-secondary" :disabled="!search" @click="search = ''">{{ t('نمایش همه', 'Show all') }}</button>
       </div>
-      <table class="tr-table tr-cards">
+      <table class="tr-table tr-cards tr-holders">
         <thead>
-          <tr><th>{{ t('نام و نام خانوادگی', 'Name') }}</th><th>{{ t('سمت سازمانی / شغل', 'Job') }}</th><th>{{ t('نقش‌ها و عملیات', 'Roles and operations') }}</th>
-            <th>{{ t('تلفن همراه', 'Mobile') }}</th><th>{{ t('داخلی', 'Ext.') }}</th><th>{{ t('اسکن امضا', 'Scan') }}</th><th>{{ t('وضعیت', 'State') }}</th><th /></tr>
+          <tr><th class="c-person">{{ t('نام و سمت', 'Name and job') }}</th><th>{{ t('نقش‌ها (به ترتیب گردش کار) و عملیات', 'Roles (in the order of the flow) and operations') }}</th>
+            <th class="c-contact">{{ t('تماس', 'Contact') }}</th><th class="c-scan">{{ t('اسکن امضا', 'Scan') }}</th><th class="c-state">{{ t('وضعیت', 'State') }}</th><th class="c-actions" /></tr>
         </thead>
         <tbody>
           <tr v-for="h in shown" :key="h.id" :class="{ inactive: !h.isActive }">
-            <td :data-label="t('نام', 'Name')">{{ h.fullName }}</td>
-            <td :data-label="t('سمت سازمانی / شغل', 'Job')">{{ h.jobTitle }}</td>
+            <td :data-label="t('نام و سمت', 'Name and job')"><div><strong class="tr-h-name">{{ h.fullName }}</strong><span class="tr-h-job">{{ h.jobTitle }}</span></div></td>
             <td :data-label="t('نقش‌ها و عملیات', 'Roles and operations')">
-              <div><div v-for="r in h.roles" :key="r.kind" class="tr-role-line"><strong>{{ roleName(r) }}:</strong> {{ r.operations.map(o => operationTitle(o, fa)).join('، ') }}</div></div>
+              <div class="tr-h-roles">
+                <div v-for="r in inFlowOrder(h.roles)" :key="r.kind" class="tr-h-role">
+                  <span class="tr-h-role-name">{{ roleName(r) }}<small v-if="r.kind === 'Other' && r.place">{{ placeTitle(r.place, fa) }}</small></span>
+                  <span class="tr-h-ops"><span v-for="o in r.operations" :key="o" class="tr-chip">{{ operationTitle(o, fa) }}</span></span>
+                </div>
+              </div>
             </td>
-            <td :data-label="t('تلفن همراه', 'Mobile')" dir="ltr">{{ h.mobile }}</td>
-            <td :data-label="t('داخلی', 'Ext.')" dir="ltr">{{ h.extension }}</td>
+            <td :data-label="t('تماس', 'Contact')"><div class="tr-h-contact"><span v-if="h.mobile" dir="ltr">{{ h.mobile }}</span>
+              <span v-if="h.extension">{{ t('داخلی', 'Ext.') }} <span dir="ltr">{{ h.extension }}</span></span><span v-if="h.email" dir="ltr">{{ h.email }}</span></div></td>
             <td :data-label="t('اسکن امضا', 'Scan')">{{ h.hasSignature ? t('دارد', 'Yes') : t('ندارد', 'No') }}</td>
             <td :data-label="t('وضعیت', 'State')">{{ h.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }}</td>
             <td class="tr-actions">
@@ -237,7 +254,7 @@ onMounted(load)
               <button type="button" class="tr-link danger" @click="change(h, 'delete')">{{ t('حذف', 'Delete') }}</button>
             </td>
           </tr>
-          <tr v-if="!shown.length"><td colspan="8" class="muted">{{ t('موردی پیدا نشد.', 'Nothing found.') }}</td></tr>
+          <tr v-if="!shown.length"><td colspan="6" class="muted">{{ t('موردی پیدا نشد.', 'Nothing found.') }}</td></tr>
         </tbody>
       </table>
     </template>
@@ -252,9 +269,36 @@ onMounted(load)
 .tr-role { border: 1px solid #e4e7eb; border-radius: 8px; padding: .5rem .75rem; margin-bottom: .5rem; }
 .tr-role.on { border-color: #93c5fd; background: #f8fbff; }
 .tr-role-name { font-weight: 600; font-size: .9rem; }
-.tr-role-title { max-width: 20rem; margin: .5rem 0; }
+.tr-other { display: grid; grid-template-columns: repeat(auto-fill, minmax(14rem, 20rem)); gap: .75rem; margin: .5rem 0; }
 .tr-ops { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .75rem; margin-top: .5rem; }
 .tr-ops-group { display: flex; flex-direction: column; gap: .3rem; }
 .tr-ops-title { font-weight: 600; color: #1f2933; border-bottom: 1px solid #e4e7eb; padding-bottom: .2rem; }
-.tr-role-line { margin: .1rem 0; }
+/* The list (owner, 22 Nov 2026: «فهرست دارندگان مجوز لازم است کمی مرتب‌تر شود»): the person in one column, each role on its own line with
+   its operations as chips, the contact details together; columns keep their width so the rows line up. */
+.tr-holders { table-layout: fixed; }
+.tr-holders th { white-space: nowrap; font-size: .82rem; color: #52606d; font-weight: 600; background: #f8fafc; }
+.tr-holders td { vertical-align: top; }
+.tr-holders .c-person { width: 10rem; }
+.tr-holders .c-contact { width: 8.5rem; }
+.tr-holders .c-scan { width: 4.5rem; }
+.tr-holders .c-state { width: 4.5rem; }
+.tr-holders .c-actions { width: 7rem; }
+.tr-holders .tr-actions { white-space: normal; }
+.tr-holders .tr-actions .tr-link { display: block; padding: .1rem 0; text-align: start; }
+.tr-h-name { display: block; }
+.tr-h-job { display: block; color: #7b8794; font-size: .82rem; }
+.tr-h-roles { display: grid; gap: .35rem; }
+.tr-h-role { display: grid; grid-template-columns: 8.5rem 1fr; gap: .5rem; align-items: start; padding-bottom: .35rem; border-bottom: 1px dashed #e4e7eb; }
+.tr-h-role:last-child { padding-bottom: 0; border-bottom: 0; }
+.tr-h-role-name { font-weight: 600; font-size: .85rem; color: #1e3a8a; }
+.tr-h-role-name small { display: block; font-weight: 400; color: #7b8794; font-size: .74rem; }
+.tr-h-ops { display: flex; flex-wrap: wrap; gap: .25rem; }
+.tr-chip { padding: .05rem .45rem; border-radius: 999px; background: #eef4ff; color: #1f2933; font-size: .78rem; white-space: nowrap; }
+.tr-h-contact { display: grid; gap: .1rem; font-size: .85rem; overflow-wrap: anywhere; }
+@media (max-width: 900px) {
+  .tr-holders { table-layout: auto; }
+  .tr-holders td { width: 100%; }
+  .tr-h-role { grid-template-columns: 1fr; gap: .15rem; }
+  .tr-holders .tr-actions .tr-link { display: inline-block; padding: .2rem .4rem; }
+}
 </style>

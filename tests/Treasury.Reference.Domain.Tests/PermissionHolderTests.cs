@@ -118,4 +118,45 @@ public sealed class PermissionHolderTests
         h.Delete();
         Assert.Contains(h.PendingEvents, e => e is PermissionHolderDeleted);
     }
+
+    [Fact]
+    public void The_fixed_roles_follow_each_other_and_a_role_under_other_is_given_its_place_owner_22_Nov_2026()
+    {
+        // Owner: «بطور طبیعی ابتدا تایید اول بعد تایید دوم بعد تصویب اول و بعد تصویب دوم است».
+        Assert.Equal([10, 20, 30, 40], new[] { PermissionRoleKind.FirstConfirmer, PermissionRoleKind.SecondConfirmer, PermissionRoleKind.FirstApprover, PermissionRoleKind.SecondApprover }
+            .Select(k => Holder(Data(roles: Role(k, TreasuryOperation.CashReceipt))).Roles[0].Step));
+        Assert.All(Enum.GetValues<PermissionRoleKind>().Where(k => k != PermissionRoleKind.Other), k => Assert.Null(Holder(Data(roles: new PermissionRoleForm(k, null, [TreasuryOperation.CashReceipt], OtherRolePlace.AfterFirstConfirmer))).Roles[0].Place));
+
+        // «اگر برای حالت سایر مجوزی باشد که بین این مراحل قرار گیرد شماره ترتیب مجوزها باید تعیین شوند»: each place lies between two fixed steps.
+        PermissionRole Other(OtherRolePlace? place) => Holder(Data(roles: new PermissionRoleForm(PermissionRoleKind.Other, "ناظر", [TreasuryOperation.CashReceipt], place))).Roles[0];
+        Assert.Equal([5, 15, 25, 35, 45], Enum.GetValues<OtherRolePlace>().Select(p => Other(p).Step));
+        // Without a place it comes after the last approval.
+        Assert.Equal((OtherRolePlace.AfterSecondApprover, 45), (Other(null).Place, Other(null).Step));
+        Assert.Equal("PermissionHolder.PlaceUnknown", Code(() => Other((OtherRolePlace)9)));
+    }
+
+    [Fact]
+    public void The_roles_of_a_person_in_an_operation_are_listed_in_the_order_of_the_flow()
+    {
+        var h = Holder(Data(roles:
+        [
+            Role(PermissionRoleKind.SecondApprover, TreasuryOperation.ChequePayment),
+            new PermissionRoleForm(PermissionRoleKind.Other, "کنترل بودجه", [TreasuryOperation.ChequePayment], OtherRolePlace.AfterSecondConfirmer),
+            Role(PermissionRoleKind.FirstConfirmer, TreasuryOperation.ChequePayment),
+        ]));
+        // On the form the roles keep the order of the tick boxes; in the flow «سایر» stands where it was put.
+        Assert.Equal([PermissionRoleKind.FirstConfirmer, PermissionRoleKind.SecondApprover, PermissionRoleKind.Other], h.Roles.Select(r => r.Kind));
+        Assert.Equal(["تایید کننده (اول)", "کنترل بودجه", "تصویب کننده (دوم)"], h.RolesIn(TreasuryOperation.ChequePayment).Select(r => r.Title));
+
+        // Moving the role in the flow is a change of the holder.
+        h.MarkSaved(1);
+        h.Edit(Data(roles:
+        [
+            Role(PermissionRoleKind.SecondApprover, TreasuryOperation.ChequePayment),
+            new PermissionRoleForm(PermissionRoleKind.Other, "کنترل بودجه", [TreasuryOperation.ChequePayment], OtherRolePlace.BeforeFirstConfirmer),
+            Role(PermissionRoleKind.FirstConfirmer, TreasuryOperation.ChequePayment),
+        ]), null);
+        Assert.IsType<PermissionHolderChanged>(Assert.Single(h.PendingEvents));
+        Assert.Equal("کنترل بودجه", h.RolesIn(TreasuryOperation.ChequePayment)[0].Title);
+    }
 }

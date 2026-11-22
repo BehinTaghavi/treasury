@@ -232,7 +232,8 @@ public sealed class PostgresPermissionHolderRepository : IPermissionHolderReposi
 
         foreach (var role in h.Roles)
         {
-            await using var cmd = tx.Command("INSERT INTO reference.permission_holder_role (holder_id, role, title, operations) VALUES (@id, @role, @title, @operations)");
+            await using var cmd = tx.Command("INSERT INTO reference.permission_holder_role (holder_id, role, title, operations, place) VALUES (@id, @role, @title, @operations, @place)");
+            PersonRows.Text(cmd, "place", role.Place?.ToString());
             cmd.Parameters.AddWithValue("id", h.Id);
             cmd.Parameters.AddWithValue("role", role.Kind.ToString());
             cmd.Parameters.AddWithValue("title", role.Title);
@@ -245,7 +246,7 @@ public sealed class PostgresPermissionHolderRepository : IPermissionHolderReposi
     {
         var tx = PostgresUnitOfWork.Current;
         var roles = new Dictionary<Guid, List<PermissionRole>>();
-        await using (var cmd = tx.Command($"SELECT holder_id, role, title, operations FROM reference.permission_holder_role {(id is null ? string.Empty : "WHERE holder_id = @id")}"))
+        await using (var cmd = tx.Command($"SELECT holder_id, role, title, operations, place FROM reference.permission_holder_role {(id is null ? string.Empty : "WHERE holder_id = @id")}"))
         {
             if (id is { } i)
             {
@@ -263,7 +264,7 @@ public sealed class PostgresPermissionHolderRepository : IPermissionHolderReposi
 
                 // An operation the code no longer knows (dropped from the list) is left out instead of failing the page.
                 var operations = r.GetFieldValue<string[]>(3).Select(o => Enum.TryParse<TreasuryOperation>(o, out var op) ? op : (TreasuryOperation?)null).OfType<TreasuryOperation>().Order().ToList();
-                list.Add(new PermissionRole(Enum.Parse<PermissionRoleKind>(r.GetString(1)), r.GetString(2), operations));
+                list.Add(new PermissionRole(Enum.Parse<PermissionRoleKind>(r.GetString(1)), r.GetString(2), operations, r.IsDBNull(4) ? null : Enum.Parse<OtherRolePlace>(r.GetString(4))));
             }
         }
 

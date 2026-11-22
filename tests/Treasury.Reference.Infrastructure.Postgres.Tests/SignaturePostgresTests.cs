@@ -86,7 +86,7 @@ public sealed class SignaturePostgresTests : IDisposable
     {
         var code = NationalCode(_n + 1);
         var added = await _holders.AddAsync(Key(), new PermissionHolderForm("دارنده " + _n, "مدیر مالی",
-            [new(PermissionRoleKind.FirstApprover, null, [TreasuryOperation.PaymentRequest, TreasuryOperation.NotePayment]), new(PermissionRoleKind.Other, "ناظر " + _n, [TreasuryOperation.NotePayment])],
+            [new(PermissionRoleKind.FirstApprover, null, [TreasuryOperation.PaymentRequest, TreasuryOperation.NotePayment]), new(PermissionRoleKind.Other, "ناظر " + _n, [TreasuryOperation.NotePayment], OtherRolePlace.AfterFirstConfirmer)],
             null, code, "09121234567", null, "120", $"h{_n}@nazho.example"), CancellationToken.None);
         Assert.True(added.IsSuccess, added.ErrorCode);
         var h = (await _holders.ListAsync(true, CancellationToken.None)).Single(x => x.Id == added.Value);
@@ -94,10 +94,12 @@ public sealed class SignaturePostgresTests : IDisposable
             (h.FullName, h.JobTitle, h.NationalCode, h.Mobile, h.Extension, h.Email, h.HasSignature, h.IsActive, h.Version));
         Assert.Equal([("FirstApprover", "تصویب کننده (اول)"), ("Other", "ناظر " + _n)], h.Roles.Select(r => (r.Kind, r.Title)));
         Assert.Equal(["PaymentRequest", "NotePayment"], h.Roles[0].Operations);
+        // The place of the role under «سایر» in the approval flow round-trips; a fixed role has none.
+        Assert.Equal((null, 30, "AfterFirstConfirmer", 15), (h.Roles[0].Place, h.Roles[0].Step, h.Roles[1].Place, h.Roles[1].Step));
         Assert.Equal("PermissionHolder.NameTaken", (await _holders.AddAsync(Key(), h.ToForm(), CancellationToken.None)).ErrorCode);
 
         var forNotes = (await _holders.ListForOperationAsync(TreasuryOperation.NotePayment, CancellationToken.None)).Single(x => x.Id == added.Value);
-        Assert.Equal($"تصویب کننده (اول)، ناظر {_n} – مدیر مالی", forNotes.Position);
+        Assert.Equal($"ناظر {_n}، تصویب کننده (اول) – مدیر مالی", forNotes.Position); // in the order of the flow: after the first confirmer, before the approver
 
         // The roles are replaced as a whole by a correction.
         Assert.True((await _holders.EditAsync(Key(), added.Value,
@@ -121,6 +123,7 @@ internal static class PermissionHolderViews
     /// <summary>The form that would save the holder as it is listed.</summary>
     public static PermissionHolderForm ToForm(this PermissionHolderView h) => new(
         h.FullName, h.JobTitle,
-        h.Roles.Select(r => new PermissionRoleForm(Enum.Parse<PermissionRoleKind>(r.Kind), r.Title, r.Operations.Select(Enum.Parse<TreasuryOperation>).ToList())).ToList(),
+        h.Roles.Select(r => new PermissionRoleForm(Enum.Parse<PermissionRoleKind>(r.Kind), r.Title, r.Operations.Select(Enum.Parse<TreasuryOperation>).ToList(),
+            r.Place is null ? null : Enum.Parse<OtherRolePlace>(r.Place))).ToList(),
         h.DetailCode, h.NationalCode, h.Mobile, h.Phone, h.Extension, h.Email);
 }

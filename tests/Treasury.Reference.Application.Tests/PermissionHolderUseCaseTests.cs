@@ -128,4 +128,22 @@ public sealed class PermissionHolderUseCaseTests : IDisposable
         Assert.Equal(a.Value, b.Value);
         Assert.Single(await _useCases.ListAsync(true, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task The_holders_of_an_operation_come_in_the_order_of_the_approval_flow_with_other_roles_at_their_place()
+    {
+        // Owner, 22 Nov 2026: confirmation before approval; a step nobody holds is left out; «سایر» stands where its place says.
+        await Add(Form("تصویب دوم", roles: Role(PermissionRoleKind.SecondApprover, TreasuryOperation.ChequePayment)));
+        await Add(Form("تایید اول", roles: Role(PermissionRoleKind.FirstConfirmer, TreasuryOperation.ChequePayment)));
+        await Add(Form("کنترل بودجه", roles: new PermissionRoleForm(PermissionRoleKind.Other, "کنترل بودجه", [TreasuryOperation.ChequePayment], OtherRolePlace.AfterSecondConfirmer)));
+        await Add(Form("بایگانی", roles: new PermissionRoleForm(PermissionRoleKind.Other, "بایگانی", [TreasuryOperation.ChequePayment])));
+        await Add(Form("پیش کنترل", roles: new PermissionRoleForm(PermissionRoleKind.Other, "پیش کنترل", [TreasuryOperation.ChequePayment], OtherRolePlace.BeforeFirstConfirmer)));
+
+        // No second confirmer and no first approver in this operation: «کنترل بودجه» still stands between confirmation and approval.
+        Assert.Equal(["پیش کنترل", "تایید اول", "کنترل بودجه", "تصویب دوم", "بایگانی"],
+            (await _useCases.ListForOperationAsync(TreasuryOperation.ChequePayment, CancellationToken.None)).Select(h => h.FullName));
+        var stored = (await _useCases.ListAsync(true, CancellationToken.None)).Single(h => h.FullName == "کنترل بودجه").Roles[0];
+        Assert.Equal(("Other", "AfterSecondConfirmer", 25), (stored.Kind, stored.Place, stored.Step));
+        Assert.Equal((null, 10), ((await _useCases.ListAsync(true, CancellationToken.None)).Single(h => h.FullName == "تایید اول").Roles[0].Place, (await _useCases.ListAsync(true, CancellationToken.None)).Single(h => h.FullName == "تایید اول").Roles[0].Step));
+    }
 }

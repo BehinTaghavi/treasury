@@ -16,9 +16,11 @@ public sealed record PermissionHolderForm(
     public PermissionHolderData ToData() => new(new PersonForm(FullName, DetailCode, NationalCode, Mobile, Phone, Extension, Email), JobTitle, Roles);
 }
 
-public sealed record PermissionRoleView(string Kind, string Title, IReadOnlyList<string> Operations)
+/// <param name="Place">«سایر» only: where the role stands among the fixed steps of the approval flow.</param>
+/// <param name="Step">The role's order in the flow: 10, 20, 30, 40 for the fixed roles, 5–45 for «سایر».</param>
+public sealed record PermissionRoleView(string Kind, string Title, IReadOnlyList<string> Operations, string? Place = null, int Step = 0)
 {
-    public static PermissionRoleView From(PermissionRole r) => new(r.Kind.ToString(), r.Title, r.Operations.Select(o => o.ToString()).ToList());
+    public static PermissionRoleView From(PermissionRole r) => new(r.Kind.ToString(), r.Title, r.Operations.Select(o => o.ToString()).ToList(), r.Place?.ToString(), r.Step);
 }
 
 public sealed record PermissionHolderView(
@@ -121,15 +123,16 @@ public sealed class PermissionHolderUseCases(IUnitOfWork unitOfWork, IPermission
             cancellationToken);
 
     /// <summary>
-    /// The active holders of a permission in one operation (asked by the forms of that operation): first confirmers first, then second
-    /// confirmers, approvers and other roles; within a role by name.
+    /// The active holders of a permission in one operation (asked by the forms of that operation), in the order of the approval flow
+    /// (owner, 22 Nov 2026): first confirmers, second confirmers, first approvers, second approvers, with a role under «سایر» at the
+    /// place it was given; within a step by name.
     /// </summary>
     public Task<IReadOnlyList<OperationHolderView>> ListForOperationAsync(TreasuryOperation operation, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<OperationHolderView>>(async ct =>
             (await holders.ListAsync(includeInactive: false, ct).ConfigureAwait(false))
                 .Select(h => (Holder: h, Roles: h.RolesIn(operation)))
                 .Where(x => x.Roles.Count > 0)
-                .OrderBy(x => x.Roles[0].Kind).ThenBy(x => x.Holder.FullName, PersianOrder)
+                .OrderBy(x => x.Roles[0].Step).ThenBy(x => x.Holder.FullName, PersianOrder)
                 .Select(x =>
                 {
                     var titles = x.Roles.Select(r => r.Title).ToList();

@@ -56,20 +56,51 @@ public static class PermissionRoleKinds
     };
 }
 
+/// <summary>
+/// Where a role under «سایر» stands among the four fixed steps of the approval flow (owner, 22 Nov 2026): «اگر برای حالت سایر مجوزی
+/// باشد که بین این مراحل قرار گیرد شماره ترتیب مجوزها باید تعیین شوند تا در ورک فلو قرار گیرند». The fixed steps follow each other
+/// naturally – تایید کننده (اول)، تایید کننده (دوم)، تصویب کننده (اول)، تصویب کننده (دوم) – and a step nobody holds is left out,
+/// confirmation always before approval.
+/// </summary>
+public enum OtherRolePlace
+{
+    BeforeFirstConfirmer,
+    AfterFirstConfirmer,
+    AfterSecondConfirmer,
+    AfterFirstApprover,
+    AfterSecondApprover,
+}
+
 /// <summary>A role as ticked on the form with the operations ticked under it.</summary>
-public sealed record PermissionRoleForm(PermissionRoleKind? Kind, string? Title, IReadOnlyList<TreasuryOperation>? Operations);
+/// <param name="Place">«سایر» only: where the role stands in the flow; left empty it comes last.</param>
+public sealed record PermissionRoleForm(PermissionRoleKind? Kind, string? Title, IReadOnlyList<TreasuryOperation>? Operations, OtherRolePlace? Place = null);
 
 /// <summary>
 /// One role of a permission holder with the treasury operations in which the person has it: «هر شخص ممکن است … در چند عملیات نقش
 /// داشته باشد» (owner's report no. 8).
 /// </summary>
 /// <param name="Title">The role's name: the fixed title, or the text typed for «سایر».</param>
-public sealed record PermissionRole(PermissionRoleKind Kind, string Title, IReadOnlyList<TreasuryOperation> Operations)
+/// <param name="Place">«سایر» only: where the role stands among the fixed steps; null for the four fixed roles.</param>
+public sealed record PermissionRole(PermissionRoleKind Kind, string Title, IReadOnlyList<TreasuryOperation> Operations, OtherRolePlace? Place = null)
 {
-    public bool Equals(PermissionRole? other) =>
-        other is not null && Kind == other.Kind && Title == other.Title && Operations.SequenceEqual(other.Operations);
+    /// <summary>
+    /// The order of the role in the approval flow of an operation (owner, 22 Nov 2026): first confirmer 10, second confirmer 20, first
+    /// approver 30, second approver 40; a role under «سایر» stands just before the first confirmer (5) or just after the step it names
+    /// (15, 25, 35, 45). Steps nobody holds in an operation are simply absent, so the others keep their order.
+    /// </summary>
+    public int Step => Kind switch
+    {
+        PermissionRoleKind.FirstConfirmer => 10,
+        PermissionRoleKind.SecondConfirmer => 20,
+        PermissionRoleKind.FirstApprover => 30,
+        PermissionRoleKind.SecondApprover => 40,
+        _ => ((int)(Place ?? OtherRolePlace.AfterSecondApprover) * 10) + 5,
+    };
 
-    public override int GetHashCode() => HashCode.Combine(Kind, Title, Operations.Count);
+    public bool Equals(PermissionRole? other) =>
+        other is not null && Kind == other.Kind && Title == other.Title && Place == other.Place && Operations.SequenceEqual(other.Operations);
+
+    public override int GetHashCode() => HashCode.Combine(Kind, Title, Place, Operations.Count);
 }
 
 /// <summary>What the form «دارندگان مجوزها (فرم‌ها)» sends.</summary>
@@ -114,8 +145,8 @@ public sealed class PermissionHolder : AggregateRoot<Guid>
 
     public bool IsActive { get; private set; }
 
-    /// <summary>The roles the person has in one operation, in the order of <see cref="PermissionRoleKind"/>.</summary>
-    public IReadOnlyList<PermissionRole> RolesIn(TreasuryOperation operation) => Roles.Where(r => r.Operations.Contains(operation)).ToList();
+    /// <summary>The roles the person has in one operation, in the order of the approval flow (<see cref="PermissionRole.Step"/>).</summary>
+    public IReadOnlyList<PermissionRole> RolesIn(TreasuryOperation operation) => Roles.Where(r => r.Operations.Contains(operation)).OrderBy(r => r.Step).ToList();
 
     public static PermissionHolder Register(Guid id, PermissionHolderData data, DetailFact? detail)
     {
@@ -192,7 +223,9 @@ public sealed class PermissionHolder : AggregateRoot<Guid>
             Rules.Require(operations.All(o => Enum.IsDefined(o)), "PermissionHolder.OperationUnknown", "Unknown treasury operation.");
             // A role without an operation gives no permission: the list of operations opens with the role and at least one is ticked.
             Rules.Require(operations.Count > 0, "PermissionHolder.OperationRequired", "Tick at least one treasury operation for each role.");
-            roles.Add(new PermissionRole(kind, title, [.. operations.Order()]));
+            // Owner, 22 Nov 2026: a role under «سایر» is given its place among the steps; without one it comes after the last approval.
+            Rules.Require(role.Place is not { } place || Enum.IsDefined(place), "PermissionHolder.PlaceUnknown", "Unknown place of the role in the approval flow.");
+            roles.Add(new PermissionRole(kind, title, [.. operations.Order()], kind == PermissionRoleKind.Other ? role.Place ?? OtherRolePlace.AfterSecondApprover : null));
         }
 
         Rules.Require(roles.Count > 0, "PermissionHolder.RoleRequired", "Tick at least one role.");

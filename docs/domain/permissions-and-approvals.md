@@ -27,7 +27,8 @@ Rules the services check (each has a test):
   is added; **the fixed signatories are not more than the number of signatures** (they all sign every cheque) and **the
   signatories named are not fewer than that number** (otherwise no cheque could be completed). The owner's example — two
   signatures, one fixed and two variable signatories — is a test.
-- A permission holder has at least one role; a role is ticked once and has at least one operation; «سایر» needs its title.
+- A permission holder has at least one role; a role is ticked once and has at least one operation; «سایر» needs its title and
+  has a place among the fixed steps (last unless chosen). The holders of an operation are listed in the order of the flow.
 
 ## 2. What happens to the forms that used the signature rule
 
@@ -46,8 +47,11 @@ with their own user name and password), so it comes with the Keycloak login of P
 1. **A holder is linked to a user.** The form of a permission holder gets one more field, «کاربر سیستم». A holder without a
    user (not a user of the system) cannot act in the system; for that person the printed form keeps an empty box to sign by hand.
 2. **The steps of an operation come from the roles ticked for it**, always in this order: تهیه کننده (who filled the form) →
-   تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم) → the roles under «سایر». A step exists only
-   when somebody holds that role in the operation; an operation in which nobody holds a role has no workflow.
+   تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم). A step exists only when somebody holds that
+   role in the operation — with one or two steps missing the rest keep the order, confirmation before approval — and an
+   operation in which nobody holds a role has no workflow. **Confirmed by the owner on 22 Nov 2026**, who added: a role under
+   «سایر» that stands between these steps is given its order. That part is built: the form asks «جایگاه در گردش کار» for
+   «سایر» (before the first confirmer, or after one of the four steps; last when nothing is chosen).
 3. **When several persons hold the same role in one operation, any one of them acts** (the first who does); the others see
    that it is done.
 4. **Task inbox («کارتابل»).** After the preparer saves a form it is «در انتظار تایید» and appears in the inbox of the holders
@@ -146,7 +150,7 @@ Asked on 22 Nov 2026. The questions about what is already built (Q86–Q93) are 
 
 | # | Question | Proposed |
 |---|---|---|
-| QP1 | Is the **order of the steps** right: تهیه کننده → تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم) → «سایر»? Where do the roles under «سایر» stand? | As written; «سایر» last |
+| QP1 | Is the **order of the steps** right: تهیه کننده → تایید کننده (اول) → تایید کننده (دوم) → تصویب کننده (اول) → تصویب کننده (دوم) → «سایر»? Where do the roles under «سایر» stand? | **Answered 22 Nov 2026:** yes, that order; with steps missing, confirmation first, then approval; «سایر» gets its own order among the steps — built as «جایگاه در گردش کار» on the form. Still to confirm: is choosing the place (before / after a step) enough, or do you want to type a number? |
 | QP2 | When **several persons hold the same role** in an operation: is one of them enough, or must all of them act? | One of them |
 | QP3 | **Receipts:** the money has already arrived when the form is filled. Is it right that a receipt is recorded at once and confirmed afterwards, and that only its accounting voucher waits for the last step? And for payment requests and payments: nothing leaves before the last approval? | Yes to both |
 | QP4 | Are **amount limits** needed — for example the second approver only above an amount — and a **substitute** («جانشین») for a holder who is away? | Both, set by the company; not in the first version |
