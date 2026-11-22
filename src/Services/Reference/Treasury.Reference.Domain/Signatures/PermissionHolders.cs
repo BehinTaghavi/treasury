@@ -5,8 +5,9 @@ namespace Treasury.Reference.Domain.Signatures;
 
 /// <summary>
 /// «فهرست عملیات خزانه داری» (owner's report no. 8, 21 Nov 2026): the operations of the treasury system for which a person can hold
-/// a permission, e.g. «درخواست وجه، دریافت یا پرداخت و …». The owner named three; the list below follows the menus of the system as
-/// built and planned (payment requests, receipts, payments, vouchers) and waits for his confirmation (Q86).
+/// a permission, e.g. «درخواست وجه، دریافت یا پرداخت و …». The list follows the menus of the system as built and planned (payment
+/// requests, receipts, payments, vouchers). Owner's answer to Q86 (22 Nov 2026): the receipts also have «نقل و انتقال بانکی
+/// (الکترونیکی)» and «دریافت چک نقل و انتقال (انتقال گیرنده)», the payments «پرداخت چک نقل و انتقال». The names are stored.
 /// </summary>
 public enum TreasuryOperation
 {
@@ -14,7 +15,9 @@ public enum TreasuryOperation
     CashReceipt,
     BankDeposit,
     CardDeposit,
+    ElectronicTransferReceipt,
     ChequeReceipt,
+    TransferChequeReceipt,
     NoteReceipt,
     ReceivedChequeSteps,
     ReceivedNoteSteps,
@@ -22,6 +25,7 @@ public enum TreasuryOperation
     ChequeTransfer,
     CashPayment,
     ChequePayment,
+    TransferChequePayment,
     NotePayment,
     ElectronicPayment,
     OwnAccountTransfer,

@@ -3,7 +3,8 @@
  * «دارندگان امضای مجاز (اسناد بهادار)» (owner, 16 Nov 2026, answers to Q41 and Q45; redesigned by his report no. 8 of 21 Nov 2026).
  * A signatory has a name, the staff تفصیل when there is one (its name is then taken), a position chosen from the owner's list – with
  * «سایر» a box opens in which it is typed –, national code, mobile and landline numbers, the extension inside the organisation, an
- * e-mail address, the scan of the specimen signature, and two ticks: «دارنده امضاء مجاز (چک)» and «دارنده مجوز امضاء (سفته)».
+ * e-mail address, the scan of the specimen signature, and three ticks in any combination (owner's answer to Q88, 22 Nov 2026):
+ * «چک», «سفته», «قراردادها و سایر اسناد تعهدی».
  * The signature rule per kind of document of 16 Nov 2026 is gone: who signs the cheques of a bank account is set on the bank account
  * (Basic Information → حساب‌های بانکی), and who confirms or approves forms on the page «دارندگان مجوزها (فرم‌ها)». A signatory named by
  * a bank account is switched off instead of deleted.
@@ -18,7 +19,7 @@ import { uploadSignature } from './signatureScan'
 
 interface Signatory {
   id: string; fullName: string; positionKind: string; position: string; detailCode: string | null; nationalCode: string | null; mobile: string | null
-  phone: string | null; extension: string | null; email: string | null; signsCheques: boolean; signsNotes: boolean; hasSignature: boolean
+  phone: string | null; extension: string | null; email: string | null; signsCheques: boolean; signsNotes: boolean; signsContracts: boolean; hasSignature: boolean
   isActive: boolean; isInUse: boolean; version: number
 }
 interface Detail { code: string; name: string; isActive: boolean }
@@ -37,7 +38,7 @@ const showForm = ref(false)
 const busy = ref(false)
 const message = ref<{ kind: 'ok' | 'error'; text: string } | null>(null)
 const empty = () => ({
-  fullName: '', position: '', otherPosition: '', detailCode: '', nationalCode: '', mobile: '', phone: '', extension: '', email: '', signsCheques: true, signsNotes: false,
+  fullName: '', position: '', otherPosition: '', detailCode: '', nationalCode: '', mobile: '', phone: '', extension: '', email: '', signsCheques: true, signsNotes: false, signsContracts: false,
 })
 const form = reactive(empty())
 /** A scan chosen on the form, sent after the form is saved. */
@@ -71,7 +72,7 @@ function onDetail(code: string) {
   if (d && !form.fullName.trim()) form.fullName = d.name
 }
 
-const signs = (s: Signatory) => [s.signsCheques ? t('چک', 'Cheques') : '', s.signsNotes ? t('سفته', 'Notes') : ''].filter(Boolean)
+const signs = (s: Signatory) => [s.signsCheques ? t('چک', 'Cheques') : '', s.signsNotes ? t('سفته', 'Notes') : '', s.signsContracts ? t('قراردادها', 'Contracts') : ''].filter(Boolean)
 const shown = computed(() => {
   const q = searchKey(search.value)
   return signatories.value.filter(s => !q || searchKey(`${s.fullName} ${s.position} ${s.nationalCode ?? ''} ${s.mobile ?? ''} ${s.detailCode ?? ''} ${s.email ?? ''}`).includes(q))
@@ -87,7 +88,7 @@ function open(s: Signatory | null) {
   Object.assign(form, s
     ? {
         fullName: s.fullName, position: s.positionKind, otherPosition: s.positionKind === 'Other' ? s.position : '', detailCode: s.detailCode ?? '', nationalCode: s.nationalCode ?? '',
-        mobile: s.mobile ?? '', phone: s.phone ?? '', extension: s.extension ?? '', email: s.email ?? '', signsCheques: s.signsCheques, signsNotes: s.signsNotes,
+        mobile: s.mobile ?? '', phone: s.phone ?? '', extension: s.extension ?? '', email: s.email ?? '', signsCheques: s.signsCheques, signsNotes: s.signsNotes, signsContracts: s.signsContracts,
       }
     : empty())
   editing.value = s
@@ -103,7 +104,7 @@ async function save() {
   const body = {
     fullName: text(form.fullName), position: form.position || null, otherPosition: form.position === 'Other' ? text(form.otherPosition) : null, detailCode: form.detailCode || null,
     nationalCode: text(toLatinDigits(form.nationalCode)), mobile: text(toLatinDigits(form.mobile)), phone: text(toLatinDigits(form.phone)),
-    extension: text(toLatinDigits(form.extension)), email: text(form.email), signsCheques: form.signsCheques, signsNotes: form.signsNotes,
+    extension: text(toLatinDigits(form.extension)), email: text(form.email), signsCheques: form.signsCheques, signsNotes: form.signsNotes, signsContracts: form.signsContracts,
   }
   busy.value = true
   try {
@@ -176,12 +177,12 @@ onMounted(load)
         <label v-if="form.position === 'Other'" class="req"><span>{{ t('سمت سازمانی', 'Position in the organisation') }} <span class="star">*</span></span>
           <input v-model="form.otherPosition" maxlength="100" :placeholder="t('مثلاً مدیر مالی', 'e.g. Finance manager')" />
         </label>
-        <!-- Report no. 8, item 3-د: the two ticks beside the position. -->
+        <!-- Report no. 8, item 3-د, as the owner settled it (answer to Q88): three ticks beside the position, in any combination. -->
         <div class="wide tr-ticks">
-          <span class="tr-ticks-title">{{ t('امضا می‌کند', 'Signs') }} <span class="star">*</span></span>
-          <label class="tr-check"><input v-model="form.signsCheques" type="checkbox" />{{ t('دارنده امضای مجاز (چک)', 'Authorised signatory (cheques)') }}
-            <small class="muted">{{ t('شامل چک، سفته، قراردادها', 'cheques, notes, contracts') }}</small></label>
-          <label class="tr-check"><input v-model="form.signsNotes" type="checkbox" />{{ t('دارنده مجوز امضا (سفته)', 'Authorised to sign notes') }}</label>
+          <span class="tr-ticks-title">{{ t('دارنده امضای مجاز برای', 'Authorised to sign') }} <span class="star">*</span></span>
+          <label class="tr-check"><input v-model="form.signsCheques" type="checkbox" />{{ t('چک', 'Cheques') }}</label>
+          <label class="tr-check"><input v-model="form.signsNotes" type="checkbox" />{{ t('سفته', 'Notes') }}</label>
+          <label class="tr-check"><input v-model="form.signsContracts" type="checkbox" />{{ t('قراردادها و سایر اسناد تعهدی', 'Contracts and other documents of commitment') }}</label>
         </div>
         <label>{{ t('کد ملی', 'National code') }} <input v-model="form.nationalCode" dir="ltr" inputmode="numeric" maxlength="10" /></label>
         <label>{{ t('تلفن همراه', 'Mobile') }} <input v-model="form.mobile" dir="ltr" inputmode="tel" maxlength="13" placeholder="09121234567" /></label>

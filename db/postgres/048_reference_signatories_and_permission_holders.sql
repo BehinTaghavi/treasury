@@ -16,13 +16,14 @@ ALTER TABLE reference.signatory ADD COLUMN IF NOT EXISTS signs_cheques boolean N
 ALTER TABLE reference.signatory ADD COLUMN IF NOT EXISTS signs_notes boolean NOT NULL DEFAULT true;
 ALTER TABLE reference.signatory ADD COLUMN IF NOT EXISTS signature_type text CHECK (signature_type IN ('image/png', 'image/jpeg'));
 ALTER TABLE reference.signatory ADD COLUMN IF NOT EXISTS in_use boolean NOT NULL DEFAULT false;
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'signatory_signs_something') THEN
-        ALTER TABLE reference.signatory ADD CONSTRAINT signatory_signs_something CHECK (signs_cheques OR signs_notes);
-    END IF;
-END
-$$;
+-- Owner's answer to Q88 (22 Nov 2026): three ticks in any combination – «چک», «سفته», «قراردادها و سایر اسناد تعهدی». The first form of
+-- the cheque tick was described as covering contracts too, so a signatory saved before the third tick takes it from its cheque tick.
+ALTER TABLE reference.signatory ADD COLUMN IF NOT EXISTS signs_contracts boolean;
+UPDATE reference.signatory SET signs_contracts = signs_cheques WHERE signs_contracts IS NULL;
+ALTER TABLE reference.signatory ALTER COLUMN signs_contracts SET DEFAULT false;
+ALTER TABLE reference.signatory ALTER COLUMN signs_contracts SET NOT NULL;
+ALTER TABLE reference.signatory DROP CONSTRAINT IF EXISTS signatory_signs_something;
+ALTER TABLE reference.signatory ADD CONSTRAINT signatory_signs_something CHECK (signs_cheques OR signs_notes OR signs_contracts);
 
 -- Positions typed before the list existed stay as typed under «سایر»; one that is exactly a title of the list takes that choice.
 UPDATE reference.signatory s SET position_kind = t.kind

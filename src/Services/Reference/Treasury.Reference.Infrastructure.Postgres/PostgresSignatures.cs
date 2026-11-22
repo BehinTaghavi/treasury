@@ -84,7 +84,7 @@ internal static class PersonRows
 
 public sealed class PostgresSignatureRepository : ISignatureRepository
 {
-    private const string Columns = "id, " + PersonRows.Columns + ", position_kind, position, signs_cheques, signs_notes, signature_type, is_active, in_use, version";
+    private const string Columns = "id, " + PersonRows.Columns + ", position_kind, position, signs_cheques, signs_notes, signature_type, is_active, in_use, version, signs_contracts";
 
     public async Task<Signatory?> GetSignatoryAsync(Guid id, CancellationToken cancellationToken) =>
         await ReadAsync("WHERE id = @id", id, cancellationToken).ConfigureAwait(false) is [var s, ..] ? s : null;
@@ -98,8 +98,8 @@ public sealed class PostgresSignatureRepository : ISignatureRepository
         var tx = PostgresUnitOfWork.Current;
         await PersonRows.ExecuteAsync(tx, signatory.Id, null,
             "INSERT INTO reference.signatory (id, full_name, name_key, detail_code, national_code, mobile, phone, extension, email, position_kind, position, " +
-            "signs_cheques, signs_notes, signature_type, is_active, in_use) " +
-            "VALUES (@id, @name, @key, @detail, @national, @mobile, @phone, @extension, @email, @kind, @position, @cheques, @notes, @signature, @active, @in_use)",
+            "signs_cheques, signs_notes, signs_contracts, signature_type, is_active, in_use) " +
+            "VALUES (@id, @name, @key, @detail, @national, @mobile, @phone, @extension, @email, @kind, @position, @cheques, @notes, @contracts, @signature, @active, @in_use)",
             cmd => Bind(cmd, signatory), cancellationToken).ConfigureAwait(false);
         await PostgresOutbox.WriteAsync(tx, signatory.PendingEvents, cancellationToken).ConfigureAwait(false);
         signatory.MarkSaved(1);
@@ -111,7 +111,7 @@ public sealed class PostgresSignatureRepository : ISignatureRepository
         var tx = PostgresUnitOfWork.Current;
         await PersonRows.ExecuteAsync(tx, signatory.Id, signatory.Version,
             "UPDATE reference.signatory SET full_name = @name, name_key = @key, detail_code = @detail, national_code = @national, mobile = @mobile, phone = @phone, " +
-            "extension = @extension, email = @email, position_kind = @kind, position = @position, signs_cheques = @cheques, signs_notes = @notes, " +
+            "extension = @extension, email = @email, position_kind = @kind, position = @position, signs_cheques = @cheques, signs_notes = @notes, signs_contracts = @contracts, " +
             "signature_type = @signature, is_active = @active, in_use = @in_use, version = version + 1, updated_at = now() WHERE id = @id AND version = @expected",
             cmd => Bind(cmd, signatory), cancellationToken).ConfigureAwait(false);
         await PersonRows.WriteScanAsync(tx, "signatory_signature", "signatory_id", signatory.Id, signatory.HasSignature, scan, cancellationToken).ConfigureAwait(false);
@@ -140,6 +140,7 @@ public sealed class PostgresSignatureRepository : ISignatureRepository
         cmd.Parameters.AddWithValue("position", s.Position);
         cmd.Parameters.AddWithValue("cheques", s.SignsCheques);
         cmd.Parameters.AddWithValue("notes", s.SignsNotes);
+        cmd.Parameters.AddWithValue("contracts", s.SignsContracts);
         cmd.Parameters.AddWithValue("in_use", s.IsInUse);
     }
 
@@ -157,7 +158,7 @@ public sealed class PostgresSignatureRepository : ISignatureRepository
         {
             list.Add(Signatory.Restore(
                 r.GetGuid(0), PersonRows.Read(r, 1), Enum.Parse<SignatoryPosition>(r.GetString(8)), r.GetString(9), r.GetBoolean(10), r.GetBoolean(11),
-                r.IsDBNull(12) ? null : r.GetString(12), r.GetBoolean(13), r.GetBoolean(14), r.GetInt64(15)));
+                r.IsDBNull(12) ? null : r.GetString(12), r.GetBoolean(13), r.GetBoolean(14), r.GetInt64(15), r.GetBoolean(16)));
         }
 
         return list;

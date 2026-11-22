@@ -7,7 +7,7 @@ namespace Treasury.Reference.Infrastructure.InMemory;
 
 public sealed record SignatorySnapshot(
     Guid Id, PersonParticulars Person, SignatoryPosition PositionKind, string Position, bool SignsCheques, bool SignsNotes, string? SignatureType, byte[]? Scan,
-    bool IsActive, bool IsInUse, long Version);
+    bool IsActive, bool IsInUse, long Version, bool SignsContracts = false);
 
 public sealed record PermissionHolderSnapshot(
     Guid Id, PersonParticulars Person, string JobTitle, IReadOnlyList<PermissionRole> Roles, string? SignatureType, byte[]? Scan, bool IsActive, long Version);
@@ -96,10 +96,10 @@ public sealed class InMemorySignatureRepository(InMemoryReferenceDatabase db) : 
         Task.FromResult<(string, byte[])?>(_rows.Find(signatoryId) is { SignatureType: { } type, Scan: { } data } ? (type, data) : null);
 
     private static SignatorySnapshot Snapshot(Signatory s, long version, byte[]? scan) =>
-        new(s.Id, s.Person, s.PositionKind, s.Position, s.SignsCheques, s.SignsNotes, s.SignatureType, scan, s.IsActive, s.IsInUse, version);
+        new(s.Id, s.Person, s.PositionKind, s.Position, s.SignsCheques, s.SignsNotes, s.SignatureType, scan, s.IsActive, s.IsInUse, version, s.SignsContracts);
 
     private static Signatory ToDomain(SignatorySnapshot s) =>
-        Signatory.Restore(s.Id, s.Person, s.PositionKind, s.Position, s.SignsCheques, s.SignsNotes, s.SignatureType, s.IsActive, s.IsInUse, s.Version);
+        Signatory.Restore(s.Id, s.Person, s.PositionKind, s.Position, s.SignsCheques, s.SignsNotes, s.SignatureType, s.IsActive, s.IsInUse, s.Version, s.SignsContracts);
 }
 
 /// <summary>In-memory permission holders: same version checks and outbox as the database.</summary>

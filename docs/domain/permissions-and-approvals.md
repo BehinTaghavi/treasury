@@ -1,7 +1,7 @@
 # Permissions («مجوزها»), approval workflow, electronic signature, users and access levels — proposal
 
 > Farsi version: [permissions-and-approvals.fa.md](permissions-and-approvals.fa.md). Keep both in step when either changes.
-> Status: **sections 1 and 2 are built; sections 3–7 are a proposal, waiting for the owner's answers** (questions QP1–QP9 at the end).
+> Status: **sections 1 and 2 are built; sections 3–7 are a proposal, waiting for the owner's answers** (questions QP1–QP9 at the end; QP1 and QP5 are answered).
 > Nothing of sections 3–7 is built before the answers.
 
 The owner's report no. 8 (21 Nov 2026) redesigned «دارندگان امضای مجاز» in Basic Information and ended with five suggestions
@@ -16,13 +16,13 @@ The owner's report no. 8 (21 Nov 2026) redesigned «دارندگان امضای 
 | 3-الف. Extension inside the organisation, e-mail address | Two new fields on both pages |
 | 3-ب. «سمت» chosen from seven choices; with «سایر» a box for the position | A list in the owner's order; «سایر» opens «سمت سازمانی» |
 | 3-ج. A place for the scan of the specimen signature | A PNG or JPEG picture of at most 1 MB, shown on the form, replaceable and removable |
-| 3-د. Two ticks: «دارنده امضاء مجاز (چک)», «دارنده مجوز امضاء (سفته)» | Two ticks; at least one is ticked |
+| 3-د. Two ticks: «دارنده امضاء مجاز (چک)», «دارنده مجوز امضاء (سفته)» | **Three ticks since the owner's answer of 22 Nov 2026:** «چک», «سفته», «قراردادها و سایر اسناد تعهدی», in any combination; at least one is ticked |
 | Bank accounts: «دارندگان امضای مجاز» of the chosen account | A block on the bank account form: number of signatures (one digit); rows with the signatory (only those ticked «چک»), the kind «امضای ثابت / امضای متغیر» and the scan of the signature; the first row with «تعریف دارنده امضاء مجاز اول», the next with «رکورد جدید» |
 | «دارندگان مجوزها»: same upper part, «سمت سازمانی / شغل», «نقش» with five ticks, and the list of treasury operations per role | Built as described; a person may have several roles, each in several operations |
 
 Rules the services check (each has a test):
 
-- A signatory signs cheques, notes or both. One named by a bank account is switched off instead of deleted and keeps its «چک» tick.
+- A signatory signs cheques, notes, contracts and other documents of commitment, in any combination. One named by a bank account is switched off instead of deleted and keeps its «چک» tick.
 - A bank account: the number of signatures is 0–9 (0: not set yet); a signatory is named once, is active and ticked «چک» when it
   is added; **the fixed signatories are not more than the number of signatures** (they all sign every cheque) and **the
   signatories named are not fewer than that number** (otherwise no cheque could be completed). The owner's example — two
@@ -75,6 +75,7 @@ receipts and the steps of cheques and notes.
 ## 4. Suggestion 2 — electronic signature or scans of signatures: my recommendation
 
 **Recommendation: the act recorded by the system is the signature; the scan is only its picture, and optional.**
+**Accepted by the owner on 22 Nov 2026** («بله میپذیرم»); it is built with the login and the workflow.
 
 - What proves that a person confirmed a form is the system's record: that person logged in with their own password and pressed
   «تایید» at a known date and time, and the record cannot be changed afterwards. This is the electronic signature of the
@@ -154,7 +155,7 @@ Asked on 22 Nov 2026. The questions about what is already built (Q86–Q93) are 
 | QP2 | When **several persons hold the same role** in an operation: is one of them enough, or must all of them act? | One of them |
 | QP3 | **Receipts:** the money has already arrived when the form is filled. Is it right that a receipt is recorded at once and confirmed afterwards, and that only its accounting voucher waits for the last step? And for payment requests and payments: nothing leaves before the last approval? | Yes to both |
 | QP4 | Are **amount limits** needed — for example the second approver only above an amount — and a **substitute** («جانشین») for a holder who is away? | Both, set by the company; not in the first version |
-| QP5 | **Electronic signature:** do you accept the recommendation of section 4 — the system's record is the signature, the scan is an optional picture, a one-time SMS code for sensitive approvals, no hardware tokens? Will you ask the auditor / legal adviser whether forms confirmed only in the system are accepted? | As recommended |
+| QP5 | **Electronic signature:** do you accept the recommendation of section 4 — the system's record is the signature, the scan is an optional picture, a one-time SMS code for sensitive approvals, no hardware tokens? Will you ask the auditor / legal adviser whether forms confirmed only in the system are accepted? | **Answered 22 Nov 2026: accepted as recommended.** Still open: whether the auditor / legal adviser accept forms confirmed only in the system |
 | QP6 | **Switch per company** «گردش کار مجوزها» and steps per operation from the roles — is that the "plug and play" you mean? | Yes |
 | QP7 | Is the form of **users and access groups** of section 6 what you need? Which ready groups should be added or dropped? Is the limit by bank account / cash desk / organisational unit needed in the first version? | As proposed; the limit later |
 | QP8 | The same person is often **both a signatory and a permission holder** (for example the managing director). Now the person is entered on each page, with the scan twice. When users are built, should the two pages take the person from one common record? | Yes, with the users |

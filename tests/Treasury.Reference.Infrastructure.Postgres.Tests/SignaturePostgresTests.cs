@@ -44,7 +44,7 @@ public sealed class SignaturePostgresTests : IDisposable
         var ceo = await _useCases.AddSignatoryAsync(Key(),
             new SignatoryForm("مدیر " + _n, SignatoryPosition.ManagingDirector, null, null, code, "09121234567", "021-88990011", "214", $"ceo{_n}@nazho.example", true, true),
             CancellationToken.None);
-        var cfo = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مالی " + _n, SignatoryPosition.Other, "مدیر مالی", SignsCheques: false, SignsNotes: true), CancellationToken.None);
+        var cfo = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مالی " + _n, SignatoryPosition.Other, "مدیر مالی", SignsCheques: false, SignsNotes: true, SignsContracts: true), CancellationToken.None);
         Assert.True(ceo.IsSuccess, ceo.ErrorCode);
         Assert.True(cfo.IsSuccess, cfo.ErrorCode);
         var view = (await _useCases.GetSignatoryAsync(ceo.Value, CancellationToken.None))!;
@@ -52,7 +52,8 @@ public sealed class SignaturePostgresTests : IDisposable
             (view.FullName, view.PositionKind, view.Position, view.NationalCode, view.Mobile, view.Phone, view.Extension, view.Email));
         Assert.Equal((true, true, false, true, false, 1L), (view.SignsCheques, view.SignsNotes, view.HasSignature, view.IsActive, view.IsInUse, view.Version));
         var other = (await _useCases.ListSignatoriesAsync(true, CancellationToken.None)).Single(s => s.Id == cfo.Value);
-        Assert.Equal(("Other", "مدیر مالی", false, true), (other.PositionKind, other.Position, other.SignsCheques, other.SignsNotes));
+        Assert.Equal(("Other", "مدیر مالی", false, true, true), (other.PositionKind, other.Position, other.SignsCheques, other.SignsNotes, other.SignsContracts));
+        Assert.False(view.SignsContracts);
         Assert.Equal("Signatory.NameTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مدیر " + _n, SignatoryPosition.Chairman), CancellationToken.None)).ErrorCode);
         Assert.Equal("Signatory.NationalCodeTaken",
             (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگر " + _n, SignatoryPosition.Chairman, NationalCode: code), CancellationToken.None)).ErrorCode);

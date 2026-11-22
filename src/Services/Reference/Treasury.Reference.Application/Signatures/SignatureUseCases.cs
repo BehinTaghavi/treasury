@@ -13,18 +13,19 @@ namespace Treasury.Reference.Application.Signatures;
 /// <param name="Position">One of <see cref="SignatoryPosition"/>; with Other, <paramref name="OtherPosition"/> is the typed position.</param>
 public sealed record SignatoryForm(
     string? FullName, SignatoryPosition? Position, string? OtherPosition = null, string? DetailCode = null, string? NationalCode = null, string? Mobile = null,
-    string? Phone = null, string? Extension = null, string? Email = null, bool SignsCheques = true, bool SignsNotes = false)
+    string? Phone = null, string? Extension = null, string? Email = null, bool SignsCheques = true, bool SignsNotes = false, bool SignsContracts = false)
 {
-    public SignatoryData ToData() => new(new PersonForm(FullName, DetailCode, NationalCode, Mobile, Phone, Extension, Email), Position, OtherPosition, SignsCheques, SignsNotes);
+    public SignatoryData ToData() =>
+        new(new PersonForm(FullName, DetailCode, NationalCode, Mobile, Phone, Extension, Email), Position, OtherPosition, SignsCheques, SignsNotes, SignsContracts);
 }
 
 public sealed record SignatoryView(
     Guid Id, string FullName, string PositionKind, string Position, string? DetailCode, string? NationalCode, string? Mobile, string? Phone, string? Extension,
-    string? Email, bool SignsCheques, bool SignsNotes, bool HasSignature, bool IsActive, bool IsInUse, long Version)
+    string? Email, bool SignsCheques, bool SignsNotes, bool HasSignature, bool IsActive, bool IsInUse, long Version, bool SignsContracts = false)
 {
     public static SignatoryView From(Signatory s) => new(
         s.Id, s.FullName, s.PositionKind.ToString(), s.Position, s.Person.DetailCode, s.Person.NationalCode, s.Person.Mobile, s.Person.Phone, s.Person.Extension,
-        s.Person.Email, s.SignsCheques, s.SignsNotes, s.HasSignature, s.IsActive, s.IsInUse, s.Version);
+        s.Person.Email, s.SignsCheques, s.SignsNotes, s.HasSignature, s.IsActive, s.IsInUse, s.Version, s.SignsContracts);
 }
 
 public sealed record SignatureStateCommand(string IdempotencyKey, Guid Id, string Change, long ExpectedVersion);

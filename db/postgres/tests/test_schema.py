@@ -893,9 +893,10 @@ def test_signatories_are_unique_and_say_what_they_sign_and_the_signature_rule_is
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(add, row)
-        # A row written the old way signs both kinds of document, with its position under «سایر», no scan and not in use.
-        assert c.execute("SELECT position_kind, signs_cheques, signs_notes, signature_type, in_use FROM reference.signatory WHERE id = %s", (ceo,)).fetchone() \
-            == ("Other", True, True, None, False)
+        # A row written the old way signs cheques and notes, with its position under «سایر», no scan and not in use; the third tick
+        # («قراردادها و سایر اسناد تعهدی», owner's answer to Q88) is off unless written.
+        assert c.execute("SELECT position_kind, signs_cheques, signs_notes, signs_contracts, signature_type, in_use FROM reference.signatory WHERE id = %s", (ceo,)).fetchone() \
+            == ("Other", True, True, False, None, False)
         for change, error in (
                 ("position_kind = 'Treasurer'", psycopg.errors.CheckViolation),                     # not a position of the list
                 ("signs_cheques = false, signs_notes = false", psycopg.errors.CheckViolation),      # signs nothing
@@ -904,6 +905,7 @@ def test_signatories_are_unique_and_say_what_they_sign_and_the_signature_rule_is
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(f"UPDATE reference.signatory SET {change} WHERE id = %s", (ceo,))
+        c.execute("UPDATE reference.signatory SET signs_cheques = false, signs_notes = false, signs_contracts = true WHERE id = %s", (cfo,))  # contracts alone
         c.execute("UPDATE reference.signatory SET position_kind = 'ManagingDirector', extension = '214', email = 'ceo@nazho.example', signs_notes = false, "
                   "signature_type = 'image/png' WHERE id = %s", (ceo,))
         c.execute("INSERT INTO reference.signatory_signature (signatory_id, data) VALUES (%s, %s)", (ceo, b"\x89PNG"))

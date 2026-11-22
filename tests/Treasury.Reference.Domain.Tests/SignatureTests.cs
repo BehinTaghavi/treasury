@@ -18,8 +18,8 @@ public sealed class SignatureTests
 
     private static SignatoryData Data(string? name = "علی رضایی", SignatoryPosition? position = SignatoryPosition.ManagingDirector, string? other = null,
         string? detail = null, string? national = null, string? mobile = null, string? phone = null, string? extension = null, string? email = null,
-        bool cheques = true, bool notes = false) =>
-        new(new PersonForm(name, detail, national, mobile, phone, extension, email), position, other, cheques, notes);
+        bool cheques = true, bool notes = false, bool contracts = false) =>
+        new(new PersonForm(name, detail, national, mobile, phone, extension, email), position, other, cheques, notes, contracts);
 
     private static Signatory Signatory(SignatoryData? data = null, DetailFact? fact = null) => Signatures.Signatory.Register(Guid.NewGuid(), data ?? Data(), fact);
 
@@ -69,13 +69,24 @@ public sealed class SignatureTests
     }
 
     [Fact]
-    public void Report_8_item_3d_a_signatory_signs_cheques_notes_or_both()
+    public void A_signatory_signs_cheques_notes_contracts_or_any_combination_owner_answer_Q88()
     {
-        Assert.Equal((true, false), (Signatory(Data(cheques: true, notes: false)).SignsCheques, Signatory(Data(cheques: true, notes: false)).SignsNotes));
-        Assert.Equal((false, true), (Signatory(Data(cheques: false, notes: true)).SignsCheques, Signatory(Data(cheques: false, notes: true)).SignsNotes));
-        var both = Signatory(Data(cheques: true, notes: true));
-        Assert.True(both.SignsCheques && both.SignsNotes);
-        Assert.Equal("Signatory.DocumentRequired", Code(() => Signatory(Data(cheques: false, notes: false))));
+        // Report no. 8, item 3-د, as the owner settled it on 22 Nov 2026: three ticks «چک»، «سفته»، «قراردادها و سایر اسناد تعهدی»;
+        // «ترکیبی از آنها قابل انتخاب خواهد بود».
+        foreach (var (cheques, notes, contracts) in new[] { (true, false, false), (false, true, false), (false, false, true), (true, true, false), (true, false, true), (false, true, true), (true, true, true) })
+        {
+            var s = Signatory(Data(cheques: cheques, notes: notes, contracts: contracts));
+            Assert.Equal((cheques, notes, contracts), (s.SignsCheques, s.SignsNotes, s.SignsContracts));
+        }
+
+        Assert.Equal("Signatory.DocumentRequired", Code(() => Signatory(Data(cheques: false, notes: false, contracts: false))));
+
+        // Changing only the third tick is a change.
+        var only = Signatory(Data(cheques: true));
+        only.MarkSaved(1);
+        only.Edit(Data(cheques: true, contracts: true), null);
+        Assert.True(only.SignsContracts);
+        Assert.True(Assert.IsType<SignatoryChanged>(Assert.Single(only.PendingEvents)).SignsContracts);
     }
 
     [Fact]

@@ -114,15 +114,17 @@ public static class SignatoryPositions
 
 /// <summary>What the form «دارندگان امضای مجاز (اسناد بهادار)» sends.</summary>
 /// <param name="OtherPosition">The position typed by the user when <paramref name="Position"/> is «سایر».</param>
-/// <param name="SignsCheques">Tick «دارنده امضاء مجاز (چک)»: cheques, and by the owner's note also notes and contracts.</param>
-/// <param name="SignsNotes">Tick «دارنده مجوز امضاء (سفته)».</param>
-public sealed record SignatoryData(PersonForm? Person, SignatoryPosition? Position, string? OtherPosition, bool SignsCheques, bool SignsNotes);
+/// <param name="SignsCheques">Tick «چک».</param>
+/// <param name="SignsNotes">Tick «سفته».</param>
+/// <param name="SignsContracts">Tick «قراردادها و سایر اسناد تعهدی» (owner, 22 Nov 2026, answer to Q88: three ticks, any combination).</param>
+public sealed record SignatoryData(PersonForm? Person, SignatoryPosition? Position, string? OtherPosition, bool SignsCheques, bool SignsNotes, bool SignsContracts = false);
 
 /// <summary>
 /// A holder of an authorised signature on valuable documents («دارندگان امضای مجاز (اسناد بهادار)»), kept in Basic Information.
 /// Owner, 16 Nov 2026 (answers to Q41 and Q45): name, position, the staff تفصیل when there is one, national code, mobile and landline
 /// numbers. Owner's report no. 8 (21 Nov 2026): the position is chosen from a list, the extension, the e-mail address and the scan of
-/// the specimen signature are added, and two ticks say what the person may sign: cheques, notes or both. Who signs the cheques of a
+/// the specimen signature are added, and ticks say what the person may sign – since his answer to Q88 (22 Nov 2026) three of them, in
+/// any combination: «چک», «سفته», «قراردادها و سایر اسناد تعهدی». Who signs the cheques of a
 /// bank account is set on the bank account (accounts-svc), which marks the signatory as in use: from then on it is switched off
 /// instead of deleted, and keeps its cheque tick. The signature rule per kind of document of 16 Nov 2026 was removed by the same report.
 /// </summary>
@@ -130,10 +132,10 @@ public sealed class Signatory : AggregateRoot<Guid>
 {
     public const int MaxPositionLength = 100;
 
-    private Signatory(Guid id, PersonParticulars person, SignatoryPosition positionKind, string position, bool signsCheques, bool signsNotes)
+    private Signatory(Guid id, PersonParticulars person, SignatoryPosition positionKind, string position, bool signsCheques, bool signsNotes, bool signsContracts)
         : base(id)
     {
-        (Person, PositionKind, Position, SignsCheques, SignsNotes) = (person, positionKind, position, signsCheques, signsNotes);
+        (Person, PositionKind, Position, SignsCheques, SignsNotes, SignsContracts) = (person, positionKind, position, signsCheques, signsNotes, signsContracts);
         IsActive = true;
     }
 
@@ -152,6 +154,9 @@ public sealed class Signatory : AggregateRoot<Guid>
 
     public bool SignsNotes { get; private set; }
 
+    /// <summary>«قراردادها و سایر اسناد تعهدی».</summary>
+    public bool SignsContracts { get; private set; }
+
     /// <summary>Media type of the stored scan of the signature (image/png or image/jpeg); null: no scan yet.</summary>
     public string? SignatureType { get; private set; }
 
@@ -165,7 +170,7 @@ public sealed class Signatory : AggregateRoot<Guid>
     public static Signatory Register(Guid id, SignatoryData data, DetailFact? detail)
     {
         var v = Validate(data, detail, null);
-        var s = new Signatory(id, v.Person, v.Kind, v.Position, v.Cheques, v.Notes);
+        var s = new Signatory(id, v.Person, v.Kind, v.Position, v.Cheques, v.Notes, v.Contracts);
         s.Raise(SignatoryChanged.From(s));
         return s;
     }
@@ -173,12 +178,12 @@ public sealed class Signatory : AggregateRoot<Guid>
     public void Edit(SignatoryData data, DetailFact? detail)
     {
         var v = Validate(data, detail, this);
-        if (v == (Person, PositionKind, Position, SignsCheques, SignsNotes))
+        if (v == (Person, PositionKind, Position, SignsCheques, SignsNotes, SignsContracts))
         {
             return;
         }
 
-        (Person, PositionKind, Position, SignsCheques, SignsNotes) = v;
+        (Person, PositionKind, Position, SignsCheques, SignsNotes, SignsContracts) = v;
         Raise(SignatoryChanged.From(this));
     }
 
@@ -222,9 +227,9 @@ public sealed class Signatory : AggregateRoot<Guid>
 
     public static Signatory Restore(
         Guid id, PersonParticulars person, SignatoryPosition positionKind, string position, bool signsCheques, bool signsNotes, string? signatureType,
-        bool isActive, bool isInUse, long version)
+        bool isActive, bool isInUse, long version, bool signsContracts = false)
     {
-        var s = new Signatory(id, person, positionKind, position, signsCheques, signsNotes) { SignatureType = signatureType, IsActive = isActive, IsInUse = isInUse };
+        var s = new Signatory(id, person, positionKind, position, signsCheques, signsNotes, signsContracts) { SignatureType = signatureType, IsActive = isActive, IsInUse = isInUse };
         s.SetLoadedVersion(version);
         return s;
     }
@@ -238,7 +243,7 @@ public sealed class Signatory : AggregateRoot<Guid>
         }
     }
 
-    private static (PersonParticulars Person, SignatoryPosition Kind, string Position, bool Cheques, bool Notes) Validate(SignatoryData? data, DetailFact? detail, Signatory? before)
+    private static (PersonParticulars Person, SignatoryPosition Kind, string Position, bool Cheques, bool Notes, bool Contracts) Validate(SignatoryData? data, DetailFact? detail, Signatory? before)
     {
         ArgumentNullException.ThrowIfNull(data);
         var person = PersonParticulars.Check(data.Person, detail, before?.Person.DetailCode);
@@ -246,16 +251,19 @@ public sealed class Signatory : AggregateRoot<Guid>
         var kind = data.Position!.Value;
         // Report no. 8, item 3-ب: with «سایر» a box opens in which the position is typed.
         var position = kind.Title() ?? Rules.Name(data.OtherPosition, MaxPositionLength, "Signatory.OtherPositionRequired", "Signatory.PositionTooLong");
-        // Report no. 8, item 3-د: «اگر مجوز امضای هر دو را داشته باشد هر دو چک باکس تیک میشود» – a signatory signs at least one of them.
-        Rules.Require(data.SignsCheques || data.SignsNotes, "Signatory.DocumentRequired", "Tick what the signatory may sign: cheques, notes or both.");
+        // Report no. 8, item 3-د, and the owner's answer to Q88: «چک»، «سفته»، «قراردادها و سایر اسناد تعهدی» – «ترکیبی از آنها قابل انتخاب
+        // خواهد بود»; a signatory signs at least one of them.
+        Rules.Require(data.SignsCheques || data.SignsNotes || data.SignsContracts, "Signatory.DocumentRequired",
+            "Tick what the signatory may sign: cheques, notes, contracts and other documents of commitment.");
         Rules.Require(before is not { IsInUse: true } || data.SignsCheques, "Signatory.ChequesInUse", "A bank account names this signatory for its cheques; the cheque tick stays.");
-        return (person, kind, position, data.SignsCheques, data.SignsNotes);
+        return (person, kind, position, data.SignsCheques, data.SignsNotes, data.SignsContracts);
     }
 }
 
-public sealed record SignatoryChanged(Guid SignatoryId, string FullName, string Position, bool SignsCheques, bool SignsNotes, bool HasSignature, bool IsActive) : DomainEvent
+public sealed record SignatoryChanged(
+    Guid SignatoryId, string FullName, string Position, bool SignsCheques, bool SignsNotes, bool SignsContracts, bool HasSignature, bool IsActive) : DomainEvent
 {
-    public static SignatoryChanged From(Signatory s) => new(s.Id, s.FullName, s.Position, s.SignsCheques, s.SignsNotes, s.HasSignature, s.IsActive);
+    public static SignatoryChanged From(Signatory s) => new(s.Id, s.FullName, s.Position, s.SignsCheques, s.SignsNotes, s.SignsContracts, s.HasSignature, s.IsActive);
 }
 
 public sealed record SignatoryDeleted(Guid SignatoryId) : DomainEvent;

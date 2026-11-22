@@ -85,10 +85,13 @@ public sealed class PermissionHolderTests
     [Fact]
     public void The_operations_list_names_requests_receipts_payments_and_vouchers()
     {
-        // The owner's examples: «درخواست وجه، دریافت یا پرداخت و …». The names are stored, so a rename is a data change.
+        // The owner's examples: «درخواست وجه، دریافت یا پرداخت و …», and his answer to Q86 (22 Nov 2026): the receipts also have «نقل و انتقال
+        // بانکی (الکترونیکی)» and «دریافت چک نقل و انتقال (انتقال گیرنده)», the payments «پرداخت چک نقل و انتقال». The names are stored, so
+        // a rename is a data change.
         Assert.Equal(
-            ["PaymentRequest", "CashReceipt", "BankDeposit", "CardDeposit", "ChequeReceipt", "NoteReceipt", "ReceivedChequeSteps", "ReceivedNoteSteps", "LegalAction",
-             "ChequeTransfer", "CashPayment", "ChequePayment", "NotePayment", "ElectronicPayment", "OwnAccountTransfer", "PettyCash", "VoucherConfirmation"],
+            ["PaymentRequest", "CashReceipt", "BankDeposit", "CardDeposit", "ElectronicTransferReceipt", "ChequeReceipt", "TransferChequeReceipt", "NoteReceipt",
+             "ReceivedChequeSteps", "ReceivedNoteSteps", "LegalAction", "ChequeTransfer", "CashPayment", "ChequePayment", "TransferChequePayment", "NotePayment",
+             "ElectronicPayment", "OwnAccountTransfer", "PettyCash", "VoucherConfirmation"],
             Enum.GetNames<TreasuryOperation>());
     }
 

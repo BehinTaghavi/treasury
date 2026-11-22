@@ -50,7 +50,10 @@ export const OPERATION_GROUPS: readonly OperationGroup[] = [
     { code: 'CashReceipt', fa: 'دریافت نقدی', en: 'Cash receipt' },
     { code: 'BankDeposit', fa: 'واریز به بانک', en: 'Bank deposit' },
     { code: 'CardDeposit', fa: 'واریز به کارت بانک', en: 'Deposit onto a bank card' },
+    // Owner's answer to Q86 (22 Nov 2026): the two receipt sides of a transfer between the company's own bank accounts.
+    { code: 'ElectronicTransferReceipt', fa: 'نقل و انتقال بانکی (الکترونیکی)', en: 'Bank transfer (electronic)' },
     { code: 'ChequeReceipt', fa: 'دریافت چک', en: 'Cheque receipt' },
+    { code: 'TransferChequeReceipt', fa: 'دریافت چک نقل و انتقال (انتقال گیرنده)', en: 'Cheque receipt – transfer (the receiver)' },
     { code: 'NoteReceipt', fa: 'دریافت سفته', en: 'Note receipt' },
     { code: 'ReceivedChequeSteps', fa: 'عملیات چک‌های دریافتی', en: 'Received cheque steps' },
     { code: 'ReceivedNoteSteps', fa: 'عملیات سفته‌های دریافتی', en: 'Received note steps' },
@@ -60,6 +63,7 @@ export const OPERATION_GROUPS: readonly OperationGroup[] = [
     { code: 'ChequeTransfer', fa: 'ثبت انتقال (خرج چک)', en: 'Transfer of a received cheque' },
     { code: 'CashPayment', fa: 'پرداخت نقدی', en: 'Cash payment' },
     { code: 'ChequePayment', fa: 'پرداخت چک', en: 'Cheque payment' },
+    { code: 'TransferChequePayment', fa: 'پرداخت چک نقل و انتقال', en: 'Cheque payment – transfer' },
     { code: 'NotePayment', fa: 'پرداخت سفته', en: 'Note payment' },
     { code: 'ElectronicPayment', fa: 'پرداخت الکترونیکی (حواله)', en: 'Electronic payment (transfer order)' },
     { code: 'OwnAccountTransfer', fa: 'نقل و انتقال بین بانک‌های شرکت', en: 'Transfer between the company\'s banks' },

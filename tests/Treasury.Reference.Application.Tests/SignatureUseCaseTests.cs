@@ -47,7 +47,7 @@ public sealed class SignatureUseCaseTests : IDisposable
     public async Task Signatories_are_listed_by_name_with_all_their_particulars()
     {
         var r = await _useCases.AddSignatoryAsync(Key(),
-            new SignatoryForm(null, SignatoryPosition.ManagingDirector, null, "600046", "0123456789", "09121234567", "021-88990011", "214", "rezaei@nazho.example", true, true),
+            new SignatoryForm(null, SignatoryPosition.ManagingDirector, null, "600046", "0123456789", "09121234567", "021-88990011", "214", "rezaei@nazho.example", true, true, true),
             CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         await Add("بهرام کریمی", SignatoryPosition.NonBoardManager);
@@ -56,8 +56,9 @@ public sealed class SignatureUseCaseTests : IDisposable
         var s = list[1];
         Assert.Equal(("ManagingDirector", "مدیر عامل", "600046", "0123456789", "09121234567", "021-88990011", "214", "rezaei@nazho.example"),
             (s.PositionKind, s.Position, s.DetailCode, s.NationalCode, s.Mobile, s.Phone, s.Extension, s.Email));
-        Assert.Equal((true, true, false, true, false, 1L), (s.SignsCheques, s.SignsNotes, s.HasSignature, s.IsActive, s.IsInUse, s.Version));
+        Assert.Equal((true, true, true, false, true, false, 1L), (s.SignsCheques, s.SignsNotes, s.SignsContracts, s.HasSignature, s.IsActive, s.IsInUse, s.Version));
         Assert.Equal("مدیر و مسئول غیر عضو هیئت مدیره", list[0].Position);
+        Assert.Equal((true, false, false), (list[0].SignsCheques, list[0].SignsNotes, list[0].SignsContracts));
         Assert.Equal(s, await _useCases.GetSignatoryAsync(r.Value, CancellationToken.None));
         Assert.Null(await _useCases.GetSignatoryAsync(Guid.NewGuid(), CancellationToken.None));
     }
@@ -74,6 +75,8 @@ public sealed class SignatureUseCaseTests : IDisposable
         Assert.Equal("Signatory.OtherPositionRequired", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", SignatoryPosition.Other), CancellationToken.None)).ErrorCode);
         Assert.Equal("Signatory.DocumentRequired",
             (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", SignatoryPosition.Chairman, SignsCheques: false, SignsNotes: false), CancellationToken.None)).ErrorCode);
+        // Owner's answer to Q88: contracts and other documents of commitment alone are enough.
+        Assert.True((await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("فقط قرارداد", SignatoryPosition.Chairman, SignsCheques: false, SignsContracts: true), CancellationToken.None)).IsSuccess);
     }
 
     [Fact]
