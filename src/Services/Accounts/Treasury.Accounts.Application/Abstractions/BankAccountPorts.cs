@@ -94,11 +94,14 @@ public interface IReferenceLookup
     /// <summary>A purpose group of reference-svc; null when unknown.</summary>
     Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>One of «دارندگان امضای مجاز» of Basic Information (owner's report no. 8); null when unknown.</summary>
+    Task<SignatoryFact?> SignatoryAsync(Guid id, CancellationToken cancellationToken);
+
     /// <summary>Name of a تفصیل (e.g. the holder of a cash desk); null when unknown.</summary>
     Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Tells reference-svc that a bank account is about to name this entry (<paramref name="list"/>: banks, cities, currencies),
+    /// Tells reference-svc that a bank account is about to name this entry (<paramref name="list"/>: banks, cities, currencies, signatories),
     /// so it can no longer be deleted there. Called before the save; false when the entry no longer exists.
     /// </summary>
     Task<bool> MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);

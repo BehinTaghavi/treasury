@@ -137,16 +137,12 @@ public sealed class HttpReceiptReferenceLookup(HttpClient http) : IReceiptRefere
                 p.Mobile ?? (p.Phone is null ? null : string.Join('-', new[] { p.PhoneAreaCode, p.Phone }.Where(x => !string.IsNullOrWhiteSpace(x))))))
             .FirstOrDefault();
 
-    private sealed record RuleSignatory(Guid Id, string FullName, string? Position);
+    private sealed record OperationHolder(Guid Id, string FullName, string? Position);
 
-    private sealed record Rule(int Required, RuleSignatory[]? Compulsory, RuleSignatory[]? Optional);
-
-    public async Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken)
-    {
-        static List<SignerFact> Facts(RuleSignatory[]? list) => (list ?? []).Select(s => new SignerFact(s.Id, s.FullName, s.Position)).ToList();
-        return await ServiceHttp.GetAsync<Rule>(http, $"api/reference/signature-rules/{Uri.EscapeDataString(document)}", "Reference.Unavailable", cancellationToken)
-            .ConfigureAwait(false) is { } r ? new SignatureRuleFact(r.Required, Facts(r.Compulsory), Facts(r.Optional)) : null;
-    }
+    /// <summary>reference-svc lists the active holders of the operation in the order of their roles, with what is printed over the signature.</summary>
+    public async Task<FormSigners?> FormSignersAsync(string operation, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<OperationHolder[]>(http, $"api/reference/permission-holders/for/{Uri.EscapeDataString(operation)}", "Reference.Unavailable", cancellationToken)
+            .ConfigureAwait(false) is { } holders ? new FormSigners(holders.Select(h => new SignerFact(h.Id, h.FullName, h.Position)).ToList()) : null;
 
     public async Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {

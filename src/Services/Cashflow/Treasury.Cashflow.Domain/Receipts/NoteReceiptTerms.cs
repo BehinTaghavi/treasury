@@ -50,8 +50,8 @@ public sealed record NoteAttachments(bool NoteImage = false, bool Contract = fal
 /// <param name="OriginalReceived">«وضعیت دریافت اصل سند»; when received, <paramref name="OriginalReceivedOn"/> is its date.</param>
 /// <param name="Discrepancy">«شرح نقص یا مغایرت احتمالی».</param>
 /// <param name="DeliveredBy">«تحویل‌دهنده»: who handed the notes over.</param>
-/// <param name="Signers">«تأییدکنندهٔ مجاز»: the authorised signatories chosen by the signature rule of the note receipt (owner's answers to
-/// Q41 and Q45–Q47); set by the receipt, printed with their positions on the receipt they sign.</param>
+/// <param name="Signers">«تأییدکننده»: the persons chosen among the holders of a permission in the receipt of notes (owner's report no. 8;
+/// before it, by the signature rule of 16 Nov 2026); set by the receipt, printed with their roles on the receipt they sign.</param>
 public sealed record NoteReceiptTerms(
     NoteReason Reason,
     NoteForm Form,

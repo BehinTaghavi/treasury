@@ -7,7 +7,7 @@ using Xunit;
 
 namespace Treasury.Reference.Application.Tests;
 
-/// <summary>«دارندگان امضای مجاز» and the signature rules (owner, 16 Nov 2026, answers to Q45–Q47).</summary>
+/// <summary>«دارندگان امضای مجاز (اسناد بهادار)» (owner, 16 Nov 2026, answers to Q41 and Q45; his report no. 8 of 21 Nov 2026).</summary>
 public sealed class SignatureUseCaseTests : IDisposable
 {
     private readonly InMemoryReferenceDatabase _db = new();
@@ -29,9 +29,14 @@ public sealed class SignatureUseCaseTests : IDisposable
 
     private static string Key() => Guid.NewGuid().ToString();
 
-    private async Task<Guid> Add(string name, string position = "عضو هیئت مدیره", string? national = null)
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+
+    private static SignatoryForm Form(string? name, SignatoryPosition? position = SignatoryPosition.ExecutiveBoardMember, string? national = null, string? detail = null) =>
+        new(name, position, NationalCode: national, DetailCode: detail);
+
+    private async Task<Guid> Add(string name, SignatoryPosition position = SignatoryPosition.ExecutiveBoardMember, string? national = null)
     {
-        var r = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm(name, position, NationalCode: national), CancellationToken.None);
+        var r = await _useCases.AddSignatoryAsync(Key(), Form(name, position, national), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         return r.Value;
     }
@@ -41,35 +46,46 @@ public sealed class SignatureUseCaseTests : IDisposable
     [Fact]
     public async Task Signatories_are_listed_by_name_with_all_their_particulars()
     {
-        var r = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm(null, "مدیر عامل", "600046", "0123456789", "09121234567", "021-88990011"), CancellationToken.None);
+        var r = await _useCases.AddSignatoryAsync(Key(),
+            new SignatoryForm(null, SignatoryPosition.ManagingDirector, null, "600046", "0123456789", "09121234567", "021-88990011", "214", "rezaei@nazho.example", true, true),
+            CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
-        await Add("بهرام کریمی", "مدیر مالی");
+        await Add("بهرام کریمی", SignatoryPosition.NonBoardManager);
         var list = await _useCases.ListSignatoriesAsync(false, CancellationToken.None);
         Assert.Equal(["بهرام کریمی", "علی رضایی"], list.Select(s => s.FullName));
         var s = list[1];
-        Assert.Equal(("مدیر عامل", "600046", "0123456789", "09121234567", "021-88990011", true, false, 1L),
-            (s.Position, s.DetailCode, s.NationalCode, s.Mobile, s.Phone, s.IsActive, s.IsInRule, s.Version));
+        Assert.Equal(("ManagingDirector", "مدیر عامل", "600046", "0123456789", "09121234567", "021-88990011", "214", "rezaei@nazho.example"),
+            (s.PositionKind, s.Position, s.DetailCode, s.NationalCode, s.Mobile, s.Phone, s.Extension, s.Email));
+        Assert.Equal((true, true, false, true, false, 1L), (s.SignsCheques, s.SignsNotes, s.HasSignature, s.IsActive, s.IsInUse, s.Version));
+        Assert.Equal("مدیر و مسئول غیر عضو هیئت مدیره", list[0].Position);
+        Assert.Equal(s, await _useCases.GetSignatoryAsync(r.Value, CancellationToken.None));
+        Assert.Null(await _useCases.GetSignatoryAsync(Guid.NewGuid(), CancellationToken.None));
     }
 
     [Fact]
     public async Task The_same_name_or_national_code_is_not_entered_twice_and_details_are_checked()
     {
         await Add("علی رضایی", national: "0123456789");
-        Assert.Equal("Signatory.NameTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("علي رضايي", "مدیر"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.NationalCodeTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", "مدیر", NationalCode: "0123456789"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.DetailNotFound", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", "مدیر", "999999"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.DetailInactive", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", "مدیر", "600047"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.PositionRequired", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", " "), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.NameTaken", (await _useCases.AddSignatoryAsync(Key(), Form("علي رضايي"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.NationalCodeTaken", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", national: "0123456789"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Person.DetailNotFound", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", detail: "999999"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Person.DetailInactive", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", detail: "600047"), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.PositionRequired", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", null), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.OtherPositionRequired", (await _useCases.AddSignatoryAsync(Key(), Form("دیگری", SignatoryPosition.Other), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.DocumentRequired",
+            (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگری", SignatoryPosition.Chairman, SignsCheques: false, SignsNotes: false), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]
     public async Task A_signatory_is_corrected_with_its_version_switched_off_and_deleted()
     {
         var id = await Add("علی رضایی");
-        Assert.True((await _useCases.EditSignatoryAsync(Key(), id, new SignatoryForm("علی رضایی", "مدیر عامل", Mobile: "09121234567"), 1, CancellationToken.None)).IsSuccess);
-        Assert.Equal(("مدیر عامل", "09121234567", 2L), ((await Get(id)).Position, (await Get(id)).Mobile, (await Get(id)).Version));
-        Assert.Equal("Concurrency.Conflict", (await _useCases.EditSignatoryAsync(Key(), id, new SignatoryForm("علی رضایی", "مدیر"), 1, CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.NotFound", (await _useCases.EditSignatoryAsync(Key(), Guid.NewGuid(), new SignatoryForm("الف", "ب"), 1, CancellationToken.None)).ErrorCode);
+        var corrected = new SignatoryForm("علی رضایی", SignatoryPosition.Other, "مدیر مالی", Mobile: "09121234567", SignsCheques: false, SignsNotes: true);
+        Assert.True((await _useCases.EditSignatoryAsync(Key(), id, corrected, 1, CancellationToken.None)).IsSuccess);
+        var s = await Get(id);
+        Assert.Equal(("Other", "مدیر مالی", "09121234567", false, true, 2L), (s.PositionKind, s.Position, s.Mobile, s.SignsCheques, s.SignsNotes, s.Version));
+        Assert.Equal("Concurrency.Conflict", (await _useCases.EditSignatoryAsync(Key(), id, Form("علی رضایی"), 1, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.NotFound", (await _useCases.EditSignatoryAsync(Key(), Guid.NewGuid(), Form("الف"), 1, CancellationToken.None)).ErrorCode);
 
         Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), id, "deactivate", 2), CancellationToken.None)).IsSuccess);
         Assert.Empty(await _useCases.ListSignatoriesAsync(false, CancellationToken.None));
@@ -80,58 +96,49 @@ public sealed class SignatureUseCaseTests : IDisposable
     }
 
     [Fact]
-    public async Task Each_kind_of_document_has_its_rule_and_a_kind_without_one_needs_no_signature()
+    public async Task The_scan_of_the_signature_is_stored_replaced_and_removed()
     {
-        var ceo = await Add("علی رضایی", "مدیر عامل");
-        var cfo = await Add("بهرام کریمی", "مدیر مالی");
-        var board = await Add("سارا احمدی");
+        var id = await Add("علی رضایی");
+        Assert.Null(await _useCases.GetSignatureAsync(id, CancellationToken.None));
+        Assert.True((await _useCases.AttachSignatureAsync(Key(), id, Png, 1, CancellationToken.None)).IsSuccess);
+        Assert.Equal(("image/png", Png.Length), ((await _useCases.GetSignatureAsync(id, CancellationToken.None))!.Value.ContentType, (await _useCases.GetSignatureAsync(id, CancellationToken.None))!.Value.Data.Length));
+        Assert.True((await Get(id)).HasSignature);
 
-        var rules = await _useCases.ListRulesAsync(CancellationToken.None);
-        Assert.Equal(["IssuedCheque", "IssuedNote", "ChequeReceipt", "NoteReceipt", "ChequePaymentSheet", "NotePaymentSheet"], rules.Select(r => r.Document));
-        Assert.All(rules, r => Assert.Equal((0, 0L), (r.Required, r.Version)));
+        // A correction of the form keeps the scan; a new scan replaces it.
+        Assert.True((await _useCases.EditSignatoryAsync(Key(), id, Form("علی رضایی", SignatoryPosition.Chairman), 2, CancellationToken.None)).IsSuccess);
+        Assert.Equal(Png, (await _useCases.GetSignatureAsync(id, CancellationToken.None))!.Value.Data);
+        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xE0, 9];
+        Assert.True((await _useCases.AttachSignatureAsync(Key(), id, jpeg, 3, CancellationToken.None)).IsSuccess);
+        Assert.Equal(("image/jpeg", jpeg), ((await _useCases.GetSignatureAsync(id, CancellationToken.None))!.Value.ContentType, (await _useCases.GetSignatureAsync(id, CancellationToken.None))!.Value.Data));
 
-        var set = await _useCases.SetRuleAsync(Key(), SignedDocument.NoteReceipt, new SignatureRuleForm(2, [ceo], [cfo, board], 0), CancellationToken.None);
-        Assert.True(set.IsSuccess, set.ErrorCode);
-        var rule = await _useCases.GetRuleAsync(SignedDocument.NoteReceipt, CancellationToken.None);
-        Assert.Equal((2, 1L), (rule.Required, rule.Version));
-        Assert.Equal(("علی رضایی", "مدیر عامل"), (Assert.Single(rule.Compulsory).FullName, rule.Compulsory[0].Position));
-        Assert.Equal([cfo, board], rule.Optional.Select(s => s.Id));
-        Assert.Equal(0, (await _useCases.GetRuleAsync(SignedDocument.IssuedCheque, CancellationToken.None)).Required);
-        Assert.True((await Get(ceo)).IsInRule);
-
-        // Changed with its version; an old version is refused.
-        Assert.Equal("Concurrency.Conflict", (await _useCases.SetRuleAsync(Key(), SignedDocument.NoteReceipt, new SignatureRuleForm(1, [ceo], [], 0), CancellationToken.None)).ErrorCode);
-        Assert.True((await _useCases.SetRuleAsync(Key(), SignedDocument.NoteReceipt, new SignatureRuleForm(1, [ceo], [], 1), CancellationToken.None)).IsSuccess);
-        Assert.Empty((await _useCases.GetRuleAsync(SignedDocument.NoteReceipt, CancellationToken.None)).Optional);
-        Assert.False((await Get(board)).IsInRule);
+        Assert.Equal("Person.SignatureInvalid", (await _useCases.AttachSignatureAsync(Key(), id, [1, 2, 3], 4, CancellationToken.None)).ErrorCode);
+        Assert.Equal("Concurrency.Conflict", (await _useCases.AttachSignatureAsync(Key(), id, Png, 1, CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.RemoveSignatureAsync(Key(), id, 4, CancellationToken.None)).IsSuccess);
+        Assert.Null(await _useCases.GetSignatureAsync(id, CancellationToken.None));
+        Assert.Equal("Person.NoSignature", (await _useCases.RemoveSignatureAsync(Key(), id, 5, CancellationToken.None)).ErrorCode);
     }
 
     [Fact]
-    public async Task A_rule_is_checked_and_its_signatories_stay_on_the_list()
+    public async Task A_signatory_named_by_a_bank_account_is_marked_in_use_and_no_longer_deleted()
     {
-        var ceo = await Add("علی رضایی", "مدیر عامل");
-        var cfo = await Add("بهرام کریمی", "مدیر مالی");
-        async Task<string?> Code(int required, Guid[] compulsory, Guid[] optional) =>
-            (await _useCases.SetRuleAsync(Key(), SignedDocument.IssuedCheque, new SignatureRuleForm(required, compulsory, optional, 0), CancellationToken.None)).ErrorCode;
-        Assert.Equal("SignatureRule.CountTooSmall", await Code(1, [ceo, cfo], []));
-        Assert.Equal("SignatureRule.CountTooLarge", await Code(3, [ceo], [cfo]));
-        Assert.Equal("SignatureRule.SignatoryTwice", await Code(1, [ceo], [ceo]));
-        Assert.Equal("SignatureRule.SignatoryNotFound", await Code(1, [Guid.NewGuid()], []));
-        Assert.Null(await Code(2, [ceo, cfo], []));
-
-        Assert.Equal("Signatory.InRule", (await _useCases.ChangeSignatoryAsync(new(Key(), cfo, "deactivate", 1), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.InRule", (await _useCases.ChangeSignatoryAsync(new(Key(), cfo, "delete", 1), CancellationToken.None)).ErrorCode);
-        Assert.True((await _useCases.SetRuleAsync(Key(), SignedDocument.IssuedCheque, new SignatureRuleForm(1, [ceo], [], 1), CancellationToken.None)).IsSuccess);
-        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), cfo, "deactivate", 1), CancellationToken.None)).IsSuccess);
-        Assert.Equal("SignatureRule.SignatoryInactive", (await _useCases.SetRuleAsync(Key(), SignedDocument.IssuedCheque, new SignatureRuleForm(2, [ceo], [cfo], 2), CancellationToken.None)).ErrorCode);
+        var id = await Add("علی رضایی");
+        Assert.True((await _useCases.MarkInUseAsync($"in-use:{id}", id, CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.MarkInUseAsync(Key(), id, CancellationToken.None)).IsSuccess);
+        var s = await Get(id);
+        Assert.Equal((true, 2L), (s.IsInUse, s.Version));
+        Assert.Equal("Signatory.InUse", (await _useCases.ChangeSignatoryAsync(new(Key(), id, "delete", 2), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.ChequesInUse",
+            (await _useCases.EditSignatoryAsync(Key(), id, new SignatoryForm("علی رضایی", SignatoryPosition.Chairman, SignsCheques: false, SignsNotes: true), 2, CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), id, "deactivate", 2), CancellationToken.None)).IsSuccess);
+        Assert.Equal("Signatory.NotFound", (await _useCases.MarkInUseAsync(Key(), Guid.NewGuid(), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]
     public async Task The_same_request_twice_adds_one_signatory()
     {
         var key = Key();
-        var a = await _useCases.AddSignatoryAsync(key, new SignatoryForm("علی رضایی", "مدیر عامل"), CancellationToken.None);
-        var b = await _useCases.AddSignatoryAsync(key, new SignatoryForm("علی رضایی", "مدیر عامل"), CancellationToken.None);
+        var a = await _useCases.AddSignatoryAsync(key, Form("علی رضایی"), CancellationToken.None);
+        var b = await _useCases.AddSignatoryAsync(key, Form("علی رضایی"), CancellationToken.None);
         Assert.Equal(a.Value, b.Value);
         Assert.Single(await _useCases.ListSignatoriesAsync(true, CancellationToken.None));
     }

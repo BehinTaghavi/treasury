@@ -34,6 +34,24 @@ public sealed class FakeReference : IReferenceLookup
         ["600046"] = new("600046", "كاركنان دفتر", true, "Staff"),
     };
 
+    /// <summary>«دارندگان امضای مجاز» of Basic Information: two who sign cheques, one for notes only, one switched off.</summary>
+    public static readonly Guid Ceo = Guid.NewGuid();
+    public static readonly Guid Chairman = Guid.NewGuid();
+    public static readonly Guid BoardMember = Guid.NewGuid();
+    public static readonly Guid NotesOnly = Guid.NewGuid();
+    public static readonly Guid Retired = Guid.NewGuid();
+
+    public Dictionary<Guid, SignatoryFact> Signatories { get; } = new()
+    {
+        [Ceo] = new(Ceo, true, true),
+        [Chairman] = new(Chairman, true, true),
+        [BoardMember] = new(BoardMember, true, true),
+        [NotesOnly] = new(NotesOnly, true, false),
+        [Retired] = new(Retired, false, true),
+    };
+
+    public Task<SignatoryFact?> SignatoryAsync(Guid id, CancellationToken cancellationToken) => Answer(Signatories.GetValueOrDefault(id));
+
     public bool Down { get; set; }
 
     /// <summary>Entries marked in use, as (list, id).</summary>

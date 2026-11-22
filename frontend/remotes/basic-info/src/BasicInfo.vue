@@ -25,6 +25,7 @@ import Beneficiaries from './organization/Beneficiaries.vue'
 import CompanyInfo from './organization/CompanyInfo.vue'
 import Departments from './organization/Departments.vue'
 import Requesters from './organization/Requesters.vue'
+import PermissionHolders from './organization/PermissionHolders.vue'
 import Signatories from './organization/Signatories.vue'
 import PurposeGroups from './purposes/PurposeGroups.vue'
 import type { ListSpec } from './types'
@@ -74,6 +75,7 @@ const current = computed(() => lists.find(l => l.list === selected.value))
       <Requesters v-else-if="selected === 'requesters'" :key="'requesters' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Beneficiaries v-else-if="selected === 'beneficiaries'" :key="'beneficiaries' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <Signatories v-else-if="selected === 'signatories'" :key="'signatories' + locale" :api-base="apiBase" :locale="locale" :token="token" />
+      <PermissionHolders v-else-if="selected === 'permission-holders'" :key="'permission-holders' + locale" :api-base="apiBase" :locale="locale" :token="token" />
       <VoucherTemplate v-else-if="selected === 'voucher-template'" :key="'voucher-template' + locale" :api-base="apiBase" :locale="locale" :token="token" />
     </div>
   </SectionMenu>

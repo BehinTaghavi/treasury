@@ -24,7 +24,9 @@ public sealed record BankAccountForm(
     bool IsFacility,
     BankAccountType AccountType = BankAccountType.CurrentQardHasan,
     ShortTermPeriod? Term = null,
-    IReadOnlyList<BankCard>? Cards = null);
+    IReadOnlyList<BankCard>? Cards = null,
+    int RequiredSignatures = 0,
+    IReadOnlyList<AccountSignatory>? Signatories = null);
 
 /// <param name="IsBackup">"پشتیبان" ticked on the form; then <paramref name="MainAccountId"/> is required.</param>
 public sealed record RegisterBankAccountCommand(string IdempotencyKey, BankAccountForm Form, Guid? MainAccountId = null, bool IsBackup = false);
@@ -39,13 +41,14 @@ public sealed record BankAccountView(
     Guid Id, string AccountNumber, Guid BankId, string? BranchName, string? BranchCode, Guid? CityId, string? OpeningDate,
     string CurrencyCode, Guid? MainAccountId, string LedgerAccountCode, string? Detail1Code, string? Detail2Code,
     string? CollectionAccountCode, string? BouncedAccountCode, int? CollectionPriority, bool IsFacility, bool IsActive, long Version, bool IsInUse = false,
-    BankAccountType AccountType = BankAccountType.CurrentQardHasan, ShortTermPeriod? Term = null, IReadOnlyList<BankCard>? Cards = null, bool HasCheques = true)
+    BankAccountType AccountType = BankAccountType.CurrentQardHasan, ShortTermPeriod? Term = null, IReadOnlyList<BankCard>? Cards = null, bool HasCheques = true,
+    int RequiredSignatures = 0, IReadOnlyList<AccountSignatory>? Signatories = null)
 {
     public static BankAccountView From(BankAccount a) => new(
         a.Id, a.Data.AccountNumber, a.Data.BankId, a.Data.BranchName, a.Data.BranchCode, a.Data.CityId, a.Data.OpeningDate?.ToJalaliString(),
         a.Data.CurrencyCode, a.MainAccountId, a.Data.Ledger.AccountCode, a.Data.Ledger.Detail1Code, a.Data.Ledger.Detail2Code,
         a.Data.Ledger.CollectionAccountCode, a.Data.Ledger.BouncedAccountCode, a.Data.CollectionPriority, a.Data.IsFacility, a.IsActive, a.Version, a.IsInUse,
-        a.Data.AccountType, a.Data.Term, a.Data.CardList, a.Data.AccountType.HasCheques());
+        a.Data.AccountType, a.Data.Term, a.Data.CardList, a.Data.AccountType.HasCheques(), a.Data.RequiredSignatures, a.Data.SignatoryList);
 }
 
 /// <summary>Use cases of the company's bank accounts (manual section 5). Each write is one command in one transaction.</summary>
@@ -57,7 +60,7 @@ public sealed class BankAccountUseCases(
     public Task<Result<Guid>> RegisterAsync(RegisterBankAccountCommand command, CancellationToken cancellationToken) =>
         Run(command.IdempotencyKey, async ct =>
         {
-            var (data, ledger, used) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
+            var (data, ledger, used, signatories) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
             BankAccount? main = null;
             var mainHasBackup = false;
             if (command.MainAccountId is { } mainId)
@@ -71,7 +74,7 @@ public sealed class BankAccountUseCases(
                 mainHasBackup = await accounts.HasBackupAsync(mainId, null, ct).ConfigureAwait(false);
             }
 
-            var account = BankAccount.Register(Guid.NewGuid(), data, ledger, main, mainHasBackup, command.IsBackup);
+            var account = BankAccount.Register(Guid.NewGuid(), data, ledger, main, mainHasBackup, command.IsBackup, signatories);
             if (await accounts.NumberTakenAsync(account.NumberKey, null, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined."); // "شماره حساب تكراري است"
@@ -88,8 +91,8 @@ public sealed class BankAccountUseCases(
         Run(command.IdempotencyKey, async ct =>
         {
             var account = await LoadAsync(command.Id, command.ExpectedVersion, ct).ConfigureAwait(false);
-            var (data, ledger, used) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
-            account.Change(data, ledger);
+            var (data, ledger, used, signatories) = await PrepareAsync(command.Form, ct).ConfigureAwait(false);
+            account.Change(data, ledger, signatories);
             if (await accounts.NumberTakenAsync(account.NumberKey, account.Id, ct).ConfigureAwait(false))
             {
                 return Result<Guid>.Fail("BankAccount.NumberTaken", "This account number is already defined.");
@@ -180,7 +183,7 @@ public sealed class BankAccountUseCases(
     }
 
     /// <summary>
-    /// Tells reference-svc which of its entries the account names (bank, city, foreign currency), so they can no longer be
+    /// Tells reference-svc which of its entries the account names (bank, city, foreign currency, authorised signatories), so they can no longer be
     /// deleted there. Runs just before the save: if the save then fails, the entries merely stay undeletable.
     /// </summary>
     private async Task MarkInUseAsync(IEnumerable<(string List, Guid Id, string MissingCode)> used, CancellationToken ct)
@@ -192,10 +195,11 @@ public sealed class BankAccountUseCases(
     }
 
     /// <summary>
-    /// Checks the form against reference-svc (bank, city, currency, ledger accounts and تفصیل) and builds the domain data.
-    /// Also returns the reference-svc entries the account names (list, id, error code if it has disappeared).
+    /// Checks the form against reference-svc (bank, city, currency, ledger accounts, تفصیل and authorised signatories) and builds the
+    /// domain data. Also returns the reference-svc entries the account names (list, id, error code if it has disappeared).
     /// </summary>
-    private async Task<(BankAccountData Data, LedgerFacts Ledger, List<(string List, Guid Id, string MissingCode)> Used)> PrepareAsync(BankAccountForm form, CancellationToken ct)
+    private async Task<(BankAccountData Data, LedgerFacts Ledger, List<(string List, Guid Id, string MissingCode)> Used, Dictionary<Guid, SignatoryFact> Signatories)> PrepareAsync(
+        BankAccountForm form, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(form);
         var used = new List<(string List, Guid Id, string MissingCode)>();
@@ -242,6 +246,17 @@ public sealed class BankAccountUseCases(
             }
         }
 
+        // Owner's report no. 8: the signatories are chosen from «دارندگان امضای مجاز» of Basic Information (reference-svc).
+        var signatories = new Dictionary<Guid, SignatoryFact>();
+        foreach (var id in (form.Signatories ?? []).Where(x => x is not null).Select(x => x.SignatoryId).Where(x => x != Guid.Empty).Distinct())
+        {
+            if (await reference.SignatoryAsync(id, ct).ConfigureAwait(false) is { } fact)
+            {
+                signatories[id] = fact;
+                used.Add(("signatories", id, "BankAccount.SignatoryNotFound"));
+            }
+        }
+
         var data = new BankAccountData(
             form.AccountNumber,
             form.BankId,
@@ -255,8 +270,10 @@ public sealed class BankAccountUseCases(
             form.IsFacility,
             form.AccountType,
             form.Term,
-            form.Cards);
-        return (data, new LedgerFacts(accountsByCode, detailsByCode), used);
+            form.Cards,
+            form.RequiredSignatures,
+            form.Signatories);
+        return (data, new LedgerFacts(accountsByCode, detailsByCode), used, signatories);
     }
 
     /// <summary>A bank card belongs to one account only (owner's report no. 4, item 2: "کارت بانک متعلق به همان حساب بانکی خواهد بود").</summary>

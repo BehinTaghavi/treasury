@@ -30,6 +30,10 @@ curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank n
 curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
 # «مشخصات شرکت» (was «اطلاعات شرکت»): the company's name and logo for the top bar of every screen (schemas 033, 034, 039).
 curl -sf "$base/api/reference/company" | grep -q '"nationalId"' || fail "company information (reference-svc) is not served"
+# Owner's report no. 8 (schema 048): the two lists of persons with a signature, and the forms' question "who holds a permission here?".
+[[ "$(status "$base/api/reference/signatories?includeInactive=true")" == 200 ]] || fail "authorised signatories (reference-svc) are not served"
+curl -sf "$base/api/reference/permission-holders/operations" | grep -q '"NoteReceipt"' || fail "the list of treasury operations (reference-svc) is not served"
+[[ "$(status "$base/api/reference/permission-holders/for/NoteReceipt")" == 200 ]] || fail "permission holders of an operation (reference-svc) are not served"
 
 # Bank accounts (accounts-svc -> PostgreSQL as accounts_svc).
 for _ in $(seq 1 60); do

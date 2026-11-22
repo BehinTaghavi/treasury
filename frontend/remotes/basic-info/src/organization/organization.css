@@ -31,4 +31,19 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-chips li button { padding: 0 .35rem; background: transparent; color: #b42318; border: 0; font-size: 1rem; }
 .muted { color: #7b8794; }
 .small { font-size: .8rem; }
+.tr-ticks { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; align-items: center; align-self: end; padding-bottom: .35rem; font-size: .85rem; }
+.tr-ticks-title { font-weight: 600; }
 @media (max-width: 720px) { .wide { grid-column: auto; } }
+/* Phones and tablets (ADR 0006): a list marked tr-cards becomes one card per row, each cell beside its own label (data-label);
+   on a tablet the cards stand side by side. */
+@media (max-width: 900px) {
+  .tr-cards thead { display: none; }
+  .tr-cards, .tr-cards tr, .tr-cards td { display: block; width: 100%; box-sizing: border-box; }
+  .tr-cards tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: .6rem; }
+  .tr-cards tr { border: 1px solid #e4e7eb; border-radius: 8px; padding: .35rem .6rem; }
+  .tr-cards td { display: flex; gap: .5rem; border: 0; padding: .2rem 0; direction: rtl; overflow-wrap: anywhere; }
+  .tr-cards td[data-label]::before { content: attr(data-label); flex: 0 0 6.5rem; color: #7b8794; font-size: .8rem; }
+  .tr-cards td:empty { display: none; }
+  .tr-cards td > div { min-width: 0; }
+  .tr-cards .tr-actions { white-space: normal; flex-wrap: wrap; border-top: 1px solid #eef2f7; margin-top: .25rem; padding-top: .35rem; }
+}

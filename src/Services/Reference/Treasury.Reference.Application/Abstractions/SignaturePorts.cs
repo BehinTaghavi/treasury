@@ -2,7 +2,7 @@ using Treasury.Reference.Domain.Signatures;
 
 namespace Treasury.Reference.Application.Abstractions;
 
-/// <summary>Holders of authorised signatures and the signature rule of each kind of document (owner, 16 Nov 2026).</summary>
+/// <summary>Holders of authorised signatures on valuable documents (owner, 16 Nov 2026; report no. 8, 21 Nov 2026).</summary>
 public interface ISignatureRepository
 {
     Task<Signatory?> GetSignatoryAsync(Guid id, CancellationToken cancellationToken);
@@ -11,18 +11,30 @@ public interface ISignatureRepository
 
     Task AddSignatoryAsync(Signatory signatory, CancellationToken cancellationToken);
 
-    /// <summary>Version-checked.</summary>
-    Task SaveSignatoryAsync(Signatory signatory, CancellationToken cancellationToken);
+    /// <summary>
+    /// Version-checked. With <paramref name="scan"/> also replaces the stored scan of the signature; a signatory without a signature
+    /// type loses its stored scan, all in the same transaction.
+    /// </summary>
+    Task SaveSignatoryAsync(Signatory signatory, CancellationToken cancellationToken, byte[]? scan = null);
 
     Task DeleteSignatoryAsync(Signatory signatory, CancellationToken cancellationToken);
 
-    /// <summary>The rule of a kind of document; null when none was ever set.</summary>
-    Task<SignatureRule?> GetRuleAsync(SignedDocument document, CancellationToken cancellationToken);
+    Task<(string ContentType, byte[] Data)?> GetSignatureAsync(Guid signatoryId, CancellationToken cancellationToken);
+}
 
-    Task<IReadOnlyList<SignatureRule>> ListRulesAsync(CancellationToken cancellationToken);
+/// <summary>Holders of permissions on the forms of treasury operations («دارندگان مجوزها», owner's report no. 8).</summary>
+public interface IPermissionHolderRepository
+{
+    Task<PermissionHolder?> GetAsync(Guid id, CancellationToken cancellationToken);
 
-    Task AddRuleAsync(SignatureRule rule, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PermissionHolder>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
 
-    /// <summary>Version-checked.</summary>
-    Task SaveRuleAsync(SignatureRule rule, CancellationToken cancellationToken);
+    Task AddAsync(PermissionHolder holder, CancellationToken cancellationToken);
+
+    /// <summary>Version-checked; the scan as in <see cref="ISignatureRepository.SaveSignatoryAsync"/>.</summary>
+    Task SaveAsync(PermissionHolder holder, CancellationToken cancellationToken, byte[]? scan = null);
+
+    Task DeleteAsync(PermissionHolder holder, CancellationToken cancellationToken);
+
+    Task<(string ContentType, byte[] Data)?> GetSignatureAsync(Guid holderId, CancellationToken cancellationToken);
 }

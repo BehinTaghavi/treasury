@@ -19,6 +19,8 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
 
     private sealed record Group(Guid Id, string Direction, bool IsActive);
 
+    private sealed record Signatory(Guid Id, bool IsActive, bool SignsCheques);
+
     private sealed record Detail(string Code, string? Type, bool IsActive, string? Name = null, string? Role = null);
 
     public Task<ReferenceEntry?> BankAsync(Guid id, CancellationToken cancellationToken) => EntryAsync($"api/reference/banks/{id}", cancellationToken);
@@ -47,6 +49,9 @@ public sealed class HttpReferenceLookup(HttpClient http) : IReferenceLookup
         await GetAsync<Group>($"api/reference/purpose-groups/{id}", cancellationToken).ConfigureAwait(false) is { } g
             ? new PurposeGroupFact(g.Id, g.Direction == "Payment", g.IsActive)
             : null;
+
+    public async Task<SignatoryFact?> SignatoryAsync(Guid id, CancellationToken cancellationToken) =>
+        await GetAsync<Signatory>($"api/reference/signatories/{id}", cancellationToken).ConfigureAwait(false) is { } s ? new SignatoryFact(s.Id, s.IsActive, s.SignsCheques) : null;
 
     public async Task<string?> DetailNameAsync(string code, CancellationToken cancellationToken) =>
         (await GetAsync<Detail>($"api/reference/ledger/details/{Uri.EscapeDataString(code)}", cancellationToken).ConfigureAwait(false))?.Name;

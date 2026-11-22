@@ -48,8 +48,11 @@ export const sections: readonly MenuGroup[] = [
     { id: 'requesters', title: ['درخواست کنندگان وجوه', 'Requesters of funds'] },
     // Owner, 19 Nov 2026: one form for the three groups.
     { id: 'beneficiaries', title: ['ذینفعان / متعهدین / ضامنین', 'Beneficiaries / obligors / guarantors'] },
-    // Owner, 16 Nov 2026: the holders of authorised signatures and the signature rule of each valuable document.
-    { id: 'signatories', title: ['دارندگان امضای مجاز', 'Authorised signatories'] },
+    // Owner, 16 Nov 2026: the holders of authorised signatures. His report no. 8 (21 Nov 2026) makes two items of it: who signs the
+    // company's valuable documents (cheques, notes), and who holds a permission – confirms or approves – on the forms of the treasury
+    // operations. The signature rule per kind of document is removed; a bank account names its own signatories.
+    { id: 'signatories', title: ['دارندگان امضای مجاز (اسناد بهادار)', 'Authorised signatories (valuable documents)'] },
+    { id: 'permission-holders', title: ['دارندگان مجوزها (فرم‌ها)', 'Permission holders (forms)'] },
   ] },
   { title: ['اسناد', 'Vouchers'], items: [
     // Owner's report no. 4, item 8: the fixed accounts of treasury vouchers.

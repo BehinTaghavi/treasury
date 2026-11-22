@@ -6,12 +6,13 @@ using Xunit;
 
 namespace Treasury.Reference.Infrastructure.Postgres.Tests;
 
-/// <summary>Signatories and signature rules through the real PostgreSQL adapters (db/postgres/034), acting as the reference_svc role.</summary>
+/// <summary>Signatories and permission holders through the real PostgreSQL adapters (db/postgres/034 and 048), acting as the reference_svc role.</summary>
 [Collection(SharedChartTests.Name)]
 public sealed class SignaturePostgresTests : IDisposable
 {
     private readonly NpgsqlDataSource _dataSource;
     private readonly SignatureUseCases _useCases;
+    private readonly PermissionHolderUseCases _holders;
     private readonly int _n = Random.Shared.Next(100_000_000, 900_000_000);
 
     public SignaturePostgresTests(PostgresDatabase db)
@@ -19,6 +20,7 @@ public sealed class SignaturePostgresTests : IDisposable
         db.Require();
         _dataSource = NpgsqlDataSource.Create(db.ServiceAs("reference_svc"));
         _useCases = new SignatureUseCases(new PostgresUnitOfWork(_dataSource), new PostgresSignatureRepository(), new PostgresLedgerRepository(), new PostgresIdempotencyStore(_dataSource));
+        _holders = new PermissionHolderUseCases(new PostgresUnitOfWork(_dataSource), new PostgresPermissionHolderRepository(), new PostgresLedgerRepository(), new PostgresIdempotencyStore(_dataSource));
     }
 
     public void Dispose() => _dataSource.Dispose();
@@ -33,40 +35,92 @@ public sealed class SignaturePostgresTests : IDisposable
         return digits + (r < 2 ? r : 11 - r).ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3];
+
     [Fact]
-    public async Task Signatories_and_the_rule_of_a_document_round_trip()
+    public async Task Signatories_round_trip_with_their_scan_and_are_kept_once_a_bank_account_names_them()
     {
         var code = NationalCode(_n);
-        var ceo = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مدیر " + _n, "مدیر عامل", null, code, "09121234567", "021-88990011"), CancellationToken.None);
-        var cfo = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مالی " + _n, "مدیر مالی"), CancellationToken.None);
+        var ceo = await _useCases.AddSignatoryAsync(Key(),
+            new SignatoryForm("مدیر " + _n, SignatoryPosition.ManagingDirector, null, null, code, "09121234567", "021-88990011", "214", $"ceo{_n}@nazho.example", true, true),
+            CancellationToken.None);
+        var cfo = await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مالی " + _n, SignatoryPosition.Other, "مدیر مالی", SignsCheques: false, SignsNotes: true), CancellationToken.None);
         Assert.True(ceo.IsSuccess, ceo.ErrorCode);
         Assert.True(cfo.IsSuccess, cfo.ErrorCode);
-        var view = (await _useCases.ListSignatoriesAsync(true, CancellationToken.None)).Single(s => s.Id == ceo.Value);
-        Assert.Equal(("مدیر " + _n, "مدیر عامل", code, "09121234567", "021-88990011", true, 1L),
-            (view.FullName, view.Position, view.NationalCode, view.Mobile, view.Phone, view.IsActive, view.Version));
-        Assert.Equal("Signatory.NameTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مدیر " + _n, "دیگر"), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.NationalCodeTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگر " + _n, "دیگر", NationalCode: code), CancellationToken.None)).ErrorCode);
+        var view = (await _useCases.GetSignatoryAsync(ceo.Value, CancellationToken.None))!;
+        Assert.Equal(("مدیر " + _n, "ManagingDirector", "مدیر عامل", code, "09121234567", "021-88990011", "214", $"ceo{_n}@nazho.example"),
+            (view.FullName, view.PositionKind, view.Position, view.NationalCode, view.Mobile, view.Phone, view.Extension, view.Email));
+        Assert.Equal((true, true, false, true, false, 1L), (view.SignsCheques, view.SignsNotes, view.HasSignature, view.IsActive, view.IsInUse, view.Version));
+        var other = (await _useCases.ListSignatoriesAsync(true, CancellationToken.None)).Single(s => s.Id == cfo.Value);
+        Assert.Equal(("Other", "مدیر مالی", false, true), (other.PositionKind, other.Position, other.SignsCheques, other.SignsNotes));
+        Assert.Equal("Signatory.NameTaken", (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("مدیر " + _n, SignatoryPosition.Chairman), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Signatory.NationalCodeTaken",
+            (await _useCases.AddSignatoryAsync(Key(), new SignatoryForm("دیگر " + _n, SignatoryPosition.Chairman, NationalCode: code), CancellationToken.None)).ErrorCode);
 
-        Assert.True((await _useCases.EditSignatoryAsync(Key(), cfo.Value, new SignatoryForm("مالی " + _n, "معاون مالی"), 1, CancellationToken.None)).IsSuccess);
-        Assert.Equal("Concurrency.Conflict", (await _useCases.EditSignatoryAsync(Key(), cfo.Value, new SignatoryForm("مالی " + _n, "مدیر"), 1, CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.EditSignatoryAsync(Key(), cfo.Value, new SignatoryForm("مالی " + _n, SignatoryPosition.NonBoardManager, SignsNotes: true), 1, CancellationToken.None)).IsSuccess);
+        Assert.Equal("Concurrency.Conflict", (await _useCases.EditSignatoryAsync(Key(), cfo.Value, new SignatoryForm("مالی " + _n, SignatoryPosition.Chairman), 1, CancellationToken.None)).ErrorCode);
 
-        // The rule of a kind of document is one row for the company; it is set from whatever version it has now and cleared at the end.
-        var before = await _useCases.GetRuleAsync(SignedDocument.NotePaymentSheet, CancellationToken.None);
-        var set = await _useCases.SetRuleAsync(Key(), SignedDocument.NotePaymentSheet, new SignatureRuleForm(2, [ceo.Value], [cfo.Value], before.Version), CancellationToken.None);
-        Assert.True(set.IsSuccess, set.ErrorCode);
-        var rule = await _useCases.GetRuleAsync(SignedDocument.NotePaymentSheet, CancellationToken.None);
-        Assert.Equal((2, before.Version + 1), (rule.Required, rule.Version));
-        Assert.Equal(("مدیر " + _n, "مدیر عامل"), (Assert.Single(rule.Compulsory).FullName, rule.Compulsory[0].Position));
-        Assert.Equal("معاون مالی", Assert.Single(rule.Optional).Position);
-        Assert.Contains(await _useCases.ListRulesAsync(CancellationToken.None), r => r.Document == "NotePaymentSheet" && r.Required == 2);
-        Assert.Equal("Concurrency.Conflict",
-            (await _useCases.SetRuleAsync(Key(), SignedDocument.NotePaymentSheet, new SignatureRuleForm(1, [ceo.Value], [], before.Version), CancellationToken.None)).ErrorCode);
-        Assert.Equal("Signatory.InRule", (await _useCases.ChangeSignatoryAsync(new(Key(), cfo.Value, "delete", 2), CancellationToken.None)).ErrorCode);
+        // The scan lives beside the row; a correction of the form keeps it, removing it deletes it.
+        Assert.True((await _useCases.AttachSignatureAsync(Key(), ceo.Value, Png, 1, CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.EditSignatoryAsync(Key(), ceo.Value,
+            new SignatoryForm("مدیر " + _n, SignatoryPosition.ManagingDirectorAndChairman, NationalCode: code, SignsCheques: true), 2, CancellationToken.None)).IsSuccess);
+        var scan = await _useCases.GetSignatureAsync(ceo.Value, CancellationToken.None);
+        Assert.Equal("image/png", scan!.Value.ContentType);
+        Assert.Equal(Png, scan.Value.Data);
+        Assert.True((await _useCases.GetSignatoryAsync(ceo.Value, CancellationToken.None))!.HasSignature);
+        Assert.Null(await _useCases.GetSignatureAsync(cfo.Value, CancellationToken.None));
+        Assert.True((await _useCases.RemoveSignatureAsync(Key(), ceo.Value, 3, CancellationToken.None)).IsSuccess);
+        Assert.Null(await _useCases.GetSignatureAsync(ceo.Value, CancellationToken.None));
 
-        Assert.True((await _useCases.SetRuleAsync(Key(), SignedDocument.NotePaymentSheet, new SignatureRuleForm(0, [], [], rule.Version), CancellationToken.None)).IsSuccess);
-        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), cfo.Value, "deactivate", 2), CancellationToken.None)).IsSuccess);
-        Assert.DoesNotContain(await _useCases.ListSignatoriesAsync(false, CancellationToken.None), s => s.Id == cfo.Value);
-        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), cfo.Value, "delete", 3), CancellationToken.None)).IsSuccess);
-        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), ceo.Value, "delete", 1), CancellationToken.None)).IsSuccess);
+        // In use (a bank account names it): never deleted, still switched off.
+        Assert.True((await _useCases.MarkInUseAsync($"in-use:{ceo.Value}", ceo.Value, CancellationToken.None)).IsSuccess);
+        Assert.Equal("Signatory.InUse", (await _useCases.ChangeSignatoryAsync(new(Key(), ceo.Value, "delete", 5), CancellationToken.None)).ErrorCode);
+        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), ceo.Value, "deactivate", 5), CancellationToken.None)).IsSuccess);
+        Assert.DoesNotContain(await _useCases.ListSignatoriesAsync(false, CancellationToken.None), s => s.Id == ceo.Value);
+        Assert.True((await _useCases.ChangeSignatoryAsync(new(Key(), cfo.Value, "delete", 2), CancellationToken.None)).IsSuccess);
+        Assert.Null(await _useCases.GetSignatoryAsync(cfo.Value, CancellationToken.None));
     }
+
+    [Fact]
+    public async Task Permission_holders_round_trip_with_their_roles_operations_and_scan()
+    {
+        var code = NationalCode(_n + 1);
+        var added = await _holders.AddAsync(Key(), new PermissionHolderForm("دارنده " + _n, "مدیر مالی",
+            [new(PermissionRoleKind.FirstApprover, null, [TreasuryOperation.PaymentRequest, TreasuryOperation.NotePayment]), new(PermissionRoleKind.Other, "ناظر " + _n, [TreasuryOperation.NotePayment])],
+            null, code, "09121234567", null, "120", $"h{_n}@nazho.example"), CancellationToken.None);
+        Assert.True(added.IsSuccess, added.ErrorCode);
+        var h = (await _holders.ListAsync(true, CancellationToken.None)).Single(x => x.Id == added.Value);
+        Assert.Equal(("دارنده " + _n, "مدیر مالی", code, "09121234567", "120", $"h{_n}@nazho.example", false, true, 1L),
+            (h.FullName, h.JobTitle, h.NationalCode, h.Mobile, h.Extension, h.Email, h.HasSignature, h.IsActive, h.Version));
+        Assert.Equal([("FirstApprover", "تصویب کننده (اول)"), ("Other", "ناظر " + _n)], h.Roles.Select(r => (r.Kind, r.Title)));
+        Assert.Equal(["PaymentRequest", "NotePayment"], h.Roles[0].Operations);
+        Assert.Equal("PermissionHolder.NameTaken", (await _holders.AddAsync(Key(), h.ToForm(), CancellationToken.None)).ErrorCode);
+
+        var forNotes = (await _holders.ListForOperationAsync(TreasuryOperation.NotePayment, CancellationToken.None)).Single(x => x.Id == added.Value);
+        Assert.Equal($"تصویب کننده (اول)، ناظر {_n} – مدیر مالی", forNotes.Position);
+
+        // The roles are replaced as a whole by a correction.
+        Assert.True((await _holders.EditAsync(Key(), added.Value,
+            new PermissionHolderForm("دارنده " + _n, "معاون مالی", [new(PermissionRoleKind.SecondConfirmer, null, [TreasuryOperation.CashReceipt])], NationalCode: code), 1, CancellationToken.None)).IsSuccess);
+        h = (await _holders.ListAsync(true, CancellationToken.None)).Single(x => x.Id == added.Value);
+        Assert.Equal(("معاون مالی", "SecondConfirmer", 2L), (h.JobTitle, Assert.Single(h.Roles).Kind, h.Version));
+        Assert.DoesNotContain(await _holders.ListForOperationAsync(TreasuryOperation.NotePayment, CancellationToken.None), x => x.Id == added.Value);
+        Assert.Equal("Concurrency.Conflict", (await _holders.EditAsync(Key(), added.Value, h.ToForm(), 1, CancellationToken.None)).ErrorCode);
+
+        Assert.True((await _holders.AttachSignatureAsync(Key(), added.Value, Png, 2, CancellationToken.None)).IsSuccess);
+        Assert.Equal(Png, (await _holders.GetSignatureAsync(added.Value, CancellationToken.None))!.Value.Data);
+        Assert.True((await _holders.ChangeAsync(new(Key(), added.Value, "deactivate", 3), CancellationToken.None)).IsSuccess);
+        Assert.DoesNotContain(await _holders.ListForOperationAsync(TreasuryOperation.CashReceipt, CancellationToken.None), x => x.Id == added.Value);
+        Assert.True((await _holders.ChangeAsync(new(Key(), added.Value, "delete", 4), CancellationToken.None)).IsSuccess);
+        Assert.Null(await _holders.GetSignatureAsync(added.Value, CancellationToken.None));
+    }
+}
+
+internal static class PermissionHolderViews
+{
+    /// <summary>The form that would save the holder as it is listed.</summary>
+    public static PermissionHolderForm ToForm(this PermissionHolderView h) => new(
+        h.FullName, h.JobTitle,
+        h.Roles.Select(r => new PermissionRoleForm(Enum.Parse<PermissionRoleKind>(r.Kind), r.Title, r.Operations.Select(Enum.Parse<TreasuryOperation>).ToList())).ToList(),
+        h.DetailCode, h.NationalCode, h.Mobile, h.Phone, h.Extension, h.Email);
 }

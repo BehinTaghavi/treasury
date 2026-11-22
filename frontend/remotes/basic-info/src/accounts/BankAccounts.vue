@@ -10,10 +10,16 @@
  *   saved (item 10).
  * - Collection priority is a number from 1 (highest) to 5, chosen from a small pop-up (item 15).
  * - The list has a search box (item 16); typing a number that already exists opens that account (item 17).
+ * - Owner's report no. 8 (21 Nov 2026): each account has its own authorised signatories – «دارندگان امضای مجاز هر حساب بانکی ممکن است
+ *   متفاوت از دارندگان امضای مجاز حساب بانک بعدی باشد». The block «دارندگان امضای مجاز» asks for the number of signatures (one digit)
+ *   and, row by row, a signatory chosen from Basic Information → «دارندگان امضای مجاز (اسناد بهادار)» who may sign cheques, the kind
+ *   of signature – «ثابت»: on every cheque; «متغیر»: chosen among the variable ones to complete the number – and shows the scan of
+ *   the signature. The first row is added with «تعریف دارنده امضاء مجاز اول», the next ones with «رکورد جدید».
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { cardNumberHint, createApi, normaliseJalali, translate, type Locale, toLatinDigits } from '@treasury/ui-kit'
 import SearchSelect, { type Choice } from '@treasury/ui-kit/SearchSelect.vue'
+import { fetchSignature } from '../organization/signatureScan'
 import { searchKey } from '../text'
 
 interface Entry { id: string; name: string; code: string | null; isActive: boolean; parentId: string | null }
@@ -25,7 +31,12 @@ interface BankAccount {
   detail2Code: string | null; collectionAccountCode: string | null; bouncedAccountCode: string | null; collectionPriority: number | null
   isFacility: boolean; isActive: boolean; version: number; isInUse: boolean
   accountType: AccountType; term: string | null; cards: Card[] | null; hasCheques: boolean
+  requiredSignatures: number; signatories: AccountSignatory[] | null
 }
+type SignatureKind = 'Fixed' | 'Variable'
+interface AccountSignatory { signatoryId: string; kind: SignatureKind | '' }
+/** One of «دارندگان امضای مجاز (اسناد بهادار)» of Basic Information. */
+interface Signatory { id: string; fullName: string; position: string; signsCheques: boolean; hasSignature: boolean; isActive: boolean; version: number }
 type AccountType = 'CurrentQardHasan' | 'SavingsQardHasan' | 'ShortTermDeposit' | 'LongTermDeposit'
 interface Card { number: string; holderName: string }
 
@@ -69,6 +80,7 @@ const empty = () => ({
   currencyCode: '', isBackup: false, mainAccountId: '', ledgerAccountCode: '', detail1Code: '', detail2Code: '',
   collectionAccountCode: '', bouncedAccountCode: '', collectionPriority: null as number | null, isFacility: false,
   accountType: 'CurrentQardHasan' as AccountType, term: '', hasCards: false, cards: [] as Card[],
+  requiredSignatures: '', signatories: [] as AccountSignatory[],
 })
 const form = reactive(empty())
 
@@ -81,6 +93,30 @@ const typeName = (a: BankAccount) => {
   return (fa.value ? ty.fa : ty.en) + term
 }
 function addCard() { form.cards.push({ number: '', holderName: '' }) }
+
+// ---- authorised signatories of the account (owner's report no. 8) ----
+const signatories = ref<Signatory[]>([])
+const signatoryOf = (id: string) => signatories.value.find(s => s.id === id)
+/** Offered on a row: the active signatories who may sign cheques and are not on another row; the row's own choice stays. */
+const signatoryChoices = (row: AccountSignatory): Choice[] => signatories.value
+  .filter(s => s.id === row.signatoryId || (s.isActive && s.signsCheques && !form.signatories.some(r => r.signatoryId === s.id)))
+  .map(s => ({ value: s.id, label: s.fullName, hint: s.position, muted: !s.isActive }))
+const fixedCount = computed(() => form.signatories.filter(r => r.kind === 'Fixed').length)
+const variableCount = computed(() => form.signatories.filter(r => r.kind === 'Variable').length)
+function addSignatory() { form.signatories.push({ signatoryId: '', kind: '' }) }
+/** The scans of the signatures, fetched once per signatory and shown from memory. */
+const scans = reactive<Record<string, string>>({})
+async function showScan(id: string) {
+  const s = signatoryOf(id)
+  if (!s?.hasSignature || scans[id] !== undefined) return
+  scans[id] = ''
+  scans[id] = await fetchSignature({ apiBase: props.apiBase, token: props.token }, `/api/reference/signatories/${id}/signature?v=${s.version}`)
+}
+watch(() => form.signatories.map(r => r.signatoryId), ids => { for (const id of ids) if (id) void showScan(id) })
+onBeforeUnmount(() => { for (const url of Object.values(scans)) if (url) URL.revokeObjectURL(url) })
+const signatureSummary = (a: BankAccount) => (a.requiredSignatures
+  ? t(`${num(a.requiredSignatures)} امضا از ${num(a.signatories?.length ?? 0)} نفر`, `${a.requiredSignatures} of ${a.signatories?.length ?? 0}`)
+  : '')
 // A kind that cannot be in a foreign currency clears the currency; one without cards clears them.
 watch(() => form.accountType, ty => {
   if (!TYPES[ty].foreign) Object.assign(form, { isForeign: false, currencyCode: '' })
@@ -120,13 +156,15 @@ const fail = (code: string) => { message.value = { kind: 'error', text: translat
 const numberKey = (s: string) => searchKey(s).replace(/\D/g, '')
 
 async function loadLists() {
-  const [b, p, c, cu, l] = await Promise.all([
+  const [b, p, c, cu, l, sg] = await Promise.all([
     api.get<Entry[]>('/api/reference/banks'),
     api.get<Entry[]>('/api/reference/provinces'),
     api.get<Entry[]>('/api/reference/cities'),
     api.get<Entry[]>('/api/reference/currencies'),
     api.get<LedgerAccount[]>('/api/reference/ledger/accounts?postableOnly=true'),
+    api.get<Signatory[]>('/api/reference/signatories?includeInactive=true'),
   ])
+  if (sg.ok) signatories.value = sg.value
   if (b.ok) banks.value = b.value
   if (p.ok) provinces.value = p.value
   if (c.ok) cities.value = c.value
@@ -206,6 +244,7 @@ function startEdit(a: BankAccount) {
     detail2Code: a.detail2Code ?? '', collectionAccountCode: a.collectionAccountCode ?? '', bouncedAccountCode: a.bouncedAccountCode ?? '',
     collectionPriority: a.collectionPriority, isFacility: a.isFacility,
     accountType: a.accountType ?? 'CurrentQardHasan', term: a.term ?? '', hasCards: !!a.cards?.length, cards: (a.cards ?? []).map(c => ({ ...c })),
+    requiredSignatures: a.requiredSignatures ? String(a.requiredSignatures) : '', signatories: (a.signatories ?? []).map(x => ({ ...x })),
   })
   editing.value = a
   showForm.value = true
@@ -242,7 +281,11 @@ async function save() {
     cards: form.hasCards && TYPES[form.accountType].cards
       ? form.cards.filter(c => c.number.trim() || c.holderName.trim()).map(c => ({ number: toLatinDigits(c.number).replace(/\D/g, ''), holderName: c.holderName.trim() }))
       : [],
+    // Rows left empty are not sent; a row with a signatory and no kind is refused by the service with its message.
+    requiredSignatures: Number(toLatinDigits(form.requiredSignatures).replace(/\D/g, '')) || 0,
+    signatories: form.signatories.filter(r => r.signatoryId).map(r => ({ signatoryId: r.signatoryId, kind: r.kind || 'Unset' })),
   }
+  if (payload.signatories.some(r => r.kind === 'Unset')) return fail('BankAccount.SignatureKindRequired')
   busy.value = true
   const r = editing.value
     ? await api.put<string>(`${base}/${editing.value.id}`, { form: payload, version: editing.value.version })
@@ -385,6 +428,41 @@ onMounted(async () => {
         <label class="tr-check"><input v-model="form.isFacility" type="checkbox" /> {{ t('تسهیلات', 'Used for facilities') }}</label>
       </fieldset>
 
+      <!-- Owner's report no. 8: the authorised signatories of this account. -->
+      <fieldset :disabled="restLocked" class="tr-signers">
+        <legend>{{ t('دارندگان امضای مجاز', 'Authorised signatories') }}</legend>
+        <p class="muted small tr-full">{{ t('امضاکنندگان چک‌های همین حساب. از میان «دارندگان امضای مجاز (اسناد بهادار)» که تیک «چک» دارند انتخاب می‌شوند. «ثابت»: امضای او روی هر چک الزامی است. «متغیر»: برای تکمیل تعداد امضای لازم، از میان امضاهای متغیر انتخاب می‌شود.',
+          'Who signs the cheques of this account, chosen from the authorised signatories ticked for cheques. Fixed: the signature is on every cheque. Variable: chosen among the variable ones to complete the number of signatures.') }}</p>
+        <label><span>{{ t('تعداد امضا', 'Number of signatures') }}</span>
+          <input v-model="form.requiredSignatures" dir="ltr" inputmode="numeric" maxlength="1" class="tr-count" :aria-label="t('تعداد امضا', 'Number of signatures')" />
+        </label>
+        <p v-if="form.signatories.length" class="muted small tr-summary">{{ t(`ثابت: ${num(fixedCount)} نفر · متغیر: ${num(variableCount)} نفر. تعداد امضا نباید از امضاهای ثابت کمتر و از کل دارندگان امضا بیشتر باشد.`,
+          `Fixed: ${fixedCount} · variable: ${variableCount}. The number of signatures is not less than the fixed ones and not more than all the signatories.`) }}</p>
+        <div class="tr-full tr-signer-rows">
+          <div v-for="(r, i) in form.signatories" :key="i" class="tr-signer">
+            <label class="req"><span>{{ t('نام دارنده امضای مجاز', 'Authorised signatory') }}</span>
+              <SearchSelect v-model="r.signatoryId" :options="signatoryChoices(r)" required :aria-label="t(`دارنده امضای مجاز ردیف ${num(i + 1)}`, `Signatory of row ${i + 1}`)"
+                            :none-text="t('صاحب امضای دیگری با مجوز چک تعریف نشده است', 'No other signatory is authorised for cheques')" />
+            </label>
+            <label class="req"><span>{{ t('نوع امضا', 'Kind of signature') }}</span>
+              <select v-model="r.kind" :aria-label="t(`نوع امضای ردیف ${num(i + 1)}`, `Kind of signature of row ${i + 1}`)">
+                <option value="" disabled>{{ t('— انتخاب کنید —', '— choose —') }}</option>
+                <option value="Fixed">{{ t('امضای ثابت', 'Fixed signature') }}</option>
+                <option value="Variable">{{ t('امضای متغیر', 'Variable signature') }}</option>
+              </select>
+            </label>
+            <div class="tr-signer-scan" :title="t('اسکن امضا', 'Scan of the signature')">
+              <img v-if="scans[r.signatoryId]" :src="scans[r.signatoryId]" :alt="t('نمونه امضا', 'Specimen signature')" />
+              <span v-else class="muted small">{{ r.signatoryId ? t('اسکن امضا ثبت نشده', 'No scan stored') : t('اسکن امضا', 'Scan') }}</span>
+            </div>
+            <button type="button" class="tr-link danger" @click="form.signatories.splice(i, 1)">{{ t('حذف', 'Remove') }}</button>
+          </div>
+          <p v-if="!signatories.some(s => s.isActive && s.signsCheques)" class="muted small">{{ t('ابتدا در «دارندگان امضای مجاز (اسناد بهادار)» صاحبان امضا را با تیک «چک» تعریف کنید.',
+            'First add the signatories ticked for cheques on the page Authorised signatories (valuable documents).') }}</p>
+          <button v-else type="button" class="tr-secondary tr-add" @click="addSignatory">{{ form.signatories.length ? t('رکورد جدید', 'New record') : t('تعریف دارنده امضاء مجاز اول', 'Add the first signatory') }}</button>
+        </div>
+      </fieldset>
+
       <div class="tr-buttons">
         <button type="submit" :disabled="busy || restLocked">{{ t('ذخیره', 'Save') }}</button>
         <button type="button" class="tr-link" @click="showForm = false">{{ t('انصراف', 'Cancel') }}</button>
@@ -403,7 +481,7 @@ onMounted(async () => {
             <tr>
               <th>{{ t('شماره حساب', 'Number') }}</th><th>{{ t('نوع حساب', 'Kind') }}</th><th>{{ t('بانک', 'Bank') }}</th><th>{{ t('شعبه', 'Branch') }}</th><th>{{ t('شهر', 'City') }}</th>
               <th>{{ t('ارز', 'Currency') }}</th><th>{{ t('معین', 'Ledger') }}</th><th>{{ t('تفصیل', 'Detail') }}</th><th>{{ t('اولویت', 'Priority') }}</th>
-              <th>{{ t('پشتیبانِ', 'Backup of') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
+              <th>{{ t('پشتیبانِ', 'Backup of') }}</th><th>{{ t('امضای مجاز', 'Signatures') }}</th><th>{{ t('وضعیت', 'Status') }}</th><th />
             </tr>
           </thead>
           <tbody>
@@ -414,6 +492,7 @@ onMounted(async () => {
               <td dir="ltr" :title="ledgerName(a.ledgerAccountCode)">{{ a.ledgerAccountCode }}</td><td dir="ltr">{{ a.detail1Code }}</td>
               <td>{{ a.collectionPriority ? num(a.collectionPriority) : '' }}</td>
               <td dir="ltr">{{ accounts.find(m => m.id === a.mainAccountId)?.accountNumber }}</td>
+              <td>{{ signatureSummary(a) }}</td>
               <td>{{ a.isActive ? t('فعال', 'Active') : t('غیرفعال', 'Inactive') }} <span v-if="a.isInUse" class="tr-tag">{{ t('در حال استفاده', 'in use') }}</span></td>
               <td class="tr-actions">
                 <button type="button" class="tr-link" @click="startEdit(a)">{{ t('ویرایش', 'Edit') }}</button>
@@ -421,7 +500,7 @@ onMounted(async () => {
                 <button v-if="!a.isInUse && !hasBackup(a)" type="button" class="tr-link danger" @click="remove(a)">{{ t('حذف', 'Delete') }}</button>
               </td>
             </tr>
-            <tr v-if="!shown.length"><td colspan="11" class="muted">{{ t('با این جستجو حسابی پیدا نشد.', 'No account matches this search.') }}</td></tr>
+            <tr v-if="!shown.length"><td colspan="12" class="muted">{{ t('با این جستجو حسابی پیدا نشد.', 'No account matches this search.') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -478,4 +557,22 @@ button:disabled { opacity: .5; cursor: default; }
 .tr-card { display: grid; grid-template-columns: minmax(12rem, 16rem) minmax(12rem, 1fr) auto; gap: .75rem; align-items: start; }
 .tr-card > button { margin-top: 1.5rem; }
 .type { min-width: 16rem; }
+/* Owner's report no. 8: the signatories of the account, one row each. */
+.tr-full { grid-column: 1 / -1; margin: 0; }
+.tr-summary { grid-column: span 2; align-self: end; margin: 0; }
+.tr-count { width: 5rem; }
+.tr-signer-rows { display: grid; gap: .6rem; }
+.tr-signer { display: grid; grid-template-columns: minmax(12rem, 1.4fr) minmax(9rem, 12rem) 9rem auto; gap: .75rem; align-items: end; }
+.tr-signer-scan { height: 3.4rem; display: flex; align-items: center; justify-content: center; background: #f5f7fa; border: 1px dashed #cbd2d9; border-radius: 6px; overflow: hidden; padding: 0 .25rem; text-align: center; }
+.tr-signer-scan img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.tr-add { justify-self: start; }
+@media (max-width: 720px) {
+  .tr-summary { grid-column: 1 / -1; }
+  .tr-signer { grid-template-columns: 1fr; border: 1px solid #e4e7eb; border-radius: 8px; padding: .5rem; align-items: stretch; }
+  .tr-signer > button { justify-self: start; }
+  .tr-card { grid-template-columns: 1fr; }
+  .tr-card > button { margin-top: 0; justify-self: start; }
+  .tr-kind { justify-content: flex-start; }
+  .tr-kind .main, .type { min-width: 0; width: 100%; }
+}
 </style>

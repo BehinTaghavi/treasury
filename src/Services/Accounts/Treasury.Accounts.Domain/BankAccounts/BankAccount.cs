@@ -47,6 +47,25 @@ public enum ShortTermPeriod
 /// <summary>A company bank card (کارت بانک حقوقی) of the account: 16-digit number and the name on the card (report no. 4, items 2 and 4).</summary>
 public sealed record BankCard(string Number, string HolderName);
 
+/// <summary>
+/// How an authorised signatory signs the cheques of a bank account (owner's report no. 8, 21 Nov 2026, field «نوع امضاء»).
+/// «ثابت»: the signature must be on every cheque. «متغیر»: the signature can be chosen among the variable signatories to complete
+/// the number of signatures the account needs – with two signatures needed, one fixed signatory and two variable ones, either of
+/// the two may give the second signature.
+/// </summary>
+public enum SignatureKind
+{
+    Fixed,
+    Variable,
+}
+
+/// <summary>An authorised signatory of a bank account: one of «دارندگان امضای مجاز» of Basic Information (reference-svc) and how it signs.</summary>
+public sealed record AccountSignatory(Guid SignatoryId, SignatureKind Kind);
+
+/// <summary>What reference-svc says about an authorised signatory; null in place of a fact: no such signatory.</summary>
+/// <param name="SignsCheques">Ticked «دارنده امضاء مجاز (چک)» (report no. 8, item 3-د).</param>
+public sealed record SignatoryFact(Guid Id, bool IsActive, bool SignsCheques);
+
 public static class BankAccountTypes
 {
     /// <summary>Only a current Qard-al-hasan account has cheque books (report no. 4, item 1).</summary>
@@ -62,6 +81,8 @@ public static class BankAccountTypes
 /// <summary>Everything the user enters on the bank account form (manual section 5 "معرفی حساب‌های بانکی").</summary>
 /// <param name="AccountType">Chosen at the top of the form (report no. 4, item 2); accounts saved before it are current Qard-al-hasan.</param>
 /// <param name="Cards">The account's company bank cards; one account may have several, e.g. for different petty-cash holders (item 4).</param>
+/// <param name="RequiredSignatures">«تعداد امضاء»: how many authorised signatures a cheque of this account needs (report no. 8); 0: not set yet.</param>
+/// <param name="Signatories">The authorised signatories of this account, each fixed or variable; they may differ from account to account.</param>
 public sealed record BankAccountData(
     string AccountNumber,
     Guid BankId,
@@ -75,19 +96,29 @@ public sealed record BankAccountData(
     bool IsFacility,
     BankAccountType AccountType = BankAccountType.CurrentQardHasan,
     ShortTermPeriod? Term = null,
-    IReadOnlyList<BankCard>? Cards = null)
+    IReadOnlyList<BankCard>? Cards = null,
+    int RequiredSignatures = 0,
+    IReadOnlyList<AccountSignatory>? Signatories = null)
 {
     public const int MaxCards = 50;
 
+    /// <summary>«تعداد امضاء: یک رقمی است» (owner's report no. 8).</summary>
+    public const int MaxRequiredSignatures = 9;
+
+    public const int MaxSignatories = 20;
+
     public IReadOnlyList<BankCard> CardList => Cards ?? [];
+
+    public IReadOnlyList<AccountSignatory> SignatoryList => Signatories ?? [];
 
     /// <summary>Records with a list compare the list's items, not the list object.</summary>
     public bool Equals(BankAccountData? other) =>
         other is not null && EqualityContract == other.EqualityContract
-        && (AccountNumber, BankId, BranchName, BranchCode, CityId, OpeningDate, CurrencyCode, Ledger, CollectionPriority, IsFacility, AccountType, Term)
+        && (AccountNumber, BankId, BranchName, BranchCode, CityId, OpeningDate, CurrencyCode, Ledger, CollectionPriority, IsFacility, AccountType, Term, RequiredSignatures)
         == (other.AccountNumber, other.BankId, other.BranchName, other.BranchCode, other.CityId, other.OpeningDate, other.CurrencyCode, other.Ledger,
-            other.CollectionPriority, other.IsFacility, other.AccountType, other.Term)
-        && CardList.SequenceEqual(other.CardList);
+            other.CollectionPriority, other.IsFacility, other.AccountType, other.Term, other.RequiredSignatures)
+        && CardList.SequenceEqual(other.CardList)
+        && SignatoryList.SequenceEqual(other.SignatoryList);
 
     public override int GetHashCode() => HashCode.Combine(AccountNumber, BankId, CurrencyCode, AccountType, Term, CardList.Count);
 }
@@ -98,6 +129,9 @@ public sealed record BankAccountData(
 /// A backup account (حساب پشتیبان) belongs to a main current account of the same bank, defined first.
 /// Owner's report of 11 Nov 2026: branch, branch code, city, تفصیل, collection and bounced-cheque accounts are required too
 /// (item 12); collection priority is a number 1–5, 1 the highest (item 15); a backup needs its main account (item 10).
+/// Owner's report no. 8 (21 Nov 2026): the authorised signatories are set per bank account – «دارندگان امضای مجاز هر حساب بانکی ممکن
+/// است متفاوت از دارندگان امضای مجاز حساب بانک بعدی باشد» – with the number of signatures a cheque needs and, for each signatory,
+/// whether the signature is fixed or variable.
 /// </summary>
 public sealed partial class BankAccount : AggregateRoot<Guid>
 {
@@ -134,12 +168,14 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
     /// <param name="main">The main account when registering a backup account, as loaded by the use case.</param>
     /// <param name="mainAlreadyHasBackup">Whether another backup account already points to <paramref name="main"/>.</param>
     /// <param name="isBackup">The user ticked "پشتیبان"; then <paramref name="main"/> is required.</param>
+    /// <param name="signatories">The signatories named on the form as reference-svc describes them, by id.</param>
     public static BankAccount Register(
-        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false, bool isBackup = false)
+        Guid id, BankAccountData data, LedgerFacts ledger, BankAccount? main = null, bool mainAlreadyHasBackup = false, bool isBackup = false,
+        IReadOnlyDictionary<Guid, SignatoryFact>? signatories = null)
     {
         // Owner, 11 Nov 2026 (item 10): "ابتدا حسابجاری مربوط به این حساب پشتیبان را تعریف نموده ..." – never saved as an ordinary account.
         Require(!isBackup || main is not null, "BankAccount.MainAccountRequired", "A backup account needs its main current account, defined first.");
-        var clean = Validate(data, ledger);
+        var clean = Validate(data, ledger, signatories, null);
         if (main is not null)
         {
             // MVC BanksController: the main account is of the same bank, is not itself a backup, and has no other backup.
@@ -158,9 +194,9 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
     }
 
     /// <summary>Saves the edited form. Whether it is a backup account, and of which main account, does not change.</summary>
-    public void Change(BankAccountData data, LedgerFacts ledger)
+    public void Change(BankAccountData data, LedgerFacts ledger, IReadOnlyDictionary<Guid, SignatoryFact>? signatories = null)
     {
-        var clean = Validate(data, ledger);
+        var clean = Validate(data, ledger, signatories, Data.SignatoryList);
         Require(!IsBackup || clean.BankId == Data.BankId, "BankAccount.MainAccountOtherBank", "A backup account stays at the bank of its main account.");
         Require(!IsBackup || clean.CurrencyCode == Data.CurrencyCode, "BankAccount.MainAccountOtherCurrency", "A backup account keeps the currency of its main account.");
         if (clean == Data)
@@ -222,7 +258,7 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
         Raise(BankAccountChanged.From(this));
     }
 
-    private static BankAccountData Validate(BankAccountData data, LedgerFacts ledger)
+    private static BankAccountData Validate(BankAccountData data, LedgerFacts ledger, IReadOnlyDictionary<Guid, SignatoryFact>? signatoryFacts, IReadOnlyList<AccountSignatory>? keptSignatories)
     {
         ArgumentNullException.ThrowIfNull(data);
         ArgumentNullException.ThrowIfNull(ledger);
@@ -243,6 +279,7 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             "A short-term deposit is ordinary, 3-month or 6-month.");
         Require(currency == Rial || data.AccountType.MayBeForeign(), "BankAccount.CurrencyNotForType", "A short-term deposit is in Rial.");
         var cards = CheckCards(data.CardList, data.AccountType);
+        var signatories = CheckSignatories(data.RequiredSignatures, data.SignatoryList, signatoryFacts, keptSignatories ?? []);
 
         var l = data.Ledger ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account is required.");
         var accountCode = Clean(l.AccountCode) ?? throw new DomainException("BankAccount.LedgerAccountRequired", "The ledger account (معین) is required."); // "حساب معين نامشخص است"
@@ -270,7 +307,40 @@ public sealed partial class BankAccount : AggregateRoot<Guid>
             Ledger = new BankLedger(accountCode, d1, d2, collection, bounced),
             Term = data.AccountType == BankAccountType.ShortTermDeposit ? data.Term : null,
             Cards = cards,
+            Signatories = signatories,
         };
+    }
+
+    /// <summary>
+    /// Owner's report no. 8 (21 Nov 2026), «قواعد حاکم»: the number of signatures has one digit; a signatory is chosen from «دارندگان
+    /// امضای مجاز» who may sign cheques, once, as fixed or variable; the fixed signatories all sign, so they are not more than the
+    /// number of signatures; and the signatories named are not fewer than that number, so that every cheque can be completed.
+    /// </summary>
+    /// <param name="kept">The signatories the account already had: one of them may have been switched off since.</param>
+    private static List<AccountSignatory> CheckSignatories(
+        int required, IReadOnlyList<AccountSignatory> signatories, IReadOnlyDictionary<Guid, SignatoryFact>? facts, IReadOnlyList<AccountSignatory> kept)
+    {
+        Require(required is >= 0 and <= BankAccountData.MaxRequiredSignatures, "BankAccount.SignatureCountInvalid", "The number of signatures has one digit.");
+        Require(signatories.Count <= BankAccountData.MaxSignatories, "BankAccount.TooManySignatories", "Too many authorised signatories on one account.");
+        var clean = new List<AccountSignatory>();
+        foreach (var signatory in signatories)
+        {
+            Require(signatory is not null && signatory.SignatoryId != Guid.Empty, "BankAccount.SignatoryRequired", "Choose the authorised signatory of each row.");
+            Require(Enum.IsDefined(signatory!.Kind), "BankAccount.SignatureKindRequired", "A signature is fixed or variable.");
+            Require(clean.All(c => c.SignatoryId != signatory.SignatoryId), "BankAccount.SignatoryTwice", "An authorised signatory is named once on an account.");
+            var fact = facts?.GetValueOrDefault(signatory.SignatoryId);
+            Require(fact is not null, "BankAccount.SignatoryNotFound", "An authorised signatory of the account is not in the list of signatories.");
+            var isKept = kept.Any(k => k.SignatoryId == signatory.SignatoryId);
+            Require(fact!.IsActive || isKept, "BankAccount.SignatoryInactive", "An authorised signatory of the account is switched off.");
+            Require(fact.SignsCheques || isKept, "BankAccount.SignatoryNotForCheques", "A signatory of the account is not authorised to sign cheques.");
+            clean.Add(signatory);
+        }
+
+        Require(clean.Count == 0 || required > 0, "BankAccount.SignatureCountRequired", "Enter the number of signatures the account needs.");
+        Require(clean.Count(c => c.Kind == SignatureKind.Fixed) <= required, "BankAccount.TooManyFixedSignatories",
+            "The fixed signatories are more than the number of signatures.");
+        Require(clean.Count >= required, "BankAccount.TooFewSignatories", "The signatories named are fewer than the number of signatures.");
+        return clean;
     }
 
     /// <summary>Cards: 16 digits with the Luhn check digit, the name on the card, each number once (report no. 4, items 2 and 4).</summary>

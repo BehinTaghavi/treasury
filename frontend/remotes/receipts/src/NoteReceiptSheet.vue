@@ -20,7 +20,7 @@ const money = (n: number) => formatAmount(n, props.locale)
 const pick = (m: Record<string, [string, string]>, k: string) => (m[k] ? (fa.value ? m[k][0] : m[k][1]) : k)
 const terms = computed(() => props.receipt.noteTerms)
 const notes = computed(() => props.receipt.instruments ?? [])
-/** The authorised signatories chosen by the signature rule; with none, one empty box is left for the approver. */
+/** The confirmers chosen among the permission holders of note receipts (owner's report no. 8); with none, one empty box is left. */
 const signers = computed(() => (terms.value?.signers?.length ? terms.value.signers : [{ id: '', name: '', position: null }]))
 /** Every guarantor once, with the notes it guarantees (all of them when it is on every note). */
 const guarantors = computed(() => {
@@ -137,7 +137,7 @@ const checked = (key: string) => notes.value.length > 0 && notes.value.every(n =
       <thead>
         <tr>
           <th>{{ t('تحویل‌دهنده', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرندهٔ خزانه', 'Received by (treasury)') }}</th>
-          <th v-for="s in signers" :key="s.id">{{ t('تأییدکنندهٔ مجاز', 'Authorised signatory') }}<template v-if="s.position"> – {{ s.position }}</template></th>
+          <th v-for="s in signers" :key="s.id">{{ s.position || t('تأییدکننده', 'Confirmer') }}</th>
         </tr>
       </thead>
       <tbody>

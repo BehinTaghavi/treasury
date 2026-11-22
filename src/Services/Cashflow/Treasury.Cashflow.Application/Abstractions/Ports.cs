@@ -182,8 +182,11 @@ public interface IReceiptReferenceLookup
     /// </summary>
     Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken);
 
-    /// <summary>The signature rule of a kind of document ("NoteReceipt"…) with its signatories; null when reference-svc knows none.</summary>
-    Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken);
+    /// <summary>
+    /// The holders of a permission in a treasury operation ("NoteReceipt", "ChequeTransfer"…) as «دارندگان مجوزها» of Basic Information
+    /// lists them, in the order of their roles; null when reference-svc does not know the operation.
+    /// </summary>
+    Task<FormSigners?> FormSignersAsync(string operation, CancellationToken cancellationToken);
 
     /// <summary>Tells reference-svc an entry ("banks", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);

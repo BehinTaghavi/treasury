@@ -81,7 +81,7 @@ public sealed record NoteTermsInput(
     NoteAttachments? Attachments = null,
     string? DeliveredBy = null);
 
-/// <param name="SignerIds">The authorised signatories chosen by the signature rule of the note receipt (Basic Information).</param>
+/// <param name="SignerIds">Who signs the receipt, chosen among the holders of a permission in the receipt of notes (Basic Information).</param>
 public sealed record RecordNoteReceiptCommand(
     string IdempotencyKey, ReceiptHeaderInput Header, NoteTermsInput Terms, IReadOnlyList<NoteLineInput> Notes, IReadOnlyList<NoteGuarantorInput>? Guarantors = null,
     IReadOnlyList<Guid>? SignerIds = null);
@@ -121,7 +121,7 @@ public sealed record CancelReceiptCommand(string IdempotencyKey, Guid Id, string
 public sealed record ReplaceChequeCommand(string IdempotencyKey, Guid InstrumentId, ReceiptHeaderInput Header, IReadOnlyList<ReceivedInstrumentInput> Instruments);
 
 /// <summary>Endorsement of a received cheque (خرج چک, owner's item 14 (g)): it pays an approved payment request (answer to Q36).</summary>
-/// <param name="SignerIds">A cheque: the authorised signatories of its payment sheet, chosen by the rule «برگ پرداخت چک» (answer to Q57).</param>
+/// <param name="SignerIds">A cheque: who signs its payment sheet (answer to Q57), chosen among the holders of a permission in the transfer.</param>
 public sealed record EndorseChequeCommand(string IdempotencyKey, Guid InstrumentId, string Date, Guid PaymentRequestId, string SayadTracking, string? Note = null,
     IReadOnlyList<Guid>? SignerIds = null);
 
@@ -218,11 +218,11 @@ public sealed class ReceiptUseCases(
     IPaymentRequestLookup paymentRequests,
     TimeProvider? clock = null)
 {
-    /// <summary>The name reference-svc gives the note receipt among the documents with a signature rule.</summary>
-    public const string NoteReceiptDocument = "NoteReceipt";
+    /// <summary>The name reference-svc gives the receipt of notes in «فهرست عملیات خزانه داری» (owner's report no. 8).</summary>
+    public const string NoteReceiptOperation = "NoteReceipt";
 
-    /// <summary>The payment sheet of a cheque («برگ پرداخت چک») among the documents with a signature rule (owner's answer to Q57).</summary>
-    public const string ChequePaymentSheetDocument = "ChequePaymentSheet";
+    /// <summary>«ثبت انتقال (خرج چک)», whose payment sheet («برگ پرداخت چک», owner's answer to Q57) is signed, in the same list.</summary>
+    public const string ChequeTransferOperation = "ChequeTransfer";
 
     /// <summary>At most this many cheques and notes on one receipt.</summary>
     public const int MaxInstruments = 100;
@@ -394,13 +394,13 @@ public sealed class ReceiptUseCases(
             }
 
             // Owner's answers to Q57 (19 Nov 2026): the transfer of a cheque gets a payment sheet with a serial number of its own, signed
-            // also by the authorised signatories of the rule «برگ پرداخت چک». The number is taken in this transaction: a refused transfer
-            // gives it back.
+            // also by the persons chosen among the holders of a permission in the transfer (report no. 8). The number is taken in this
+            // transaction: a refused transfer gives it back.
             int? sheet = null;
             IReadOnlyList<ReceiptSigner> signers = [];
             if (cheque.Kind.IsCheque())
             {
-                signers = (await reference.SignatureRuleAsync(ChequePaymentSheetDocument, ct).ConfigureAwait(false) ?? SignatureRuleFact.None).Choose(command.SignerIds);
+                signers = (await reference.FormSignersAsync(ChequeTransferOperation, ct).ConfigureAwait(false) ?? FormSigners.None).Choose(command.SignerIds);
                 sheet = await instruments.NextPaymentSheetNumberAsync(date.JalaliYear, ct).ConfigureAwait(false);
             }
 
@@ -630,7 +630,7 @@ public sealed class ReceiptUseCases(
         var terms = new NoteReceiptTerms(
             t.Reason, t.Form, t.Maturity, t.IssuerNationalCode, t.IssuerPhone, t.CommitmentSubject, t.ReturnTerms, t.CustodyPlace, t.OriginalReceived,
             string.IsNullOrWhiteSpace(t.OriginalReceivedOn) ? null : FiscalDate.ParseJalali(t.OriginalReceivedOn), t.Discrepancy, t.Attachments, t.DeliveredBy);
-        var rule = await reference.SignatureRuleAsync(NoteReceiptDocument, ct).ConfigureAwait(false);
+        var signers = await reference.FormSignersAsync(NoteReceiptOperation, ct).ConfigureAwait(false);
 
         // Guarantors are chosen from the «ضامنین» of Basic Information only (owner's answer to Q54, 19 Nov 2026; before, a تفصیل or a typed
         // name); each guarantees one note («شماره سفته مرتبط») or all of them.
@@ -690,12 +690,12 @@ public sealed class ReceiptUseCases(
 
         if (correcting is not null)
         {
-            correcting.Receipt.CorrectNotes(header, terms, created, user, correcting.VoucherConfirmed, rule, command.SignerIds);
+            correcting.Receipt.CorrectNotes(header, terms, created, user, correcting.VoucherConfirmed, signers, command.SignerIds);
             return (correcting.Receipt, created);
         }
 
         var receiptNumber = preview ? 1 : await receipts.NextNumberAsync(date.JalaliYear, ReceiptKind.Notes, ct).ConfigureAwait(false);
-        return (Receipt.RecordNotes(receiptId, receiptNumber, header, terms, created, user, rule, command.SignerIds), created);
+        return (Receipt.RecordNotes(receiptId, receiptNumber, header, terms, created, user, signers, command.SignerIds), created);
     }
 
     /// <summary>

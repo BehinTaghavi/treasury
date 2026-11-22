@@ -184,25 +184,28 @@ public sealed class NoteReceiptTests
     }
 
     [Fact]
-    public void The_chosen_signatories_meet_the_signature_rule_owner_answers_Q41_Q45_Q46()
+    public void The_chosen_signers_hold_a_permission_in_the_receipt_of_notes_owner_report_8()
     {
-        var ceo = new SignerFact(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
-        var cfo = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
-        var board = new SignerFact(Guid.NewGuid(), "سارا احمدی", null);
-        var rule = new SignatureRuleFact(2, [ceo], [cfo, board]);
+        // Report no. 8 (21 Nov 2026): the signature rule of 16 Nov 2026 (a number, compulsory and optional signatories; Q41, Q45–Q47) is
+        // removed; who confirms a form is one of «دارندگان مجوزها» of its operation, and nobody is compulsory.
+        var confirmer = new SignerFact(Guid.NewGuid(), "علی رضایی", "تایید کننده (اول) – رئیس حسابداری");
+        var approver = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "تصویب کننده (اول) – مدیر مالی");
+        var other = new SignerFact(Guid.NewGuid(), "سارا احمدی", null);
+        var holders = new FormSigners([confirmer, approver, other]);
         var id = Guid.NewGuid();
-        Receipt Save(SignatureRuleFact? r, params Guid[] signers) => Receipt.RecordNotes(id, 1, Header(), Terms(), [Note(id, Terms())], User, r, signers);
+        Receipt Save(FormSigners? s, params Guid[] signers) => Receipt.RecordNotes(id, 1, Header(), Terms(), [Note(id, Terms())], User, s, signers);
 
-        // In the rule's order, with the name and position of the day.
-        Assert.Equal([new ReceiptSigner(ceo.Id, "علی رضایی", "مدیر عامل"), new ReceiptSigner(board.Id, "سارا احمدی", null)], Save(rule, board.Id, ceo.Id, ceo.Id).NoteTerms!.Signers!);
-        Assert.Equal(3, Save(rule, ceo.Id, cfo.Id, board.Id).NoteTerms!.Signers!.Count);
-        Assert.Equal("Receipt.CompulsorySignerMissing", Assert.Throws<DomainException>(() => Save(rule, cfo.Id, board.Id)).Code);
-        Assert.Equal("Receipt.SignersTooFew", Assert.Throws<DomainException>(() => Save(rule, ceo.Id)).Code);
-        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(rule, ceo.Id, cfo.Id, Guid.NewGuid())).Code);
+        // In the order of the roles, each once, with the name and position of the day.
+        Assert.Equal([new ReceiptSigner(confirmer.Id, "علی رضایی", "تایید کننده (اول) – رئیس حسابداری"), new ReceiptSigner(other.Id, "سارا احمدی", null)],
+            Save(holders, other.Id, confirmer.Id, confirmer.Id).NoteTerms!.Signers!);
+        Assert.Equal(3, Save(holders, confirmer.Id, approver.Id, other.Id).NoteTerms!.Signers!.Count);
+        Assert.Equal(approver.Id, Assert.Single(Save(holders, approver.Id).NoteTerms!.Signers!).Id);
+        Assert.Empty(Save(holders).NoteTerms!.Signers!);
+        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(holders, confirmer.Id, Guid.NewGuid())).Code);
 
-        // No rule set in Basic Information: nobody signs as an authorised signatory.
+        // Nobody holds a permission in the operation: nobody can be chosen.
         Assert.Empty(Save(null).NoteTerms!.Signers!);
-        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(null, ceo.Id)).Code);
+        Assert.Equal("Receipt.SignerNotAuthorised", Assert.Throws<DomainException>(() => Save(null, confirmer.Id)).Code);
     }
 
     [Fact]

@@ -433,8 +433,8 @@ public sealed class ReceiptPostgresTests : IDisposable
         public static readonly SignerFact Ceo = new(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
         public static readonly SignerFact Cfo = new(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
 
-        public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) =>
-            Task.FromResult<SignatureRuleFact?>(new(1, [Ceo], [Cfo]));
+        public Task<FormSigners?> FormSignersAsync(string operation, CancellationToken cancellationToken) =>
+            Task.FromResult<FormSigners?>(new([Ceo, Cfo]));
     }
 
     /// <summary>requests-svc stand-in: the approved requests a test puts in.</summary>

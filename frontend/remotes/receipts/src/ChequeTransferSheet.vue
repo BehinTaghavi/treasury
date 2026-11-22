@@ -4,7 +4,9 @@
  * received cheque gets its payment sheet. It names the cheque's Sayad number, its series and number, its due date and its owner, the
  * sentence «چک جهت وصول بابت بدهی تحویل می‌شود» and, at the foot, the owner's text on what the handover settles. It is printed, signed
  * by who hands the cheque over and who receives it, and the cheque is handed over. Owner's answers to Q57 (19 Nov 2026): the sheet has
- * a serial number of its own, and the authorised signatories of the rule «برگ پرداخت چک» sign it too.
+ * a serial number of its own, and it is signed too by the persons chosen on the form among the holders of a permission in the transfer
+ * (Basic Information → «دارندگان مجوزها», owner's report no. 8; before it, by the signature rule «برگ پرداخت چک»); each box is headed
+ * by the person's roles and job title.
  * The company's name and logo come from «مشخصات شرکت» (owner's answer of 16 Nov 2026: every printed form starts with them).
  * ChequeTransferPrint shows the sheet on the screen and hands a copy to the printer.
  */
@@ -69,7 +71,7 @@ const sayad = computed(() => digits((c.value.sayadId ?? '').replace(/(\d{4})(?=\
     <table class="signatures">
       <thead>
         <tr><th>{{ t('تحویل‌دهنده چک', 'Handed over by') }}</th><th>{{ t('تحویل‌گیرنده چک', 'Received by') }}</th>
-          <th v-for="s in sheet.signers" :key="s.id">{{ t('امضای مجاز', 'Authorised signatory') }}<template v-if="s.position"> – {{ s.position }}</template></th></tr>
+          <th v-for="s in sheet.signers" :key="s.id">{{ s.position || t('تأییدکننده', 'Confirmer') }}</th></tr>
       </thead>
       <tbody>
         <tr>

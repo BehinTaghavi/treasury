@@ -396,27 +396,27 @@ public sealed class Receipt : AggregateRoot<Guid>
     /// becomes an instrument in the cash desk: a guarantee note when the notes are held as security or in trust, otherwise an ordinary
     /// note. With «معین» every note has its due date; with «عندالمطالبه» none has (it can be collected whenever its holder wishes).
     /// Every note must have passed the checks of article 308 (owner's answer to Q40). The receipt records the handing over of the
-    /// notes only; it is not a receipt of money. The authorised signatories who sign it are chosen by the signature rule of the note
-    /// receipt (Basic Information, owner's answers to Q41 and Q45–Q47).
+    /// notes only; it is not a receipt of money. Who signs it as «تأییدکننده» is chosen among the holders of a permission in the
+    /// operation «دریافت سفته» (Basic Information → «دارندگان مجوزها», owner's report no. 8; before it, the signature rule of 16 Nov 2026).
     /// </summary>
-    /// <param name="rule">The signature rule of the note receipt; null when none is set (no authorised signature needed).</param>
-    /// <param name="signerIds">The signatories chosen on the form.</param>
+    /// <param name="signers">The holders of a permission in the receipt of notes; null when there is none (nobody to choose).</param>
+    /// <param name="signerIds">The persons chosen on the form.</param>
     public static Receipt RecordNotes(Guid id, int number, ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId,
-        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
+        FormSigners? signers = null, IReadOnlyList<Guid>? signerIds = null)
     {
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(notes);
         Validate(header, number, userId);
-        var checkedTerms = CheckNotes(terms, notes, rule, signerIds);
+        var checkedTerms = CheckNotes(terms, notes, signers, signerIds);
         var receipt = new Receipt(id, ReceiptKind.Notes, number, header, userId) { NoteTerms = checkedTerms };
         receipt.SetInstruments(notes);
         receipt.Raise(receipt.Recorded());
         return receipt;
     }
 
-    private static NoteReceiptTerms CheckNotes(NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, SignatureRuleFact? rule, IReadOnlyList<Guid>? signerIds)
+    private static NoteReceiptTerms CheckNotes(NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, FormSigners? signers, IReadOnlyList<Guid>? signerIds)
     {
-        var checkedTerms = terms.Validated() with { Signers = (rule ?? SignatureRuleFact.None).Choose(signerIds) };
+        var checkedTerms = terms.Validated() with { Signers = (signers ?? FormSigners.None).Choose(signerIds) };
         Require(notes.Count > 0, "Receipt.NoInstruments", "Enter at least one cheque or note.");
         var onDemand = checkedTerms.Maturity == NoteMaturity.OnDemand;
         foreach (var n in notes)
@@ -493,13 +493,13 @@ public sealed class Receipt : AggregateRoot<Guid>
 
     /// <summary>Correction of a receipt of promissory notes, with the rules of <see cref="RecordNotes"/>.</summary>
     public void CorrectNotes(ReceiptHeader header, NoteReceiptTerms terms, IReadOnlyList<Instrument> notes, string userId, bool voucherConfirmed,
-        SignatureRuleFact? rule = null, IReadOnlyList<Guid>? signerIds = null)
+        FormSigners? signers = null, IReadOnlyList<Guid>? signerIds = null)
     {
         ArgumentNullException.ThrowIfNull(terms);
         ArgumentNullException.ThrowIfNull(notes);
         RequireCorrectable(ReceiptKind.Notes, header, userId, voucherConfirmed);
         RequireHeaderKept(header, notes);
-        var checkedTerms = CheckNotes(terms, notes, rule, signerIds);
+        var checkedTerms = CheckNotes(terms, notes, signers, signerIds);
         ApplyHeader(header);
         NoteTerms = checkedTerms;
         SetInstruments(notes);

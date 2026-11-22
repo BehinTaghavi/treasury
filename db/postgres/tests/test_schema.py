@@ -876,10 +876,10 @@ def test_a_note_receipt_has_its_own_numbers_names_its_notes_and_keeps_its_terms(
         c.rollback()
 
 
-def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(db):
-    # 034_reference_signatories.sql (owner, 16 Nov 2026: authorised signatories in Basic Information and a rule per kind of document).
+def test_signatories_are_unique_and_say_what_they_sign_and_the_signature_rule_is_gone(db):
+    # 034_reference_signatories.sql (owner, 16 Nov 2026) and 048 (his report no. 8, 21 Nov 2026): position from a list, extension,
+    # e-mail, cheque and note ticks, scan of the signature beside the row; the rule per kind of document is removed.
     add = """INSERT INTO reference.signatory (id, full_name, name_key, position, national_code, mobile) VALUES (%s, %s, %s, 'مدیر عامل', %s, %s)"""
-    rule = "INSERT INTO reference.signature_rule (document, id, required_count, compulsory, optional) VALUES (%s, %s, %s, %s, %s)"
     with psycopg.connect(db) as c:
         c.execute("SET ROLE reference_svc")
         ceo, cfo = uuid.uuid4(), uuid.uuid4()
@@ -893,21 +893,106 @@ def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(
             with pytest.raises(error):
                 with c.transaction():
                     c.execute(add, row)
-        c.execute(rule, ("NoteReceipt", uuid.uuid4(), 2, [ceo], [cfo]))
-        for row, error in (
-                (("NoteReceipt", uuid.uuid4(), 1, [ceo], []), psycopg.errors.UniqueViolation),                # one rule per kind of document
-                (("IssuedCheque", uuid.uuid4(), 1, [ceo, cfo], []), psycopg.errors.CheckViolation),           # fewer than the compulsory ones
-                (("IssuedCheque", uuid.uuid4(), 3, [ceo], [cfo]), psycopg.errors.CheckViolation),             # more than those named
-                (("IssuedCheque", uuid.uuid4(), 1, [ceo], [ceo]), psycopg.errors.CheckViolation),             # compulsory and optional
-                (("Invoice", uuid.uuid4(), 0, [], []), psycopg.errors.CheckViolation)):
+        # A row written the old way signs both kinds of document, with its position under «سایر», no scan and not in use.
+        assert c.execute("SELECT position_kind, signs_cheques, signs_notes, signature_type, in_use FROM reference.signatory WHERE id = %s", (ceo,)).fetchone() \
+            == ("Other", True, True, None, False)
+        for change, error in (
+                ("position_kind = 'Treasurer'", psycopg.errors.CheckViolation),                     # not a position of the list
+                ("signs_cheques = false, signs_notes = false", psycopg.errors.CheckViolation),      # signs nothing
+                ("extension = '21-4'", psycopg.errors.CheckViolation),
+                ("signature_type = 'application/pdf'", psycopg.errors.CheckViolation)):
             with pytest.raises(error):
                 with c.transaction():
-                    c.execute(rule, row)
+                    c.execute(f"UPDATE reference.signatory SET {change} WHERE id = %s", (ceo,))
+        c.execute("UPDATE reference.signatory SET position_kind = 'ManagingDirector', extension = '214', email = 'ceo@nazho.example', signs_notes = false, "
+                  "signature_type = 'image/png' WHERE id = %s", (ceo,))
+        c.execute("INSERT INTO reference.signatory_signature (signatory_id, data) VALUES (%s, %s)", (ceo, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.UniqueViolation):                                           # one scan per signatory
+            with c.transaction():
+                c.execute("INSERT INTO reference.signatory_signature (signatory_id, data) VALUES (%s, %s)", (ceo, b"\x89PNG"))
+        with pytest.raises(psycopg.errors.CheckViolation):                                            # at most 1 MB
+            with c.transaction():
+                c.execute("INSERT INTO reference.signatory_signature (signatory_id, data) VALUES (%s, %s)", (cfo, b"0" * (1024 * 1024 + 1)))
+        c.execute("DELETE FROM reference.signatory WHERE id = %s", (ceo,))                           # the scan goes with its signatory
+        assert c.execute("SELECT count(*) FROM reference.signatory_signature WHERE signatory_id = %s", (ceo,)).fetchone()[0] == 0
+        assert c.execute("SELECT to_regclass('reference.signature_rule')").fetchone()[0] is None      # «قاعده امضاء اسناد بهادار» removed
         c.execute("SET ROLE cashflow_svc")
         with pytest.raises(psycopg.errors.InsufficientPrivilege):  # another service does not read reference-svc's tables
             with c.transaction():
                 c.execute("SELECT 1 FROM reference.signatory")
         c.rollback()
+
+
+def test_a_permission_holder_has_roles_each_with_its_operations(db):
+    # 048_reference_signatories_and_permission_holders.sql (owner's report no. 8): «دارندگان مجوزها (فرم‌ها)».
+    add = "INSERT INTO reference.permission_holder (id, full_name, name_key, job_title, national_code, extension) VALUES (%s, %s, %s, %s, %s, %s)"
+    role = "INSERT INTO reference.permission_holder_role (holder_id, role, title, operations) VALUES (%s, %s, %s, %s)"
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE reference_svc")
+        cfo = uuid.uuid4()
+        c.execute(add, (cfo, "بهرام کریمی", "بهرامکریمی", "مدیر مالی", "0123456789", "120"))
+        for row, error in (
+                ((uuid.uuid4(), "بهرام کریمی", "بهرامکریمی", "مدیر", None, None), psycopg.errors.UniqueViolation),   # the same name
+                ((uuid.uuid4(), "دیگری", "دیگری", "مدیر", "0123456789", None), psycopg.errors.UniqueViolation),       # the same national code
+                ((uuid.uuid4(), "دیگری", "دیگری", " ", None, None), psycopg.errors.CheckViolation),                   # no job title
+                ((uuid.uuid4(), "دیگری", "دیگری", "مدیر", None, "12a"), psycopg.errors.CheckViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, row)
+        c.execute(role, (cfo, "FirstApprover", "تصویب کننده (اول)", ["PaymentRequest", "ChequePayment"]))
+        c.execute(role, (cfo, "Other", "ناظر", ["PettyCash"]))
+        for row, error in (
+                ((cfo, "FirstApprover", "تصویب کننده (اول)", ["CashReceipt"]), psycopg.errors.UniqueViolation),       # a role is ticked once
+                ((cfo, "Treasurer", "خزانه دار", ["CashReceipt"]), psycopg.errors.CheckViolation),                   # not a role of the form
+                ((cfo, "SecondApprover", "تصویب کننده (دوم)", []), psycopg.errors.CheckViolation),                    # a role without an operation
+                ((uuid.uuid4(), "FirstConfirmer", "تایید کننده (اول)", ["CashReceipt"]), psycopg.errors.ForeignKeyViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(role, row)
+        c.execute("UPDATE reference.permission_holder SET signature_type = 'image/jpeg' WHERE id = %s", (cfo,))
+        c.execute("INSERT INTO reference.permission_holder_signature (holder_id, data) VALUES (%s, %s)", (cfo, b"\xff\xd8\xff"))
+        c.execute("DELETE FROM reference.permission_holder WHERE id = %s", (cfo,))                    # roles and scan go with the holder
+        assert c.execute("SELECT count(*) FROM reference.permission_holder_role WHERE holder_id = %s", (cfo,)).fetchone()[0] == 0
+        assert c.execute("SELECT count(*) FROM reference.permission_holder_signature WHERE holder_id = %s", (cfo,)).fetchone()[0] == 0
+        c.execute("SET ROLE requests_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):  # other services ask reference-svc's API (ADR 0001)
+            with c.transaction():
+                c.execute("SELECT 1 FROM reference.permission_holder")
+        c.rollback()
+
+
+def test_a_bank_account_keeps_its_number_of_signatures_and_its_signatories(db):
+    # 049_accounts_bank_account_signatories.sql (owner's report no. 8): the authorised signatories of each bank account.
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE accounts_svc")
+        account = uuid.uuid4()
+        c.execute("INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, currency, ledger_account, is_facility, is_active) "
+                  "VALUES (%s, %s, %s, %s, 'IRR', '1103', false, true)", (account, "0303-8-1", "030381", uuid.uuid4()))
+        assert c.execute("SELECT required_signatures FROM accounts.bank_account WHERE id = %s", (account,)).fetchone()[0] == 0
+        with pytest.raises(psycopg.errors.CheckViolation):                                            # one digit
+            with c.transaction():
+                c.execute("UPDATE accounts.bank_account SET required_signatures = 10 WHERE id = %s", (account,))
+        c.execute("UPDATE accounts.bank_account SET required_signatures = 2 WHERE id = %s", (account,))
+        add = "INSERT INTO accounts.bank_account_signatory (bank_account_id, signatory_id, kind, position) VALUES (%s, %s, %s, %s)"
+        ceo = uuid.uuid4()
+        c.execute(add, (account, ceo, "Fixed", 0))
+        c.execute(add, (account, uuid.uuid4(), "Variable", 1))
+        for row, error in (
+                ((account, ceo, "Variable", 2), psycopg.errors.UniqueViolation),                      # a signatory once per account
+                ((account, uuid.uuid4(), "Sometimes", 2), psycopg.errors.CheckViolation),             # fixed or variable
+                ((uuid.uuid4(), ceo, "Fixed", 0), psycopg.errors.ForeignKeyViolation)):
+            with pytest.raises(error):
+                with c.transaction():
+                    c.execute(add, row)
+        c.execute("DELETE FROM accounts.bank_account WHERE id = %s", (account,))                     # the signatories go with the account
+        assert c.execute("SELECT count(*) FROM accounts.bank_account_signatory WHERE bank_account_id = %s", (account,)).fetchone()[0] == 0
+        c.execute("SET ROLE cashflow_svc")
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            with c.transaction():
+                c.execute("SELECT 1 FROM accounts.bank_account_signatory")
+        c.rollback()
+
+
 def test_one_company_profile_with_a_small_logo(db):
     # 033_reference_company.sql (owner, 16 Nov 2026): one row per database; the logo is a PNG/JPEG of at most 1 MB.
     with psycopg.connect(db) as c:

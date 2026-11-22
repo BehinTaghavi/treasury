@@ -258,11 +258,10 @@ public sealed class VoucherUseCaseTests : IDisposable
             (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", FakePaymentRequests.Approved, "SY-1"), CancellationToken.None)).ErrorCode);
         Assert.Equal("Instrument.SayadTrackingRequired", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, " "), CancellationToken.None)).ErrorCode);
 
-        // Answer to Q57: the authorised signatories of the rule «برگ پرداخت چک» sign the payment sheet too.
+        // Answer to Q57 and report no. 8: the payment sheet is also signed by persons chosen among the holders of a permission in the transfer.
         var ceo = new SignerFact(Guid.NewGuid(), "علی رضایی", "مدیر عامل");
         var cfo = new SignerFact(Guid.NewGuid(), "بهرام کریمی", "مدیر مالی");
-        _reference.ChequeSheetRule = new SignatureRuleFact(1, [ceo], [cfo]);
-        Assert.Equal("Receipt.CompulsorySignerMissing", (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1"), CancellationToken.None)).ErrorCode);
+        _reference.ChequeTransferSigners = new FormSigners([ceo, cfo]);
         Assert.Equal("Receipt.SignerNotAuthorised",
             (await _receipts.EndorseAsync(new(Key(), cheque, "1405/08/24", transfer, "SY-1", SignerIds: [ceo.Id, Guid.NewGuid()]), CancellationToken.None)).ErrorCode);
 

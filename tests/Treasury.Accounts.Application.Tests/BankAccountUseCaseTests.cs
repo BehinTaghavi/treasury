@@ -177,4 +177,53 @@ public sealed class BankAccountUseCaseTests : IDisposable
         Assert.True((await _useCases.ChangeAsync(new(Guid.NewGuid().ToString(), first.Value, WithCard("0101-111") with { AccountType = BankAccountType.SavingsQardHasan }, view.Version), CancellationToken.None)).IsSuccess);
         Assert.False((await _useCases.ListAsync(true, CancellationToken.None)).Single(a => a.Id == first.Value).HasCheques);
     }
+
+    [Fact]
+    public async Task Report_8_the_signatories_of_an_account_are_checked_with_basic_information_saved_and_marked_in_use()
+    {
+        var form = Form() with
+        {
+            RequiredSignatures = 2,
+            Signatories = [new(FakeReference.Ceo, SignatureKind.Fixed), new(FakeReference.Chairman, SignatureKind.Variable), new(FakeReference.BoardMember, SignatureKind.Variable)],
+        };
+        var id = await Register(form);
+        var v = await View(id);
+        Assert.Equal(2, v.RequiredSignatures);
+        Assert.Equal([(FakeReference.Ceo, SignatureKind.Fixed), (FakeReference.Chairman, SignatureKind.Variable), (FakeReference.BoardMember, SignatureKind.Variable)],
+            v.Signatories!.Select(s => (s.SignatoryId, s.Kind)));
+        // reference-svc is told, so a signatory named by an account is no longer deleted there.
+        Assert.Equal([FakeReference.Ceo, FakeReference.Chairman, FakeReference.BoardMember], _reference.MarkedInUse.Where(m => m.List == "signatories").Select(m => m.Id));
+
+        // Another account of the company has its own signatories.
+        var other = await Register(Form(number: "0202-999-1") with { RequiredSignatures = 1, Signatories = [new(FakeReference.Chairman, SignatureKind.Fixed)] });
+        Assert.Equal(FakeReference.Chairman, Assert.Single((await View(other)).Signatories!).SignatoryId);
+        Assert.Equal(3, (await View(id)).Signatories!.Count);
+
+        // Corrected: one signature, either of two.
+        var changed = await _useCases.ChangeAsync(new(Key(), id, form with { RequiredSignatures = 1, Signatories = [new(FakeReference.Ceo, SignatureKind.Variable), new(FakeReference.Chairman, SignatureKind.Variable)] }, v.Version), CancellationToken.None);
+        Assert.True(changed.IsSuccess, changed.ErrorCode);
+        Assert.Equal((1, 2), ((await View(id)).RequiredSignatures, (await View(id)).Signatories!.Count));
+    }
+
+    [Theory]
+    [InlineData("unknown", "BankAccount.SignatoryNotFound")]
+    [InlineData("notes", "BankAccount.SignatoryNotForCheques")]
+    [InlineData("retired", "BankAccount.SignatoryInactive")]
+    [InlineData("fixed", "BankAccount.TooManyFixedSignatories")]
+    [InlineData("few", "BankAccount.TooFewSignatories")]
+    [InlineData("count", "BankAccount.SignatureCountInvalid")]
+    public async Task Report_8_each_fault_in_the_signatories_is_reported_with_its_code(string fault, string code)
+    {
+        var form = fault switch
+        {
+            "unknown" => Form() with { RequiredSignatures = 1, Signatories = [new(Guid.NewGuid(), SignatureKind.Fixed)] },
+            "notes" => Form() with { RequiredSignatures = 1, Signatories = [new(FakeReference.NotesOnly, SignatureKind.Fixed)] },
+            "retired" => Form() with { RequiredSignatures = 1, Signatories = [new(FakeReference.Retired, SignatureKind.Fixed)] },
+            "fixed" => Form() with { RequiredSignatures = 1, Signatories = [new(FakeReference.Ceo, SignatureKind.Fixed), new(FakeReference.Chairman, SignatureKind.Fixed)] },
+            "few" => Form() with { RequiredSignatures = 2, Signatories = [new(FakeReference.Ceo, SignatureKind.Fixed)] },
+            _ => Form() with { RequiredSignatures = 12, Signatories = [new(FakeReference.Ceo, SignatureKind.Fixed)] },
+        };
+        Assert.Equal(code, (await _useCases.RegisterAsync(new(Key(), form), CancellationToken.None)).ErrorCode);
+        Assert.Empty(await _useCases.ListAsync(true, CancellationToken.None));
+    }
 }

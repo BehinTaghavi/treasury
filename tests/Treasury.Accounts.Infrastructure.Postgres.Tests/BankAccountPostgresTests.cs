@@ -200,5 +200,34 @@ public sealed class BankAccountPostgresTests : IDisposable
         Assert.Equal(1405, (await balances.ListAsync(1407, CancellationToken.None)).Single(v => v.AccountId == bank.Value).Carried!.FromYear);
         Assert.Equal("BankAccount.InUse", (await _useCases.DeleteAsync(new(Key(), bank.Value, 1), CancellationToken.None)).ErrorCode);
     }
-}
 
+    [Fact]
+    public async Task The_signatories_of_an_account_round_trip_in_their_order_report_8()
+    {
+        var form = Form("8") with
+        {
+            RequiredSignatures = 2,
+            Signatories =
+            [
+                new(FakeReference.Chairman, Treasury.Accounts.Domain.BankAccounts.SignatureKind.Variable),
+                new(FakeReference.Ceo, Treasury.Accounts.Domain.BankAccounts.SignatureKind.Fixed),
+                new(FakeReference.BoardMember, Treasury.Accounts.Domain.BankAccounts.SignatureKind.Variable),
+            ],
+        };
+        var r = await _useCases.RegisterAsync(new(Key(), form), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await _useCases.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(2, v.RequiredSignatures);
+        Assert.Equal([FakeReference.Chairman, FakeReference.Ceo, FakeReference.BoardMember], v.Signatories!.Select(s => s.SignatoryId));
+        Assert.Equal(Treasury.Accounts.Domain.BankAccounts.SignatureKind.Fixed, v.Signatories![1].Kind);
+
+        // Replaced as a whole by a correction; an account without signatories lists none.
+        var changed = await _useCases.ChangeAsync(new(Key(), r.Value, form with { RequiredSignatures = 1, Signatories = [new(FakeReference.Ceo, Treasury.Accounts.Domain.BankAccounts.SignatureKind.Fixed)] }, v.Version), CancellationToken.None);
+        Assert.True(changed.IsSuccess, changed.ErrorCode);
+        v = (await _useCases.ListAsync(true, CancellationToken.None)).Single(x => x.Id == r.Value);
+        Assert.Equal((1, FakeReference.Ceo), (v.RequiredSignatures, Assert.Single(v.Signatories!).SignatoryId));
+        var plain = await _useCases.RegisterAsync(new(Key(), Form("9")), CancellationToken.None);
+        Assert.True(plain.IsSuccess, plain.ErrorCode);
+        Assert.Empty((await _useCases.GetAsync(plain.Value, CancellationToken.None))!.Signatories!);
+    }
+}

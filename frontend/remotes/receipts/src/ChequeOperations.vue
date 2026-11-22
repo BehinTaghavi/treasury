@@ -199,17 +199,16 @@ async function loadApproved() {
 }
 const replacing = ref<Cheque | null>(null)
 
-// ---- authorised signatories of the payment sheet: the signature rule «برگ پرداخت چک» of Basic Information (owner's answer to Q57) ----
-interface RuleSignatory { id: string; fullName: string; position: string }
-interface SignatureRule { required: number; compulsory: RuleSignatory[]; optional: RuleSignatory[] }
-const rule = ref<SignatureRule>({ required: 0, compulsory: [], optional: [] })
-const optionalSigners = reactive<Record<string, boolean>>({})
-const signerIds = computed(() => [...rule.value.compulsory.map(s => s.id), ...rule.value.optional.filter(s => optionalSigners[s.id]).map(s => s.id)])
-const hasRule = computed(() => rule.value.required > 0 || rule.value.compulsory.length + rule.value.optional.length > 0)
+// ---- who signs the payment sheet besides the two parties (owner's answer to Q57): ticked among the holders of a permission in
+// «ثبت انتقال (خرج چک)» (Basic Information → دارندگان مجوزها; owner's report no. 8, which removed the signature rule «برگ پرداخت چک») ----
+interface OperationHolder { id: string; fullName: string; position: string }
+const holders = ref<OperationHolder[]>([])
+const chosenSigners = reactive<Record<string, boolean>>({})
+const signerIds = computed(() => holders.value.filter(s => chosenSigners[s.id]).map(s => s.id))
 async function loadRule() {
-  const r = await api.get<SignatureRule>('/api/reference/signature-rules/ChequePaymentSheet')
-  rule.value = r.ok ? r.value : { required: 0, compulsory: [], optional: [] }
-  for (const k of Object.keys(optionalSigners)) delete optionalSigners[k]
+  const r = await api.get<OperationHolder[]>('/api/reference/permission-holders/for/ChequeTransfer')
+  holders.value = r.ok ? r.value : []
+  for (const k of Object.keys(chosenSigners)) delete chosenSigners[k]
 }
 
 async function start(c: Cheque, action: string) {
@@ -230,7 +229,6 @@ async function confirmStep() {
   if (!p || busy.value) return
   const date = normaliseJalali(p.date)
   if (!date) return show('error', translate('FiscalDate.Invalid', props.locale))
-  if (p.action === 'Endorse' && !props.notes && signerIds.value.length < rule.value.required) return show('error', translate('Receipt.SignersTooFew', props.locale))
   busy.value = true
   const r = p.action === 'Endorse'
     ? await api.post<string>(`/api/cashflow/instruments/${p.cheque.id}/endorse`,
@@ -458,16 +456,15 @@ onMounted(async () => { await L.load(); await load() })
           {{ t('پس از این چک مانده', 'left after this cheque') }} {{ money(chosenRequest.amount - chosenRequest.paidAmount - pending.cheque.amount) }}
         </p>
         <label v-if="!notes" class="req">{{ t('کد رهگیری ثبت انتقال در سامانهٔ صیاد', 'Sayad tracking code of the transfer') }} <input v-model="pending.sayad" dir="ltr" /></label>
-        <!-- Owner's answer to Q57: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک». -->
+        <!-- Owner's answer to Q57 and report no. 8: who signs the payment sheet, among the permission holders of the transfer. -->
         <div v-if="!notes" class="tr-group wide3">
-          <span>{{ t('امضاکنندگان مجاز برگ پرداخت', 'Authorised signatories of the payment sheet') }}
-            <span v-if="hasRule" class="muted">{{ t(`– ${rule.required.toLocaleString('fa-IR')} امضا لازم است؛ ${signerIds.length.toLocaleString('fa-IR')} نفر انتخاب شده`, `– ${rule.required} needed; ${signerIds.length} chosen`) }}</span></span>
-          <div v-if="hasRule" class="tr-ticks">
-            <label v-for="s in rule.compulsory" :key="s.id"><input type="checkbox" checked disabled /> {{ s.fullName }} <span class="muted small">({{ s.position }} – {{ t('اجباری', 'compulsory') }})</span></label>
-            <label v-for="s in rule.optional" :key="s.id"><input v-model="optionalSigners[s.id]" type="checkbox" /> {{ s.fullName }} <span class="muted small">({{ s.position }})</span></label>
+          <span>{{ t('امضاکنندگان برگ پرداخت (دارندگان مجوز «ثبت انتقال / خرج چک»)', 'Signers of the payment sheet (permission holders of the transfer)') }}
+            <span v-if="holders.length" class="muted">{{ t(`– ${signerIds.length.toLocaleString('fa-IR')} نفر انتخاب شده`, `– ${signerIds.length} chosen`) }}</span></span>
+          <div v-if="holders.length" class="tr-ticks">
+            <label v-for="s in holders" :key="s.id"><input v-model="chosenSigners[s.id]" type="checkbox" /> {{ s.fullName }} <span class="muted small">({{ s.position }})</span></label>
           </div>
-          <span v-else class="muted small">{{ t('قاعدهٔ امضای «برگ پرداخت چک» در اطلاعات پایه ← «دارندگان امضای مجاز» تعیین نشده است؛ برگ پرداخت فقط با امضای تحویل‌دهنده و تحویل‌گیرنده چاپ می‌شود.',
-            'No signature rule is set for the cheque payment sheet (Basic Information → Authorised signatories); the sheet is printed with the two parties\' signatures only.') }}</span>
+          <span v-else class="muted small">{{ t('در اطلاعات پایه ← «دارندگان مجوزها (فرم‌ها)» کسی برای عملیات «ثبت انتقال (خرج چک)» نقش ندارد؛ برگ پرداخت فقط با امضای تحویل‌دهنده و تحویل‌گیرنده چاپ می‌شود.',
+            'Nobody holds a role in the transfer of a cheque (Basic Information → Permission holders); the sheet is printed with the two parties\' signatures only.') }}</span>
         </div>
         <label class="wide">{{ t('توضیحات', 'Note') }} <input v-model="pending.note" /></label>
       </template>

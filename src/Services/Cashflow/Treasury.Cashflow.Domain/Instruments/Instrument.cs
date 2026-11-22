@@ -61,7 +61,8 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
 /// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
 /// <param name="SheetNumber">Transfer of a cheque: the serial number of its payment sheet («برگ پرداخت», owner's answer to Q57, 19 Nov 2026).</param>
-/// <param name="Signers">Transfer of a cheque: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک» (Q57).</param>
+/// <param name="Signers">Transfer of a cheque: who signs the payment sheet besides the two parties (Q57), chosen among the holders of a
+/// permission in the operation (owner's report no. 8).</param>
 /// <param name="OriginalStamped">Cancellation: «اصل چک ممهور به مهر ابطال شد» was ticked (owner, 19 Nov 2026, answer to Q62).</param>
 /// <param name="RecordedAt">Cancellation: the computer's date and time when it was recorded, shown with the user beside that tick.</param>
 public sealed record StepDetails(
@@ -95,8 +96,8 @@ public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, str
 /// one cheque (owner, 19 Nov 2026); null for a request of another kind.</param>
 /// <param name="SheetNumber">A cheque: the serial number of the payment sheet («برگ پرداخت») the transfer gets, from 1 each fiscal year
 /// (owner's answer to Q57, 19 Nov 2026).</param>
-/// <param name="Signers">A cheque: the authorised signatories who sign the payment sheet besides who hands the cheque over and who receives
-/// it, chosen by the signature rule «برگ پرداخت چک» of Basic Information (owner's answer to Q57).</param>
+/// <param name="Signers">A cheque: who signs the payment sheet besides who hands the cheque over and who receives it (owner's answer to
+/// Q57), chosen among the holders of a permission in «ثبت انتقال (خرج چک)» (Basic Information → «دارندگان مجوزها», report no. 8).</param>
 public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId,
     Guid? RequestChequeId = null, int? SheetNumber = null, IReadOnlyList<ReceiptSigner>? Signers = null);
 

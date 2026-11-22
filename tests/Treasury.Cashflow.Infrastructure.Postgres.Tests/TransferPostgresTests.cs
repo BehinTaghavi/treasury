@@ -292,7 +292,7 @@ public sealed class TransferPostgresTests : IDisposable
 
         public Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken) => Task.FromResult<NotePartyFact?>(null);
 
-        public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) => Task.FromResult<SignatureRuleFact?>(null);
+        public Task<FormSigners?> FormSignersAsync(string operation, CancellationToken cancellationToken) => Task.FromResult<FormSigners?>(null);
 
         public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
 

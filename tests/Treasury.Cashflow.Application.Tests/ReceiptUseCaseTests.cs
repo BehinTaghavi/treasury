@@ -91,14 +91,14 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     /// <summary>The تفصیل types account 8205 («هزینه کارمزد خدمات بانکی») takes; empty: the account has no تفصیل.</summary>
     public IReadOnlyList<string> FeeAccountDetailTypes { get; set; } = [];
 
-    /// <summary>The signature rule of the note receipt set in Basic Information; null: none set.</summary>
-    public SignatureRuleFact? NoteReceiptRule { get; set; }
+    /// <summary>The holders of a permission in the receipt of notes («دارندگان مجوزها», Basic Information); null: none.</summary>
+    public FormSigners? NoteReceiptSigners { get; set; }
 
-    /// <summary>The signature rule of the cheque payment sheet («برگ پرداخت چک»); null: none set.</summary>
-    public SignatureRuleFact? ChequeSheetRule { get; set; }
+    /// <summary>The holders of a permission in «ثبت انتقال (خرج چک)», who may sign the cheque payment sheet; null: none.</summary>
+    public FormSigners? ChequeTransferSigners { get; set; }
 
-    public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) =>
-        Check(document == "NoteReceipt" ? NoteReceiptRule : document == "ChequePaymentSheet" ? ChequeSheetRule : null);
+    public Task<FormSigners?> FormSignersAsync(string operation, CancellationToken cancellationToken) =>
+        Check(operation == "NoteReceipt" ? NoteReceiptSigners : operation == "ChequeTransfer" ? ChequeTransferSigners : null);
 
     /// <summary>
     /// «ذینفعان / متعهدین / ضامنین» of Basic Information by تفصیل: 200015 an obligor, 200016 a guarantor, 300001 (staff) both, 200017 a

@@ -9,7 +9,8 @@ using Treasury.BuildingBlocks.Domain;
 
 namespace Treasury.Accounts.Infrastructure.Postgres;
 
-// Written against Npgsql 10 and db/postgres/006_accounts.sql, 008_accounts_collection_priority.sql.
+// Written against Npgsql 10 and db/postgres/006_accounts.sql, 008_accounts_collection_priority.sql, 027_accounts_bank_account_types.sql,
+// 049_accounts_bank_account_signatories.sql.
 // Integration tests against PostgreSQL 17: tests/Treasury.Accounts.Infrastructure.Postgres.Tests.
 
 public static class PostgresRegistration
@@ -98,7 +99,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
 {
     private const string Columns =
         "id, account_number, bank_id, branch_name, branch_code, city_id, opening_date, currency, main_account_id, ledger_account, " +
-        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, in_use, account_type, term";
+        "detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, in_use, account_type, term, required_signatures";
 
     public async Task<BankAccount?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -141,9 +142,9 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         await using (var cmd = tx.Command(
             "INSERT INTO accounts.bank_account (id, account_number, number_key, bank_id, branch_name, branch_code, city_id, opening_date, currency, " +
             "main_account_id, ledger_account, detail1, detail2, collection_account, bounced_account, collection_priority, is_facility, is_active, version, " +
-            "account_type, term) " +
+            "account_type, term, required_signatures) " +
             "VALUES (@id, @number, @key, @bank, @branch, @branchCode, @city, @opened, @currency, @main, @ledger, @d1, @d2, @collection, @bounced, " +
-            "@priority, @facility, @active, 1, @type, @term)"))
+            "@priority, @facility, @active, 1, @type, @term, @signatures)"))
         {
             Bind(cmd, account);
             cmd.Parameters.Add(Nullable("main", NpgsqlDbType.Uuid, account.MainAccountId));
@@ -151,6 +152,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         }
 
         await WriteCardsAsync(tx, account, cancellationToken).ConfigureAwait(false);
+        await WriteSignatoriesAsync(tx, account, cancellationToken).ConfigureAwait(false);
 
         await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
         account.MarkSaved(1);
@@ -164,7 +166,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             "UPDATE accounts.bank_account SET account_number = @number, number_key = @key, bank_id = @bank, branch_name = @branch, " +
             "branch_code = @branchCode, city_id = @city, opening_date = @opened, currency = @currency, ledger_account = @ledger, detail1 = @d1, " +
             "detail2 = @d2, collection_account = @collection, bounced_account = @bounced, collection_priority = @priority, is_facility = @facility, " +
-            "is_active = @active, in_use = @in_use, account_type = @type, term = @term, version = version + 1, updated_at = now() " +
+            "is_active = @active, in_use = @in_use, account_type = @type, term = @term, required_signatures = @signatures, version = version + 1, updated_at = now() " +
             "WHERE id = @id AND version = @expected"))
         {
             Bind(cmd, account);
@@ -176,6 +178,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         }
 
         await WriteCardsAsync(tx, account, cancellationToken).ConfigureAwait(false);
+        await WriteSignatoriesAsync(tx, account, cancellationToken).ConfigureAwait(false);
 
         await PostgresOutbox.WriteAsync(tx, account.PendingEvents, cancellationToken).ConfigureAwait(false);
         account.MarkSaved(account.Version + 1);
@@ -233,6 +236,29 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
         cmd.Parameters.AddWithValue("active", a.IsActive);
         cmd.Parameters.AddWithValue("type", d.AccountType.ToString());
         cmd.Parameters.Add(Nullable("term", NpgsqlDbType.Text, d.Term?.ToString()));
+        cmd.Parameters.Add(new NpgsqlParameter("signatures", NpgsqlDbType.Smallint) { Value = (short)d.RequiredSignatures });
+    }
+
+    /// <summary>The account's authorised signatories are replaced as a whole, in the order of the form (owner's report no. 8).</summary>
+    private static async Task WriteSignatoriesAsync(TransactionContext tx, BankAccount account, CancellationToken ct)
+    {
+        await using (var del = tx.Command("DELETE FROM accounts.bank_account_signatory WHERE bank_account_id = @id"))
+        {
+            del.Parameters.AddWithValue("id", account.Id);
+            await del.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        var position = 0;
+        foreach (var signatory in account.Data.SignatoryList)
+        {
+            await using var ins = tx.Command(
+                "INSERT INTO accounts.bank_account_signatory (bank_account_id, signatory_id, kind, position) VALUES (@id, @signatory, @kind, @position)");
+            ins.Parameters.AddWithValue("id", account.Id);
+            ins.Parameters.AddWithValue("signatory", signatory.SignatoryId);
+            ins.Parameters.AddWithValue("kind", signatory.Kind.ToString());
+            ins.Parameters.AddWithValue("position", position++);
+            await ins.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
     }
 
     /// <summary>The account's cards are replaced as a whole (they are part of the account aggregate).</summary>
@@ -270,7 +296,7 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
                 r.GetString(1), r.GetGuid(2), S(3), S(4), r.IsDBNull(5) ? null : r.GetGuid(5),
                 r.IsDBNull(6) ? null : new FiscalDate(r.GetFieldValue<DateOnly>(6)), r.GetString(7).Trim(),
                 new BankLedger(r.GetString(9), S(10), S(11), S(12), S(13)), r.IsDBNull(14) ? null : r.GetInt16(14), r.GetBoolean(15),
-                Enum.Parse<BankAccountType>(r.GetString(19)), S(20) is { } term ? Enum.Parse<ShortTermPeriod>(term) : null);
+                Enum.Parse<BankAccountType>(r.GetString(19)), S(20) is { } term ? Enum.Parse<ShortTermPeriod>(term) : null, RequiredSignatures: r.GetInt16(21));
             list.Add(BankAccount.Restore(r.GetGuid(0), data, r.IsDBNull(8) ? null : r.GetGuid(8), r.GetBoolean(16), r.GetInt64(17), r.GetBoolean(18)));
         }
 
@@ -298,8 +324,28 @@ public sealed class PostgresBankAccountRepository : IBankAccountRepository
             }
         }
 
-        return list.Select(a => cards.TryGetValue(a.Id, out var l)
-            ? BankAccount.Restore(a.Id, a.Data with { Cards = l }, a.MainAccountId, a.IsActive, a.Version, a.IsInUse)
+        var signatories = new Dictionary<Guid, List<AccountSignatory>>();
+        await using (var c = PostgresUnitOfWork.Current.Command(
+            "SELECT bank_account_id, signatory_id, kind FROM accounts.bank_account_signatory WHERE bank_account_id = ANY(@ids) ORDER BY bank_account_id, position"))
+        {
+            c.Parameters.AddWithValue("ids", list.Select(a => a.Id).ToArray());
+            await using var sr = await c.ExecuteReaderAsync(ct).ConfigureAwait(false);
+            while (await sr.ReadAsync(ct).ConfigureAwait(false))
+            {
+                var id = sr.GetGuid(0);
+                if (!signatories.TryGetValue(id, out var l))
+                {
+                    signatories[id] = l = [];
+                }
+
+                l.Add(new AccountSignatory(sr.GetGuid(1), Enum.Parse<SignatureKind>(sr.GetString(2))));
+            }
+        }
+
+        return list.Select(a => cards.ContainsKey(a.Id) || signatories.ContainsKey(a.Id)
+            ? BankAccount.Restore(
+                a.Id, a.Data with { Cards = cards.GetValueOrDefault(a.Id) ?? a.Data.Cards, Signatories = signatories.GetValueOrDefault(a.Id) ?? a.Data.Signatories },
+                a.MainAccountId, a.IsActive, a.Version, a.IsInUse)
             : a).ToList();
     }
 }

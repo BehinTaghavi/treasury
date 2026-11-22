@@ -34,6 +34,7 @@ if (!usePostgres)
     builder.Services.AddSingleton<IOrganizationRepository, InMemoryOrganizationRepository>();
     builder.Services.AddSingleton<ICompanyRepository, InMemoryCompanyRepository>();
     builder.Services.AddSingleton<ISignatureRepository, InMemorySignatureRepository>();
+    builder.Services.AddSingleton<IPermissionHolderRepository, InMemoryPermissionHolderRepository>();
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
     builder.Services.AddSingleton<InMemoryLedgerRepository>();
     builder.Services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<InMemoryLedgerRepository>());
@@ -73,6 +74,7 @@ builder.Services.AddSingleton<Treasury.Reference.Application.Purposes.PurposeUse
 builder.Services.AddSingleton<Treasury.Reference.Application.Organization.OrganizationUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Company.CompanyUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Signatures.SignatureUseCases>();
+builder.Services.AddSingleton<Treasury.Reference.Application.Signatures.PermissionHolderUseCases>();
 builder.Services.AddSingleton<Treasury.Reference.Application.Ledger.LedgerUseCases>();
 
 var app = builder.Build();

@@ -10,7 +10,7 @@ export interface NoteTerms {
   returnTerms: string | null; custodyPlace: string | null; originalReceived: boolean; originalReceivedOn: string | null; discrepancy: string | null
   attachments: NoteAttachments; deliveredBy: string | null; signers: NoteSigner[]
 }
-/** An authorised signatory chosen by the signature rule of the note receipt («دارندگان امضای مجاز», Basic Information). */
+/** A confirmer chosen among the permission holders of note receipts («دارندگان مجوزها», Basic Information); position: roles and job title. */
 export interface NoteSigner { id: string; name: string; position: string | null }
 export interface NoteLine {
   id: string; kind: string; number: string | null; amount: number; amountInRial: number; dueDate: string | null; noteIssueDate?: string | null; state: string
