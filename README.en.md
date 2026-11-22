@@ -31,6 +31,8 @@ The MVC version is not repaired. The system is rebuilt, and each part runs besid
 
 ## Latest changes
 
+**22 Nov 2026, waiting for review (branch `claude/clever-einstein-s4w59x`) — Enter goes to the next field:** a general rule of the product owner for every form. After a field is filled, **Enter moves to the next field** of the form, as the mouse or Tab does; after the last field it goes to the save button, and Enter there saves. In a list box Enter first chooses the marked entry; in a box of several lines Shift+Enter starts a new line. Ctrl+Enter still saves from anywhere in the form. To try it: open «دریافت‌ها», fill the date and keep pressing Enter down to «ثبت رسید».
+
 By 15 Nov 2026 eight pull requests were merged into `main`. The CI run of the latest one, #8, was green before it was merged.
 
 **21 Nov 2026, waiting for review — the four open pull requests joined on one branch (`claude/zealous-carson-lptcph`):** [#10](https://github.com/BehinTaghavi/treasury/pull/10) (promissory notes and authorised signatories), [#11](https://github.com/BehinTaghavi/treasury/pull/11) («ثبت صیادی شد»), [#12](https://github.com/BehinTaghavi/treasury/pull/12) (company name and logo) and [#14](https://github.com/BehinTaghavi/treasury/pull/14) (legal action and rule N3) changed the same code and could no longer be merged one by one. They are joined with their conflicts resolved:
@@ -74,7 +76,7 @@ Phase A is almost finished. Basic Information (Phase B) is built and waits for r
 | Architecture rules | Layers depend inward only; no service references another service's code | Architecture tests |
 | Database | One schema per service (scripts 000 to 042), fiscal-year partitions, closed-year freeze, and one role per service that cannot see another service's schema | Schema tests on PostgreSQL 17 |
 | Migration tool | Old cheques moved to the new schema with a reconciliation report; Jalali dates checked day by day against .NET for 1380–1420 | Migration tests |
-| User interface | Nuxt 4 shell (the company's name and logo at the top of every screen) and three micro-frontends: Receipts, Basic Information and Payment requests | ui-kit tests and browser checks |
+| User interface | Nuxt 4 shell (the company's name and logo at the top of every screen) and three micro-frontends: Receipts, Basic Information and Payment requests; in every form Enter goes to the next field | ui-kit tests and browser checks |
 | Deployment | Docker Compose for one client's server, and the Windows test server; the version running is shown at the top of the screen | `deploy/smoke-test.sh` and the CI job `compose` on every pull request |
 | Login with Keycloak | Token validation in the API is compiled | **Not yet run**; comes later in Phase B |
 

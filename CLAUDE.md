@@ -31,6 +31,7 @@ The new Treasury (AR/AP) module of the ERP: received and issued cheques and note
 6. **The instrument lifecycle table** (`InstrumentLifecycle.cs`) is the single source of allowed state changes. The migration tool has a copy (`tools/migration/.../legacy_mapping.py`); a test fails if they differ. Changing it is a business decision — note it in `docs/domain/open-questions.md`. Files under `docs/domain/` have Farsi copies (`*.fa.md`) for the domain expert; update the Farsi copy in the same change.
 7. No hard-coded database ids in code. No `sa` or any password in files; secrets come from the environment.
 8. Keep pull requests small: one task, its tests, its docs.
+9. **Enter goes to the next field** (owner, 22 Nov 2026) in every form: the rule is `frontend/packages/ui-kit/src/enterNext.ts`, switched on once by the shell. A screen adds no Enter handling of its own; it only has to put its fields in a `<form>` whose save button is `type="submit"` (or, outside a form, in a `<fieldset>` or table row with its button after the fields). Every other button in a form is `type="button"`.
 
 ## Commands
 | What | With NuGet access (normal) | Without NuGet (offline workspace) |
