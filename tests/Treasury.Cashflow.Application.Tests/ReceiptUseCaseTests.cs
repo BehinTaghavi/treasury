@@ -21,8 +21,20 @@ public sealed class FakeReceiptAccounts : IReceiptAccountLookup
         id == Desk || id == ClosedDesk ? new ReceiptAccountFact(ReceiptAccountKind.CashDesk, id, "صندوق", "IRR", id == Desk, "1101", "500001") : null);
 
     public Task<ReceiptAccountFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(
-        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true, "1102", "600001")
+        id == RialBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "0202-3572", "IRR", true, "1102", "600001", HasCards: true)
         : id == DollarBank ? new ReceiptAccountFact(ReceiptAccountKind.BankAccount, id, "USD-1", "USD", true, "1103", "600002") : null);
+
+    /// <summary>A petty cash kept on its holder's bank card, one kept in cash only (no card), a company card without a bank account, and one switched off.</summary>
+    public static readonly Guid PettyCashOnCard = Guid.NewGuid();
+    public static readonly Guid PettyCashInCash = Guid.NewGuid();
+    public static readonly Guid CompanyCard = Guid.NewGuid();
+    public static readonly Guid ClosedCompanyCard = Guid.NewGuid();
+
+    public Task<ReceiptAccountFact?> CardAsync(ReceiptAccountKind kind, Guid id, CancellationToken cancellationToken) => Task.FromResult(
+        kind == ReceiptAccountKind.PettyCashCard && id == PettyCashOnCard ? new ReceiptAccountFact(kind, id, "مریم کریمی – 6219861034529007", "IRR", true, "1104", "700002")
+        : kind == ReceiptAccountKind.CompanyCard && (id == CompanyCard || id == ClosedCompanyCard)
+            ? new ReceiptAccountFact(kind, id, "شرکت نمونه – 6037991234567893", "IRR", id == CompanyCard, "1105", "600009")
+        : null);
 }
 
 /// <summary>reference-svc stand-in: two payers (one switched off), a receipt and a payment purpose group, two banks.</summary>
@@ -34,6 +46,11 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     public static readonly Guid Melli = Guid.NewGuid();
 
     public bool Down { get; set; }
+
+    /// <summary>The city of the company's address («مشخصات شرکت»); null: not entered yet.</summary>
+    public string? CompanyCity { get; set; }
+
+    public Task<string?> CompanyCityAsync(CancellationToken cancellationToken) => Check(CompanyCity);
 
     public List<(string List, Guid Id)> Marked { get; } = [];
 
@@ -56,10 +73,46 @@ public sealed class FakeReceiptReference : IReceiptReferenceLookup
     public Task<Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact?> LedgerAccountAsync(string code, CancellationToken cancellationToken) => Check(code switch
     {
         "1201" or "1202" or "1203" or "9101" or "9201" or "8101" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "حساب " + code, true, true),
+        "8205" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "هزینه کارمزد خدمات بانکی", true, true, FeeAccountDetailTypes),
         "12" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "کل", false, true),
         "1299" => new Treasury.Cashflow.Domain.Vouchers.LedgerAccountFact(code, "قدیمی", true, false),
         _ => null,
     });
+
+    /// <summary>تفصیل by code with its type: 810001 a cost centre of the finance department, 810002 one that is switched off, 200015 a customer.</summary>
+    public Task<Treasury.Cashflow.Domain.Transfers.FeeDetailFact?> DetailAsync(string detailCode, CancellationToken cancellationToken) => Check(detailCode switch
+    {
+        "810001" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("810001", "مرکز هزینه امور مالی", "مراکز هزینه", true),
+        "810002" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("810002", "مرکز هزینه قدیمی", "مراکز هزینه", false),
+        "200015" => new Treasury.Cashflow.Domain.Transfers.FeeDetailFact("200015", "شرکت نمونه بازرگانی", "مشتریان", true),
+        _ => null,
+    });
+
+    /// <summary>The تفصیل types account 8205 («هزینه کارمزد خدمات بانکی») takes; empty: the account has no تفصیل.</summary>
+    public IReadOnlyList<string> FeeAccountDetailTypes { get; set; } = [];
+
+    /// <summary>The signature rule of the note receipt set in Basic Information; null: none set.</summary>
+    public SignatureRuleFact? NoteReceiptRule { get; set; }
+
+    /// <summary>The signature rule of the cheque payment sheet («برگ پرداخت چک»); null: none set.</summary>
+    public SignatureRuleFact? ChequeSheetRule { get; set; }
+
+    public Task<SignatureRuleFact?> SignatureRuleAsync(string document, CancellationToken cancellationToken) =>
+        Check(document == "NoteReceipt" ? NoteReceiptRule : document == "ChequePaymentSheet" ? ChequeSheetRule : null);
+
+    /// <summary>
+    /// «ذینفعان / متعهدین / ضامنین» of Basic Information by تفصیل: 200015 an obligor, 200016 a guarantor, 300001 (staff) both, 200017 a
+    /// guarantor that is switched off.
+    /// </summary>
+    public Dictionary<string, NotePartyFact> Parties { get; } = new()
+    {
+        ["200015"] = new("200015", "شرکت نمونه بازرگانی", true, IsObligor: true, IsGuarantor: false),
+        ["200016"] = new("200016", "مشتری دیگر", true, IsObligor: false, IsGuarantor: true, NationalId: "0123456789", Phone: "09121112233"),
+        ["300001"] = new("300001", "کارمند", true, IsObligor: true, IsGuarantor: true),
+        ["200017"] = new("200017", "ضامن قدیمی", false, IsObligor: false, IsGuarantor: true),
+    };
+
+    public Task<NotePartyFact?> NotePartyAsync(string detailCode, CancellationToken cancellationToken) => Check(Parties.GetValueOrDefault(detailCode));
 
     public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {
@@ -155,11 +208,101 @@ public sealed class ReceiptUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cheque_on_a_bank_in_another_city_than_the_companys_is_out_of_town()
+    {
+        // Owner, 18 Nov 2026: the company is in Tehran; a cheque on a Shiraz bank is «خارج از مرکز», one on a Tehran bank is not, whatever
+        // the user ticked. Arabic and Persian letters count as the same city name.
+        _reference.CompanyCity = "تهران";
+        var r = await _receipts.RecordInstrumentsAsync(new(Key(), Header(),
+        [
+            Cheque("1", "1405/10/01") with { City = "شیراز", OutOfTown = false },
+            Cheque("2", "1405/10/01") with { City = "تهران", OutOfTown = true },
+            Cheque("3", "1405/10/01") with { City = null, OutOfTown = true },
+        ]), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var cheques = (await _receipts.GetAsync(r.Value, CancellationToken.None))!.Instruments!;
+        Assert.Equal([("1", true), ("2", false), ("3", true)], cheques.OrderBy(c => c.Number).Select(c => (c.Number!, c.Details!.OutOfTown)));
+
+        _reference.CompanyCity = "شيراز"; // typed with the Arabic yeh
+        var same = await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("4", "1405/10/01") with { City = "شیراز", OutOfTown = true }]), CancellationToken.None);
+        Assert.False((await _receipts.GetAsync(same.Value, CancellationToken.None))!.Instruments![0].Details!.OutOfTown);
+
+        // Until the company's city is entered in Basic Information, what the user ticked stays.
+        _reference.CompanyCity = null;
+        var manual = await _receipts.RecordInstrumentsAsync(new(Key(), Header(), [Cheque("5", "1405/10/01") with { City = "اصفهان", OutOfTown = true }]), CancellationToken.None);
+        Assert.True((await _receipts.GetAsync(manual.Value, CancellationToken.None))!.Instruments![0].Details!.OutOfTown);
+    }
+
+    [Fact]
     public async Task Each_kind_has_its_own_numbers_as_in_the_old_program()
     {
         await _receipts.RecordCashAsync(new(Key(), Header(), FakeReceiptAccounts.Desk, 1_000), CancellationToken.None);
         var bank = await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.Pos, "778899", 2_000), CancellationToken.None);
         Assert.Equal(1, (await _receipts.GetAsync(bank.Value, CancellationToken.None))!.Number);
+    }
+
+    [Fact]
+    public async Task A_deposit_onto_a_bank_card_has_its_own_numbers_and_names_its_card_report_6_item_12()
+    {
+        // Owner's report no. 6, item 12 («واریز به کارت بانک»), answers to Q68–Q70 (20 Nov 2026).
+        await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.CardToCard, null, 2_000), CancellationToken.None);
+        var first = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.CardToCard, "T-77", 2_500_000), CancellationToken.None);
+        Assert.True(first.IsSuccess, first.ErrorCode);
+        var second = await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.PaymentGateway, null, 900_000), CancellationToken.None);
+        Assert.True(second.IsSuccess, second.ErrorCode);
+
+        var v = (await _receipts.GetAsync(first.Value, CancellationToken.None))!;
+        Assert.Equal(("CardDeposit", 1, "PettyCashCard", FakeReceiptAccounts.PettyCashOnCard, "CardToCard", "T-77", 2_500_000m, "IRR"),
+            (v.Kind, v.Number, v.AccountKind, v.AccountId!.Value, v.Method, v.TrackingNumber, v.Amount!.Value, v.Currency));
+        Assert.Equal(2, (await _receipts.GetAsync(second.Value, CancellationToken.None))!.Number);
+        Assert.Equal(2, (await _receipts.ListAsync(1405, ReceiptKind.CardDeposit, CancellationToken.None)).Count);
+        Assert.Single(await _receipts.ListAsync(1405, ReceiptKind.BankDeposit, CancellationToken.None));
+        Assert.Contains(("purpose-groups", FakeReceiptReference.SalesGroup), _reference.Marked);
+    }
+
+    [Fact]
+    public async Task A_card_deposit_is_refused_without_a_card_or_with_another_kind_of_account_or_deposit()
+    {
+        Task<Treasury.BuildingBlocks.Application.Result<Guid>> Record(ReceiptAccountKind kind, Guid id, DepositMethod method = DepositMethod.CardToCard) =>
+            _receipts.RecordCardDepositAsync(new(Key(), Header(), kind, id, method, null, 1_000), CancellationToken.None);
+
+        Assert.Equal("Receipt.AccountNotFound", (await Record(ReceiptAccountKind.PettyCashCard, Guid.NewGuid())).ErrorCode);
+        // A petty cash whose holder keeps the money in cash has no card to pay onto.
+        Assert.Equal("Receipt.AccountNotFound", (await Record(ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashInCash)).ErrorCode);
+        Assert.Equal("Receipt.AccountNotFound", (await Record(ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.PettyCashOnCard)).ErrorCode);
+        Assert.Equal("Receipt.AccountKindWrong", (await Record(ReceiptAccountKind.BankAccount, FakeReceiptAccounts.RialBank)).ErrorCode);
+        Assert.Equal("Receipt.AccountInactive", (await Record(ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.ClosedCompanyCard)).ErrorCode);
+        Assert.Equal("Receipt.CardDepositMethod", (await Record(ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.Satna)).ErrorCode);
+        Assert.Equal("Receipt.CardDepositMethod",
+            (await _receipts.PreviewCardDepositAsync(new("preview", Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.Pos, null, 1_000), CancellationToken.None)).ErrorCode);
+        Assert.Empty(await _receipts.ListAsync(1405, ReceiptKind.CardDeposit, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task The_voucher_of_a_card_deposit_is_previewed_and_the_receipt_is_corrected_under_its_number()
+    {
+        // Answer to Q68: Dr the petty cash's account · holder / Cr the purpose group · payer.
+        var preview = await _receipts.PreviewCardDepositAsync(
+            new("preview", Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.DepositSlip, "F-1", 2_500_000), CancellationToken.None);
+        Assert.True(preview.IsSuccess, preview.ErrorCode);
+        Assert.Equal([(true, "1104", "700002", 2_500_000m), (false, "4101", "200015", 2_500_000m)],
+            preview.Value!.Lines.Select(l => (l.IsDebit, l.AccountCode, l.DetailCode, l.AmountRial)));
+        Assert.Empty(await _receipts.ListAsync(1405, ReceiptKind.CardDeposit, CancellationToken.None)); // a preview saves nothing
+
+        var id = (await _receipts.RecordCardDepositAsync(
+            new(Key(), Header(), ReceiptAccountKind.PettyCashCard, FakeReceiptAccounts.PettyCashOnCard, DepositMethod.DepositSlip, "F-1", 2_500_000), CancellationToken.None)).Value;
+        var corrected = await _receipts.CorrectCardDepositAsync(
+            new(Key(), id, 1, Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.CardToCard, null, 3_000_000), CancellationToken.None);
+        Assert.True(corrected.IsSuccess, corrected.ErrorCode);
+        var v = (await _receipts.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((1, "CompanyCard", FakeReceiptAccounts.CompanyCard, "CardToCard", (string?)null, 3_000_000m),
+            (v.Number, v.AccountKind, v.AccountId!.Value, v.Method, v.TrackingNumber, v.TotalRial));
+        Assert.Equal("Concurrency.Conflict", (await _receipts.CorrectCardDepositAsync(
+            new(Key(), id, 1, Header(), ReceiptAccountKind.CompanyCard, FakeReceiptAccounts.CompanyCard, DepositMethod.CardToCard, null, 1), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.CorrectionKindDiffers", (await _receipts.CorrectBankDepositAsync(
+            new(Key(), id, v.Version, Header(), FakeReceiptAccounts.RialBank, DepositMethod.Pos, null, 1), CancellationToken.None)).ErrorCode);
     }
 
     [Fact]
@@ -173,9 +316,31 @@ public sealed class ReceiptUseCaseTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Paya_transfer_keeps_its_Sheba_and_card_to_card_needs_an_account_with_a_card()
+    {
+        // Owner, 18 Nov 2026: the kinds of a direct deposit.
+        var paya = await _receipts.RecordBankDepositAsync(
+            new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.Paya, "P-1", 2_000_000, PayerSheba: "IR06 2960 0000 0010 0324 2000 01"), CancellationToken.None);
+        Assert.True(paya.IsSuccess, paya.ErrorCode);
+        var v = (await _receipts.GetAsync(paya.Value, CancellationToken.None))!;
+        Assert.Equal(("Paya", "IR062960000000100324200001"), (v.Method, v.PayerSheba));
+        Assert.Equal("IR062960000000100324200001", (await _receipts.ListAsync(1405, ReceiptKind.BankDeposit, CancellationToken.None)).Single().PayerSheba);
+
+        Assert.Equal("Receipt.ShebaRequired",
+            (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.Satna, null, 1_000), CancellationToken.None)).ErrorCode);
+        Assert.Equal("Receipt.ShebaRequired",
+            (await _receipts.PreviewBankDepositAsync(new("preview", Header(), FakeReceiptAccounts.RialBank, DepositMethod.Satna, null, 1_000), CancellationToken.None)).ErrorCode);
+        Assert.True((await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.RialBank, DepositMethod.PaymentGateway, "PG-7", 1_000), CancellationToken.None)).IsSuccess);
+
+        // The dollar account of this test has no bank card (and takes no card payments anyway): the Rial rule is checked with it switched.
+        Assert.Equal("Receipt.MethodNotForForeignCurrency",
+            (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.CardToCard, null, 10, 600_000), CancellationToken.None)).ErrorCode);
+    }
+
+    [Fact]
     public async Task A_dollar_account_takes_dollars_at_a_rate()
     {
-        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.Transfer, "SW-1", 1_500.25m, 600_000), CancellationToken.None);
+        var r = await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.InternalTransfer, "SW-1", 1_500.25m, 600_000), CancellationToken.None);
         var v = (await _receipts.GetAsync(r.Value, CancellationToken.None))!;
         Assert.Equal(("USD", 1_500.25m, 900_150_000m), (v.Currency, v.Amount, v.TotalRial));
         Assert.Equal("Money.RateRequired", (await _receipts.RecordBankDepositAsync(new(Key(), Header(), FakeReceiptAccounts.DollarBank, DepositMethod.Transfer, null, 10), CancellationToken.None)).ErrorCode);

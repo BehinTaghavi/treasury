@@ -21,6 +21,8 @@ public static class PostgresRegistration
         services.AddSingleton<ICatalogueRepository, PostgresCatalogueRepository>();
         services.AddSingleton<IPurposeRepository, PostgresPurposeRepository>();
         services.AddSingleton<IOrganizationRepository, PostgresOrganizationRepository>();
+        services.AddSingleton<ICompanyRepository, PostgresCompanyRepository>();
+        services.AddSingleton<ISignatureRepository, PostgresSignatureRepository>();
         services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
         services.AddSingleton<PostgresLedgerRepository>();
         services.AddSingleton<ILedgerRepository>(sp => sp.GetRequiredService<PostgresLedgerRepository>());

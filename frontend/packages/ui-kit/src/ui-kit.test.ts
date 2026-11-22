@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createApi, formatAmount, hasTranslation, normaliseJalali, parseAmount, translate } from './index'
+import { createApi, formatAmount, hasTranslation, logoFileProblem, normaliseJalali, parseAmount, translate } from './index'
 
 describe('formatting', () => {
   it('accepts Persian digits and separators in amounts', () => {
@@ -67,5 +67,62 @@ describe('api client', () => {
     expect(seen?.body).toBeInstanceOf(FormData)
     expect(h['Idempotency-Key']).toBeTruthy()
     expect(h['Content-Type']).toBeUndefined()
+  })
+})
+
+describe('company logo', () => {
+  // Owner, 16 Nov 2026: the logo scanned by the user is a PNG or JPEG picture; the domain allows at most 1 MB (CompanyProfile).
+  it('accepts a PNG or JPEG picture of at most 1 MB', () => {
+    expect(logoFileProblem({ size: 20_000, type: 'image/png' })).toBeNull()
+    expect(logoFileProblem({ size: 1024 * 1024, type: 'image/jpeg' })).toBeNull()
+  })
+  it('names the problem of any other file with an error code that has a text', () => {
+    expect(logoFileProblem({ size: 20_000, type: 'application/pdf' })).toBe('Company.LogoInvalid')
+    expect(logoFileProblem({ size: 0, type: 'image/png' })).toBe('Company.LogoInvalid')
+    expect(logoFileProblem({ size: 1024 * 1024 + 1, type: 'image/png' })).toBe('Company.LogoTooLarge')
+    expect(hasTranslation('Company.LogoInvalid') && hasTranslation('Company.LogoTooLarge')).toBe(true)
+  })
+})
+
+import { receiptNumber } from './index'
+
+describe('the receipt number box of the receipts lists (report no. 6, item 9)', () => {
+  it('reads Persian digits and spaces, and tells an empty box from text that is no number', () => {
+    expect(receiptNumber('۱۲')).toBe(12)
+    expect(receiptNumber(' 0012 ')).toBe(12)
+    expect(receiptNumber('')).toBeNull()
+    expect(receiptNumber('۱۲الف')).toBeNaN()
+  })
+})
+
+import { cardCheckDigitFits, cardNumberHint, groupSheba, shebaCheckDigitsFit, shebaDigits } from './index'
+
+describe('Sheba and card numbers (report no. 6, items 16 and 17)', () => {
+  it('reads the digits of a Sheba typed or pasted with IR, spaces or Persian digits', () => {
+    expect(shebaDigits('IR06 2960 0000 0010 0324 2000 01')).toBe('062960000000100324200001')
+    expect(shebaDigits(' ir۰۶۲۹۶۰۰۰۰۰۰۰۱۰۰۳۲۴۲۰۰۰۰۱')).toBe('062960000000100324200001')
+    expect(shebaDigits('0629-6000')).toBe('06296000')
+    expect(shebaDigits('0629600000001003242000019999')).toHaveLength(24)
+    expect(shebaDigits(null)).toBe('')
+  })
+  it('groups the digits as banks print them after IR', () => {
+    expect(groupSheba('062960000000100324200001')).toBe('06 2960 0000 0010 0324 2000 01')
+    expect(groupSheba('0629')).toBe('06 29')
+    expect(groupSheba('')).toBe('')
+  })
+  it('tells a complete number with wrong check digits from a right one', () => {
+    expect(shebaCheckDigitsFit('062960000000100324200001')).toBe(true)
+    expect(shebaCheckDigitsFit('062960000000100324200002')).toBe(false)
+    expect(shebaCheckDigitsFit('123456789012345678901234')).toBe(false)
+    expect(shebaCheckDigitsFit('0629600000001003242')).toBe(false)
+    expect(cardCheckDigitFits('6037991234567893')).toBe(true)
+    expect(cardCheckDigitFits('6037991234567890')).toBe(false)
+    expect(cardCheckDigitFits('603799123456789')).toBe(false)
+  })
+  it('says under a card box whether the length or the check digit is wrong', () => {
+    expect(cardNumberHint('')).toBeNull()
+    expect(cardNumberHint('6037-9912', 'en')).toEqual({ bad: true, text: '8 of 16 digits' })
+    expect(cardNumberHint('۶۰۳۷-۹۹۱۲-۳۴۵۶-۷۸۹۳')?.bad).toBe(false)
+    expect(cardNumberHint('6037991234567890', 'en')?.text).toContain('check digit does not fit')
   })
 })

@@ -17,6 +17,8 @@ interface Request {
   attachments: number; note: string | null; state: string; recordedBy: string; approvedBy: string | null; cancelReason: string | null; version: number
   files: RequestFile[] | null
   paidAmount: number; payments: { key: string; kind: string; reference: string | null; amount: number; date: string; userId: string }[] | null
+  /** «ثبت انتقال (خرج چک)»: the received cheque the request hands on (owner, 19 Nov 2026). */
+  cheque: { instrumentId: string; number: string; dueDate: string | null; payerName: string; bankName: string | null; sayadId: string | null } | null
 }
 
 const props = withDefaults(defineProps<{ apiBase?: string; locale?: Locale; token?: () => string | undefined; fiscalYear?: number; approved?: boolean }>(),
@@ -128,9 +130,13 @@ onMounted(async () => { await L.load(); await load() })
             <td class="num">{{ num(r.number) }}</td>
             <td class="num">{{ r.date }}</td>
             <td>{{ r.requesterName }}</td>
-            <td>{{ r.beneficiaryName }} <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
+            <!-- A transfer between the company's own accounts (answer to Q82) names the receiving bank account in place of a beneficiary. -->
+            <td><span v-if="r.method === 'OwnAccountTransfer'" class="muted small">{{ t('حساب مقصد (انتقال گیرنده):', 'Receiving account:') }} </span>{{ r.beneficiaryName }}
+              <span class="muted small">{{ r.beneficiaryDetailCode }}</span></td>
             <td>{{ r.purpose }} <span class="muted small">{{ r.purposeGroupName }}</span> <span v-if="r.files?.length" class="tr-tag" :title="t('تصاویر ضمائم', 'Scans')">📎 {{ num(r.files.length) }}</span></td>
-            <td>{{ methodName(r.method) }}</td>
+            <td>{{ methodName(r.method) }}
+              <div v-if="r.cheque" class="muted small">{{ t('چک', 'cheque') }} <span class="num">{{ r.cheque.number }}</span> · {{ t('سررسید', 'due') }} <span class="num">{{ r.cheque.dueDate }}</span></div>
+            </td>
             <td class="num">{{ money(r.amount) }} <span v-if="r.currency !== 'IRR'">{{ r.currency }}</span>
               <div v-if="r.paidAmount && r.state !== 'Paid'" class="muted small">{{ t(`پرداخت‌شده ${money(r.paidAmount)} – مانده ${money(r.amount - r.paidAmount)}`, `paid ${money(r.paidAmount)} – left ${money(r.amount - r.paidAmount)}`) }}</div></td>
             <td class="num">{{ num(r.priority) }}</td>
@@ -156,6 +162,8 @@ onMounted(async () => { await L.load(); await load() })
         {{ t('ثبت', 'By') }}: {{ selected.recordedBy }}<template v-if="selected.approvedBy"> · {{ t('تایید', 'Approved by') }}: {{ selected.approvedBy }}</template>
         <template v-if="selected.reference1"> · {{ selected.reference1 }}</template>
         <template v-if="selected.dueDate"> · {{ t('سررسید', 'Due') }}: <span class="num">{{ selected.dueDate }}</span></template>
+        <template v-if="selected.cheque"> · {{ t('چک دریافتی', 'Received cheque') }}: <span class="num">{{ selected.cheque.number }}</span><template v-if="selected.cheque.bankName"> {{ selected.cheque.bankName }}</template>
+          · {{ t('تاریخ سررسید چک', 'Cheque due') }}: <span class="num">{{ selected.cheque.dueDate }}</span> · {{ t('واگذارنده چک', 'Given by') }}: {{ selected.cheque.payerName }}</template>
         <template v-if="selected.transferAccount"> · {{ t('به حساب', 'To account') }}: <span dir="ltr">{{ selected.transferAccount }}</span></template>
         <template v-if="selected.cardNumber"> · {{ t('به کارت', 'To card') }}: <span dir="ltr">{{ selected.cardNumber }}</span></template>
         <template v-if="payFromName(selected)"> · {{ t('پرداخت از', 'Pay from') }}: {{ payFromName(selected) }}</template>
@@ -174,7 +182,7 @@ onMounted(async () => { await L.load(); await load() })
         <strong>{{ t('پرداخت‌ها', 'Payments') }}</strong>
         <ul>
           <li v-for="p in selected.payments" :key="p.key">
-            <span class="num">{{ p.date }}</span> – {{ p.kind === 'EndorsedCheque' ? t('خرج چک دریافتی', 'Endorsed received cheque') : p.kind }} {{ p.reference }} –
+            <span class="num">{{ p.date }}</span> – {{ p.kind === 'EndorsedCheque' ? t('ثبت انتقال (خرج) چک یا سفتهٔ دریافتی', 'Transferred (endorsed) received cheque or note') : p.kind }} {{ p.reference }} –
             <span class="num">{{ money(p.amount) }}</span> <span class="muted">({{ p.userId }})</span>
           </li>
         </ul>

@@ -1,3 +1,4 @@
+using Treasury.Reference.Application.Abstractions;
 using Treasury.Reference.Application.Ledger;
 using Treasury.Reference.Domain.Ledger;
 using Treasury.Reference.Infrastructure.InMemory;
@@ -107,5 +108,14 @@ public sealed class LedgerUseCaseTests : IDisposable
         await _useCases.ImportChartAsync(Key(), Chart, CancellationToken.None);
         var r = await _useCases.SetCodeFormatAsync(new SetCodeFormatCommand(Key(), 1, 3, 5, 7, 6), CancellationToken.None);
         Assert.Equal("Ledger.FormatLocked", r.ErrorCode);
+    }
+
+    [Fact]
+    public void A_detail_type_carries_the_role_of_its_accounts_for_the_type_list_before_a_detail_field()
+    {
+        // Owner, 18 Nov 2026: «نوع حساب تفصیل» before the payer list offers only the types that may pay (customers, persons or companies).
+        Assert.Equal("Customer", new DetailTypeView("مشتریان داخلی", 3).Role);
+        Assert.Equal("PersonOrCompany", new DetailTypeView("اشخاص و شرکتها", 5).Role);
+        Assert.Null(new DetailTypeView("بانكها", 2).Role);
     }
 }

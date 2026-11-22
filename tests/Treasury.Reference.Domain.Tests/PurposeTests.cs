@@ -64,11 +64,14 @@ public sealed class PurposeTests
     }
 
     [Fact]
-    public void A_group_in_use_keeps_its_direction_and_is_never_deleted()
+    public void A_group_in_use_keeps_its_direction_and_is_never_deleted_but_stays_correctable()
     {
+        // Owner, 19 Nov 2026 (answer to Q61): a used group stays correctable; its report no. 6 lock (items 3 and 7) was withdrawn.
         var g = Group();
         Assert.True(g.MarkInUse());
         Assert.Equal("PurposeGroup.DirectionInUse", Code(() => g.Edit(PurposeDirection.Payment, g.Name, "2101", Postable, null, null)));
+        g.Edit(g.Direction, "نام اصلاح‌شده", "2102", Postable, null, null);
+        Assert.Equal(("نام اصلاح‌شده", "2102"), (g.Name, g.LedgerAccountCode));
         Assert.Equal("PurposeGroup.InUse", Code(() => g.Delete(hasPurposes: false)));
         Assert.Equal("PurposeGroup.HasPurposes", Code(() => Group().Delete(hasPurposes: true)));
     }

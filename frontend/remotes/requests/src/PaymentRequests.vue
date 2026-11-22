@@ -5,6 +5,7 @@
  * Paying them (cheque, cash, transfer…) comes with the payments screens.
  */
 import { computed, ref } from 'vue'
+import '@treasury/ui-kit/required.css'
 import type { Locale } from '@treasury/ui-kit'
 import RequestForm from './RequestForm.vue'
 import RequestList from './RequestList.vue'

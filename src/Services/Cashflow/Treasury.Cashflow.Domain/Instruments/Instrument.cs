@@ -1,5 +1,6 @@
 using Treasury.BuildingBlocks.Domain;
 using Treasury.Cashflow.Domain.Common;
+using Treasury.Cashflow.Domain.Receipts;
 
 namespace Treasury.Cashflow.Domain.Instruments;
 
@@ -58,6 +59,11 @@ public sealed record InstrumentHistoryEntry(
 /// <param name="SayadTracking">Endorsement: tracking number of the transfer in the Sayad system (answer to Q32).</param>
 /// <param name="ReceiptId">Replacement: the cheque receipt of the new cheques.</param>
 /// <param name="PaymentRequestId">Endorsement: the approved payment request the cheque pays (answer to Q36).</param>
+/// <param name="TrackingCode">Legal action: the tracking code of the certificate of non-payment (گواهی عدم پرداخت).</param>
+/// <param name="SheetNumber">Transfer of a cheque: the serial number of its payment sheet («برگ پرداخت», owner's answer to Q57, 19 Nov 2026).</param>
+/// <param name="Signers">Transfer of a cheque: the authorised signatories of the payment sheet, by the rule «برگ پرداخت چک» (Q57).</param>
+/// <param name="OriginalStamped">Cancellation: «اصل چک ممهور به مهر ابطال شد» was ticked (owner, 19 Nov 2026, answer to Q62).</param>
+/// <param name="RecordedAt">Cancellation: the computer's date and time when it was recorded, shown with the user beside that tick.</param>
 public sealed record StepDetails(
     Guid? AccountId = null,
     string? PartyDetailCode = null,
@@ -67,13 +73,32 @@ public sealed record StepDetails(
     string? Purpose = null,
     string? SayadTracking = null,
     Guid? ReceiptId = null,
-    Guid? PaymentRequestId = null);
+    Guid? PaymentRequestId = null,
+    string? TrackingCode = null,
+    int? SheetNumber = null,
+    IReadOnlyList<ReceiptSigner>? Signers = null,
+    bool OriginalStamped = false,
+    DateTimeOffset? RecordedAt = null);
+
+/// <summary>
+/// The bank's certificate of non-payment («گواهی عدم پرداخت», the owner's term of 18 Nov 2026 for what was called the bounce notice): its
+/// number, date and tracking code, as entered on the legal-action screen.
+/// </summary>
+public sealed record NonPaymentCertificate(string? Number, FiscalDate? Date, string? TrackingCode);
 
 /// <summary>
 /// An endorsement (خرج چک): it pays an approved payment request (owner, answer to Q36), whose beneficiary receives the cheque and whose
-/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32).
+/// payment purpose group and purpose it takes; the Sayad transfer's tracking number is recorded (answer to Q32). An endorsed promissory
+/// note («خرج سفته: ظهرنویسی و انتقال به غیر», owner, 16 Nov 2026) has no Sayad transfer.
 /// </summary>
-public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId);
+/// <param name="RequestChequeId">The received cheque the payment request names: a request of the kind «ثبت انتقال (خرج چک)» is written for
+/// one cheque (owner, 19 Nov 2026); null for a request of another kind.</param>
+/// <param name="SheetNumber">A cheque: the serial number of the payment sheet («برگ پرداخت») the transfer gets, from 1 each fiscal year
+/// (owner's answer to Q57, 19 Nov 2026).</param>
+/// <param name="Signers">A cheque: the authorised signatories who sign the payment sheet besides who hands the cheque over and who receives
+/// it, chosen by the signature rule «برگ پرداخت چک» of Basic Information (owner's answer to Q57).</param>
+public sealed record Endorsement(string ReceiverDetailCode, string ReceiverName, Guid PurposeGroupId, string Purpose, string SayadTracking, Guid PaymentRequestId,
+    Guid? RequestChequeId = null, int? SheetNumber = null, IReadOnlyList<ReceiptSigner>? Signers = null);
 
 /// <summary>
 /// A received or issued cheque, promissory note or similar instrument, with its whole life across fiscal years.
@@ -107,13 +132,13 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     public InstrumentDirection Direction { get; }
 
-    public InstrumentKind Kind { get; }
+    public InstrumentKind Kind { get; private set; }
 
     /// <summary>Number printed on the instrument. Set at receipt, or when an issued cheque gets its sheet number.</summary>
     public string? Number { get; private set; }
 
     /// <summary>Drawer's bank for received cheques.</summary>
-    public string? BankName { get; }
+    public string? BankName { get; private set; }
 
     /// <summary>Received side: the receipt (رسید دریافت) that brought the instrument in; null for older single entries.</summary>
     public Guid? ReceiptId { get; private set; }
@@ -127,6 +152,10 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// </summary>
     public bool IsPostDated => Direction == InstrumentDirection.Received && DueDate is { } due && due > IssueDate;
 
+    /// <summary>«سررسید چک» (owner, 18 Nov 2026): see <see cref="ReceivedChequeStatus.HasReachedDueDate"/>.</summary>
+    public bool HasReachedDueDate(FiscalDate today) =>
+        Direction == InstrumentDirection.Received && ReceivedChequeStatus.HasReachedDueDate(State, IssueDate, DueDate, today);
+
     /// <summary>Our bank account for issued cheques.</summary>
     public Guid? BankAccountId { get; private set; }
 
@@ -135,18 +164,18 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>Payment (in the Disbursements context) this issued instrument settles.</summary>
     public Guid? PaymentId { get; private set; }
 
-    public Money Amount { get; }
+    public Money Amount { get; private set; }
 
     /// <summary>Date written on the instrument (received side: date received).</summary>
-    public FiscalDate IssueDate { get; }
+    public FiscalDate IssueDate { get; private set; }
 
-    /// <summary>Maturity (سررسید). Null only for guarantee items.</summary>
-    public FiscalDate? DueDate { get; }
+    /// <summary>Maturity (سررسید). Null only for guarantee items and notes payable on demand («عندالمطالبه»).</summary>
+    public FiscalDate? DueDate { get; private set; }
 
-    public CounterpartyRef Counterparty { get; }
+    public CounterpartyRef Counterparty { get; private set; }
 
     /// <summary>بابت — what the instrument is for.</summary>
-    public string Purpose { get; }
+    public string Purpose { get; private set; }
 
     /// <summary>Collection account (received cheques sent to a bank) or endorsee (received cheques given to others).</summary>
     public string? Destination { get; private set; }
@@ -165,7 +194,26 @@ public sealed class Instrument : AggregateRoot<Guid>
     public IReadOnlyList<InstrumentHistoryEntry> History => _history;
 
     public IReadOnlyList<InstrumentAction> AllowedActions() =>
-        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured);
+        InstrumentLifecycle.AllowedActions(Direction, State, Kind, IsMatured).Where(a => !IsTransferCheque || TransferChequeSteps.Contains(a)).ToList();
+
+    /// <summary>
+    /// A received cheque of a transfer between two bank accounts of the company (owner's report no. 7, 20 Nov 2026, «نقل و انتقال
+    /// (انتقال گیرنده)»): the company's own cheque, issued from the source account and recorded here with one button.
+    /// </summary>
+    public bool IsTransferCheque => Direction == InstrumentDirection.Received && Details.TransferId is not null;
+
+    /// <summary>
+    /// The steps of a transfer cheque on the receipts side. Owner's report no. 7: «در مورد چک‌های نقل و انتقال در بخش دریافت مراحل بعدی
+    /// واگذاری به بانک و ثبت صیادی مانند سایر چک‌های دریافتی انجام می‌گردد» — so: ثبت صیادی, واگذاری به بانک (the destination account),
+    /// وصول, and عودت از بانک with a new deposit. The steps that settle with an outside payer (برگشت, عودت به پرداخت‌کننده, تعویض,
+    /// اقدام حقوقی, ثبت انتقال / خرج) do not apply to the company's own cheque. Owner, 21 Nov 2026 (answer to Q79): there is no
+    /// replacement, and «ابطال» is recorded through the transfer, while the cheque is not registered in Sayad
+    /// (<see cref="CancelTransferCheque"/>), not on the cheque screens.
+    /// </summary>
+    public static readonly IReadOnlySet<InstrumentAction> TransferChequeSteps = new HashSet<InstrumentAction>
+    {
+        InstrumentAction.RegisterSayad, InstrumentAction.DepositForCollection, InstrumentAction.RecordCleared, InstrumentAction.ReturnFromBank,
+    };
 
     /// <summary>A cheque or note received into a cash desk (old Stcode 11, form D_Check; rule R1).</summary>
     public static Instrument Receive(
@@ -186,7 +234,8 @@ public sealed class Instrument : AggregateRoot<Guid>
 
     /// <summary>
     /// A cheque or note received on a receipt (رسید دریافت), with what is written on it. A cheque needs its bank (rule R1); a
-    /// promissory note has no bank and may name up to two guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»).
+    /// promissory note has no bank and may name up to three guarantors (new-version manual, form «دریافت چک و اسناد دریافتنی»; owner's
+    /// answer to Q39).
     /// </summary>
     public static Instrument Receive(
         Guid id,
@@ -202,13 +251,7 @@ public sealed class Instrument : AggregateRoot<Guid>
         ReceivedInstrumentDetails details,
         Guid? receiptId)
     {
-        ArgumentNullException.ThrowIfNull(details);
-        Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
-        Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
-        Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
-        ValidateCommon(kind, drawer, purpose, dueDate);
-        var checkedDetails = details.Validated(kind);
-
+        var checkedDetails = CheckReceived(kind, number, bankName, dueDate, drawer, purpose, details);
         var instrument = new Instrument(id, InstrumentDirection.Received, kind, amount, receivedOn, dueDate, drawer, purpose.Trim(),
             string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim())
         {
@@ -220,6 +263,116 @@ public sealed class Instrument : AggregateRoot<Guid>
         };
         instrument.Record(InstrumentAction.Receive, null, InstrumentState.InCashDesk, receivedOn, userId, null, null);
         return instrument;
+    }
+
+    /// <summary>What is checked on a received cheque or note, when it is received and when it is corrected; returns its details as kept.</summary>
+    private static ReceivedInstrumentDetails CheckReceived(
+        InstrumentKind kind, string number, string? bankName, FiscalDate? dueDate, CounterpartyRef drawer, string purpose, ReceivedInstrumentDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+        Require(kind.IsValidFor(InstrumentDirection.Received), "Instrument.KindNotValidForDirection", $"{kind} cannot be received.");
+        Require(!string.IsNullOrWhiteSpace(number), "Instrument.NumberRequired", "Instrument number is required.");
+        Require(!kind.IsCheque() || !string.IsNullOrWhiteSpace(bankName), "Instrument.BankRequired", "Bank is required.");
+        var checkedDetails = details.Validated(kind);
+
+        // Owner's note receipt form (16 Nov 2026): a note payable on demand («عندالمطالبه») has no due date; a dated note is not due
+        // before the day it was written (old rule R6, which the old program applied to cheques).
+        ValidateCommon(kind, drawer, purpose, dueDate, checkedDetails.OnDemand);
+        Require(!checkedDetails.OnDemand || dueDate is null, "Instrument.OnDemandHasDueDate", "A note payable on demand has no due date.");
+        Require(checkedDetails.WrittenOn is not { } written || dueDate is not { } due || due >= new FiscalDate(written),
+            "Instrument.DueBeforeIssue", "Due date cannot be earlier than the issue date.");
+        return checkedDetails;
+    }
+
+    /// <summary>
+    /// The receipts side of a cheque transfer («نقل و انتقال (انتقال گیرنده)», owner's report no. 7): the cheque the company issued from
+    /// its source account, recorded as a received cheque «نزد صندوق» with the same number, amount and due date. It names its transfer
+    /// and the destination account instead of a receipt.
+    /// </summary>
+    /// <param name="issued">The cheque as issued for the transfer (payment side).</param>
+    /// <param name="drawer">The company's source account, with the bank account's تفصیل.</param>
+    /// <param name="details">What is written on the cheque: the source account's bank, branch, account number and the Sayad ID.</param>
+    public static Instrument ReceiveTransferCheque(
+        Guid id, Instrument issued, Guid transferId, Guid destinationAccountId, CounterpartyRef drawer, string bankName, ReceivedInstrumentDetails details,
+        FiscalDate receivedOn, string userId)
+    {
+        ArgumentNullException.ThrowIfNull(issued);
+        ArgumentNullException.ThrowIfNull(details);
+        Require(transferId != Guid.Empty && issued.Direction == InstrumentDirection.Issued && issued.State == InstrumentState.Issued && issued.PaymentId == transferId,
+            "Transfer.ChequeMismatch", "The received cheque must be the cheque issued for this transfer.");
+        Require(receivedOn >= issued.IssueDate, "Transfer.ReceivedBeforeIssue", "The cheque cannot be received before the day it was issued.");
+        Require(details.SayadId is not null, "Transfer.SayadIdRequired", "A transfer cheque carries its 16-digit Sayad ID.");
+        return Receive(id, InstrumentKind.OrdinaryCheque, issued.Number ?? string.Empty, bankName, issued.Amount, receivedOn, issued.DueDate, drawer, issued.Purpose, userId,
+            details with { TransferId = transferId, TransferAccountId = destinationAccountId }, null);
+    }
+
+    /// <summary>
+    /// «ابطال» of a transfer cheque on the receipts side, with its transfer (<c>BankTransfer.CancelCheque</c>; owner, 21 Nov 2026, answer
+    /// to Q79): only while it is «نزد صندوق» and not registered in Sayad. It needs no order of management: the cheque is the company's own.
+    /// </summary>
+    public void CancelTransferCheque(Guid transferId, FiscalDate date, string userId, string reason)
+    {
+        Require(IsTransferCheque && Details.TransferId == transferId, "Transfer.ChequeMismatch", "The cheque does not belong to this transfer.");
+        Require(!string.IsNullOrWhiteSpace(reason), "Transfer.CancelReasonRequired", "Give the reason for cancelling the cheque.");
+        Apply(InstrumentAction.Cancel, date, userId, null, reason.Trim(), byTransfer: true);
+    }
+
+    /// <summary>
+    /// The issued cheque of a transfer recorded by mistake is taken away with its transfer (<c>BankTransfer.Delete</c>); the caller then
+    /// deletes it and frees its sheet. Only while it is as it was issued: no later step, not on the receipts side.
+    /// </summary>
+    public void RemoveIssuedForTransfer(Guid transferId, string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(Direction == InstrumentDirection.Issued && State == InstrumentState.Issued && PaymentId == transferId && _history[^1].Action == InstrumentAction.Issue,
+            "Transfer.ChequeMovedOn", "A step is recorded on the cheque; its transfer can no longer be deleted.");
+        Raise(new IssuedInstrumentRemoved(Id, transferId, Kind, Number, userId));
+    }
+
+    /// <summary>
+    /// A received cheque or note can be corrected or taken off its receipt only while it is as it was received: in the cash desk
+    /// («نزد صندوق»), with no step recorded on it (owner's report no. 6, items 2 and 6). After «ثبت صیادی», a deposit or any other
+    /// step, what is written on it stands.
+    /// </summary>
+    public bool IsAsReceived => Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && _history.Count == 1;
+
+    /// <summary>
+    /// Correction of a received cheque or note with its receipt (owner's report no. 6, items 2 and 6), with the rules it was received
+    /// with. It stays in the fiscal year it was received in. The receipt step keeps who received it and takes the corrected date.
+    /// </summary>
+    public void CorrectReceived(
+        InstrumentKind kind, string number, string? bankName, Money amount, FiscalDate receivedOn, FiscalDate? dueDate, CounterpartyRef drawer, string purpose,
+        string userId, ReceivedInstrumentDetails details)
+    {
+        ArgumentNullException.ThrowIfNull(amount);
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(IsAsReceived, "Instrument.CorrectionAfterStep",
+            $"Cheque or note {Number} has left «نزد صندوق» or has a step recorded on it; it can no longer be corrected with its receipt.");
+        Require(receivedOn.JalaliYear == OriginFiscalYear, "Receipt.CorrectionOtherYear", $"The date stays in fiscal year {OriginFiscalYear}.");
+        var checkedDetails = CheckReceived(kind, number, bankName, dueDate, drawer, purpose, details);
+        Kind = kind;
+        Number = number.Trim();
+        BankName = string.IsNullOrWhiteSpace(bankName) ? null : bankName.Trim();
+        Amount = amount;
+        IssueDate = receivedOn;
+        DueDate = dueDate;
+        Counterparty = drawer;
+        Purpose = purpose.Trim();
+        Details = checkedDetails;
+        _history[0] = _history[0] with { Date = receivedOn };
+        Raise(new ReceivedInstrumentCorrected(Id, ReceiptId, Kind, Number, IssueDate, DueDate, Amount, Counterparty.Id, userId));
+    }
+
+    /// <summary>
+    /// Takes a cheque or note typed by mistake off its receipt while the receipt is corrected; the caller then deletes it. Only
+    /// while it is as it was received (see <see cref="IsAsReceived"/>); later a cheque leaves through its steps (عودت، ابطال).
+    /// </summary>
+    public void RemoveFromReceipt(string userId)
+    {
+        Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
+        Require(IsAsReceived, "Instrument.CorrectionAfterStep",
+            $"Cheque or note {Number} has left «نزد صندوق» or has a step recorded on it; it can no longer be corrected with its receipt.");
+        Raise(new ReceivedInstrumentRemoved(Id, ReceiptId, Kind, Number, userId));
     }
 
     /// <summary>
@@ -259,11 +412,14 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// The cheque leaves the cash desk («در جریان وصول نزد صندوق») for one of our bank accounts («در جریان وصول نزد بانک»), owner's
     /// report no. 4, item 9; old form D_Check_Vag_m (account and deposit slip «شماره فیش واگذاری»). The account must be switched on and
-    /// in the cheque's currency.
+    /// in the cheque's currency. Rule N3 (owner, 18 Nov 2026): a cheque is deposited only after «ثبت صیادی».
     /// </summary>
     public void DepositForCollection(CollectionAccount account, FiscalDate date, string userId, string? slipNumber = null)
     {
         ArgumentNullException.ThrowIfNull(account);
+        RequireSayadRegistration();
+        Require(Details.TransferAccountId is not { } destination || destination == account.Id, "Instrument.TransferChequeOtherAccount",
+            "A transfer cheque is deposited at the destination account of its transfer.");
         Require(account.IsActive, "Instrument.CollectionAccountInactive", "The bank account is switched off.");
         Require(string.Equals(account.CurrencyCode.Trim(), Amount.Currency, StringComparison.OrdinalIgnoreCase), "Instrument.CollectionAccountCurrency",
             "The cheque is deposited at an account in its own currency.");
@@ -277,7 +433,23 @@ public sealed class Instrument : AggregateRoot<Guid>
     public void DepositForCollection(string collectionAccount, FiscalDate date, string userId, string? reference = null)
     {
         Require(!string.IsNullOrWhiteSpace(collectionAccount), "Instrument.CollectionAccountRequired", "Collection account is required."); // R3
+        Require(!IsTransferCheque, "Instrument.TransferChequeOtherAccount", "A transfer cheque is deposited at the destination account of its transfer.");
+        RequireSayadRegistration();
         Apply(InstrumentAction.DepositForCollection, date, userId, reference, null, () => Destination = collectionAccount.Trim());
+    }
+
+    /// <summary>
+    /// Rule N3 (owner, 18 Nov 2026: "ثبت صیادی باید اجباری باشد؛ چک بدون آن به بانک واگذار نمی‌شود"): a cheque still «نزد صندوق» is
+    /// registered in Sayad first. The old program had no such step (D_Check_Vag_m). A promissory note has no Sayad registration and goes
+    /// to the bank straight from the cash desk (owner, 18 Nov 2026, when promissory notes and rule N3 were joined).
+    /// </summary>
+    private void RequireSayadRegistration()
+    {
+        if (Direction == InstrumentDirection.Received && State == InstrumentState.InCashDesk && !Kind.IsNote())
+        {
+            Require(Kind.IsCollectable(), "Instrument.KindNotAllowedForAction", $"'{InstrumentAction.DepositForCollection}' is not allowed for {Kind}."); // R3
+            throw new DomainException("Instrument.SayadRegistrationRequired", "Register the cheque in Sayad before depositing it at the bank.");
+        }
     }
 
     /// <summary>
@@ -294,17 +466,57 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// (e)). From the bank, or after the bank returned the cheque (answer to Q33). Rule N2 also applies (answer to Q11): not before the due
     /// date. The step's date is the notice's date.
     /// </summary>
-    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber)
+    /// <param name="trackingCode">The tracking code of the certificate of non-payment (گواهی عدم پرداخت), when typed (owner, 18 Nov 2026).</param>
+    public void RecordBounced(FiscalDate date, string userId, string? reason, string? noticeNumber, string? trackingCode = null)
     {
         var fromBank = State == InstrumentState.DepositedForCollection;
+        var code = Clean(trackingCode);
         Apply(InstrumentAction.RecordBounced, date, userId, Clean(noticeNumber), reason,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
                 Require(!string.IsNullOrWhiteSpace(noticeNumber), "Instrument.BounceNoticeRequired", "Enter the number of the bank's bounce notice.");
             },
-            details: fromBank ? new StepDetails(AccountId: CollectionAccountId) : null);
+            details: fromBank || code is not null ? new StepDetails(AccountId: fromBank ? CollectionAccountId : null, TrackingCode: code) : null);
     }
+
+    /// <summary>
+    /// «ثبت صیادی شد» (owner, 18 Nov 2026): the cheque in the cash desk is registered in the banks' Sayad system. The tracking number of
+    /// the registration may be recorded. The cheque stays in the cash desk.
+    /// </summary>
+    public void RegisterSayad(FiscalDate date, string userId, string? trackingNumber = null, string? note = null) =>
+        Apply(InstrumentAction.RegisterSayad, date, userId, Clean(trackingNumber), Clean(note),
+            details: Clean(trackingNumber) is { } tracking ? new StepDetails(SayadTracking: tracking) : null);
+
+    /// <summary>
+    /// «اقدام حقوقی» (owner, 18 Nov 2026): the bounced cheque, with the bank's bounce notice, is handed to the company's lawyer for legal
+    /// action and collection; rarely the action is taken on a cheque still in the cash desk (answer to Q38). Recorded on its own screen with the date of the action and its description (شرح اقدام حقوقی); the scans of
+    /// its papers are attached afterwards (<see cref="InstrumentAttachment"/>). Old program: the flag GoInlaw, without date or text.
+    /// </summary>
+    /// <param name="certificate">The certificate of non-payment (گواهی عدم پرداخت): number, date and tracking code. Required for a bounced
+    /// ordinary cheque or note (owner, 18 Nov 2026); a guarantee item, or a cheque taken to law from the cash desk, may have none.</param>
+    public void SendToLegal(FiscalDate date, string userId, string? description, NonPaymentCertificate? certificate = null)
+    {
+        var (number, issued, code) = (Clean(certificate?.Number), certificate?.Date, Clean(certificate?.TrackingCode));
+        Apply(InstrumentAction.SendToLegal, date, userId, number, Clean(description),
+            validate: () =>
+            {
+                Require(!string.IsNullOrWhiteSpace(description), "Instrument.LegalActionDescriptionRequired", "Enter the description of the legal action.");
+                Require(State != InstrumentState.Bounced || Kind.IsGuarantee() || (number is not null && issued is not null && code is not null),
+                    "Instrument.NonPaymentCertificateRequired", "Enter the number, date and tracking code of the certificate of non-payment.");
+            },
+            details: issued is null && code is null ? null : new StepDetails(DocumentDate: issued, TrackingCode: code));
+    }
+
+    /// <summary>
+    /// The cheque or note in legal action became collectable, during the action or at its end: it is handed back to the cash desk, at the
+    /// start of the cycle («نزد صندوق»), and goes on like a new cheque (owner's answer to Q38 (2), 18 Nov 2026).
+    /// </summary>
+    public void ReturnFromLegal(FiscalDate date, string userId, string? note = null) =>
+        Apply(InstrumentAction.ReturnFromLegal, date, userId, null, Clean(note), () => Destination = null);
+
+    /// <summary>The step (1 = received) that put the cheque in legal action, while it is there; scans are attached to it.</summary>
+    public int? LegalActionStep => State == InstrumentState.InLegal ? _history.FindLastIndex(h => h.Action == InstrumentAction.SendToLegal) + 1 : null;
 
     /// <summary>The bank gave the cheque back to the company without collecting it and without a bounce notice (owner's item 14 (c)).</summary>
     public void ReturnFromBank(FiscalDate date, string userId, string? note = null) =>
@@ -316,20 +528,41 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// <summary>
     /// Endorsement («خرج چک», owner's item 14 (g), kept by the owner): the cheque pays a debt of the company. The receiver is any تفصیل
     /// and the Sayad transfer's tracking number is recorded (answers to Q32).
+    /// Owner, 19 Nov 2026 («ثبت انتقال (خرج چک)»): the cheque must first be registered in Sayad and have the status «ثبت صیادی شد»; the
+    /// payment request must have been written for the transfer of this very cheque; with the Sayad tracking code of the transfer the
+    /// cheque gets the status «ثبت انتقال شد (خرج چک شد)». A promissory note has no Sayad system and is endorsed as before.
     /// </summary>
     public void Endorse(Endorsement endorsement, FiscalDate date, string userId, string? note = null)
     {
         ArgumentNullException.ThrowIfNull(endorsement);
+        if (Kind.IsCheque())
+        {
+            Require(Direction != InstrumentDirection.Received || State != InstrumentState.InCashDesk || !Kind.IsCollectable(),
+                "Instrument.TransferNeedsSayadRegistration", "Register the cheque in Sayad before transferring it.");
+            Require(endorsement.RequestChequeId == Id, "Instrument.PaymentRequestNotForThisCheque",
+                "The payment request was not written for the transfer of this cheque.");
+            // Owner's answer to Q57: like every payment the transfer has its payment sheet, with a serial number of its own.
+            Require(endorsement.SheetNumber is > 0, "Instrument.PaymentSheetNumberRequired", "The transfer needs the number of its payment sheet.");
+        }
+        else
+        {
+            // A request of the kind «ثبت انتقال (خرج چک)» is paid by its own cheque, never by a note.
+            Require(endorsement.RequestChequeId is null, "Instrument.PaymentRequestNotForThisCheque", "That payment request is for the transfer of a cheque.");
+        }
+
         Require(!string.IsNullOrWhiteSpace(endorsement.ReceiverDetailCode) && !string.IsNullOrWhiteSpace(endorsement.ReceiverName),
             "Instrument.EndorseeRequired", "The party receiving the endorsed cheque is required.");
         Require(endorsement.PurposeGroupId != Guid.Empty, "Instrument.EndorsementGroupRequired", "Choose the payment purpose group.");
         Require(!string.IsNullOrWhiteSpace(endorsement.Purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(!string.IsNullOrWhiteSpace(endorsement.SayadTracking), "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
+        // Only cheques are transferred in the Sayad system; a note is endorsed on its back.
+        var sayad = Kind.IsCheque() ? Clean(endorsement.SayadTracking) : null;
+        Require(!Kind.IsCheque() || sayad is not null, "Instrument.SayadTrackingRequired", "Enter the tracking number of the Sayad transfer.");
         Require(endorsement.PaymentRequestId != Guid.Empty, "Instrument.PaymentRequestRequired", "Choose the approved payment request the cheque pays.");
-        Apply(InstrumentAction.Endorse, date, userId, endorsement.SayadTracking.Trim(), note, () => Destination = endorsement.ReceiverName.Trim(),
+        Apply(InstrumentAction.Endorse, date, userId, sayad, note, () => Destination = endorsement.ReceiverName.Trim(),
             details: new StepDetails(PartyDetailCode: endorsement.ReceiverDetailCode.Trim(), PartyName: endorsement.ReceiverName.Trim(),
-                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: endorsement.SayadTracking.Trim(),
-                PaymentRequestId: endorsement.PaymentRequestId));
+                PurposeGroupId: endorsement.PurposeGroupId, Purpose: endorsement.Purpose.Trim(), SayadTracking: sayad,
+                PaymentRequestId: endorsement.PaymentRequestId, SheetNumber: Kind.IsCheque() ? endorsement.SheetNumber : null,
+                Signers: Kind.IsCheque() && endorsement.Signers is { Count: > 0 } signers ? signers : null));
     }
 
     /// <summary>The key of the payment an endorsement made on its request: the cheque and the endorsement's step (answer to Q36).</summary>
@@ -343,8 +576,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     /// The receiver of an endorsed cheque brings it back bounced, with the bank's bounce notice (owner's item 14 (h)). The cheque becomes
     /// «برگشت شده» again in the company's hands; rule N2 applies.
     /// </summary>
-    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null) =>
+    public void RecordEndorsementReturned(FiscalDate date, string userId, string? noticeNumber, string? reason = null, string? trackingCode = null) =>
         Apply(InstrumentAction.RecordEndorsementReturned, date, userId, Clean(noticeNumber), reason,
+            details: Clean(trackingCode) is { } code ? new StepDetails(TrackingCode: code) : null,
             validate: () =>
             {
                 RequireNotBeforeDueDate(date, "Instrument.BouncedBeforeDueDate", "Bounce");
@@ -353,27 +587,45 @@ public sealed class Instrument : AggregateRoot<Guid>
             changeDetails: () => Destination = null);
 
     /// <summary>
-    /// Replacement («تعویض», owner's item 14 (d)): the payer gives new cheques for this one; they may differ in amount and number (answer
+    /// Replacement («تعویض», owner's item 14 (d)), only of a cheque that was cancelled first («ابطال شده»; owner's answer to Q62, 19 Nov
+    /// 2026: "برای اصل رعایت کنترل داخلی در ابتدا بایستی باطل شود"): the payer gives new cheques for this one; they may differ in amount and number (answer
     /// to Q31) and come on their own cheque receipt.
     /// </summary>
     public void Replace(Guid replacementReceiptId, FiscalDate date, string userId)
     {
         Require(replacementReceiptId != Guid.Empty, "Instrument.ReplacementRequired", "The replacement receipt is required.");
+
+        // Owner, 20 Nov 2026 (answer to Q66): "حتما این کنترل باید وجود داشته باشد در هنگام تعویض؛ ابطال چک قبلی ثبت شده باشد". The
+        // lifecycle table says the same; this names the reason to the user.
+        Require(Direction != InstrumentDirection.Received || State == InstrumentState.Cancelled, "Instrument.ReplaceNeedsCancellation",
+            $"Cheque {Number} must be cancelled («ابطال») before it is replaced.");
         Apply(InstrumentAction.Replace, date, userId, null, null, details: new StepDetails(ReceiptId: replacementReceiptId));
     }
 
     /// <summary>
     /// Cancellation of a received cheque («ابطال», owner's item 14 (f)): in the cash desk, back from the bank or bounced. The treasurer
     /// cancels it and types the number and date of management's order (answer to Q30), with the reason.
+    /// Owner, 19 Nov 2026 (answer to Q62): the cancellation records whether «اصل چک ممهور به مهر ابطال شد» was ticked, with the user
+    /// who cancelled and the computer's date and time. A cheque that is to be replaced is cancelled first (see <see cref="Replace"/>).
+    /// Owner's report no. 6, item 19: a cheque in the cash desk that was registered in Sayad («ثبت صیادی شد») is not cancelled.
     /// </summary>
-    public void CancelReceived(FiscalDate date, string userId, string? orderNumber, FiscalDate? orderDate, string? reason)
+    /// <param name="originalStamped">The original cheque was stamped «ابطال».</param>
+    /// <param name="recordedAt">The computer's date and time, written beside that tick with the user.</param>
+    public void CancelReceived(FiscalDate date, string userId, string? orderNumber, FiscalDate? orderDate, string? reason, bool originalStamped = false,
+        DateTimeOffset? recordedAt = null)
     {
         Require(Direction == InstrumentDirection.Received, "Instrument.InvalidTransition", "Only a received cheque is cancelled this way.");
+
+        // Owner's report no. 6, item 19: a cheque in the cash desk that is registered in Sayad is not cancelled. The lifecycle table
+        // says the same; this names the reason to the user.
+        Require(State != InstrumentState.SayadRegistered, "Instrument.SayadRegisteredNotCancelled",
+            $"Cheque {Number} is registered in Sayad («ثبت صیادی شد») and cannot be cancelled.");
         Require(!string.IsNullOrWhiteSpace(orderNumber) && orderDate is not null, "Instrument.CancelOrderRequired",
             "Enter the number and date of management's order to cancel.");
         Require(orderDate is null || orderDate <= date, "Instrument.CancelOrderAfterCancel", "Management's order cannot be dated after the cancellation.");
         Require(!string.IsNullOrWhiteSpace(reason), "Instrument.CancelReasonRequired", "A reason is required to cancel.");
-        Apply(InstrumentAction.Cancel, date, userId, orderNumber!.Trim(), reason!.Trim(), details: new StepDetails(DocumentDate: orderDate));
+        Apply(InstrumentAction.Cancel, date, userId, orderNumber!.Trim(), reason!.Trim(),
+            details: new StepDetails(DocumentDate: orderDate, OriginalStamped: originalStamped, RecordedAt: recordedAt));
     }
 
     private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
@@ -464,8 +716,9 @@ public sealed class Instrument : AggregateRoot<Guid>
     }
 
     /// <param name="validate">Extra rule of this action, checked after the transition and date rules, before anything changes.</param>
+    /// <param name="byTransfer">The step is recorded by the cheque's transfer itself (its cancellation), not on the cheque screens.</param>
     private void Apply(InstrumentAction action, FiscalDate date, string userId, string? reference, string? note, Action? changeDetails = null, Action? validate = null,
-        StepDetails? details = null)
+        StepDetails? details = null, bool byTransfer = false)
     {
         Require(!string.IsNullOrWhiteSpace(userId), "Instrument.UserRequired", "User is required.");
         var transition = InstrumentLifecycle.Find(Direction, State, action)
@@ -477,6 +730,10 @@ public sealed class Instrument : AggregateRoot<Guid>
         {
             throw new DomainException("Instrument.KindNotAllowedForAction", $"'{action}' is not allowed for {Kind}."); // R3
         }
+
+        // Owner's report no. 7: a transfer cheque goes on with ثبت صیادی, واگذاری به بانک and وصول only (see TransferChequeSteps).
+        Require(!IsTransferCheque || byTransfer || TransferChequeSteps.Contains(action), "Instrument.NotForTransferCheque",
+            $"'{action}' is not recorded on a cheque of a transfer between the company's own bank accounts.");
 
         var lastDate = _history[^1].Date;
         if (date < lastDate)
@@ -509,12 +766,12 @@ public sealed class Instrument : AggregateRoot<Guid>
         }
     }
 
-    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate)
+    private static void ValidateCommon(InstrumentKind kind, CounterpartyRef counterparty, string purpose, FiscalDate? dueDate, bool onDemand = false)
     {
         ArgumentNullException.ThrowIfNull(counterparty);
         Require(!string.IsNullOrWhiteSpace(counterparty.DisplayName), "Instrument.CounterpartyRequired", "Drawer or payee is required.");
         Require(!string.IsNullOrWhiteSpace(purpose), "Instrument.PurposeRequired", "Purpose (بابت) is required.");
-        Require(kind.IsGuarantee() || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
+        Require(kind.IsGuarantee() || onDemand || dueDate is not null, "Instrument.DueDateRequired", "Due date is required.");
     }
 
     private static void Require(bool condition, string code, string message)
@@ -543,3 +800,14 @@ public sealed record InstrumentStateChanged(
     string? Number,
     string? Destination,
     string UserId) : DomainEvent;
+
+/// <summary>A received cheque or note was corrected with its receipt, before the receipt's voucher was confirmed.</summary>
+public sealed record ReceivedInstrumentCorrected(
+    Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, FiscalDate ReceivedOn, FiscalDate? DueDate, Money Amount, Guid CounterpartyId,
+    string UserId) : DomainEvent;
+
+/// <summary>The issued cheque of a transfer recorded by mistake was deleted with it, and its sheet freed (owner's report no. 7).</summary>
+public sealed record IssuedInstrumentRemoved(Guid InstrumentId, Guid TransferId, InstrumentKind Kind, string? Number, string UserId) : DomainEvent;
+
+/// <summary>A cheque or note typed by mistake was taken off its receipt and deleted, before the receipt's voucher was confirmed.</summary>
+public sealed record ReceivedInstrumentRemoved(Guid InstrumentId, Guid? ReceiptId, InstrumentKind Kind, string? Number, string UserId) : DomainEvent;

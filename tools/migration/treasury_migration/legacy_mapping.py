@@ -28,7 +28,6 @@ GUARANTEE_KINDS = {"GuaranteeCheque", "GuaranteeNote"}
 
 # Allowed steps — must stay identical to InstrumentLifecycle.All in the .NET domain (checked by test_lifecycle_matches_dotnet).
 TRANSITIONS = {
-    (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "DepositedForCollection", "RecordCleared"): "Cleared",
     (RECEIVED, "DepositedForCollection", "RecordBounced"): "Bounced",
     (RECEIVED, "InCashDesk", "ReturnToIssuer"): "ReturnedToIssuer",
@@ -38,13 +37,28 @@ TRANSITIONS = {
     (RECEIVED, "ReturnedFromBank", "DepositForCollection"): "DepositedForCollection",
     (RECEIVED, "ReturnedFromBank", "RecordBounced"): "Bounced",
     (RECEIVED, "ReturnedFromBank", "ReturnToIssuer"): "ReturnedToIssuer",
-    (RECEIVED, "InCashDesk", "Replace"): "Replaced",
-    (RECEIVED, "ReturnedFromBank", "Replace"): "Replaced",
-    (RECEIVED, "Bounced", "Replace"): "Replaced",
     (RECEIVED, "InCashDesk", "Cancel"): "Cancelled",
     (RECEIVED, "ReturnedFromBank", "Cancel"): "Cancelled",
     (RECEIVED, "Bounced", "Cancel"): "Cancelled",
     (RECEIVED, "Endorsed", "RecordEndorsementReturned"): "Bounced",
+    # Owner, 18 Nov 2026 (latest status of a received cheque): registered in Sayad, handed to the lawyer.
+    (RECEIVED, "InCashDesk", "RegisterSayad"): "SayadRegistered",
+    (RECEIVED, "SayadRegistered", "DepositForCollection"): "DepositedForCollection",
+    (RECEIVED, "SayadRegistered", "ReturnToIssuer"): "ReturnedToIssuer",
+    (RECEIVED, "SayadRegistered", "Endorse"): "Endorsed",
+    # Owner's report no. 6, item 19: a cheque registered in Sayad is not cancelled (no SayadRegistered -> Cancel).
+    (RECEIVED, "Bounced", "SendToLegal"): "InLegal",
+    (RECEIVED, "InLegal", "Cancel"): "Cancelled",
+    # Owner, 19 Nov 2026 (answer to Q62): a cheque is replaced only after it was cancelled.
+    (RECEIVED, "Cancelled", "Replace"): "Replaced",
+    # Owner's answer to Q38 (18 Nov 2026): legal action, unlikely as it is, on a cheque still in the cash desk.
+    (RECEIVED, "InCashDesk", "SendToLegal"): "InLegal",
+    (RECEIVED, "SayadRegistered", "SendToLegal"): "InLegal",
+    # Owner's answer to Q38 (2): a cheque in legal action that became collectable goes back to the cash desk.
+    (RECEIVED, "InLegal", "ReturnFromLegal"): "InCashDesk",
+    # A promissory note has no Sayad registration, so an ordinary note goes to the bank straight from the cash desk
+    # (owner, 16 and 18 Nov 2026). The .NET table allows this step for notes only; this copy does not check kinds.
+    (RECEIVED, "InCashDesk", "DepositForCollection"): "DepositedForCollection",
     (ISSUED, "BeingIssued", "Issue"): "Issued",
     (ISSUED, "Issued", "Deliver"): "Delivered",
     (ISSUED, "BeingIssued", "Cancel"): "Cancelled",
@@ -56,6 +70,13 @@ TRANSITIONS = {
     (ISSUED, "Issued", "RecordBouncedAtBank"): "BouncedAtBank",
     (ISSUED, "Delivered", "RecordBouncedAtBank"): "BouncedAtBank",
 }
+
+
+# Steps the old program allowed that new operations no longer do; old history is migrated as it was recorded.
+# Rule N3 (owner, 18 Nov 2026): a cheque is deposited at the bank only after «ثبت صیادی». The old program had no such step
+# (D_Check_Vag_m: 11 -> 12), and most old cheques are from before the Sayad system. That step (InCashDesk -> DepositForCollection)
+# is in TRANSITIONS since notes use it (a note has no Sayad registration), so old cheques are migrated with it as recorded.
+LEGACY_TRANSITIONS: dict[tuple[str, str, str], str] = {}
 
 
 @dataclass(frozen=True)
@@ -145,7 +166,8 @@ class _Builder:
 
     def apply(self, action: str, on: date | None, what: str, note: str | None = None) -> None:
         key = (self.direction, self.state, action)
-        if key not in TRANSITIONS:
+        allowed = TRANSITIONS | LEGACY_TRANSITIONS
+        if key not in allowed:
             raise ValueError(f"step {action} not allowed from {self.state}")
         if on is None:
             self.warnings.append(f"{what} date missing; previous step date used")
@@ -153,7 +175,7 @@ class _Builder:
         if on < self.last_date:
             self.warnings.append(f"{what} date {on} is before the previous step ({self.last_date}); previous step date used")
             on = self.last_date
-        to_state = TRANSITIONS[key]
+        to_state = allowed[key]
         self.steps.append(Step(len(self.steps) + 1, action, self.state, to_state, on, note))
         self.state = to_state
         self.last_date = on
@@ -230,9 +252,13 @@ def map_cheque(row: LegacyCheque, source_db: str, currency_by_curid: dict[int, s
                     if due is not None and b.last_date < due:
                         warnings.append(f"cleared on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
                 elif row.stcode == 14:
-                    b.apply("RecordBounced", d4, "D4 (bounced)", "legal action (GoInlaw)" if row.goinlaw else None)
+                    b.apply("RecordBounced", d4, "D4 (bounced)")
                     if due is not None and b.last_date < due:  # rule N2 / Q11, as for clearings above
                         warnings.append(f"bounced on {b.last_date}, before the due date {due} (rule N2); kept as recorded")
+                    if row.goinlaw:
+                        # Owner, 18 Nov 2026: «حقوقی» is a state of its own. The old program kept only the flag GoInlaw, without a
+                        # date, so the step takes the date of the bounce.
+                        b.apply("SendToLegal", b.last_date, "GoInlaw (legal action)", "legal action (GoInlaw); date of the bounce used")
             elif row.stcode == 15:
                 b.apply("ReturnToIssuer", d3, "D3 (returned)")
             elif row.stcode == 16:

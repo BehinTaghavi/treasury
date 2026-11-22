@@ -36,7 +36,9 @@ public sealed record ChangeInstrumentStateCommand(
     string? Destination = null,
     string? Note = null,
     string? Reference = null,
-    string? DocumentDate = null);
+    string? DocumentDate = null,
+    string? TrackingCode = null,
+    bool OriginalStamped = false);
 
 
 public sealed record IssueChequeCommand(
@@ -61,10 +63,12 @@ public sealed record InstrumentHistoryView(string Action, string? From, string T
 /// <summary>What a step recorded besides its date, reference and note (owner's item 14).</summary>
 public sealed record StepDetailsView(
     Guid? AccountId, string? PartyDetailCode, string? PartyName, string? DocumentDate, Guid? PurposeGroupId, string? Purpose, string? SayadTracking, Guid? ReceiptId,
-    Guid? PaymentRequestId = null)
+    Guid? PaymentRequestId = null, string? TrackingCode = null, int? SheetNumber = null, IReadOnlyList<Treasury.Cashflow.Domain.Receipts.ReceiptSigner>? Signers = null,
+    bool OriginalStamped = false, DateTimeOffset? RecordedAt = null)
 {
     public static StepDetailsView? From(StepDetails? d) => d is null ? null
-        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId);
+        : new(d.AccountId, d.PartyDetailCode, d.PartyName, d.DocumentDate?.ToJalaliString(), d.PurposeGroupId, d.Purpose, d.SayadTracking, d.ReceiptId, d.PaymentRequestId,
+            d.TrackingCode, d.SheetNumber, d.Signers, d.OriginalStamped, d.RecordedAt);
 }
 
 public sealed record InstrumentView(
@@ -91,9 +95,13 @@ public sealed record InstrumentView(
     bool IsPostDated = false,
     ReceivedInstrumentDetails? Details = null,
     Guid? CollectionAccountId = null,
-    string? CounterpartyDetailCode = null)
+    string? CounterpartyDetailCode = null,
+    bool ReachedDueDate = false,
+    string? NoteIssueDate = null,
+    bool AsReceived = false)
 {
-    public static InstrumentView From(Instrument i) => new(
+    /// <param name="today">Today's date, to mark «سررسید چک» (owner, 18 Nov 2026); without it the mark stays off.</param>
+    public static InstrumentView From(Instrument i, FiscalDate? today = null) => new(
         i.Id,
         i.Direction.ToString(),
         i.Kind.ToString(),
@@ -118,7 +126,12 @@ public sealed record InstrumentView(
         i.IsPostDated,
         i.Direction == InstrumentDirection.Received ? i.Details : null,
         i.CollectionAccountId,
-        i.Counterparty.DetailCode);
+        i.Counterparty.DetailCode,
+        today is { } t && i.HasReachedDueDate(t),
+        // A note's «تاریخ صدور» as Jalali text (Details.WrittenOn is the stored ISO date).
+        i.Details.WrittenOn is { } written ? new FiscalDate(written).ToJalaliString() : null,
+        // «ویرایش» of its receipt can still correct or remove it (answer to Q60): in the cash desk, no step recorded.
+        i.IsAsReceived);
 }
 
 public sealed record IssuedChequeView(Guid InstrumentId, string SheetNumber, long RemainingSheets, bool ChequeBookStillActive);
@@ -133,7 +146,9 @@ public sealed class InstrumentUseCases(
     IBankBalanceQuery bankBalances,
     IPaymentApprovalQuery paymentApprovals,
     ICurrentUser currentUser,
-    IBankAccountLookup bankAccountLookup)
+    IBankAccountLookup bankAccountLookup,
+    TimeProvider? clock = null,
+    IBankTransferRepository? transfers = null)
 {
     private readonly CommandRunner _runner = new(unitOfWork, idempotency);
 
@@ -176,6 +191,15 @@ public sealed class InstrumentUseCases(
                 return Result<Guid>.Fail("Instrument.NotFound", $"Instrument {command.InstrumentId} was not found.");
             }
 
+            // The issued cheque of a transfer between the company's own accounts (owner's report no. 7) is the same sheet as the
+            // received one: its steps follow the transfer (collected on the receipts side, or deleted with the transfer), never by hand.
+            if (instrument.Direction == InstrumentDirection.Issued && transfers is not null && instrument.PaymentId is { } paymentId
+                && await transfers.GetAsync(paymentId, ct).ConfigureAwait(false) is not null)
+            {
+                return Result<Guid>.Fail("Transfer.IssuedChequeFollowsTransfer",
+                    "This cheque belongs to a transfer between the company's bank accounts; its steps are recorded on the receipts side of the transfer.");
+            }
+
             var date = FiscalDate.ParseJalali(command.Date);
             await EnsureOpenAsync(date, ct).ConfigureAwait(false);
             var user = currentUser.UserId;
@@ -189,7 +213,7 @@ public sealed class InstrumentUseCases(
                     instrument.RecordCleared(date, user, command.Reference);
                     break;
                 case InstrumentAction.RecordBounced:
-                    instrument.RecordBounced(date, user, command.Note, command.Reference);
+                    instrument.RecordBounced(date, user, command.Note, command.Reference, command.TrackingCode);
                     break;
                 case InstrumentAction.ReturnToIssuer:
                     instrument.ReturnToIssuer(date, user, command.Note);
@@ -197,13 +221,34 @@ public sealed class InstrumentUseCases(
                 case InstrumentAction.ReturnFromBank:
                     instrument.ReturnFromBank(date, user, command.Note);
                     break;
+                case InstrumentAction.RegisterSayad:
+                    // A transfer cheque (owner, 21 Nov 2026, answer to Q79): the receipts side registers it in Sayad only after the payer did.
+                    if (transfers is not null && instrument.Details.TransferId is { } ofTransfer)
+                    {
+                        (await transfers.GetAsync(ofTransfer, ct).ConfigureAwait(false))?.EnsureReceiverMayRegisterSayad();
+                    }
+
+                    // Owner, 18 Nov 2026: «ثبت صیادی شد»; the reference is the tracking number of the registration, when typed.
+                    instrument.RegisterSayad(date, user, command.Reference, command.Note);
+                    break;
+                case InstrumentAction.SendToLegal:
+                    // Owner, 18 Nov 2026: «اقدام حقوقی», recorded on its own screen; the note is the description of the action, the
+                    // reference, document date and tracking code are those of the certificate of non-payment (گواهی عدم پرداخت).
+                    instrument.SendToLegal(date, user, command.Note, new NonPaymentCertificate(
+                        command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate), command.TrackingCode));
+                    break;
+                case InstrumentAction.ReturnFromLegal:
+                    // Owner's answer to Q38 (2): the cheque became collectable and goes back to the cash desk.
+                    instrument.ReturnFromLegal(date, user, command.Note);
+                    break;
                 case InstrumentAction.Deliver:
                     instrument.Deliver(date, user, command.Note);
                     break;
                 case InstrumentAction.Cancel when instrument.Direction == InstrumentDirection.Received:
                     // Owner's item 14 (f), answer to Q30: the treasurer types the number and date of management's order.
+                    // Answer to Q62 (19 Nov 2026): the stamp tick, with the computer's date and time beside the user.
                     instrument.CancelReceived(date, user, command.Reference, string.IsNullOrWhiteSpace(command.DocumentDate) ? null : FiscalDate.ParseJalali(command.DocumentDate),
-                        command.Note);
+                        command.Note, command.OriginalStamped, (clock ?? TimeProvider.System).GetUtcNow());
                     break;
                 case InstrumentAction.Cancel:
                     instrument.Cancel(date, user, command.Note ?? string.Empty);
@@ -228,8 +273,45 @@ public sealed class InstrumentUseCases(
             }
 
             await instruments.SaveAsync(instrument, ct).ConfigureAwait(false);
+            if (command.Action == InstrumentAction.RecordCleared && instrument.Details.TransferId is { } transferId)
+            {
+                await CompleteTransferAsync(transferId, date, command.Reference, ct).ConfigureAwait(false);
+            }
+
             return Result<Guid>.Ok(instrument.Id);
         }, id => id.ToString(), Guid.Parse, cancellationToken);
+
+    /// <summary>
+    /// The cheque of a transfer between two bank accounts of the company was collected at the destination account (owner's report
+    /// no. 7): the transfer is finished, and the same cheque on the payment side — issued from the source account — is paid by its
+    /// bank («وصول شده»). The three are saved in the command that recorded the collection (ADR 0002 amendment of 20 Nov 2026), so the
+    /// payment side never shows an unpaid cheque that the receipts side shows collected.
+    /// </summary>
+    private async Task CompleteTransferAsync(Guid transferId, FiscalDate date, string? reference, CancellationToken ct)
+    {
+        if (transfers is null)
+        {
+            return;
+        }
+
+        var transfer = await transfers.GetAsync(transferId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Transfer.NotFound", "The transfer of this cheque was not found.");
+        var issued = await instruments.GetAsync(transfer.Cheque!.IssuedChequeId, ct).ConfigureAwait(false)
+            ?? throw new DomainException("Instrument.NotFound", "The issued cheque of the transfer was not found.");
+
+        // A post-dated cheque whose maturity («سررسید») was not recorded on the payment side leaves «اسناد پرداختنی» now: it has been
+        // paid out of the bank account (owner's answer to Q81: «به محض سررسید شدن از حساب بانک خارج»).
+        if (transfer.IsPostDated && transfer.Cheque.MaturedOn is null)
+        {
+            transfer.RecordMatured(date, currentUser.UserId);
+            issued.RecordMatured(date, currentUser.UserId);
+        }
+
+        transfer.MarkCollected(date);
+        issued.RecordPaidByBank(date, currentUser.UserId, reference);
+        await instruments.SaveAsync(issued, ct).ConfigureAwait(false);
+        await transfers.SaveAsync(transfer, ct).ConfigureAwait(false);
+    }
 
     /// <summary>
     /// Issues a cheque for an approved payment: checks approval (R7), the posting window (R2), the bank balance (R8),
@@ -332,13 +414,13 @@ public sealed class InstrumentUseCases(
     /// <summary>Received cheques in a state, by due date: in the cash desk (to deposit) or at the bank (to record collected or bounced).</summary>
     public Task<IReadOnlyList<InstrumentView>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<InstrumentView>>(async ct =>
-            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(InstrumentView.From).ToList(), cancellationToken);
+            (await instruments.ListReceivedAsync(state, ct).ConfigureAwait(false)).Select(i => InstrumentView.From(i, IranClock.Today(clock))).ToList(), cancellationToken);
 
     public Task<InstrumentView?> GetAsync(Guid id, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync(async ct =>
         {
             var instrument = await instruments.GetAsync(id, ct).ConfigureAwait(false);
-            return instrument is null ? null : InstrumentView.From(instrument);
+            return instrument is null ? null : InstrumentView.From(instrument, IranClock.Today(clock));
         }, cancellationToken);
 
     private async Task EnsureOpenAsync(FiscalDate date, CancellationToken ct)

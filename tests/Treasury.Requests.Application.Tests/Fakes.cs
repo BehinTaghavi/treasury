@@ -48,11 +48,36 @@ public sealed class FakeAccounts : IPayFromLookup
     public static readonly Guid Bank = Guid.NewGuid();
     public static readonly Guid Desk = Guid.NewGuid();
 
+    /// <summary>A second company bank account, and a dollar one, for transfers between the company's own accounts.</summary>
+    public static readonly Guid OtherBank = Guid.NewGuid();
+    public static readonly Guid DollarBank = Guid.NewGuid();
+
     public Task<PayFromFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken) =>
-        Task.FromResult(id == Bank ? new PayFromFact(PayFromKind.BankAccount, id, "0202-3572", "IRR", true) : null);
+        Task.FromResult(id == Bank ? new PayFromFact(PayFromKind.BankAccount, id, "0202-3572", "IRR", true)
+            : id == OtherBank ? new PayFromFact(PayFromKind.BankAccount, id, "0303-9911", "IRR", true)
+            : id == DollarBank ? new PayFromFact(PayFromKind.BankAccount, id, "USD-1", "USD", true) : null);
 
     public Task<PayFromFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(id == Desk ? new PayFromFact(PayFromKind.CashDesk, id, "صندوق مرکزی", "IRR", true) : null);
+}
+
+/// <summary>
+/// cashflow-svc stand-in: received cheques by id. <see cref="Registered"/> is «ثبت صیادی شد» and may be transferred; <see cref="InDesk"/>
+/// is still only «نزد صندوق».
+/// </summary>
+public sealed class FakeCheques : IReceivedChequeLookup
+{
+    public static readonly Guid Registered = Guid.NewGuid();
+    public static readonly Guid InDesk = Guid.NewGuid();
+    public static readonly Guid Dollar = Guid.NewGuid();
+
+    public const decimal Amount = 80_000_000m;
+
+    public Task<ReceivedChequeFact?> ChequeAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(
+        id == Registered ? new ReceivedChequeFact(id, "445566", "بانک ملت", FiscalDate.ParseJalali("1405/10/15"), "فروشگاه آفتاب", Amount, "IRR", true, "1234567890123456")
+        : id == InDesk ? new ReceivedChequeFact(id, "445567", "بانک ملت", FiscalDate.ParseJalali("1405/10/20"), "فروشگاه آفتاب", Amount, "IRR", false, "1234567890123457")
+        : id == Dollar ? new ReceivedChequeFact(id, "9001", "بانک ملی", FiscalDate.ParseJalali("1405/10/20"), "بازرگانی سپهر", 1_500m, "USD", true)
+        : null);
 }
 
 public sealed class FixedUser(string id) : ICurrentUser

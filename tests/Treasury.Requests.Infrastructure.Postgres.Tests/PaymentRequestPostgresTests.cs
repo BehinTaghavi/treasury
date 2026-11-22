@@ -21,7 +21,7 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         db.Require();
         _dataSource = NpgsqlDataSource.Create(db.ServiceAs("requests_svc"));
         _requests = new PaymentRequestUseCases(
-            new PostgresUnitOfWork(_dataSource), new PostgresPaymentRequestRepository(), new FakeReference(), new FakeAccounts(),
+            new PostgresUnitOfWork(_dataSource), new PostgresPaymentRequestRepository(), new FakeReference(), new FakeAccounts(), new FakeCheques(),
             new PostgresIdempotencyStore(_dataSource), _user, TimeProvider.System);
     }
 
@@ -72,6 +72,25 @@ public sealed class PaymentRequestPostgresTests : IDisposable
     }
 
     [Fact]
+    public async Task A_cheque_transfer_request_keeps_its_cheque_and_the_cheque_is_on_one_open_request_db_041()
+    {
+        // Owner, 19 Nov 2026: «ثبت انتقال (خرج چک)». Other tests of this class share the database, so the cheque is one of its own.
+        var input = Input(PaymentMethod.ChequeTransfer) with { Currency = "IRR", Amount = FakeCheques.Amount, ChequeId = FakeCheques.Registered };
+        var id = (await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).Value;
+        var v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal(new TransferChequeView(FakeCheques.Registered, "445566", "1405/10/15", "فروشگاه آفتاب", "بانک ملت", "1234567890123456"), v.Cheque);
+        Assert.Equal(("ChequeTransfer", (Guid?)null), (v.Method, v.PayFromId));
+        Assert.Equal("PaymentRequest.ChequeOnAnotherRequest", (await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).ErrorCode);
+
+        // Another method: the cheque leaves the request (and the database's rule «cheque only with ChequeTransfer» holds).
+        Assert.True((await _requests.EditAsync(new(Key(), id, input with { Method = PaymentMethod.Cash, ChequeId = null }, 1), CancellationToken.None)).IsSuccess);
+        Assert.Null((await _requests.GetAsync(id, CancellationToken.None))!.Cheque);
+        Assert.True((await _requests.EditAsync(new(Key(), id, input, 2), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.ChangeAsync(new(Key(), id, "cancel", 3, "آزمایش"), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.RegisterAsync(new(Key(), input), CancellationToken.None)).IsSuccess); // free again after the cancellation
+    }
+
+    [Fact]
     public async Task A_scan_is_stored_with_its_request_and_removed_with_it()
     {
         var id = (await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None)).Value;
@@ -94,5 +113,24 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         var na = (await _requests.GetAsync(a.Value, CancellationToken.None))!.Number;
         Assert.Equal(na + 1, (await _requests.GetAsync(b.Value, CancellationToken.None))!.Number);
         Assert.Equal(2L, await _db.ScalarAsync<long>("SELECT count(*) FROM requests.outbox WHERE payload->>'PaymentRequestId' IN (@a, @b)", ("a", a.Value.ToString()), ("b", b.Value.ToString())));
+    }
+
+    [Fact]
+    public async Task A_request_for_a_transfer_between_the_companys_accounts_round_trips_db_047()
+    {
+        // Owner, 21 Nov 2026 (answer to Q82): the request names the two bank accounts instead of a beneficiary and a purpose group.
+        var input = new PaymentRequestInput("1405/08/30", FakeReference.Requester, Guid.Empty, Guid.Empty, "تأمین موجودی", 3_000_000_000, PaymentMethod.OwnAccountTransfer,
+            PayFromId: FakeAccounts.Bank, TransferToAccountId: FakeAccounts.OtherBank);
+        var r = await _requests.RegisterAsync(new(Key(), input), CancellationToken.None);
+        Assert.True(r.IsSuccess, r.ErrorCode);
+        var v = (await _requests.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(("OwnAccountTransfer", (Guid?)FakeAccounts.Bank, (Guid?)FakeAccounts.OtherBank, FakeAccounts.OtherBank, "0303-9911", Guid.Empty, PaymentRequest.OwnTransferGroupName),
+            (v.Method, v.PayFromId, v.TransferToAccountId, v.BeneficiaryId, v.BeneficiaryName, v.PurposeGroupId, v.PurposeGroupName));
+
+        Assert.True((await _requests.ChangeAsync(new(Key(), r.Value, "approve", 1), CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.RecordPaymentAsync(
+            new(Key(), r.Value, "transfer:x:1", PaymentRequest.OwnTransferPaymentKind, null, "نقل و انتقال شماره 1 – پایا", 1_000_000_000, "IRR", "1405/08/30"), CancellationToken.None)).IsSuccess);
+        v = (await _requests.GetAsync(r.Value, CancellationToken.None))!;
+        Assert.Equal(("Approved", 1_000_000_000m, 2_000_000_000m, "BankTransfer"), (v.State, v.PaidAmount, v.RemainingAmount, v.Payments![0].Kind));
     }
 }

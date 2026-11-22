@@ -23,6 +23,12 @@ public interface IPaymentRequestRepository
 
     /// <summary>Requests of a year, newest first; in one state or all.</summary>
     Task<IReadOnlyList<PaymentRequest>> ListAsync(int fiscalYear, PaymentRequestState? state, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The request of any year, registered or approved, that hands on this received cheque («ثبت انتقال»); null when none. A cheque is
+    /// promised to one request at a time.
+    /// </summary>
+    Task<PaymentRequest?> OpenRequestOfChequeAsync(Guid instrumentId, CancellationToken cancellationToken);
 }
 
 /// <summary>Answered by reference-svc over its API (ADR 0001); null when unknown. Unreachable: DomainException "Reference.Unavailable".</summary>
@@ -44,6 +50,13 @@ public interface IPayFromLookup
     Task<PayFromFact?> BankAccountAsync(Guid id, CancellationToken cancellationToken);
 
     Task<PayFromFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken);
+}
+
+/// <summary>Answered by cashflow-svc over its API (ADR 0001); null when unknown. Unreachable: DomainException "Cashflow.Unavailable".</summary>
+public interface IReceivedChequeLookup
+{
+    /// <summary>A received cheque, for a request of the kind «ثبت انتقال (خرج چک)» (owner, 19 Nov 2026).</summary>
+    Task<ReceivedChequeFact?> ChequeAsync(Guid id, CancellationToken cancellationToken);
 }
 
 public interface ICurrentUser

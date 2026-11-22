@@ -83,7 +83,7 @@ public static class Endpoints
             "Request.IdempotencyKeyRequired" or "Request.UnknownChange" => StatusCodes.Status400BadRequest,
             "PaymentRequest.NotFound" or "PaymentRequest.AttachmentNotFound" => StatusCodes.Status404NotFound,
             "Concurrency.Conflict" => StatusCodes.Status409Conflict,
-            "Reference.Unavailable" or "Accounts.Unavailable" => StatusCodes.Status503ServiceUnavailable,
+            "Reference.Unavailable" or "Accounts.Unavailable" or "Cashflow.Unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status422UnprocessableEntity,
         };
         return Results.Problem(statusCode: status, title: result.ErrorCode, detail: result.ErrorMessage, extensions: new Dictionary<string, object?> { ["code"] = result.ErrorCode });

@@ -27,9 +27,18 @@ const fixedNames: Record<string, [string, string]> = {
   ChequesInCashDesk: ['اسناد نزد صندوق (اسناد دریافتنی)', 'Cheques in the cash desk'],
   ChequesInCollection: ['چک‌های در جریان وصول', 'Cheques in collection'],
   ProtestedCheques: ['اسناد واخواست شده (برگشتی)', 'Protested cheques'],
+  ProtestedChequesInLegal: ['اسناد واخواست شده حقوقی شده', 'Protested cheques in legal action'],
+  GuaranteeChequesInLegal: ['اسناد تضمینی حقوقی شده به نفع شرکت', 'Guarantee items in legal action'],
   GuaranteeChequesForCompany: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
   GuaranteeCounterpart: ['طرف حساب انتظامی', 'Guarantee counterpart'],
   BadDebts: ['مطالبات سوخت شده', 'Bad debts written off'],
+  GuaranteeNotesForCompany: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
+  NotesInCollection: ['سفته‌های در جریان وصول', 'Notes in collection'],
+  // Owner's report no. 7: a transfer by cheque between two bank accounts of the company.
+  FundsInTransit: ['وجوه در راه', 'Funds in transit'],
+  // Owner's answers of 21 Nov 2026: the bank's fee of a transfer (Q77) and a post-dated issued cheque until its due date (Q81).
+  BankFees: ['هزینه کارمزد خدمات بانکی', 'Bank service fees'],
+  NotesPayable: ['اسناد پرداختنی', 'Notes payable'],
 }
 const missingName = (k: string) => (fixedNames[k] ? (props.locale === 'fa' ? fixedNames[k][0] : fixedNames[k][1]) : k)
 const confirmed = computed(() => props.voucher.confirmedBy !== null)

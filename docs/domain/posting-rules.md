@@ -32,21 +32,89 @@ the holders. The table, as sent (the Farsi copy of this file has the same table)
 | عملیات | عودت چک واگذاری توسط بانک | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | چک های در جریان وصول | بانک مربوطه |
 | عملیات | عودت چک‌های نزد صندوق | بدهکاران یا ... | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
 | عملیات | ابطال چک دریافتنی نزد صندوق | مطالبات سوخت شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | دریافت چک تعویضی به جای چک ابطال شده – تعویض (افزودهٔ ۲۸ آبان ۱۴۰۵؛ تایید مدیرعامل ۲۹ آبان، Q64) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | مطالبات سوخت شده (تفاوت مبلغ: گروه بابت) | ذینفع |
 | عملیات | ابطال چک / سفته انتظامی دریافتی نزد صندوق | طرف حساب انتظامی | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی دریافتی به عادی | (۱) اسناد نزد صندوق / اسناد دریافتنی، (۲) طرف حساب انتظامی | ذینفع | (۱) درآمد حاصل از تضمین استفاده شده، (۲) چک انتظامی به نفع شرکت | ذینفع |
 | عملیات | تبدیل چک / سفته انتظامی پرداختنی به عادی | (۱) هزینه تضمین متعهد شده، (۲) چک انتظامی به عهده شرکت | ذینفع | (۱) اسناد پرداختنی، (۲) طرف حساب انتظامی | ذینفع |
 | عملیات | عودت چک پرداختنی صادره نزد ذینفع و ابطال آن | اسناد پرداختنی | ذینفع | بستانکاران یا ... | ذینفع |
+| عملیات | ثبت انتقال چک دریافتی به شخص ثالث – خرج چک (افزوده و تایید مدیرعامل، ۲۸ آبان ۱۴۰۵) | گروه بابت | ذینفع (گیرندهٔ چک) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع (واگذارندهٔ چک) |
 | عملیات | عودت چک‌های خرج شده توسط ما به دیگران (پس از برگشت) | اسناد واخواست شده | ذینفع | بستانکاران یا ... | ذینفع |
+| عملیات | اقدام حقوقی چک برگشتی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد واخواست شده | ذینفع |
+| عملیات | اقدام حقوقی چک نزد صندوق، به فرض محال (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد واخواست شده حقوقی شده | ذینفع | اسناد نزد صندوق / اسناد دریافتنی | ذینفع |
+| عملیات | اقدام حقوقی چک / سفته تضمینی (افزودهٔ مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد تضمینی حقوقی شده به نفع شرکت | ذینفع | چک (سفته) انتظامی به نفع شرکت | ذینفع |
+| عملیات | تحویل چک به صندوق پس از اقدام حقوقی (چک قابل وصول؛ تایید مدیرعامل، ۲۷ آبان ۱۴۰۵) | اسناد نزد صندوق / اسناد دریافتنی | ذینفع | اسناد واخواست شده حقوقی شده | ذینفع |
+| نقل و انتقال | نقل و انتقال بانکی با چک روز – انتقال دهنده (صدور چک؛ مدیرعامل، گزارش شمارهٔ ۷، ۲۹ آبان ۱۴۰۵) | وجوه در راه | — | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | نقل و انتقال بانکی با چک مدت‌دار – انتقال دهنده (صدور چک؛ پاسخ مدیرعامل به Q81، ۳۰ آبان ۱۴۰۵) | وجوه در راه | — | اسناد پرداختنی | بانک انتقال دهنده (تایید ۳۰ آبان، Q83) |
+| نقل و انتقال | سررسید چک پرداختنی نقل و انتقال (پاسخ Q81) | اسناد پرداختنی | بانک انتقال دهنده (تایید ۳۰ آبان، Q83) | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | نقل و انتقال بانکی با چک – انتقال گیرنده (دریافت چک؛ مدیرعامل، گزارش شمارهٔ ۷؛ تفصیل: تایید ۳۰ آبان، Q78) | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده | وجوه در راه | — |
+| نقل و انتقال | نقل و انتقال بانکی الکترونیکی: انتقال داخلی، پل، پایا، ساتنا (تایید مدیرعامل، ۳۰ آبان ۱۴۰۵، Q76) | بانک انتقال گیرنده | بانک مربوطه | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | کارمزد بانک در نقل و انتقال الکترونیکی (پاسخ مدیرعامل به Q77، ۳۰ آبان ۱۴۰۵) | هزینه کارمزد خدمات بانکی | فقط اگر این حساب تفصیل‌دار باشد: تفصیل کارمزد، مثلاً مرکز هزینهٔ امور مالی (پاسخ Q83) | بانک انتقال دهنده | بانک مربوطه |
+| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال دهنده (پاسخ Q79؛ سند: تایید ۳۰ آبان، Q85) | اسناد پرداختنی (چک روز: بانک انتقال دهنده) | بانک انتقال دهنده | وجوه در راه | — |
+| نقل و انتقال | ابطال چک نقل و انتقالِ ثبت صیادی نشده – انتقال گیرنده (پاسخ Q79؛ سند: تایید ۳۰ آبان، Q85) | وجوه در راه | — | اسناد نزد صندوق / اسناد دریافتنی | بانک انتقال دهنده |
 
 Built (owner's report no. 4, item 8, and his answers of 15 Nov 2026): a Basic Information page «شابلون اسناد خزانه داری» holds the
 company's account codes for the fixed accounts of this table: اسناد نزد صندوق / اسناد دریافتنی، چک های در جریان وصول، اسناد واخواست
-شده، چک انتظامی به نفع شرکت، طرف حساب انتظامی. The purpose group, bank account and cash desk supply their own accounts.
+شده، چک انتظامی به نفع شرکت، طرف حساب انتظامی، مطالبات سوخت شده, and since the owner's answer of 18 Nov 2026 اسناد واخواست شده حقوقی شده and اسناد تضمینی حقوقی شده به نفع شرکت
+(the last four rows of the table come from his answers of that day). The purpose group, bank account and cash desk supply their own accounts.
 
 - Money paid straight into a bank account: Dr the bank account's معین with the bank account's تفصیل / Cr purpose group, payer.
+- Money paid onto a bank card («واریز به کارت بانک», owner's answers to Q68 and Q69, 20 Nov 2026): onto the card of a petty-cash holder,
+  Dr the petty cash's معین («تنخواه گردان») with the holder's تفصیل — the money is added to that petty cash; onto a company bank card
+  that has no bank account, Dr the card's own معین and تفصیل (Basic Information → «کارت‌های بانک شرکت (بدون حساب بانکی)»). Both: Cr
+  purpose group, payer.
 - «چک های در جریان وصول» is one account for all banks; its تفصیل is the bank account's تفصیل.
 - One voucher for each receipt or operation (each step of a cheque); the treasurer confirms it. A voucher with an account not set
   cannot be confirmed; a confirmed voucher keeps its lines and its receipt can no longer be cancelled.
 
-Built so far: receipts (cash, bank, cheques, guarantee cheques) and the received cheque's deposit at the bank, collected and bounced
-(`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). Next with their screens: payments, petty cash, notes, returns and the other
-operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.
+Since 19 Nov 2026 the endorsement of a cheque is called «ثبت انتقال (خرج چک)» (the transfer registered in Sayad) and has its row in the
+table above: Dr the payment purpose group's معین with the receiver's تفصیل / Cr «اسناد نزد صندوق / اسناد دریافتنی» with the تفصیل of who
+gave the cheque — the voucher built on 15 Nov from the old manual («خرج چک: بد بستانکاران / حساب‌های پرداختنی»); the owner confirmed
+the accounts on 19 Nov 2026 (answer to Q53: «صحیح است»).
+
+Built so far: receipts (cash, bank, cheques, guarantee cheques, ordinary and guarantee promissory notes) and the steps of a received cheque:
+deposit at the bank, collected, returned by the bank, bounced, replaced, cancelled, endorsed and its return (`received-cheque-steps.md`), and since
+18 Nov 2026 the return to the payer («عودت چک‌های نزد صندوق»: Dr the account the cheque's receipt credited, confirmed by the owner, Q41) and the
+legal action (Dr «اسناد واخواست شده حقوقی شده», answer to Q38) (`Treasury.Cashflow.Domain.Vouchers.ReceiptVouchers`). «ثبت صیادی» and
+«سررسید چک» have no voucher (answers to Q37 and Q39). On screens and in voucher texts the bank's paper is «گواهی عدم پرداخت» for a cheque and
+«اعلامیه» for a note. A guarantee note uses the fixed account «سفته انتظامی به نفع شرکت»; a note received in trust («امانی») is booked the same
+way (owner's answer to Q37 of the note questions, 16 Nov 2026). The steps of a received note (owner, 16 Nov 2026) are built too: deposit at the
+bank with «سفته های در جریان وصول» (straight from the cash desk: a note has no Sayad registration), collected, returned by the bank, protested,
+endorsed, cancelled, legal action, and handing a note back («استرداد»): a guarantee note reverses the off-balance entry; an ordinary note debits
+«بدهکاران» (the معین of its receipt's purpose group, obligor) and credits «اسناد نزد صندوق / اسناد دریافتنی» (owner's answer to Q50).
+Since 19 Nov 2026 (owner's report no. 6):
+- **A cheque is cancelled before it is replaced** (item 11 and the owner's answer to Q62): the cancellation always makes the table's
+  voucher «ابطال چک دریافتنی»: Dr «مطالبات سوخت شده» · payer / Cr where the cheque is («اسناد نزد صندوق», «اسناد واخواست شده» or «اسناد واخواست
+  شده حقوقی شده») · payer — "حتی اگر بعدا چک تعویض گردد". The replacement cheque is then received on its own receipt: Dr «اسناد نزد صندوق» ·
+  payer / Cr «مطالبات سوخت شده» · payer for the old cheque's amount, a difference to the purpose group (row added to the table above;
+  confirmed by the owner on 20 Nov 2026, Q64). «مطالبات سوخت شده» is one fixed account of the company, chosen on the page «شابلون اسناد
+  خزانه داری» (confirmed, Q65).
+- **A receipt's voucher follows the receipt until it is confirmed** (items 2 and 6): the voucher of an unconfirmed receipt is worked out
+  from the receipt each time it is shown, so a corrected receipt shows the corrected voucher; «تایید سند» keeps the lines and closes the
+  correction and the deletion of the receipt (answer to Q59). A purpose group stays correctable after it was used (answer to Q61); a
+  voucher confirmed before the group was corrected keeps its lines and is put right by a correcting treasury voucher (Phase F).
+- **The purpose is the description** (item 4): both lines of a cheque's or note's receipt voucher start with the receipt's purpose as written.
+
+Since 20 Nov 2026 (owner's report no. 7, «نقل و انتقال بین بانکی») and his answers of 21 Nov 2026 to Q76–Q82
+(`Treasury.Cashflow.Domain.Vouchers.TransferVouchers`):
+- **Transfer by Sayad cheque**, as the owner wrote the two vouchers: the payer's side («انتقال دهنده», on the day the cheque is issued) Dr
+  «وجوه در راه» / Cr the source bank account's معین with its تفصیل; the receiver's side («انتقال گیرنده», on the day the cheque is recorded
+  on the receipts side) Dr «اسناد نزد صندوق» / Cr «وجوه در راه». «وجوه در راه» is a fixed account of «شابلون اسناد خزانه داری»; it carries no
+  تفصیل, and «اسناد نزد صندوق» carries the source bank account's تفصیل, the drawer of the cheque (confirmed, Q78). From there the cheque
+  has the vouchers of every received cheque: «واگذاری چک به بانک» and «اعلام وصول» — so in the end the destination bank is debited and
+  «وجوه در راه» is back at zero.
+- **A post-dated transfer cheque** (answer to Q81): the payer's voucher credits **«اسناد پرداختنی»** (a fixed account of the template),
+  not the bank, until the due date. «ثبت سررسید» on the payment side, on or after the due date, makes the maturity voucher Dr «اسناد
+  پرداختنی» / Cr the source bank — "به محض سررسید شدن از حساب بانک خارج". If it was not recorded when the cheque is collected on the
+  receipts side, the collection records it on that day. «اسناد پرداختنی» is written with the source bank account's تفصیل (confirmed, Q83).
+- **Electronic transfer** (internal, Pol, Paya, Satna): one voucher on the day of the order, Dr the destination bank account / Cr the
+  source bank account, each with its own معین and تفصیل (confirmed, Q76). **The bank's fee** (answer to Q77), when typed on the form:
+  Dr «هزینه کارمزد خدمات بانکی» — one general account of the company among the financial expenses, set in the template like «مطالبات سوخت
+  شده» — / Cr the source bank account, on the same voucher. The fee account usually has no تفصیل; when the company's account is one "with
+  تفصیل" (e.g. a general cost centre of the finance department), the form asks for the fee's تفصیل and the line carries it (answer to Q83).
+- **A cancelled transfer cheque** (answer to Q79: only while it is not registered in Sayad): two vouchers on the day of the cancellation
+  take the first two back — Dr what the payer's voucher credited («اسناد پرداختنی», or the bank for a cheque of the day or one already
+  matured) / Cr «وجوه در راه», and, if the cheque was already on the receipts side, Dr «وجوه در راه» / Cr «اسناد نزد صندوق» (confirmed, Q85).
+- Each voucher of a transfer is confirmed by the treasurer («تایید سند») like a receipt's; until then an electronic transfer is corrected
+  or deleted and the voucher follows it.
+
+Next with their screens: payments, petty cash and the other operations of the table. Confirmed vouchers are sent to the accounting system in Phase F.

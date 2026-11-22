@@ -30,6 +30,18 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
     title: ['اسناد واخواست شده (چک برگشتی)', 'Protested (bounced) cheques'],
     use: ['بدهکار هنگام برگشت چک از بانک؛ تفصیل: پرداخت کننده', 'Debited when the bank returns a cheque; detail: the payer'],
   },
+  // Owner's answer of 18 Nov 2026: the voucher of the legal action («اقدام حقوقی»).
+  ProtestedChequesInLegal: {
+    title: ['اسناد واخواست شده حقوقی شده', 'Protested cheques in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی، در مقابل بستانکار «اسناد واخواست شده» (یا «اسناد نزد صندوق» برای چکی که هنوز نزد صندوق است)؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action, against a credit of «Protested cheques» (or «Cheques in the cash desk» for a cheque still there); detail: the payer'],
+  },
+  // Owner's answer of 18 Nov 2026 (Q42): the legal action on guarantee cheques and notes.
+  GuaranteeChequesInLegal: {
+    title: ['اسناد تضمینی حقوقی شده به نفع شرکت', 'Guarantee items in legal action'],
+    use: ['بدهکار هنگام اقدام حقوقی چک یا سفتهٔ تضمینی، در مقابل بستانکار «چک انتظامی به نفع شرکت»؛ تفصیل: پرداخت کننده',
+      'Debited at the legal action on a guarantee cheque or note, against a credit of «Guarantee cheques for the company»; detail: the payer'],
+  },
   GuaranteeChequesForCompany: {
     title: ['چک انتظامی به نفع شرکت', 'Guarantee cheques for the company'],
     use: ['بدهکار هنگام دریافت چک تضمینی', 'Debited when a guarantee cheque is received'],
@@ -40,7 +52,32 @@ const names: Record<string, { title: [string, string]; use: [string, string] }> 
   },
   BadDebts: {
     title: ['مطالبات سوخت شده', 'Bad debts written off'],
-    use: ['بدهکار هنگام ابطال چک دریافتی به دستور مدیریت؛ تفصیل: پرداخت کننده', "Debited when a received cheque is cancelled by management's order; detail: the payer"],
+    use: ['بدهکار هنگام ابطال چک دریافتی (به دستور مدیریت یا پیش از تعویض)، بستانکار هنگام دریافت چک تعویضی؛ تفصیل: پرداخت کننده',
+      "Debited when a received cheque is cancelled (by management's order, or before it is replaced), credited when its replacement is received; detail: the payer"],
+  },
+  GuaranteeNotesForCompany: {
+    title: ['سفته انتظامی به نفع شرکت', 'Guarantee notes for the company'],
+    use: ['بدهکار هنگام دریافت سفتهٔ تضمینی یا امانی؛ بستانکار آن «طرف حساب انتظامی» است', 'Debited when a guarantee or trust note is received; credited to the guarantee counterpart'],
+  },
+  // Owner's report no. 7 (20 Nov 2026): a transfer between two bank accounts of the company by Sayad cheque.
+  FundsInTransit: {
+    title: ['وجوه در راه', 'Funds in transit'],
+    use: ['نقل و انتقال با چک بین حساب‌های شرکت: بدهکار هنگام صدور چک، بستانکار هنگام دریافت آن', "A transfer by cheque between the company's own accounts: debited when the cheque is issued, credited when it is received"],
+  },
+  // Owner's answers of 21 Nov 2026: the bank's fee of a transfer (Q77) and a post-dated issued cheque until its due date (Q81).
+  BankFees: {
+    title: ['هزینه کارمزد خدمات بانکی', 'Bank service fees'],
+    use: ['حساب عمومی هزینه‌های مالی (معین یا معین در معین): بدهکار هنگام ثبت کارمزد نقل و انتقال؛ بستانکار آن بانک انتقال دهنده است. اگر این حساب تفصیل‌دار باشد (مثلاً مرکز هزینهٔ امور مالی)، تفصیل آن هنگام ثبت کارمزد پرسیده می‌شود',
+      'One general account of the financial expenses: debited with the fee of a transfer; credited to the source bank'],
+  },
+  NotesPayable: {
+    title: ['اسناد پرداختنی', 'Notes payable'],
+    use: ['چک مدت‌دار صادره تا سررسید: بستانکار هنگام صدور چک، بدهکار هنگام ثبت سررسید (بستانکار: بانک)؛ تفصیل: تفصیل حساب بانکی صادرکننده',
+      "A post-dated issued cheque until its due date: credited when the cheque is issued, debited when its maturity is recorded (credit: the bank); detail: the issuing bank account's detail"],
+  },
+  NotesInCollection: {
+    title: ['سفته‌های در جریان وصول', 'Notes in collection'],
+    use: ['بدهکار هنگام واگذاری سفته به بانک، بستانکار هنگام وصول، واخواست یا عودت؛ تفصیل: تفصیل حساب بانکی', "Debited when a note goes to the bank, credited when collected, protested or returned; detail: the bank account's detail"],
   },
 }
 
@@ -81,8 +118,8 @@ onMounted(load)
 <template>
   <div>
     <h3>{{ t('شابلون اسناد خزانه داری', 'Treasury voucher template') }}</h3>
-    <p class="muted">{{ t('حساب‌های ثابت اسناد دریافت و مراحل چک. سایر ردیف‌های سند، حساب خود را از گروه بابت، صندوق یا حساب بانکی می‌گیرند. سندهای تایید شده با تغییر این حساب‌ها عوض نمی‌شوند.',
-      'The fixed accounts of receipt and cheque-step vouchers. The other lines take their account from the purpose group, cash desk or bank account. Confirmed vouchers do not change when these accounts change.') }}</p>
+    <p class="muted">{{ t('حساب‌های ثابت اسناد دریافت، مراحل چک و نقل و انتقال بانکی. سایر ردیف‌های سند، حساب خود را از گروه بابت، صندوق یا حساب بانکی می‌گیرند. سندهای تایید شده با تغییر این حساب‌ها عوض نمی‌شوند.',
+      'The fixed accounts of receipt, cheque-step and bank-transfer vouchers. The other lines take their account from the purpose group, cash desk or bank account. Confirmed vouchers do not change when these accounts change.') }}</p>
     <p v-if="message" :class="['tr-msg', message.kind]" role="status">{{ message.text }}</p>
     <table class="tr-table">
       <thead>

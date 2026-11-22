@@ -152,7 +152,8 @@ public sealed class PettyCashFund : AggregateRoot<Guid>
         var cardHolder = k.Card ? Clean(k.CardHolderName) : null;
         var card = k.Card ? new string(PersianText.Key(k.CardNumber).Where(c => c != '-').ToArray()) : null;
         Require(!k.Card || cardHolder is not null, "PettyCash.KeepingCardIncomplete", "Enter the name of the card holder.");
-        Require(card is null || IsCardNumber(card), "PettyCash.CardNumberInvalid", "A bank card number has 16 digits and a valid check digit.");
+        Require(card is null || (card.Length == 16 && card.All(char.IsAsciiDigit)), "PettyCash.CardNumberInvalid", "A bank card number has 16 digits.");
+        Require(card is null || IsCardNumber(card), "PettyCash.CardCheckDigit", "The check digit of the bank card number does not fit: a digit is wrong.");
         return new PettyCashKeeping(k.Bank, bankName, bankNumber is null ? null : PersianText.Key(bankNumber), k.Cash, k.Card, cardHolder, card);
     }
 

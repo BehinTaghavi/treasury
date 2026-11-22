@@ -35,12 +35,15 @@ if (!usePostgres)
     builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
 }
 
-// reference-svc answers about requesters, beneficiaries and purpose groups; accounts-svc about the account paid from (ADR 0001).
+// reference-svc answers about requesters, beneficiaries and purpose groups; accounts-svc about the account paid from; cashflow-svc about
+// the received cheque of a request of the kind «ثبت انتقال (خرج چک)» (ADR 0001).
 static Uri BaseAddress(string url) => new(url.EndsWith('/') ? url : url + "/");
 var referenceUrl = builder.Configuration["Services:Reference"] ?? throw new InvalidOperationException("Services:Reference (reference-svc address) is not configured.");
 var accountsUrl = builder.Configuration["Services:Accounts"] ?? throw new InvalidOperationException("Services:Accounts (accounts-svc address) is not configured.");
 builder.Services.AddHttpClient<IRequestReferenceLookup, HttpRequestReferenceLookup>(c => { c.BaseAddress = BaseAddress(referenceUrl); c.Timeout = TimeSpan.FromSeconds(10); });
 builder.Services.AddHttpClient<IPayFromLookup, HttpPayFromLookup>(c => { c.BaseAddress = BaseAddress(accountsUrl); c.Timeout = TimeSpan.FromSeconds(10); });
+var cashflowUrl = builder.Configuration["Services:Cashflow"] ?? throw new InvalidOperationException("Services:Cashflow (cashflow-svc address) is not configured.");
+builder.Services.AddHttpClient<IReceivedChequeLookup, HttpReceivedChequeLookup>(c => { c.BaseAddress = BaseAddress(cashflowUrl); c.Timeout = TimeSpan.FromSeconds(10); });
 
 // Identity: Keycloak (OpenID Connect), same rules as the other services.
 var keycloakAuthority = builder.Configuration["Keycloak:Authority"];

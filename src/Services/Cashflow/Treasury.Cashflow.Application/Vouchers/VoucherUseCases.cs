@@ -66,7 +66,8 @@ public sealed class VoucherUseCases(
         unitOfWork.ExecuteAsync(async ct =>
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false);
-            if (receipt is null)
+            // A deleted receipt («حذف شده») has no voucher: it was deleted before one was confirmed.
+            if (receipt is null || receipt.State == ReceiptState.Deleted)
             {
                 return null;
             }
@@ -84,6 +85,11 @@ public sealed class VoucherUseCases(
         {
             var receipt = await receipts.GetAsync(receiptId, ct).ConfigureAwait(false)
                 ?? throw new DomainException("Receipt.NotFound", "The receipt was not found.");
+            if (receipt.State == ReceiptState.Deleted)
+            {
+                throw new DomainException("Receipt.Deleted", "The receipt was deleted.");
+            }
+
             if (receipt.State == ReceiptState.Cancelled)
             {
                 throw new DomainException("Voucher.SourceCancelled", "The receipt is cancelled.");
@@ -96,7 +102,7 @@ public sealed class VoucherUseCases(
             return Result<Guid>.Ok(voucher.Id);
         }, cancellationToken);
 
-    /// <summary>The vouchers of a received cheque's steps after it was received: deposit at the bank, collected, bounced.</summary>
+    /// <summary>The vouchers of a received cheque's steps after it was received: deposit at the bank, collected, bounced, returned…</summary>
     public Task<IReadOnlyList<VoucherView>> ChequeVouchersAsync(Guid instrumentId, CancellationToken cancellationToken) =>
         unitOfWork.ExecuteAsync<IReadOnlyList<VoucherView>>(async ct =>
         {
@@ -146,13 +152,18 @@ public sealed class VoucherUseCases(
 
     private async Task<Voucher> ComputeReceiptAsync(Receipt receipt, CancellationToken ct)
     {
-        IReadOnlyList<Instrument> lines = receipt.Kind == ReceiptKind.Instruments ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
+        IReadOnlyList<Instrument> lines = receipt.Kind is ReceiptKind.Instruments or ReceiptKind.Notes
+            ? await instruments.ListByReceiptAsync(receipt.Id, ct).ConfigureAwait(false) : [];
         LedgerSide? side = null;
         if (receipt.AccountId is { } accountId)
         {
-            var fact = receipt.AccountKind == ReceiptAccountKind.CashDesk
-                ? await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false)
-                : await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false);
+            var fact = receipt.AccountKind switch
+            {
+                ReceiptAccountKind.CashDesk => await accounts.CashDeskAsync(accountId, ct).ConfigureAwait(false),
+                // «واریز به کارت بانک»: the petty cash's account with its holder's تفصیل, or the company card's own (answers to Q68, Q69).
+                { } kind when kind.IsCard() => await accounts.CardAsync(kind, accountId, ct).ConfigureAwait(false),
+                _ => await accounts.BankAccountAsync(accountId, ct).ConfigureAwait(false),
+            };
             side = new LedgerSide(fact?.LedgerAccountCode, fact?.DetailCode);
         }
 
@@ -160,7 +171,7 @@ public sealed class VoucherUseCases(
         if (receipt.ReplacedInstrumentId is { } oldId && await instruments.GetAsync(oldId, ct).ConfigureAwait(false) is { } old)
         {
             var step = old.History.LastOrDefault(h => h.Action == InstrumentAction.Replace && h.Details?.ReceiptId == receipt.Id);
-            replacement = new Replacement(old, step?.From ?? InstrumentState.InCashDesk);
+            replacement = new Replacement(old, step?.From ?? InstrumentState.Cancelled);
         }
 
         var group = await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false);
@@ -169,8 +180,10 @@ public sealed class VoucherUseCases(
     }
 
     /// <summary>
-    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher). Each step uses the bank account it
-    /// recorded (a cheque returned from one bank may be deposited at another); steps recorded before item 14 use the cheque's last account.
+    /// Null for steps without a voucher here (receiving and replacing are on their receipt's voucher; registering in Sayad only changes
+    /// the latest status, owner's answer to Q37). Each step uses the bank account it recorded (a cheque returned from one bank may be deposited at
+    /// another); steps recorded before item 14 use the cheque's last account. A return to the payer debits the account the cheque's
+    /// receipt credited (owner, 18 Nov 2026: every state has its voucher; his table «عودت چک‌های نزد صندوق»).
     /// </summary>
     private async Task<Voucher?> ComputeStepAsync(Instrument cheque, int step, CancellationToken ct)
     {
@@ -180,9 +193,16 @@ public sealed class VoucherUseCases(
         }
 
         var entry = cheque.History[step - 1];
-        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.ReturnToIssuer)
+        if (entry.Action is InstrumentAction.Receive or InstrumentAction.Replace or InstrumentAction.RegisterSayad)
         {
             return null;
+        }
+
+        string? receiptAccount = null;
+        if (entry.Action == InstrumentAction.ReturnToIssuer && cheque.ReceiptId is { } receiptId
+            && await receipts.GetAsync(receiptId, ct).ConfigureAwait(false) is { } receipt)
+        {
+            receiptAccount = (await reference.PurposeGroupAsync(receipt.PurposeGroupId, ct).ConfigureAwait(false))?.LedgerAccountCode;
         }
 
         var bank = new LedgerSide(null, null);
@@ -205,7 +225,7 @@ public sealed class VoucherUseCases(
         }
 
         var template = await templates.GetAsync(ct).ConfigureAwait(false);
-        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template);
+        return ReceiptVouchers.ForStep(cheque, step, bank, endorsement, template, receiptAccount);
     }
 
     private Task<Result<Guid>> Run(string key, Func<CancellationToken, Task<Result<Guid>>> work, CancellationToken ct) =>

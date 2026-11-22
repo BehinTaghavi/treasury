@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Treasury.Accounts.Application.Abstractions;
 using Treasury.Accounts.Domain.BankAccounts;
 using Treasury.Accounts.Domain.CashDesks;
+using Treasury.Accounts.Domain.CompanyCards;
 using Treasury.Accounts.Domain.PettyCash;
 using Treasury.BuildingBlocks.Application;
 using Treasury.BuildingBlocks.Domain;
@@ -38,6 +39,14 @@ public sealed record CashDeskSnapshot(Guid Id, CashDeskData Data, bool IsActive,
     public CashDesk ToDomain() => CashDesk.Restore(Id, Data, IsActive, Version);
 }
 
+/// <summary>Stored form of a company bank card without a bank account.</summary>
+public sealed record CompanyCardSnapshot(Guid Id, CompanyCardData Data, bool IsActive, long Version)
+{
+    public static CompanyCardSnapshot From(CompanyCard c, long version) => new(c.Id, c.Data, c.IsActive, version);
+
+    public CompanyCard ToDomain() => CompanyCard.Restore(Id, Data, IsActive, Version);
+}
+
 /// <summary>Stored form of a petty cash.</summary>
 public sealed record PettyCashSnapshot(Guid Id, PettyCashData Data, bool IsActive, long Version)
 {
@@ -53,6 +62,7 @@ public sealed class InMemoryAccountsDatabase : IDisposable
     internal readonly Dictionary<Guid, BankAccountSnapshot> BankAccounts = [];
     internal readonly Dictionary<Guid, CashDeskSnapshot> CashDesks = [];
     internal readonly Dictionary<Guid, PettyCashSnapshot> PettyCash = [];
+    internal readonly Dictionary<Guid, CompanyCardSnapshot> CompanyCards = [];
     internal readonly Dictionary<Guid, OpeningBalanceSnapshot> OpeningBalances = [];
     internal readonly Dictionary<string, string> IdempotencyResults = [];
     internal readonly List<OutboxMessage> Outbox = [];
@@ -79,6 +89,8 @@ internal sealed class PendingChanges
     public Dictionary<Guid, CashDeskSnapshot> CashDesks { get; } = [];
 
     public Dictionary<Guid, PettyCashSnapshot> PettyCash { get; } = [];
+
+    public Dictionary<Guid, CompanyCardSnapshot> CompanyCards { get; } = [];
 
     public Dictionary<Guid, OpeningBalanceSnapshot?> OpeningBalances { get; } = []; // null: removed
 
@@ -117,6 +129,11 @@ public sealed class InMemoryUnitOfWork(InMemoryAccountsDatabase db) : IUnitOfWor
                 foreach (var (id, s) in pending.PettyCash)
                 {
                     db.PettyCash[id] = s;
+                }
+
+                foreach (var (id, s) in pending.CompanyCards)
+                {
+                    db.CompanyCards[id] = s;
                 }
 
                 foreach (var (id, s) in pending.OpeningBalances)
@@ -267,6 +284,56 @@ public sealed class InMemoryCashDeskRepository(InMemoryAccountsDatabase db) : IC
         pending.CashDesks[desk.Id] = CashDeskSnapshot.From(desk, newVersion);
         pending.Outbox.AddRange(desk.PendingEvents.Select(OutboxMessage.From));
         desk.MarkSaved(newVersion);
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class InMemoryCompanyCardRepository(InMemoryAccountsDatabase db) : ICompanyCardRepository
+{
+    public Task<CompanyCard?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().FirstOrDefault(s => s.Id == id)?.ToDomain());
+
+    public Task<bool> NumberTakenAsync(string cardNumber, Guid? exceptId, CancellationToken cancellationToken) =>
+        Task.FromResult(Visible().Any(s => s.Id != exceptId && s.Data.CardNumber == cardNumber));
+
+    public Task AddAsync(CompanyCard card, CancellationToken cancellationToken) => Write(card, 1, null);
+
+    public Task SaveAsync(CompanyCard card, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        return Write(card, card.Version + 1, card.Version);
+    }
+
+    public Task<IReadOnlyList<CompanyCard>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<CompanyCard>>(Visible().Where(s => includeInactive || s.IsActive).Select(s => s.ToDomain()).ToList());
+
+    private List<CompanyCardSnapshot> Visible()
+    {
+        var pending = InMemoryUnitOfWork.Pending;
+        lock (db.Gate)
+        {
+            var all = new Dictionary<Guid, CompanyCardSnapshot>(db.CompanyCards);
+            foreach (var (id, s) in pending.CompanyCards)
+            {
+                all[id] = s;
+            }
+
+            return [.. all.Values];
+        }
+    }
+
+    private Task Write(CompanyCard card, long newVersion, long? expected)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        if (expected is { } v && Visible().FirstOrDefault(s => s.Id == card.Id)?.Version != v)
+        {
+            throw new ConcurrencyConflictException($"Company card {card.Id} was changed by someone else.");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending;
+        pending.CompanyCards[card.Id] = CompanyCardSnapshot.From(card, newVersion);
+        pending.Outbox.AddRange(card.PendingEvents.Select(OutboxMessage.From));
+        card.MarkSaved(newVersion);
         return Task.CompletedTask;
     }
 }

@@ -20,6 +20,12 @@ public sealed class InMemoryDatabase : IDisposable
     internal readonly Dictionary<Guid, InstrumentSnapshot> Instruments = [];
     internal readonly Dictionary<Guid, ReceiptSnapshot> Receipts = [];
     internal readonly Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers = [];
+    internal readonly Dictionary<int, int> PaymentSheetNumbers = [];
+    internal readonly Dictionary<Guid, BankTransferSnapshot> Transfers = [];
+    internal readonly Dictionary<int, int> TransferNumbers = [];
+
+    /// <summary>The company's transfer limits; a new company starts with the owner's figures (report no. 7), as schema 046 does.</summary>
+    internal List<Treasury.Cashflow.Domain.Transfers.TransferLimit> TransferLimits { get; set; } = [.. Treasury.Cashflow.Domain.Transfers.TransferLimits.OwnerDefaults().Rows];
     internal readonly Dictionary<Guid, ChequeBookSnapshot> ChequeBooks = [];
     internal readonly Dictionary<Guid, ChequeFormatSnapshot> ChequeFormats = [];
     internal readonly Dictionary<Guid, (string Type, byte[] Data)> ChequeImages = [];
@@ -45,9 +51,20 @@ internal sealed class PendingChanges
 {
     public Dictionary<Guid, InstrumentSnapshot> Instruments { get; } = [];
 
+    /// <summary>Cheques and notes taken off a corrected receipt.</summary>
+    public HashSet<Guid> RemovedInstruments { get; } = [];
+
     public Dictionary<Guid, ReceiptSnapshot> Receipts { get; } = [];
 
     public Dictionary<(int Year, ReceiptKind Kind), int> ReceiptNumbers { get; } = [];
+
+    public Dictionary<int, int> PaymentSheetNumbers { get; } = [];
+
+    public Dictionary<Guid, BankTransferSnapshot> Transfers { get; } = [];
+
+    public Dictionary<int, int> TransferNumbers { get; } = [];
+
+    public List<Treasury.Cashflow.Domain.Transfers.TransferLimit>? TransferLimits { get; set; }
 
     public Dictionary<Guid, ChequeBookSnapshot> ChequeBooks { get; } = [];
 
@@ -84,6 +101,11 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                     db.Instruments[id] = s;
                 }
 
+                foreach (var id in pending.RemovedInstruments)
+                {
+                    db.Instruments.Remove(id);
+                }
+
                 foreach (var (id, s) in pending.Receipts)
                 {
                     db.Receipts[id] = s;
@@ -92,6 +114,26 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
                 foreach (var (key, n) in pending.ReceiptNumbers)
                 {
                     db.ReceiptNumbers[key] = n;
+                }
+
+                foreach (var (year, n) in pending.PaymentSheetNumbers)
+                {
+                    db.PaymentSheetNumbers[year] = n;
+                }
+
+                foreach (var (id, s) in pending.Transfers)
+                {
+                    db.Transfers[id] = s;
+                }
+
+                foreach (var (year, n) in pending.TransferNumbers)
+                {
+                    db.TransferNumbers[year] = n;
+                }
+
+                if (pending.TransferLimits is { } limits)
+                {
+                    db.TransferLimits = limits;
                 }
 
                 foreach (var (id, s) in pending.ChequeBooks)
@@ -142,6 +184,21 @@ public sealed class InMemoryUnitOfWork(InMemoryDatabase db) : IUnitOfWork
 
 public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrumentRepository
 {
+    public Task<int> NextPaymentSheetNumberAsync(int fiscalYear, CancellationToken cancellationToken)
+    {
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        if (!pending.PaymentSheetNumbers.TryGetValue(fiscalYear, out var last))
+        {
+            lock (db.Gate)
+            {
+                last = db.PaymentSheetNumbers.TryGetValue(fiscalYear, out var n) ? n : 0;
+            }
+        }
+
+        pending.PaymentSheetNumbers[fiscalYear] = last + 1;
+        return Task.FromResult(last + 1);
+    }
+
     public Task<Instrument?> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var pending = InMemoryUnitOfWork.Pending;
@@ -203,6 +260,31 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         return Task.CompletedTask;
     }
 
+    /// <summary>The whole instrument is kept as a snapshot, so a correction is saved like any other change.</summary>
+    public Task SaveCorrectionAsync(Instrument instrument, CancellationToken cancellationToken) => SaveAsync(instrument, cancellationToken);
+
+    public Task RemoveAsync(Instrument instrument, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(instrument);
+        long stored;
+        lock (db.Gate)
+        {
+            stored = db.Instruments.TryGetValue(instrument.Id, out var s) ? s.Version : 0;
+        }
+
+        if (stored != instrument.Version)
+        {
+            throw new ConcurrencyConflictException($"Instrument {instrument.Id} was changed by someone else (version {stored}, expected {instrument.Version}).");
+        }
+
+        var pending = InMemoryUnitOfWork.Pending ?? throw new InvalidOperationException("Writes must run inside IUnitOfWork.ExecuteAsync.");
+        pending.Instruments.Remove(instrument.Id);
+        pending.RemovedInstruments.Add(instrument.Id);
+        pending.Outbox.AddRange(instrument.PendingEvents.Select(OutboxMessage.From));
+        instrument.MarkSaved(instrument.Version + 1);
+        return Task.CompletedTask;
+    }
+
     public Task<IReadOnlyList<Instrument>> ListReceivedAsync(InstrumentState state, CancellationToken cancellationToken)
     {
         lock (db.Gate)
@@ -220,8 +302,22 @@ public sealed class InMemoryInstrumentRepository(InMemoryDatabase db) : IInstrum
         lock (db.Gate)
         {
             var staged = InMemoryUnitOfWork.Pending?.Instruments ?? [];
-            IReadOnlyList<Instrument> list = db.Instruments.Values.Where(s => !staged.ContainsKey(s.Id)).Concat(staged.Values)
+            var removed = InMemoryUnitOfWork.Pending?.RemovedInstruments ?? [];
+            IReadOnlyList<Instrument> list = db.Instruments.Values.Where(s => !staged.ContainsKey(s.Id) && !removed.Contains(s.Id)).Concat(staged.Values)
                 .Where(s => s.ReceiptId == receiptId).Select(s => s.ToDomain()).ToList();
+            return Task.FromResult(list);
+        }
+    }
+
+    public Task<IReadOnlyList<ReceiptChequeStatus>> ListStatusesByReceiptsAsync(IReadOnlyCollection<Guid> receiptIds, CancellationToken cancellationToken)
+    {
+        lock (db.Gate)
+        {
+            IReadOnlyList<ReceiptChequeStatus> list = db.Instruments.Values
+                .Where(s => s.ReceiptId is { } id && receiptIds.Contains(id))
+                .Select(s => new ReceiptChequeStatus(s.ReceiptId!.Value, s.State, new FiscalDate(s.IssueDate), s.DueDate is { } d ? new FiscalDate(d) : null,
+                    s.Id, s.Number, s.Kind))
+                .ToList();
             return Task.FromResult(list);
         }
     }

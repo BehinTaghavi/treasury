@@ -243,6 +243,7 @@ onMounted(async () => {
             </td>
             <td class="tr-actions">
               <button type="button" class="tr-link" @click="choose(g)">{{ t('بابت‌ها', 'Purposes') }}</button>
+              <!-- Owner, 19 Nov 2026 (answer to Q61): a used group stays correctable; only its kind is fixed. -->
               <button type="button" class="tr-link" @click="startEdit(g)">{{ t('ویرایش', 'Edit') }}</button>
               <button type="button" class="tr-link" @click="changeGroup(g, g.isActive ? 'deactivate' : 'activate')">{{ g.isActive ? t('غیرفعال کردن', 'Switch off') : t('فعال کردن', 'Switch on') }}</button>
               <button v-if="!g.isInUse" type="button" class="tr-link danger" @click="changeGroup(g, 'delete')">{{ t('حذف', 'Delete') }}</button>
@@ -307,7 +308,6 @@ label { display: flex; flex-direction: column; gap: .25rem; font-size: .85rem; }
 .tr-radio { display: flex; flex-direction: column; gap: .3rem; font-size: .85rem; }
 .tr-radio label { flex-direction: row; align-items: center; gap: .35rem; }
 input:not([type=radio]) { padding: .45rem .5rem; border: 1px solid #cbd2d9; border-radius: 6px; font: inherit; background: #fff; }
-.req > input { border-color: #d64545; box-shadow: inset 0 0 0 1px #f5c2c2; }
 .star { color: #d64545; font-weight: 700; }
 button { padding: .5rem .9rem; border-radius: 6px; border: 1px solid #1d4ed8; background: #2563eb; color: #fff; font: inherit; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }

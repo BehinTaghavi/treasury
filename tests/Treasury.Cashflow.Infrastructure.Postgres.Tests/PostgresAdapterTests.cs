@@ -176,20 +176,22 @@ public sealed class PostgresAdapterTests : IDisposable
     [Fact]
     public async Task Collection_path_stores_each_step_once_in_the_fiscal_year_it_happens_in()
     {
-        // Received in 1404, deposited in 1404, cleared in 1405 (doc 7.4): the clearing step lives in the 1405 partition.
+        // Received in 1404, registered in Sayad (rule N3) and deposited in 1404, cleared in 1405 (doc 7.4): the clearing step lives in
+        // the 1405 partition.
         var id = (await _useCases.ReceiveAsync(Receive(Key(), date: "1404/12/20") with { DueDate = "1405/01/10" }, CancellationToken.None)).Value;
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RegisterSayad, "1404/12/21", Reference: "SY-1"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1404/12/25", Destination: "حساب جاری ملت"), CancellationToken.None)).IsSuccess);
         Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RecordCleared, "1405/01/15", Reference: "R-1"), CancellationToken.None)).IsSuccess);
 
         var view = await _useCases.GetAsync(id, CancellationToken.None);
         Assert.Equal("Cleared", view!.State);
         Assert.Equal("حساب جاری ملت", view.Destination);
-        Assert.Equal(["Receive", "DepositForCollection", "RecordCleared"], view.History.Select(h => h.Action));
-        Assert.Equal("R-1", view.History[2].Reference);
-        Assert.Equal(3L, view.Version);
-        Assert.Equal(2L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.instrument_event_fy1404 WHERE instrument_id = @id", ("id", id)));
+        Assert.Equal(["Receive", "RegisterSayad", "DepositForCollection", "RecordCleared"], view.History.Select(h => h.Action));
+        Assert.Equal("R-1", view.History[3].Reference);
+        Assert.Equal(4L, view.Version);
+        Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.instrument_event_fy1404 WHERE instrument_id = @id", ("id", id)));
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.instrument_event_fy1405 WHERE instrument_id = @id", ("id", id)));
-        Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.outbox WHERE payload->>'InstrumentId' = @id", ("id", id.ToString())));
+        Assert.Equal(4L, await _db.ScalarAsync<long>("SELECT count(*) FROM cashflow.outbox WHERE payload->>'InstrumentId' = @id", ("id", id.ToString())));
     }
 
     [Fact]
@@ -207,7 +209,7 @@ public sealed class PostgresAdapterTests : IDisposable
     {
         var id = (await _useCases.ReceiveAsync(Receive(Key()), CancellationToken.None)).Value;
         var stale = await _unitOfWork.ExecuteAsync(ct => _instruments.GetAsync(id, ct), CancellationToken.None);
-        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1405/08/03", Destination: "ملت"), CancellationToken.None)).IsSuccess);
+        Assert.True((await _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RegisterSayad, "1405/08/03"), CancellationToken.None)).IsSuccess);
 
         stale!.ReturnToIssuer(FiscalDate.ParseJalali("1405/08/04"), "clerk-2", null);
         await Assert.ThrowsAsync<ConcurrencyConflictException>(() =>
@@ -216,7 +218,7 @@ public sealed class PostgresAdapterTests : IDisposable
                 await _instruments.SaveAsync(stale, ct);
                 return 0;
             }, CancellationToken.None));
-        Assert.Equal("DepositedForCollection", (await _useCases.GetAsync(id, CancellationToken.None))!.State);
+        Assert.Equal("SayadRegistered", (await _useCases.GetAsync(id, CancellationToken.None))!.State);
     }
 
     [Fact]
@@ -227,7 +229,7 @@ public sealed class PostgresAdapterTests : IDisposable
 
         // The development policy still says 1403 is open; the closed-year trigger is the last line of defence (ADR 0003).
         var error = await Assert.ThrowsAsync<PostgresException>(() =>
-            _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.DepositForCollection, "1403/11/05", Destination: "ملت"), CancellationToken.None));
+            _useCases.ChangeStateAsync(new(Key(), id, InstrumentAction.RegisterSayad, "1403/11/05"), CancellationToken.None));
         Assert.Equal("P0001", error.SqlState);
         Assert.Equal(1L, await _db.ScalarAsync<long>("SELECT version FROM cashflow.instrument WHERE id = @id", ("id", id)));
     }

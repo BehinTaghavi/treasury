@@ -6,7 +6,13 @@ import type { TreasuryApi } from '@treasury/ui-kit'
 
 export interface Entry { id: string; name: string; code?: string | null; isActive?: boolean }
 export interface Requester { id: string; number: number; fullName: string; departmentId: string | null; costCenterCode: string; isActive: boolean }
-export interface Beneficiary { id: string; detailCode: string; legalName: string; sheba: string | null; isActive: boolean }
+/** An entry of «ذینفعان / متعهدین / ضامنین»; only the group «ذینفعان» is paid (owner, 19 Nov 2026). */
+export interface Beneficiary { id: string; detailCode: string; legalName: string; sheba: string | null; isActive: boolean; isBeneficiary?: boolean }
+/** A received cheque that may be transferred: in the cash desk with the status «ثبت صیادی شد» (cashflow-svc). */
+export interface TransferableCheque {
+  id: string; kind: string; number: string | null; bankName: string | null; amount: number; currency: string; dueDate: string | null; counterparty: string
+  allowedActions: string[]; details: { sayadId: string | null; transferId?: string | null } | null
+}
 export interface PurposeGroup { id: string; number: number; direction: 'Receipt' | 'Payment'; name: string; reference1Id: string | null; reference2Id: string | null; isActive: boolean }
 export interface Purpose { id: string; groupId: string; name: string; isActive: boolean }
 export interface Department { id: string; number: number; name: string; isActive: boolean }
@@ -27,7 +33,7 @@ export function useLookups(api: TreasuryApi) {
   async function load() {
     const [rq, bf, g, rf, d, c, b, k, a] = await Promise.all([
       api.get<Requester[]>('/api/reference/requesters?includeInactive=true'),
-      api.get<Beneficiary[]>('/api/reference/beneficiaries?includeInactive=true'),
+      api.get<Beneficiary[]>('/api/reference/beneficiaries?includeInactive=true&role=Beneficiary'),
       api.get<PurposeGroup[]>('/api/reference/purpose-groups'),
       api.get<Entry[]>('/api/reference/references?includeInactive=true'),
       api.get<Department[]>('/api/reference/departments'),
@@ -63,7 +69,16 @@ export const methods: { value: string; fa: string; en: string }[] = [
   { value: 'GuaranteeNote', fa: 'سفته تضمینی (انتظامی)', en: 'Guarantee note' },
   { value: 'Transfer', fa: 'نقل و انتقال (بین بانکی)', en: 'Bank transfer' },
   { value: 'CardToCard', fa: 'کارت به کارت', en: 'Card to card' },
+  // Owner, 19 Nov 2026: a received cheque registered in Sayad is handed on to the beneficiary.
+  { value: 'ChequeTransfer', fa: 'ثبت انتقال (خرج چک)', en: 'Cheque transfer (endorsement)' },
+  // Owner, 21 Nov 2026 (answer to Q82): every transfer between the company's own bank accounts needs a request and its approval.
+  { value: 'OwnAccountTransfer', fa: 'نقل و انتقال بین بانک‌های شرکت', en: "Transfer between the company's accounts" },
 ]
+
+/** The payment method of a request that moves money between two bank accounts of the company (no beneficiary, no purpose group). */
+export const OWN_TRANSFER = 'OwnAccountTransfer'
+/** What is sent in place of the beneficiary and the purpose group of such a request: requests-svc does not ask for them. */
+export const NO_ID = '00000000-0000-0000-0000-000000000000'
 
 export const stateNames: Record<string, [string, string]> = {
   Registered: ['ثبت شده', 'Registered'], Approved: ['تایید شده', 'Approved'], Paid: ['پرداخت شده', 'Paid'], Cancelled: ['ابطال شده', 'Cancelled'],

@@ -38,7 +38,7 @@ public sealed class HttpRequestReferenceLookup(HttpClient http) : IRequestRefere
 {
     private sealed record Requester(Guid Id, string FullName, Guid? DepartmentId, string? CostCenterCode, bool IsActive);
 
-    private sealed record Beneficiary(Guid Id, string DetailCode, string LegalName, string? Sheba, bool IsActive);
+    private sealed record Beneficiary(Guid Id, string DetailCode, string LegalName, string? Sheba, bool IsActive, bool IsBeneficiary = true);
 
     private sealed record Group(Guid Id, string Name, string Direction, bool IsActive);
 
@@ -48,7 +48,7 @@ public sealed class HttpRequestReferenceLookup(HttpClient http) : IRequestRefere
 
     public async Task<BeneficiaryFact?> BeneficiaryAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Beneficiary[]>(http, "api/reference/beneficiaries?includeInactive=true", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) ?? [])
-            .Where(b => b.Id == id).Select(b => new BeneficiaryFact(b.Id, b.DetailCode, b.LegalName, b.Sheba, b.IsActive)).FirstOrDefault();
+            .Where(b => b.Id == id).Select(b => new BeneficiaryFact(b.Id, b.DetailCode, b.LegalName, b.Sheba, b.IsActive, b.IsBeneficiary)).FirstOrDefault();
 
     public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Group>(http, $"api/reference/purpose-groups/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } g
@@ -88,4 +88,25 @@ public sealed class HttpPayFromLookup(HttpClient http) : IPayFromLookup
     public async Task<PayFromFact?> CashDeskAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Desk[]>(http, "api/accounts/cash-desks?includeInactive=true", "Accounts.Unavailable", cancellationToken).ConfigureAwait(false) ?? [])
             .Where(d => d.Id == id).Select(d => new PayFromFact(PayFromKind.CashDesk, d.Id, d.Name, d.CurrencyCode, d.IsActive)).FirstOrDefault();
+}
+
+/// <summary>
+/// Received cheques, asked from cashflow-svc (ADR 0001) for requests of the kind «ثبت انتقال (خرج چک)» (owner, 19 Nov 2026). Base address:
+/// Services:Cashflow; in Docker Compose http://cashflow-api:8080. Whether the cheque may be transferred is what cashflow-svc's lifecycle
+/// table allows now ("Endorse" among the cheque's allowed actions): an ordinary cheque in the cash desk that is «ثبت صیادی شد».
+/// </summary>
+public sealed class HttpReceivedChequeLookup(HttpClient http) : IReceivedChequeLookup
+{
+    private sealed record Details(string? SayadId);
+
+    private sealed record Instrument(
+        Guid Id, string Direction, string Kind, string? Number, string? BankName, decimal Amount, string Currency, string? DueDate, string Counterparty,
+        IReadOnlyList<string>? AllowedActions, Details? Details);
+
+    public async Task<ReceivedChequeFact?> ChequeAsync(Guid id, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<Instrument>(http, $"api/cashflow/instruments/{id}", "Cashflow.Unavailable", cancellationToken).ConfigureAwait(false) is { } i
+            && i.Direction == "Received"
+            ? new ReceivedChequeFact(i.Id, i.Number ?? string.Empty, i.BankName, string.IsNullOrWhiteSpace(i.DueDate) ? null : FiscalDate.ParseJalali(i.DueDate), i.Counterparty,
+                i.Amount, i.Currency, i.Kind.EndsWith("Cheque", StringComparison.Ordinal) && (i.AllowedActions ?? []).Contains("Endorse"), i.Details?.SayadId)
+            : null;
 }

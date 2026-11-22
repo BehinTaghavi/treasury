@@ -12,6 +12,14 @@ describe('amount in Persian words (مبلغ به حروف)', () => {
     expect(amountInWords(0)).toBe('صفر')
     expect(amountInWords(1_500.75)).toBe('یک هزار و پانصد')
   })
+  it('says میلیارد once, after the whole number of milliards (report no. 6, item 15)', () => {
+    expect(amountInWords(4_500_000_000_000)).toBe('چهار هزار و پانصد میلیارد')
+    expect(amountInWords(1_000_000_000_000)).toBe('یک هزار میلیارد')
+    expect(amountInWords(999_000_000_000)).toBe('نهصد و نود و نه میلیارد')
+    expect(amountInWords(1_234_567_890_123)).toBe('یک هزار و دویست و سی و چهار میلیارد و پانصد و شصت و هفت میلیون و هشتصد و نود هزار و یکصد و بیست و سه')
+    expect(amountInWords(25_000_300_000_000_000 / 100)).toBe('دویست و پنجاه هزار و سه میلیارد')
+    expect(amountTextInWords('4,500,000,000,000', 'ریال')).toBe('چهار هزار و پانصد میلیارد ریال')
+  })
 })
 
 import { groupAmount, parseAmount } from './index'
@@ -28,5 +36,26 @@ describe('amounts typed with separators (report no. 4, item 10)', () => {
     expect(groupAmount('00012')).toBe('12')
     expect(groupAmount('\u200e\u2212۱۲٬۵۰۰', 0, true)).toBe('-12,500')
     expect(parseAmount(groupAmount('12500000'))).toBe(12_500_000)
+  })
+})
+
+import { amountTextInWords } from './index'
+
+describe('words under an amount box (report no. 6, items 1 and 5)', () => {
+  it('reads the text as typed, with separators and Persian digits', () => {
+    expect(amountTextInWords('12,500,000', 'ریال')).toBe('دوازده میلیون و پانصد هزار ریال')
+    expect(amountTextInWords('۱۲٬۵۰۰')).toBe('دوازده هزار و پانصد')
+    expect(amountTextInWords('0')).toBe('صفر')
+  })
+  it('gives nothing for an empty or unreadable box', () => {
+    expect(amountTextInWords('')).toBe('')
+    expect(amountTextInWords('-')).toBe('')
+    expect(amountTextInWords('abc', 'ریال')).toBe('')
+  })
+  it('reads decimals digit by digit after ممیز and a minus as منفی', () => {
+    expect(amountTextInWords('1,250.05', 'دلار')).toBe('یک هزار و دویست و پنجاه ممیز صفر پنج دلار')
+    expect(amountTextInWords('42.50')).toBe('چهل و دو ممیز پنج')
+    expect(amountTextInWords('12.')).toBe('دوازده')
+    expect(amountTextInWords('-3,000', 'ریال')).toBe('منفی سه هزار ریال')
   })
 })

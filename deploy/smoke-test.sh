@@ -28,6 +28,8 @@ for _ in $(seq 1 60); do
 done
 curl -sf "$base/api/reference/banks" | grep -q 'بانک ملت' || fail "bank names list (reference-svc) is missing or empty"
 curl -sf "$base/api/reference/currencies" | grep -q '"code":"IRR"' || fail "currency list has no Rial"
+# «مشخصات شرکت» (was «اطلاعات شرکت»): the company's name and logo for the top bar of every screen (schemas 033, 034, 039).
+curl -sf "$base/api/reference/company" | grep -q '"nationalId"' || fail "company information (reference-svc) is not served"
 
 # Bank accounts (accounts-svc -> PostgreSQL as accounts_svc).
 for _ in $(seq 1 60); do
@@ -51,14 +53,21 @@ for _ in $(seq 1 60); do
 done
 [[ "$issuer" == "\"issuer\":\"$base/auth/realms/master\"" ]] || fail "Keycloak issuer is $issuer, expected $base/auth/realms/master"
 
-# Receive a cheque, read it back, deposit it (API -> PostgreSQL as cashflow_svc).
+# Receive a cheque, read it back, register it in Sayad, deposit it (API -> PostgreSQL as cashflow_svc).
 key="smoke-$(date +%s)-$RANDOM"
 body='{"kind":"OrdinaryCheque","number":"'"$RANDOM"'","bankName":"SMOKE-TEST","amount":{"amount":1000000},"receivedOn":"1405/08/19","dueDate":"1405/09/30","drawerId":"5b1d3c6e-2f43-4a51-9a5b-0c3e1d2f4a11","drawerName":"Smoke test","purpose":"Smoke test"}'
 created="$(curl -s -D - -o /dev/null -X POST "$base/api/cashflow/instruments/received" -H 'Content-Type: application/json' -H "Idempotency-Key: $key" -d "$body")"
 grep -q '^HTTP/[0-9.]* 201' <<<"$created" || fail "receiving a cheque: $(head -1 <<<"$created")"
 path="$(grep -i '^location:' <<<"$created" | tr -d '\r' | awk '{print $2}')"
 curl -sf "$base$path" | grep -q '"state":"InCashDesk"' || fail "reading the cheque back"
+# Rule N3 (owner, 18 Nov 2026): a cheque is deposited at the bank only after «ثبت صیادی».
+[[ "$(status -X POST "$base$path/actions/RegisterSayad" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-sayad" -d '{"date":"1405/08/19"}')" == 201 ]] || fail "registering the cheque in Sayad"
 [[ "$(status -X POST "$base$path/actions/DepositForCollection" -H 'Content-Type: application/json' -H "Idempotency-Key: $key-deposit" -d '{"date":"1405/08/20","destination":"Smoke account"}')" == 201 ]] || fail "depositing the cheque"
 curl -sf "$base$path" | grep -q '"state":"DepositedForCollection"' || fail "state after deposit"
+
+# Transfers between the company's own bank accounts (owner's report no. 7; schema 046): the limits start with the owner's figures
+# and the year's transfers can be listed.
+curl -sf "$base/api/cashflow/transfer-limits" | grep -q '"method":"Satna","bankId":null,"minPerOrder":2000000000' || fail "transfer limits (schema 046) are not served with the starting figures"
+[[ "$(status "$base/api/cashflow/transfers?year=1405")" == 200 ]] || fail "the list of transfers between bank accounts does not answer"
 
 echo "OK: shell, receipts, basic information and payment requests micro-frontends, Keycloak, and the cashflow, reference, accounts and requests APIs with PostgreSQL work at $base"

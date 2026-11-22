@@ -24,7 +24,11 @@ public sealed record DetailAccountView(string Code, string Name, string? Type, b
     public string? Role => Treasury.Reference.Domain.Ledger.DetailRoles.Of(Type, IsCostCenter)?.ToString();
 }
 
-public sealed record DetailTypeView(string Type, int ActiveCount);
+public sealed record DetailTypeView(string Type, int ActiveCount)
+{
+    /// <summary>The role of the type's accounts (as <see cref="DetailAccountView.Role"/>), so a screen can offer only the types its field takes.</summary>
+    public string? Role => Treasury.Reference.Domain.Ledger.DetailRoles.Of(Type)?.ToString();
+}
 
 /// <summary>Read side of the ledger copy: lists and searches without loading the whole aggregate (9,600 تفصیل at Iran Nazho Co.).</summary>
 public interface ILedgerQueries
