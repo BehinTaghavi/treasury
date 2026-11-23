@@ -33,6 +33,7 @@ Update this file when a task finishes (what is done, what is next). Months count
 ## Done log
 | Date | What |
 |---|---|
+| 2026-11-23 | Reviewer's primer: five business topics added (bank transfers Sheba/Paya/Satna, cash desk and petty cash, payment requests and internal control, bank reconciliation and parallel-run reconciliation, foreign currency); resources given to the owner as two PDFs, technology and accounting/business |
 | 2026-11-23 | Reviewer's primer in Farsi (`docs/reviewer-primer.fa.md`, owner's request): each topic of the review workflow in plain words, what a reviewer needs at the start, and short and deeper learning resources; a two-week learning order |
 | 2026-11-23 | Reviewer's skills in Farsi (`docs/reviewer-skills.fa.md`, owner's request): 32 skills in seven groups with the depth needed (1–10) for the main and the second reviewer, the minimum for hiring the second reviewer, and practical interview tests on the repository |
 | 2026-11-23 | Reviewer's workflow in Farsi (`docs/reviewer-workflow.fa.md`, owner's request for a second reviewer): 18 stages of a pull request review with priority (P1 every pull request, P2 when the area is touched, P3 periodic), what to check, the tools and files of the repository for each, a separate stage for treasury vouchers, and a proposed split of the stages between two reviewers |
