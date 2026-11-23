@@ -34,6 +34,12 @@ public interface IRequestReferenceLookup
 
     Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken);
 
+    /// <summary>An organisational unit (واحد سازمانی) of Basic Information.</summary>
+    Task<DepartmentFact?> DepartmentAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>A تفصیل of the accounting system's list by its code; <see cref="CostCenterFact.IsCostCenter"/> says whether it is a cost centre.</summary>
+    Task<CostCenterFact?> CostCenterAsync(string code, CancellationToken cancellationToken);
+
     /// <summary>Tells reference-svc an entry ("requesters", "beneficiaries", "purpose-groups") is used, so it is never deleted.</summary>
     Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken);
 }

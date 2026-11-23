@@ -9,6 +9,7 @@ public sealed class FakeReference : IRequestReferenceLookup
 {
     public static readonly Guid Requester = Guid.NewGuid();
     public static readonly Guid Department = Guid.NewGuid();
+    public static readonly Guid OldDepartment = Guid.NewGuid();
     public static readonly Guid Supplier = Guid.NewGuid();
     public static readonly Guid OldSupplier = Guid.NewGuid();
     public static readonly Guid Purchases = Guid.NewGuid();
@@ -27,6 +28,22 @@ public sealed class FakeReference : IRequestReferenceLookup
 
     public Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) => Answer(
         id == Purchases ? new PurposeGroupFact(id, "خرید مواد اولیه", true, true) : id == Sales ? new PurposeGroupFact(id, "وجوه حاصل فروش", false, true) : null);
+
+    /// <summary>Two units: «تدارکات» with cost centres 810001 and 810002, and «مالی» switched off with no list of its own.</summary>
+    public Task<DepartmentFact?> DepartmentAsync(Guid id, CancellationToken cancellationToken) => Answer(
+        id == Department ? new DepartmentFact(id, "تدارکات", ["810001", "810002"], true)
+        : id == OldDepartment ? new DepartmentFact(id, "مالی", [], false) : null);
+
+    /// <summary>Cost centres 810001, 810002, 810009 (switched off); 300200 is a تفصیل that is not a cost centre.</summary>
+    public Task<CostCenterFact?> CostCenterAsync(string code, CancellationToken cancellationToken) => Answer(code switch
+    {
+        "810001" => new CostCenterFact(code, "اداری", true, true),
+        "810002" => new CostCenterFact(code, "تولید", true, true),
+        "810003" => new CostCenterFact(code, "فروش", true, true),
+        "810009" => new CostCenterFact(code, "قدیمی", true, false),
+        "300200" => new CostCenterFact(code, "شرکت نمونه بازرگانی", false, true),
+        _ => null,
+    });
 
     public Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)
     {

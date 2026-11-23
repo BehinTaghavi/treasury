@@ -39,9 +39,11 @@ public sealed record RequesterView(
 }
 
 /// <param name="DetailName">Title of the تفصیل in the accounting system's list (may differ from the legal name).</param>
+/// <param name="DetailType">Type of that تفصیل in the accounting system's list (owner's report no. 9, item 6: «نوع تفصیل» before the beneficiary).</param>
 public sealed record BeneficiaryView(
     Guid Id, string DetailCode, string? DetailName, string LegalName, Guid? BankId, string? BranchName, string? AccountNumber, string? Sheba, string? Phone,
-    bool IsActive, bool IsInUse, long Version, BeneficiaryKind? Kind = null, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null);
+    bool IsActive, bool IsInUse, long Version, BeneficiaryKind? Kind = null, string? NationalId = null, string? PostalAddress = null, string? PostalCode = null,
+    string? DetailType = null);
 
 /// <summary>
 /// Departments (manual item 12), requesters (13) and beneficiaries (14). Each write is one command in one transaction on one
@@ -285,7 +287,7 @@ public sealed class OrganizationUseCases(
             {
                 var detail = await ledger.DetailAsync(b.DetailCode, ct).ConfigureAwait(false);
                 list.Add(new(b.Id, b.DetailCode, detail?.Name, b.LegalName, b.Bank.BankId, b.Bank.BranchName, b.Bank.AccountNumber, b.Bank.Sheba, b.Phone, b.IsActive, b.IsInUse, b.Version,
-                    b.Identity?.Kind, b.Identity?.NationalId, b.Identity?.PostalAddress, b.Identity?.PostalCode));
+                    b.Identity?.Kind, b.Identity?.NationalId, b.Identity?.PostalAddress, b.Identity?.PostalCode, detail?.Type));
             }
 
             return list;

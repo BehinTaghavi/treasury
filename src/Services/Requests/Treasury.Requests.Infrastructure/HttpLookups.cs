@@ -42,6 +42,10 @@ public sealed class HttpRequestReferenceLookup(HttpClient http) : IRequestRefere
 
     private sealed record Group(Guid Id, string Name, string Direction, bool IsActive);
 
+    private sealed record Department(Guid Id, string Name, string[]? CostCenterCodes, bool IsActive);
+
+    private sealed record Detail(string Code, string Name, bool IsCostCenter, string? Role, bool IsActive);
+
     public async Task<RequesterFact?> RequesterAsync(Guid id, CancellationToken cancellationToken) =>
         (await ServiceHttp.GetAsync<Requester[]>(http, "api/reference/requesters?includeInactive=true", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) ?? [])
             .Where(r => r.Id == id).Select(r => new RequesterFact(r.Id, r.FullName, r.DepartmentId, r.CostCenterCode, r.IsActive)).FirstOrDefault();
@@ -53,6 +57,16 @@ public sealed class HttpRequestReferenceLookup(HttpClient http) : IRequestRefere
     public async Task<PurposeGroupFact?> PurposeGroupAsync(Guid id, CancellationToken cancellationToken) =>
         await ServiceHttp.GetAsync<Group>(http, $"api/reference/purpose-groups/{id}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } g
             ? new PurposeGroupFact(g.Id, g.Name, g.Direction == "Payment", g.IsActive)
+            : null;
+
+    public async Task<DepartmentFact?> DepartmentAsync(Guid id, CancellationToken cancellationToken) =>
+        (await ServiceHttp.GetAsync<Department[]>(http, "api/reference/departments?includeInactive=true", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) ?? [])
+            .Where(d => d.Id == id).Select(d => new DepartmentFact(d.Id, d.Name, d.CostCenterCodes ?? [], d.IsActive)).FirstOrDefault();
+
+    /// <summary>A cost centre is a تفصیل marked so or of a cost-centre type (owner, 13 Nov 2026), as reference-svc's role says.</summary>
+    public async Task<CostCenterFact?> CostCenterAsync(string code, CancellationToken cancellationToken) =>
+        await ServiceHttp.GetAsync<Detail>(http, $"api/reference/ledger/details/{Uri.EscapeDataString(code)}", "Reference.Unavailable", cancellationToken).ConfigureAwait(false) is { } d
+            ? new CostCenterFact(d.Code, d.Name, d.IsCostCenter || d.Role == "CostCentre", d.IsActive)
             : null;
 
     public async Task MarkInUseAsync(string list, Guid id, CancellationToken cancellationToken)

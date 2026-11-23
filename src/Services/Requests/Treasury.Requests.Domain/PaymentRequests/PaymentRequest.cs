@@ -21,7 +21,8 @@ public enum PaymentMethod
 
 /// <summary>A scanned supporting document of a request (owner's report no. 4, item 12: «تصویر اسکن شده ضمایم پرداخت»).</summary>
 /// <param name="ContentType">application/pdf, image/jpeg or image/png, read from the file itself.</param>
-public sealed record RequestAttachment(Guid Id, string FileName, string ContentType, int Size, string UploadedBy, DateTimeOffset UploadedAt);
+/// <param name="Pages">Pages of the scan (<see cref="ScanPages"/>); they make up «تعداد ضمائم» (owner's report no. 9, item 4).</param>
+public sealed record RequestAttachment(Guid Id, string FileName, string ContentType, int Size, string UploadedBy, DateTimeOffset UploadedAt, int Pages = 1);
 
 /// <summary>
 /// A payment made against an approved request (owner, answer to Q36 of 15 Nov 2026: an endorsed received cheque «خرج چک» pays an approved
@@ -49,6 +50,18 @@ public enum PayFromKind
 /// <summary>A requester of funds (درخواست کننده وجوه) as reference-svc describes it; department and cost centre come with it.</summary>
 public sealed record RequesterFact(Guid Id, string Name, Guid? DepartmentId, string? CostCenterCode, bool IsActive);
 
+/// <summary>
+/// An organisational unit (واحد سازمانی) from Basic Information, with the cost centres it consists of (manual item 12; empty: any cost
+/// centre). Owner's report no. 9 of 22 Nov 2026, item 1: «واحد درخواست کننده» is chosen from these on the request.
+/// </summary>
+public sealed record DepartmentFact(Guid Id, string Name, IReadOnlyList<string> CostCenterCodes, bool IsActive);
+
+/// <summary>
+/// A cost centre (مرکز هزینه): a تفصیل of the accounting system's list (copied into reference-svc) that is a cost centre. Owner's report
+/// no. 9, item 2: chosen on the request from the accounting system's cost centres.
+/// </summary>
+public sealed record CostCenterFact(string Code, string Name, bool IsCostCenter, bool IsActive);
+
 /// <summary>A beneficiary (ذینفع) from Basic Information, with the تفصیل it is paid to.</summary>
 public sealed record BeneficiaryFact(Guid Id, string DetailCode, string Name, string? Sheba, bool IsActive);
 
@@ -63,7 +76,8 @@ public sealed record PayFromFact(PayFromKind Kind, Guid Id, string Name, string 
 /// <param name="TransferAccount">Transfer only: the receiving account or Sheba (manual: «انتقال به حساب بانکی»).</param>
 /// <param name="CardNumber">Card-to-card only: the beneficiary's card (manual: «انتقال به شماره کارت»).</param>
 /// <param name="HasMainBeneficiaries">«پرداخت جمعی دارد / ذینفعان اصلی دارد»: the beneficiary passes the money on to others.</param>
-/// <param name="Attachments">Number of supporting documents («تعداد ضمائم»).</param>
+/// <param name="Department">«واحد درخواست کننده» (report no. 9, item 1); optional, as the requester's department is (13 Nov 2026).</param>
+/// <param name="CostCenter">«مرکز هزینه» (report no. 9, item 2); null: the requester's cost centre from Basic Information.</param>
 public sealed record PaymentRequestForm(
     FiscalDate Date,
     RequesterFact Requester,
@@ -80,10 +94,10 @@ public sealed record PaymentRequestForm(
     string? CardNumber = null,
     PayFromFact? PayFrom = null,
     FiscalDate? DueDate = null,
-    Guid? DepartmentId = null,
+    DepartmentFact? Department = null,
     bool HasMainBeneficiaries = false,
-    int Attachments = 0,
-    string? Note = null);
+    string? Note = null,
+    CostCenterFact? CostCenter = null);
 
 /// <summary>
 /// A payment request (درخواست وجه). New-version manual, «ب-صدور درخواست وجه»: every payment starts with a request entered by a
@@ -94,7 +108,6 @@ public sealed record PaymentRequestForm(
 public sealed class PaymentRequest : AggregateRoot<Guid>
 {
     public const int MaxPurposeLength = 300;
-    public const int MaxAttachments = 999;
     public const int ForeignDecimals = 2;
     public const int MaxAttachmentBytes = 5 * 1024 * 1024;
     public const int MaxAttachmentFiles = 20;
@@ -124,9 +137,13 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
 
     public string RequesterName { get; private set; } = string.Empty;
 
-    /// <summary>Taken from the requester («عنوان وشماره واحد درخواست کننده … بصورت اتوماتیکمان پر میشوند»).</summary>
+    /// <summary>The requester's own department in Basic Information when the request was saved (what the form proposes).</summary>
     public Guid? RequesterDepartmentId { get; private set; }
 
+    /// <summary>
+    /// «مرکز هزینه»: chosen on the request from the accounting system's cost centres (owner's report no. 9, item 2); the requester's cost
+    /// centre unless another is chosen. With a department that lists its cost centres it is one of them.
+    /// </summary>
     public string? CostCenterCode { get; private set; }
 
     public Guid BeneficiaryId { get; private set; }
@@ -165,12 +182,19 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
 
     public FiscalDate? DueDate { get; private set; }
 
-    /// <summary>«واحد سازمانی» (manual: «بخش»): groups payments by the company's organisational units.</summary>
+    /// <summary>
+    /// «واحد درخواست کننده» (manual: «بخش»; renamed «واحد سازمانی» 15 Nov 2026): chosen from Basic Information's organisational units
+    /// (owner's report no. 9, item 1); the form proposes the requester's department. Groups payments by the company's units.
+    /// </summary>
     public Guid? DepartmentId { get; private set; }
 
     public bool HasMainBeneficiaries { get; private set; }
 
-    public int Attachments { get; private set; }
+    /// <summary>
+    /// «تعداد ضمائم»: the pages of the scans attached (owner's report no. 9 of 22 Nov 2026, item 4: filled automatically with the number of
+    /// pages of the scanned documents; it was typed before).
+    /// </summary>
+    public int Attachments => _files.Sum(f => f.Pages);
 
     public string? Note { get; private set; }
 
@@ -228,7 +252,8 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         // Only the file's own name: browsers on Windows may send the whole path, with \ or /.
         var raw = (fileName ?? string.Empty).Trim();
         var name = raw[(raw.LastIndexOfAny(['/', '\\']) + 1)..];
-        var file = new RequestAttachment(id, string.IsNullOrWhiteSpace(name) ? "scan" : name[..Math.Min(name.Length, 200)], type, content.Length, userId, at);
+        var file = new RequestAttachment(
+            id, string.IsNullOrWhiteSpace(name) ? "scan" : name[..Math.Min(name.Length, 200)], type, content.Length, userId, at, ScanPages.Count(content, type));
         _files.Add(file);
         Raise(new PaymentRequestFileAttached(Id, file.Id, file.FileName, userId));
         return file;
@@ -325,7 +350,7 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
             BeneficiaryName = d.BeneficiaryName, PurposeGroupId = d.PurposeGroupId, PurposeGroupName = d.PurposeGroupName, Purpose = d.Purpose,
             Reference1 = d.Reference1, Reference2 = d.Reference2, Amount = d.Amount, Currency = d.Currency, Method = d.Method, Priority = d.Priority,
             TransferAccount = d.TransferAccount, CardNumber = d.CardNumber, PayFromKind = d.PayFromKind, PayFromId = d.PayFromId, DueDate = d.DueDate,
-            DepartmentId = d.DepartmentId, HasMainBeneficiaries = d.HasMainBeneficiaries, Attachments = d.Attachments, Note = d.Note,
+            DepartmentId = d.DepartmentId, HasMainBeneficiaries = d.HasMainBeneficiaries, Note = d.Note,
             State = d.State, ApprovedBy = d.ApprovedBy, ApprovedAt = d.ApprovedAt, CancelReason = d.CancelReason,
         };
         r._files.AddRange(files ?? []);
@@ -352,7 +377,6 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Require(f.Purpose.Trim().Length <= MaxPurposeLength, "PaymentRequest.PurposeTooLong", "The purpose is too long.");
         Require(Enum.IsDefined(f.Method), "PaymentRequest.MethodRequired", "Choose how it is to be paid.");
         Require(f.Priority is >= 1 and <= 3, "PaymentRequest.PriorityInvalid", "The priority is 1, 2 or 3.");
-        Require(f.Attachments is >= 0 and <= MaxAttachments, "PaymentRequest.AttachmentsInvalid", "The number of attachments is not valid.");
 
         var currency = (f.Currency ?? string.Empty).Trim().ToUpperInvariant();
         Require(currency.Length == 3 && currency.All(char.IsAsciiLetter), "PaymentRequest.CurrencyRequired", "Choose the currency (old: \"نوع ارز نامشخص است\").");
@@ -392,15 +416,36 @@ public sealed class PaymentRequest : AggregateRoot<Guid>
         Require(f.Method != PaymentMethod.PostDatedCheque || f.DueDate is not null, "PaymentRequest.DueDateRequired", "A post-dated cheque needs its due date.");
         Require(f.DueDate is null || f.DueDate >= f.Date, "PaymentRequest.DueBeforeRequest", "The due date cannot be before the request date.");
 
+        // Owner's report no. 9, items 1 and 2: unit and cost centre chosen on the request. One kept from before may have been switched
+        // off since; a new choice must be active. As for requesters in Basic Information (manual item 12): a unit that lists its cost
+        // centres takes only those.
+        var department = f.Department;
+        Require(department is null || department.IsActive || department.Id == DepartmentId, "PaymentRequest.DepartmentInactive",
+            "The organisational unit is switched off.");
+        string costCenter;
+        if (f.CostCenter is { } cc)
+        {
+            Require(cc.IsCostCenter, "PaymentRequest.NotCostCenter", $"تفصیل {cc.Code} is not a cost centre.");
+            Require(cc.IsActive || cc.Code == CostCenterCode, "PaymentRequest.CostCenterInactive", $"Cost centre {cc.Code} is switched off.");
+            costCenter = cc.Code.Trim();
+        }
+        else
+        {
+            costCenter = Clean(f.Requester.CostCenterCode) ?? throw new DomainException("PaymentRequest.CostCenterRequired", "Choose the cost centre.");
+        }
+
+        Require(department is null || department.CostCenterCodes.Count == 0 || department.CostCenterCodes.Contains(costCenter), "PaymentRequest.CostCenterNotInDepartment",
+            $"Cost centre {costCenter} is not one of the organisational unit's cost centres.");
+
         Date = f.Date;
-        (RequesterId, RequesterName, RequesterDepartmentId, CostCenterCode) = (f.Requester.Id, f.Requester.Name, f.Requester.DepartmentId, f.Requester.CostCenterCode);
+        (RequesterId, RequesterName, RequesterDepartmentId, CostCenterCode) = (f.Requester.Id, f.Requester.Name, f.Requester.DepartmentId, costCenter);
         (BeneficiaryId, BeneficiaryDetailCode, BeneficiaryName) = (f.Beneficiary.Id, f.Beneficiary.DetailCode, f.Beneficiary.Name);
         (PurposeGroupId, PurposeGroupName, Purpose) = (f.PurposeGroup.Id, f.PurposeGroup.Name, f.Purpose.Trim());
         (Reference1, Reference2, Note) = (Clean(f.Reference1), Clean(f.Reference2), Clean(f.Note));
         (Amount, Currency, Method, Priority) = (f.Amount, currency, f.Method, f.Priority);
         (TransferAccount, CardNumber) = (transfer, card);
         (PayFromKind, PayFromId) = (f.PayFrom?.Kind, f.PayFrom?.Id);
-        (DueDate, DepartmentId, HasMainBeneficiaries, Attachments) = (f.DueDate, f.DepartmentId, f.HasMainBeneficiaries, f.Attachments);
+        (DueDate, DepartmentId, HasMainBeneficiaries) = (f.DueDate, department?.Id, f.HasMainBeneficiaries);
     }
 
     /// <summary>Iranian Sheba (IBAN): IR + 24 digits, mod 97 = 1.</summary>

@@ -7,6 +7,8 @@ namespace Treasury.Requests.Application.PaymentRequests;
 
 /// <summary>The request form as typed. Dates are Jalali text; requester, beneficiary and purpose group come from Basic Information.</summary>
 /// <param name="PayFromId">Optional: a cash desk for cash, otherwise a bank account.</param>
+/// <param name="DepartmentId">«واحد درخواست کننده», from Basic Information's organisational units (owner's report no. 9, item 1).</param>
+/// <param name="CostCenterCode">«مرکز هزینه», a cost-centre تفصیل (report no. 9, item 2); empty: the requester's cost centre.</param>
 public sealed record PaymentRequestInput(
     string Date,
     Guid RequesterId,
@@ -25,8 +27,8 @@ public sealed record PaymentRequestInput(
     string? DueDate = null,
     Guid? DepartmentId = null,
     bool HasMainBeneficiaries = false,
-    int Attachments = 0,
-    string? Note = null);
+    string? Note = null,
+    string? CostCenterCode = null);
 
 public sealed record RegisterPaymentRequestCommand(string IdempotencyKey, PaymentRequestInput Input);
 
@@ -213,6 +215,20 @@ public sealed class PaymentRequestUseCases(
             ?? throw new DomainException("PaymentRequest.BeneficiaryRequired", "Choose the beneficiary.");
         var group = await reference.PurposeGroupAsync(input.PurposeGroupId, ct).ConfigureAwait(false)
             ?? throw new DomainException("PaymentRequest.PurposeGroupRequired", "Choose the purpose group.");
+        DepartmentFact? department = null;
+        if (input.DepartmentId is { } departmentId)
+        {
+            department = await reference.DepartmentAsync(departmentId, ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.DepartmentNotFound", "The organisational unit was not found.");
+        }
+
+        CostCenterFact? costCenter = null;
+        if (!string.IsNullOrWhiteSpace(input.CostCenterCode))
+        {
+            costCenter = await reference.CostCenterAsync(input.CostCenterCode.Trim(), ct).ConfigureAwait(false)
+                ?? throw new DomainException("PaymentRequest.CostCenterNotFound", "The cost centre is not in the accounting system's list.");
+        }
+
         PayFromFact? payFrom = null;
         if (input.PayFromId is { } fromId)
         {
@@ -225,8 +241,8 @@ public sealed class PaymentRequestUseCases(
         return new PaymentRequestForm(
             FiscalDate.ParseJalali(input.Date), requester, beneficiary, group, input.Purpose ?? string.Empty, input.Amount, input.Currency ?? string.Empty,
             input.Method, input.Priority, input.Reference1, input.Reference2, input.TransferAccount, input.CardNumber, payFrom,
-            string.IsNullOrWhiteSpace(input.DueDate) ? null : FiscalDate.ParseJalali(input.DueDate), input.DepartmentId, input.HasMainBeneficiaries,
-            input.Attachments, input.Note);
+            string.IsNullOrWhiteSpace(input.DueDate) ? null : FiscalDate.ParseJalali(input.DueDate), department, input.HasMainBeneficiaries,
+            input.Note, costCenter);
     }
 
     private async Task MarkInUseAsync(PaymentRequestForm form, CancellationToken ct)

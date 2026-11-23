@@ -32,7 +32,7 @@ public sealed class PaymentRequestPostgresTests : IDisposable
     private static PaymentRequestInput Input(PaymentMethod method = PaymentMethod.Transfer) =>
         new("1405/08/24", FakeReference.Requester, FakeReference.Supplier, FakeReference.Purchases, "خرید ورق", 1_500.25m, method, "USD", 2, "INV-12", "C-9",
             TransferAccount: method == PaymentMethod.Transfer ? "IR460120000000003123456789" : null, DueDate: "1405/09/10",
-            DepartmentId: FakeReference.Department, HasMainBeneficiaries: true, Attachments: 3, Note: "یادداشت");
+            DepartmentId: FakeReference.Department, HasMainBeneficiaries: true, Note: "یادداشت", CostCenterCode: "810002");
 
     [Fact]
     public async Task A_request_round_trips_is_approved_and_listed()
@@ -40,9 +40,10 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         var r = await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None);
         Assert.True(r.IsSuccess, r.ErrorCode);
         var v = (await _requests.GetAsync(r.Value, CancellationToken.None))!;
-        Assert.Equal(("Transfer", "USD", 1_500.25m, 2, "IR460120000000003123456789", "1405/09/10", true, 3, "C-9"),
+        Assert.Equal(("Transfer", "USD", 1_500.25m, 2, "IR460120000000003123456789", "1405/09/10", true, 0, "C-9"),
             (v.Method, v.Currency, v.Amount, v.Priority, v.TransferAccount, v.DueDate, v.HasMainBeneficiaries, v.Attachments, v.Reference2));
-        Assert.Equal(("علی رضایی", (Guid?)FakeReference.Department, "810001", "300200"), (v.RequesterName, v.RequesterDepartmentId, v.CostCenterCode, v.BeneficiaryDetailCode));
+        Assert.Equal(("علی رضایی", (Guid?)FakeReference.Department, (Guid?)FakeReference.Department, "810002", "300200"),
+            (v.RequesterName, v.RequesterDepartmentId, v.DepartmentId, v.CostCenterCode, v.BeneficiaryDetailCode));
 
         Assert.True((await _requests.EditAsync(new(Key(), r.Value, Input(PaymentMethod.Cash) with { Currency = "IRR", Amount = 9_000_000, PayFromId = FakeAccounts.Desk }, 1), CancellationToken.None)).IsSuccess);
         _user.UserId = "manager";
@@ -84,6 +85,21 @@ public sealed class PaymentRequestPostgresTests : IDisposable
         Assert.Equal(jpeg, (await _requests.GetFileAsync(id, file.Value, CancellationToken.None))!.Value.Content);
         Assert.True((await _requests.RemoveFileAsync(Key(), id, file.Value, 2, CancellationToken.None)).IsSuccess);
         Assert.Null(await _requests.GetFileAsync(id, file.Value, CancellationToken.None));
+    }
+
+    /// <summary>Owner's report no. 9, item 4: the pages of each scan are stored, and «تعداد ضمائم» (attachments) is their sum.</summary>
+    [Fact]
+    public async Task The_pages_of_a_scan_are_stored_and_make_up_the_attachments()
+    {
+        var id = (await _requests.RegisterAsync(new(Key(), Input()), CancellationToken.None)).Value;
+        var threePages = System.Text.Encoding.Latin1.GetBytes(
+            "%PDF-1.4\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R 5 0 R] /Count 3 >> endobj\n3 0 obj << /Type /Page >> endobj\n");
+        var file = await _requests.AttachFileAsync(Key(), id, "invoice.pdf", threePages, 1, CancellationToken.None);
+        Assert.True(file.IsSuccess, file.ErrorCode);
+        var v = (await _requests.GetAsync(id, CancellationToken.None))!;
+        Assert.Equal((3, 3), (v.Attachments, Assert.Single(v.Files!).Pages));
+        Assert.Equal(3, (await _requests.GetFileAsync(id, file.Value, CancellationToken.None))!.Value.File.Pages);
+        Assert.Equal(3L, await _db.ScalarAsync<long>("SELECT attachments::bigint FROM requests.payment_request WHERE id = @id", ("id", id)));
     }
 
     [Fact]

@@ -944,3 +944,40 @@ def test_signatories_are_unique_and_a_signature_rule_keeps_its_numbers_together(
                 c.execute("SELECT 1 FROM reference.signatory")
         c.rollback()
 
+
+
+def test_a_scan_of_a_payment_request_keeps_its_pages_and_the_request_their_sum(db):
+    # 043_requests_attachment_pages.sql (owner's report no. 9 of 22 Nov 2026, item 4: «تعداد ضمائم» is the pages of the scans).
+    add_request = """INSERT INTO requests.payment_request (fiscal_year, id, number, request_date, requester_id, requester_name, beneficiary_id,
+                         beneficiary_detail_code, beneficiary_name, purpose_group_id, purpose_group_name, purpose, amount, currency, method, priority,
+                         state, recorded_by, attachments)
+                     VALUES (1405, %s, %s, '2026-11-22', %s, 'الف', %s, '300200', 'ب', %s, 'خرید', 'خرید', 1000, 'IRR', 'Cash', 1, 'Registered', 'test', %s)"""
+    add_file = """INSERT INTO requests.request_file (fiscal_year, file_id, request_id, file_name, content_type, size, uploaded_by, uploaded_at, content, pages)
+                  VALUES (1405, %s, %s, 'a.pdf', 'application/pdf', 4, 'clerk', now(), %s, %s)"""
+    with psycopg.connect(db) as c:
+        c.execute("SET ROLE requests_svc")
+        rid = uuid.uuid4()
+        c.execute(add_request, (rid, 9431, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), 1200))  # more than the old limit of 999
+        c.execute(add_file, (uuid.uuid4(), rid, b"%PDF", 1200))
+        for pages in (0, 5001):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with c.transaction():
+                    c.execute(add_file, (uuid.uuid4(), rid, b"%PDF", pages))
+        with pytest.raises(psycopg.errors.CheckViolation):
+            with c.transaction():
+                c.execute("UPDATE requests.payment_request SET attachments = -1 WHERE id = %s", (rid,))
+        # A scan stored before the script counts one page; a request typed by hand gets the pages of its scans when the script runs again.
+        old = uuid.uuid4()
+        c.execute(add_request, (old, 9432, uuid.uuid4(), uuid.uuid4(), uuid.uuid4(), 7))
+        c.execute("""INSERT INTO requests.request_file (fiscal_year, file_id, request_id, file_name, content_type, size, uploaded_by, uploaded_at, content)
+                     VALUES (1405, %s, %s, 'b.jpg', 'image/jpeg', 3, 'clerk', now(), %s)""", (uuid.uuid4(), old, b"\xff\xd8\xff"))
+        c.commit()
+    params = psycopg.conninfo.conninfo_to_dict(db)
+    env = dict(os.environ, PGHOST=params.get("host", ""), PGPORT=str(params.get("port", "5432")), PGUSER=params.get("user", "postgres"))
+    subprocess.run([str(HERE / "apply.sh"), params["dbname"]], check=True, env=env, capture_output=True)
+    with psycopg.connect(db) as c:
+        assert c.execute("SELECT attachments FROM requests.payment_request WHERE id = %s", (old,)).fetchone() == (1,)
+        assert c.execute("SELECT attachments FROM requests.payment_request WHERE id = %s", (rid,)).fetchone() == (1200,)
+        c.execute("DELETE FROM requests.request_file WHERE request_id IN (%s, %s)", (rid, old))
+        c.execute("DELETE FROM requests.payment_request WHERE id IN (%s, %s)", (rid, old))
+        c.commit()

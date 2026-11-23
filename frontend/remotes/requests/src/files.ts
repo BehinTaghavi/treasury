@@ -5,7 +5,8 @@
 import type { Locale } from '@treasury/ui-kit'
 import { translate } from '@treasury/ui-kit'
 
-export interface RequestFile { id: string; fileName: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string }
+/** `pages`: pages of the scan; together they are «تعداد ضمائم» (owner's report no. 9, item 4). */
+export interface RequestFile { id: string; fileName: string; contentType: string; size: number; uploadedBy: string; uploadedAt: string; pages: number }
 
 export const ACCEPT = 'application/pdf,image/jpeg,image/png'
 export const MAX_BYTES = 5 * 1024 * 1024

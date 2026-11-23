@@ -143,8 +143,8 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
         if (newFile is { } nf && request.Files.FirstOrDefault(f => f.Id == nf.FileId) is { } meta)
         {
             await using var ins = tx.Command(
-                "INSERT INTO requests.request_file (fiscal_year, file_id, request_id, file_name, content_type, size, uploaded_by, uploaded_at, content) " +
-                "VALUES (@year, @file, @id, @name, @type, @size, @by, @at, @content)");
+                "INSERT INTO requests.request_file (fiscal_year, file_id, request_id, file_name, content_type, size, uploaded_by, uploaded_at, pages, content) " +
+                "VALUES (@year, @file, @id, @name, @type, @size, @by, @at, @pages, @content)");
             ins.Parameters.AddWithValue("year", request.FiscalYear);
             ins.Parameters.AddWithValue("file", meta.Id);
             ins.Parameters.AddWithValue("id", request.Id);
@@ -153,6 +153,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             ins.Parameters.AddWithValue("size", meta.Size);
             ins.Parameters.AddWithValue("by", meta.UploadedBy);
             ins.Parameters.AddWithValue("at", meta.UploadedAt);
+            ins.Parameters.AddWithValue("pages", meta.Pages);
             ins.Parameters.Add(new NpgsqlParameter("content", NpgsqlDbType.Bytea) { Value = nf.Content });
             await ins.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -164,7 +165,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
     public async Task<(RequestAttachment File, byte[] Content)?> GetFileAsync(Guid requestId, Guid fileId, CancellationToken cancellationToken)
     {
         await using var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT file_name, content_type, size, uploaded_by, uploaded_at, content FROM requests.request_file WHERE request_id = @id AND file_id = @file");
+            "SELECT file_name, content_type, size, uploaded_by, uploaded_at, content, pages FROM requests.request_file WHERE request_id = @id AND file_id = @file");
         cmd.Parameters.AddWithValue("id", requestId);
         cmd.Parameters.AddWithValue("file", fileId);
         await using var r = await cmd.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -173,7 +174,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
             return null;
         }
 
-        return (new RequestAttachment(fileId, r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetString(3), r.GetFieldValue<DateTimeOffset>(4)),
+        return (new RequestAttachment(fileId, r.GetString(0), r.GetString(1), r.GetInt32(2), r.GetString(3), r.GetFieldValue<DateTimeOffset>(4), r.GetInt32(6)),
             r.GetFieldValue<byte[]>(5));
     }
 
@@ -187,7 +188,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
 
         var files = new Dictionary<Guid, List<RequestAttachment>>();
         await using (var cmd = PostgresUnitOfWork.Current.Command(
-            "SELECT request_id, file_id, file_name, content_type, size, uploaded_by, uploaded_at FROM requests.request_file WHERE request_id = ANY(@ids) ORDER BY uploaded_at"))
+            "SELECT request_id, file_id, file_name, content_type, size, uploaded_by, uploaded_at, pages FROM requests.request_file WHERE request_id = ANY(@ids) ORDER BY uploaded_at"))
         {
             cmd.Parameters.AddWithValue("ids", list.Select(r => r.Id).ToArray());
             await using var r = await cmd.ExecuteReaderAsync(ct).ConfigureAwait(false);
@@ -199,7 +200,7 @@ public sealed class PostgresPaymentRequestRepository : IPaymentRequestRepository
                     files[id] = l = [];
                 }
 
-                l.Add(new RequestAttachment(r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetInt32(4), r.GetString(5), r.GetFieldValue<DateTimeOffset>(6)));
+                l.Add(new RequestAttachment(r.GetGuid(1), r.GetString(2), r.GetString(3), r.GetInt32(4), r.GetString(5), r.GetFieldValue<DateTimeOffset>(6), r.GetInt32(7)));
             }
         }
 

@@ -47,6 +47,21 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
         Assert.Contains(("purpose-groups", FakeReference.Purchases), _reference.Marked);
     }
 
+    /// <summary>Owner's report no. 9 of 22 Nov 2026, items 1 and 2: unit and cost centre chosen on the form, checked with reference-svc.</summary>
+    [Fact]
+    public async Task Report9_unit_and_cost_centre_are_chosen_on_the_form_and_checked_with_basic_information()
+    {
+        var v = await View(await Register(Input() with { DepartmentId = FakeReference.Department, CostCenterCode = " 810002 " }));
+        Assert.Equal(((Guid?)FakeReference.Department, "810002"), (v.DepartmentId, v.CostCenterCode));
+        Assert.Equal("810001", (await View(await Register(Input()))).CostCenterCode); // nothing chosen: the requester's cost centre
+        Assert.Equal("PaymentRequest.DepartmentNotFound", (await _requests.RegisterAsync(new(Key(), Input() with { DepartmentId = Guid.NewGuid() }), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.DepartmentInactive", (await _requests.RegisterAsync(new(Key(), Input() with { DepartmentId = FakeReference.OldDepartment }), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.CostCenterNotFound", (await _requests.RegisterAsync(new(Key(), Input() with { CostCenterCode = "999999" }), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.NotCostCenter", (await _requests.RegisterAsync(new(Key(), Input() with { CostCenterCode = "300200" }), CancellationToken.None)).ErrorCode);
+        Assert.Equal("PaymentRequest.CostCenterNotInDepartment",
+            (await _requests.RegisterAsync(new(Key(), Input() with { DepartmentId = FakeReference.Department, CostCenterCode = "810003" }), CancellationToken.None)).ErrorCode);
+    }
+
     [Fact]
     public async Task Basic_information_is_checked()
     {
@@ -136,6 +151,19 @@ public sealed class PaymentRequestUseCaseTests : IDisposable
         Assert.True((await _requests.AttachFileAsync(Key(), id, "b.pdf", pdf, 3, CancellationToken.None)).IsSuccess);
         await _requests.ChangeAsync(new(Key(), id, "approve", 4), CancellationToken.None);
         Assert.Equal("PaymentRequest.NotEditable", (await _requests.AttachFileAsync(Key(), id, "c.pdf", pdf, 5, CancellationToken.None)).ErrorCode);
+    }
+
+    /// <summary>Owner's report no. 9, item 4: «تعداد ضمائم» is the number of pages of the scans, kept with each scan.</summary>
+    [Fact]
+    public async Task Report9_attachments_are_the_pages_of_the_scans_attached()
+    {
+        var id = await Register(Input());
+        var twoPages = System.Text.Encoding.Latin1.GetBytes(
+            "%PDF-1.4\n2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj\n3 0 obj << /Type /Page >> endobj\n4 0 obj << /Type /Page >> endobj\n");
+        Assert.True((await _requests.AttachFileAsync(Key(), id, "invoice.pdf", twoPages, 1, CancellationToken.None)).IsSuccess);
+        Assert.True((await _requests.AttachFileAsync(Key(), id, "photo.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0], 2, CancellationToken.None)).IsSuccess);
+        var v = await View(id);
+        Assert.Equal((3, "2,1"), (v.Attachments, string.Join(",", v.Files!.Select(f => f.Pages))));
     }
 
     [Fact]
