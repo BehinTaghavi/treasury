@@ -90,6 +90,13 @@
 
 ## ۶. C# و ‎.NET 10 (مرحله ۵ تا ۸)
 
+> **کجای کد:**
+>
+> - `global.json`، `Directory.Build.props` — نسخه ‎.NET و تنظیمات مشترک؛ «هر هشدار خطاست»
+> - `Treasury.slnx`، `Treasury.Offline.slnf` — فهرست پروژه‌ها، عادی و Offline
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Primitives.cs` — پایه مشترک همه سرویس‌ها
+> - `src/Services/Cashflow/Treasury.Cashflow.Domain/Common/Money.cs`، `Instruments/InstrumentTypes.cs` — نمونه خوب C# امروزی: `record`، pattern matching
+
 **به زبان ساده:** C# زبان برنامه‌نویسی بک‌اند است و ‎.NET بستری که آن را اجرا می‌کند (نسخه ۱۰، از مایکروسافت، متن‌باز، روی لینوکس هم کار می‌کند). همه قواعد کسب‌وکار خزانه‌داری به C# نوشته شده‌اند.
 
 **حداقل برای شروع:**
@@ -103,6 +110,11 @@
 
 ## ۷. ASP.NET Core Minimal APIs و تزریق وابستگی (مرحله ۸)
 
+> **کجای کد:**
+>
+> - `src/Services/<Service>/Treasury.<Service>.Api/Program.cs` — تزریق وابستگی؛ انتخاب پایگاه داده واقعی یا در حافظه با متغیر `usePostgres`
+> - `src/Services/<Service>/Treasury.<Service>.Api/Endpoints.cs` — endpointها؛ در Reference چند فایل `*Endpoints.cs`
+
 **به زبان ساده:** ASP.NET Core بخشی از ‎.NET است که درخواست‌های مرورگر را می‌گیرد و جواب می‌دهد. هر «endpoint» یک نشانی است، مثل «ثبت دریافت» یا «فهرست بانک‌ها». «تزریق وابستگی» یعنی هر بخش آنچه لازم دارد (مثلاً پایگاه داده واقعی یا نسخه آزمایشی در حافظه) را از بیرون می‌گیرد، نه اینکه خودش بسازد.
 
 **حداقل برای شروع:**
@@ -114,6 +126,12 @@
 - عمیق‌تر: کتاب **ASP.NET Core in Action** از Andrew Lock (ویرایش سوم یا بعد).
 
 ## ۸. async/await (مرحله ۵، ۶)
+
+> **کجای کد:**
+>
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/PostgresAdapters.cs` — `PostgresUnitOfWork` با `AsyncLocal`
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Application/CommandRunner.cs` — اجرای هر فرمان
+> - `src/Services/<Service>/Treasury.<Service>.Application/**/*UseCases.cs` — کاربردها؛ همه `async`
 
 **به زبان ساده:** وقتی برنامه منتظر پایگاه داده یا سرویس دیگر است، به‌جای ایستادن کار دیگری می‌کند. `await` یعنی «اینجا منتظر جواب بمان».
 
@@ -127,6 +145,13 @@
 
 ## ۹. معماری تمیز (Clean Architecture) (مرحله ۵ تا ۸)
 
+> **کجای کد:**
+>
+> - `src/Services/<Service>/Treasury.<Service>.Domain|Application|Infrastructure|Infrastructure.Postgres|Api` — چهار لایه هر سرویس
+> - `src/BuildingBlocks/` — دو پروژه مشترک Domain و Application
+> - `tests/Treasury.ArchitectureTests/LayerTests.cs` — آزمون خودکار جهت وابستگی لایه‌ها
+> - `docs/architecture.md`، `docs/adr/0001-modular-services-few-processes.md` — توضیح معماری
+
 **به زبان ساده:** کد هر سرویس چهار لایه دارد، مثل پیاز: در مرکز **Domain** (قواعد کسب‌وکار)، دورش **Application** (اجرای هر کار، مثل «ثبت دریافت»)، بعد **Infrastructure** (پایگاه داده، فایل Excel) و بیرونی‌ترین **Api** (درگاه وب). لایه درونی هیچ‌وقت لایه بیرونی را نمی‌شناسد. نتیجه: قاعده کسب‌وکار به پایگاه داده یا صفحه وابسته نیست و جدا آزمون می‌شود. آزمون‌های معماری پروژه این را خودکار می‌سنجند.
 
 **حداقل برای شروع:**
@@ -137,6 +162,13 @@
 - عمیق‌تر: کتاب **Clean Architecture** از Robert C. Martin؛ مقاله **Hexagonal Architecture** از Alistair Cockburn.
 
 ## ۱۰. DDD (طراحی دامنه‌محور) (مرحله ۵)
+
+> **کجای کد:**
+>
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Primitives.cs` — `AggregateRoot`، `IDomainEvent`، `DomainException`
+> - `src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/Instrument.cs` — تجمیع چک و سفته
+> - `src/Services/Cashflow/Treasury.Cashflow.Domain/Receipts/Receipt.cs`، `ChequeBooks/ChequeBook.cs`، `Vouchers/Vouchers.cs` — تجمیع‌های دریافت، دسته چک، سند تأییدشده
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure/Snapshots.cs` — تبدیل تجمیع به ردیف ذخیره و برعکس
 
 **به زبان ساده:** روشی برای نوشتن نرم‌افزار که **زبان کد همان زبان کسب‌وکار** باشد. «چک»، «دریافت»، «سند» در کد هم همین نام‌ها را دارند. چند مفهوم اصلی:
 - **Aggregate (تجمیع):** یک واحد کسب‌وکار که همیشه با هم ذخیره می‌شود و از قواعدش محافظت می‌کند. مثلاً یک چک با همه گام‌هایش.
@@ -152,6 +184,14 @@
 
 ## ۱۱. ماشین وضعیت (چرخه عمر چک و سفته) (مرحله ۵، ۱۲)
 
+> **کجای کد:**
+>
+> - `src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/InstrumentLifecycle.cs` — تنها جدول تغییر وضعیت‌های مجاز
+> - `tools/migration/treasury_migration/legacy_mapping.py` — کپی Python همان جدول
+> - `tests/Treasury.Cashflow.Domain.Tests/InstrumentLifecycleTests.cs`، `ChequeStepTests.cs`، `NoteStepTests.cs` — آزمون‌ها
+> - `tools/migration/tests/test_mapping.py` — آزمون یکسانی دو جدول
+> - `docs/domain/instrument-lifecycle.fa.md` — توضیح برای مالک محصول
+
 **به زبان ساده:** فهرست وضعیت‌های یک چک («نزد صندوق»، «ثبت صیادی»، «واگذار شده به بانک»، «وصول شده»، «برگشتی»، «اقدام حقوقی»…) و **اینکه از هر وضعیت به کدام وضعیت‌ها می‌شود رفت**. در این پروژه این جدول فقط یک جا تعریف شده (`InstrumentLifecycle.cs`) و تغییر آن تصمیم مالک محصول است.
 
 **حداقل برای شروع:**
@@ -164,6 +204,14 @@
 
 ## ۱۲. تراکنش (مرحله ۶، ۷)
 
+> **کجای کد:**
+>
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Application/Ports.cs` — `IUnitOfWork`
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Application/CommandRunner.cs` — هر فرمان در یک تراکنش
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/PostgresAdapters.cs` — `PostgresUnitOfWork`
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure/InMemory/InMemoryStore.cs` — نسخه در حافظه برای آزمون
+> - `docs/adr/0002-one-transaction-per-command.md` — تصمیم معماری
+
 **به زبان ساده:** چند تغییر که یا **همه با هم** ثبت می‌شوند یا **هیچ‌کدام**. اگر وسط ثبت دریافت برق برود، نیمی از دریافت ثبت نمی‌شود. قاعده پروژه: «یک فرمان = یک تراکنش = یک تجمیع که یک بار ذخیره می‌شود».
 
 **حداقل برای شروع:**
@@ -175,6 +223,14 @@
 
 ## ۱۳. Idempotency (کلید یکتایی) (مرحله ۶، ۸)
 
+> **کجای کد:**
+>
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Application/CommandRunner.cs`، `Ports.cs` — `IIdempotencyStore`
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/PostgresAdapters.cs` — `PostgresIdempotencyStore`
+> - `db/postgres/002_cashflow.sql` — جدول `cashflow.idempotency`
+> - `src/Services/<Service>/Treasury.<Service>.Api/Endpoints.cs` — `Key(http)`: هدر `Idempotency-Key`
+> - `tests/Treasury.Cashflow.Application.Tests/InstrumentUseCaseTests.cs` — آزمون `The_same_idempotency_key_does_not_create_a_second_instrument`
+
 **به زبان ساده:** اگر کاربر دکمه «ثبت» را دو بار بزند یا اینترنت قطع و وصل شود و درخواست دوباره برسد، **دو دریافت ثبت نشود**. هر درخواست نوشتن یک کلید یکتا دارد؛ درخواست دوم با همان کلید فقط جواب اول را برمی‌گرداند.
 
 **حداقل برای شروع:**
@@ -185,6 +241,14 @@
 - عمیق‌تر: الگوی **Idempotent Consumer** در microservices.io.
 
 ## ۱۴. Outbox و کنترل همزمانی (مرحله ۶)
+
+> **کجای کد:**
+>
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Domain/Primitives.cs` — `AggregateRoot`: نسخه ردیف و رویدادهای در انتظار
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/PostgresAdapters.cs` — `PostgresOutbox`؛ `AND version = @expected`؛ `FOR UPDATE` روی دسته چک
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Application/Ports.cs` — `ConcurrencyConflictException`
+> - `db/postgres/002_cashflow.sql`، `001_reference.sql` — جدول‌های `outbox`
+> - `tests/Treasury.Cashflow.Application.Tests/InstrumentUseCaseTests.cs`، `tests/Treasury.Cashflow.Infrastructure.Postgres.Tests/PostgresAdapterTests.cs` — آزمون `Parallel_issues_from_one_book_never_get_the_same_number`
 
 **به زبان ساده:**
 - **Outbox:** وقتی کاری انجام شد و باید به سرویس دیگری خبر داده شود (مثلاً در آینده: «این سند را به دفتر کل بفرست»)، خبر در **همان تراکنش** در یک جدول نوشته می‌شود و بعد ارسال می‌شود. پس خبر هیچ‌وقت گم نمی‌شود و دو بار هم اثر نمی‌کند.
@@ -198,6 +262,14 @@
 - عمیق‌تر: مستندات PostgreSQL، فصل **Concurrency Control**؛ و همان فصل ۷ کتاب Kleppmann.
 
 ## ۱۵. آزمون خودکار و xUnit (مرحله ۴)
+
+> **کجای کد:**
+>
+> - `tests/Treasury.<Service>.Domain.Tests` — آزمون قواعد
+> - `tests/Treasury.<Service>.Application.Tests` — آزمون کاربردها با آداپتور در حافظه
+> - `tests/Treasury.<Service>.Infrastructure.Postgres.Tests`، `tests/Support/PostgresDatabase.cs` — آزمون با PostgreSQL واقعی
+> - `tests/Treasury.ArchitectureTests`، `tests/Treasury.Reference.Infrastructure.Excel.Tests` — معماری و خواندن Excel
+> - `tests/Treasury.TestShim` — جایگزین xUnit در حالت Offline
 
 **به زبان ساده:** برنامه کوچکی که برنامه اصلی را امتحان می‌کند: «اگر چکی که هنوز ثبت صیادی نشده به بانک واگذار شود، باید با خطای فلان رد شود». این پروژه بیش از ۶۰۰ آزمون ‎.NET دارد و قاعده‌اش «هر قاعده یک آزمون» است. **آزمون توصیفی** (characterization) آزمونی است که رفتار برنامه قدیم را ثبت می‌کند تا برنامه جدید همان را انجام دهد.
 
@@ -216,6 +288,12 @@
 
 ## ۱۶. SQL و PostgreSQL (مرحله ۷)
 
+> **کجای کد:**
+>
+> - `db/postgres/000_roles.sql` تا `042_cashflow_issued_cheque_sayad_tick.sql` — ۴۳ اسکریپت ساخت پایگاه داده
+> - `db/postgres/apply.sh` — اجرای اسکریپت‌ها به ترتیب
+> - `src/Services/<Service>/Treasury.<Service>.Infrastructure.Postgres/*.cs` — SQL دست‌نویس هر سرویس
+
 **به زبان ساده:** PostgreSQL پایگاه داده‌ای است که همه اطلاعات (چک‌ها، دریافت‌ها، اسناد، اطلاعات پایه) در آن نگه‌داری می‌شود. SQL زبان پرسیدن از آن و نوشتن در آن است.
 
 **حداقل برای شروع:**
@@ -228,6 +306,13 @@
 
 ## ۱۷. نقش‌ها و دسترسی‌ها، schema (مرحله ۷)
 
+> **کجای کد:**
+>
+> - `db/postgres/000_roles.sql` — نقش هر سرویس
+> - `GRANT`های انتهای هر اسکریپت `db/postgres/0*.sql` — دسترسی هر نقش
+> - `db/postgres/tests/test_schema.py` — آزمون نقش‌ها و دسترسی‌ها
+> - سرویس `db-init` در `deploy/docker-compose.yml` — گذرواژه نقش‌ها از `.env`
+
 **به زبان ساده:** هر سرویس (دریافت‌ها، اطلاعات پایه، حساب‌ها، درخواست وجه) در پایگاه داده **بخش جدای خودش (schema)** و **کاربر جدای خودش (نقش)** را دارد و فقط به جدول‌های خودش دسترسی دارد. پس یک خطا یا نفوذ در یک سرویس به داده سرویس دیگر نمی‌رسد.
 
 **حداقل برای شروع:**
@@ -239,6 +324,12 @@
 
 ## ۱۸. پارتیشن‌بندی بر اساس سال مالی (مرحله ۷)
 
+> **کجای کد:**
+>
+> - `db/postgres/003_fiscal_year_partitions.sql` — `ensure_fiscal_year_partitions`، `open_fiscal_year`، `fiscal_year_of`
+> - `db/postgres/002_cashflow.sql`، `025_cashflow_receipts.sql`، `026_requests.sql`، `030_cashflow_vouchers.sql` — جدول‌های `PARTITION BY LIST`
+> - `docs/adr/0003-fiscal-year-partitioning.md` — تصمیم معماری
+
 **به زبان ساده:** جدول‌های بزرگ (مثل چک‌ها) برای هر سال مالی یک «قفسه» جدا دارند. گزارش یک سال فقط قفسه همان سال را می‌خواند و سریع است، و سال بسته‌شده را می‌شود قفل کرد.
 
 **حداقل برای شروع:**
@@ -249,6 +340,12 @@
 - عمیق‌تر: همان صفحه، بخش «Partition Pruning»، و آزمون‌های `db/postgres/tests`.
 
 ## ۱۹. قیدها، اسکریپت‌های قابل اجرای دوباره، `NOT VALID` (مرحله ۷)
+
+> **کجای کد:**
+>
+> - `db/postgres/031_cashflow_cheque_steps.sql`، `018_accounts_petty_cash_and_cash_desk_details.sql` — قیدهای `NOT VALID`
+> - `db/postgres/apply.sh` — اجرای دوباره همه اسکریپت‌ها در هر شروع
+> - `db/postgres/tests/test_schema.py` — آزمون اجرای دوباره روی داده موجود
 
 **به زبان ساده:** «قید» (constraint) قاعده‌ای در خود پایگاه داده است که داده نادرست را رد می‌کند، مثلاً تکراری‌نبودن شماره برگ چک؛ خط دفاع دوم پشت قاعده Domain. اسکریپت‌های پایگاه داده در هر بار روشن شدن سیستم دوباره اجرا می‌شوند، پس باید بی‌خطر قابل تکرار باشند. `NOT VALID` یعنی «قید را برای داده‌های تازه اجرا کن، ولی داده‌های قدیمی را فعلاً رد نکن».
 
@@ -262,6 +359,12 @@
 
 ## ۲۰. Npgsql (مرحله ۷)
 
+> **کجای کد:**
+>
+> - `src/Services/Cashflow/Treasury.Cashflow.Infrastructure.Postgres/PostgresAdapters.cs`، `PostgresReceipts.cs`، `PostgresVouchers.cs` — نمونه‌های اصلی
+> - `src/Services/Reference|Accounts|Requests/Treasury.*.Infrastructure.Postgres/` — آداپتورهای سه سرویس دیگر
+> - `tests/Support/PostgresDatabase.cs` — پایگاه داده آزمون
+
 **به زبان ساده:** کتابخانه‌ای که برنامه C# با آن به PostgreSQL وصل می‌شود. این پروژه SQL را دستی می‌نویسد (بدون ORM)، پس هر خط SQL در کد C# دیده می‌شود.
 
 **حداقل برای شروع:**
@@ -272,6 +375,14 @@
 - عمیق‌تر: **Microsoft Learn — ADO.NET overview**.
 
 ## ۲۱. SQL Server و ابزار مهاجرت با Python (مرحله ۱۲)
+
+> **کجای کد:**
+>
+> - `tools/migration/treasury_migration/source.py` — خواندن SQL Server قدیمی
+> - `tools/migration/treasury_migration/legacy_mapping.py`، `jalali.py` — نگاشت ردیف قدیمی و تاریخ ۸ نویسه‌ای
+> - `tools/migration/treasury_migration/target.py`، `__main__.py` — نوشتن در PostgreSQL و گزارش تطبیق
+> - `tools/migration/tests/`، `tools/migration/README.md` — آزمون‌ها و راهنما
+> - `db/postgres/tests/test_schema.py` — نمونه دیگر pytest
 
 **به زبان ساده:** برنامه قدیمی اطلاعاتش را در SQL Server (پایگاه‌هایی مثل `Cashnajoo..`) نگه می‌داشت. ابزار مهاجرت، نوشته‌شده با Python، آن‌ها را می‌خواند، به مدل جدید تبدیل می‌کند و **گزارش تطبیق** می‌دهد: تعداد و جمع ریالی، مورد انتظار در برابر منتقل‌شده. pytest ابزار آزمون Python است.
 
@@ -284,6 +395,12 @@
 - عمیق‌تر: کتاب **Python Testing with pytest** از Brian Okken؛ مقاله **Strangler Fig Application** در martinfowler.com (روش جایگزینی تدریجی سیستم قدیم).
 
 ## ۲۲. HTTP، کدهای وضعیت و Problem Details (مرحله ۸)
+
+> **کجای کد:**
+>
+> - `src/Services/<Service>/Treasury.<Service>.Api/Endpoints.cs` — `ToHttp`: کد خطا ← وضعیت HTTP
+> - `frontend/packages/ui-kit/src/api.ts` — خواندن پاسخ و خطا در صفحه
+> - `frontend/packages/ui-kit/src/i18n.ts` — متن فارسی و انگلیسی هر کد خطا
 
 **به زبان ساده:** مرورگر و سرور با HTTP حرف می‌زنند. هر جواب یک عدد دارد: 200 یعنی موفق، 404 یعنی پیدا نشد، 409 یعنی تعارض (کس دیگری همزمان تغییر داده)، 422 یعنی قاعده کسب‌وکار اجازه نمی‌دهد. «Problem Details» قالب استاندارد پیام خطاست؛ در این پروژه خطا همیشه یک **کد ثابت** است (مثل `Instrument.InvalidTransition`) و صفحه، متن فارسی آن را نشان می‌دهد.
 
@@ -339,6 +456,14 @@
 
 ## ۲۶. تقویم شمسی و متن فارسی در نرم‌افزار (مرحله ۵)
 
+> **کجای کد:**
+>
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Domain/FiscalDate.cs` — تاریخ واقعی و `ParseJalali`
+> - `src/BuildingBlocks/Treasury.BuildingBlocks.Domain/PersianText.cs` — `PersianText.Key`: یکسان‌سازی ی/ي، ک/ك، نیم‌فاصله
+> - `frontend/packages/ui-kit/src/format.ts`، `words.ts` — نمایش تاریخ و عدد، مبلغ به حروف
+> - `tools/migration/treasury_migration/jalali.py` — تاریخ‌های قدیمی
+> - `tests/Treasury.Cashflow.Domain.Tests/ValueObjectTests.cs`، `tools/migration/tests/test_jalali.py` — آزمون‌ها
+
 **به زبان ساده:** در دامنه و پایگاه داده تاریخ واقعی نگه‌داری می‌شود و «۱۴۰۵/۰۸/۱۸» فقط در صفحه نمایش داده یا از آن گرفته می‌شود. متن فارسی چند گونه نوشتاری دارد: «ی» و «ي»، «ک» و «ك»، نیم‌فاصله. سیستم پیش از مقایسه آن‌ها را یکسان می‌کند تا «بانک ملی» و «بانك ملي» یکی شمرده شوند.
 
 **حداقل برای شروع:**
@@ -354,6 +479,12 @@
 
 ## ۲۷. TypeScript (مرحله ۱۰)
 
+> **کجای کد:**
+>
+> - `frontend/packages/ui-kit/src/*.ts` — کد مشترک
+> - `frontend/remotes/<remote>/src/*.ts` — مثلاً `receipts/src/lookups.ts`، `basic-info/src/types.ts`
+> - `tsconfig.json` هر بخش — تنظیمات TypeScript
+
 **به زبان ساده:** JavaScript (زبان مرورگر) به‌اضافه «نوع». برنامه‌نویس می‌گوید هر مقدار عدد است یا متن یا فلان ساختار، و بسیاری از خطاها پیش از اجرا گرفته می‌شوند.
 
 **حداقل برای شروع:** خواندن `type`، `interface`، و نوع‌های اختیاری (`?`).
@@ -363,6 +494,13 @@
 - عمیق‌تر: کتاب **Effective TypeScript** از Dan Vanderkam.
 
 ## ۲۸. Vue 3 (مرحله ۱۰)
+
+> **کجای کد:**
+>
+> - `frontend/remotes/receipts/src/` — `ReceiptForm.vue`، `ChequeOperations.vue`، `LegalAction.vue`، `VoucherTable.vue`، …
+> - `frontend/remotes/basic-info/src/` — اطلاعات پایه؛ `CatalogueList.vue` ساده‌ترین نمونه
+> - `frontend/remotes/requests/src/` — درخواست وجه
+> - `frontend/packages/ui-kit/src/AmountInput.vue`، `SearchSelect.vue` — کامپوننت‌های مشترک
 
 **به زبان ساده:** کتابخانه ساخت صفحه‌های وب. هر صفحه از «کامپوننت»‌ها ساخته می‌شود، مثل فرم دریافت چک یا فهرست دریافت‌ها، و هر کامپوننت HTML، منطق نمایش و ظاهر خودش را دارد.
 
@@ -375,6 +513,14 @@
 - عمیق‌تر: **Vue Guide** کامل (vuejs.org/guide)؛ کتاب **Vue.js 3 Design Patterns and Best Practices** (Packt) یا دوره‌های Vue School.
 
 ## ۲۹. Nuxt 4، Vite، Module Federation، pnpm (مرحله ۱۰)
+
+> **کجای کد:**
+>
+> - `frontend/shell/nuxt.config.ts` — پوسته و نشانی سه micro-frontend
+> - `frontend/shell/app/` — `layouts/default.vue`، `pages/*.vue`، `plugins/federation.client.ts`، `components/RemoteArea.vue`
+> - `frontend/remotes/<remote>/vite.config.ts` — Vite و Module Federation هر بخش
+> - `frontend/package.json`، `pnpm-workspace.yaml`، `pnpm-lock.yaml` — pnpm
+> - `deploy/shell-config.json`، `frontend/Dockerfile` — تنظیم و ساخت برای Docker
 
 **به زبان ساده:**
 - **Nuxt:** «پوسته» برنامه: منوی اصلی، نوار بالا با نام و لوگوی شرکت، و جای بخش‌ها.
@@ -391,6 +537,11 @@
 
 ## ۳۰. Vitest (مرحله ۴، ۱۰)
 
+> **کجای کد:**
+>
+> - `frontend/packages/ui-kit/src/codes.test.ts` — ترجمه همه کدهای خطا
+> - `frontend/packages/ui-kit/src/chequeStatus.test.ts`، `words.test.ts`، `ui-kit.test.ts` — آزمون‌های دیگر
+
 **به زبان ساده:** ابزار آزمون خودکار فرانت‌اند. در این پروژه مهم‌ترین آزمونش این است که **هر کد خطا ترجمه فارسی و انگلیسی دارد**.
 
 **حداقل برای شروع:** اجرای `pnpm test` و خواندن نتیجه.
@@ -400,6 +551,13 @@
 - عمیق‌تر: **Vue — Testing** در vuejs.org/guide.
 
 ## ۳۱. صفحه فارسی راست‌به‌چپ، تلفن و تبلت (مرحله ۱۰، ۱۱)
+
+> **کجای کد:**
+>
+> - `frontend/shell/nuxt.config.ts`، `frontend/remotes/<remote>/index.html` — `dir="rtl"`
+> - `frontend/shell/app/assets/shell.css` — ظاهر پوسته
+> - `frontend/remotes/receipts/src/receipts.css`، `requests/src/requests.css`، `basic-info/src/organization/organization.css` — `@media` برای اندازه‌های کوچک
+> - `docs/adr/0006-phones-and-tablets.md` — تصمیم معماری
 
 **به زبان ساده:** همه صفحه‌ها راست‌به‌چپ‌اند و طبق تصمیم مالک (ADR 0006) باید روی تلفن (عرض ۳۶۰ پیکسل) و تبلت (۷۶۸ پیکسل) هم قابل استفاده باشند. در مرورگر کروم با DevTools می‌شود هر اندازه صفحه را شبیه‌سازی کرد.
 
@@ -411,6 +569,12 @@
 - عمیق‌تر: **MDN — Responsive design** و **CSS logical properties** (developer.mozilla.org).
 
 ## ۳۲. smoke test (مرحله ۱۱)
+
+> **کجای کد:**
+>
+> - `deploy/smoke-test.sh` — خود آزمون
+> - job `compose` در `.github/workflows/ci.yml` — اجرا در CI، با توقف و شروع دوباره
+> - `docs/reviewer-run-guide.fa.md` — راهنمای اجرا
 
 **به زبان ساده:** آزمون سریع «آیا سیستم سالم بالا آمده؟». اسکریپت `deploy/smoke-test.sh` همه بخش‌ها را از دروازه صدا می‌زند و یک چک آزمایشی را ثبت، ثبت صیادی و واگذار می‌کند. فقط روی سرور آزمایشی اجرا می‌شود، چون داده می‌نویسد.
 
@@ -424,6 +588,12 @@
 
 ## ۳۳. Nginx (دروازه) (مرحله ۱۳)
 
+> **کجای کد:**
+>
+> - `deploy/gateway.conf` — مسیرهای دروازه
+> - `deploy/docker-compose.yml`، `deploy/.env.example` — سرویس gateway و `GATEWAY_ADDRESS`
+> - `frontend/nginx.conf` — Nginx داخل کانتینرهای فرانت‌اند
+
 **به زبان ساده:** «در ورودی» سیستم. همه درخواست‌ها به آن می‌رسند و آن هر درخواست را به بخش درست می‌فرستد (صفحه‌ها، API دریافت‌ها، Keycloak…). فعلاً فقط روی خود سرور (`127.0.0.1`) باز است، چون ورود کاربر هنوز فعال نیست.
 
 **حداقل برای شروع:** هر تغییری که دروازه را به شبکه باز کند، پیش از فعال شدن Keycloak پرچم قرمز امنیتی است.
@@ -433,6 +603,12 @@
 - عمیق‌تر: **NGINX Reverse Proxy** در docs.nginx.com.
 
 ## ۳۴. ویندوز و PowerShell (مرحله ۱۳)
+
+> **کجای کد:**
+>
+> - `deploy/windows/treasury.ps1` — اسکریپت اصلی
+> - `deploy/windows/Start Treasury.cmd`، `Stop Treasury.cmd`، `Reset test data.cmd` — دکمه‌های دوبار کلیک
+> - `docs/test-server-windows.md` — راهنمای مالک
 
 **به زبان ساده:** سرور آزمایشی مالک روی ویندوز است و با دوبار کلیک روی «Start Treasury» اجرا می‌شود. پشت آن یک اسکریپت PowerShell است (`deploy/windows/treasury.ps1`).
 
@@ -448,6 +624,14 @@
 
 ## ۳۵. امنیت برنامه وب (مرحله ۱۴)
 
+> **کجای کد:**
+>
+> - `src/Services/<Service>/Treasury.<Service>.Infrastructure.Postgres/` — SQL پارامتری
+> - `.gitignore`، `deploy/.env.example` — رازها و فایل‌هایی که هرگز commit نمی‌شوند (`.env`، `.mdb`، Excel)
+> - `db/postgres/000_roles.sql` — کمترین دسترسی
+> - `src/Services/Cashflow/Treasury.Cashflow.Domain/Instruments/InstrumentAttachment.cs` — نوع و اندازه فایل بارگذاری‌شده (`MaxBytes`)
+> - `src/Services/<Service>/Treasury.<Service>.Api/Endpoints.cs` — `RequireAuthorization`
+
 **به زبان ساده:** فهرست خطاهای امنیتی رایج که یک سیستم مالی نباید داشته باشد. مهم‌ترین‌ها برای این پروژه:
 - **SQL injection:** کاربر با تایپ متن خاص در یک فیلد، دستور پایگاه داده اجرا کند. راه‌حل: پارامتر.
 - **رازها در کد:** گذرواژه و کلید هرگز در مخزن نیست؛ فقط در فایل `.env` روی سرور.
@@ -462,6 +646,14 @@
 
 ## ۳۶. ورود کاربر: Keycloak، OAuth 2.0، OpenID Connect، JWT (مرحله ۸، ۱۷)
 
+> **کجای کد:**
+>
+> - `src/Services/<Service>/Treasury.<Service>.Api/Program.cs` — `AddJwtBearer`، `Keycloak:Authority`؛ بیرون از Development بدون آن بالا نمی‌آید
+> - `src/Services/Cashflow/Treasury.Cashflow.Api/Endpoints.cs` — `HttpCurrentUser`
+> - `src/Services/Cashflow/Treasury.Cashflow.Application/Abstractions/Ports.cs` — `ICurrentUser`
+> - سرویس `keycloak` در `deploy/docker-compose.yml` — سرور هویت
+> - `docs/adr/0005-multi-tenancy-companies-and-groups.md` — ورود همراه با چند شرکت
+
 **به زبان ساده:** Keycloak سرور «ورود و مجوز» است. کاربر یک بار وارد می‌شود و یک «بلیت» دیجیتال امضاشده (JWT) می‌گیرد که می‌گوید کیست و چه حقوقی دارد. هر سرویس بلیت را بررسی می‌کند. OAuth 2.0 و OpenID Connect استانداردهای همین کارند. کار بعدی پروژه (فاز B) ورود کاربر **همراه با چند شرکت** است: هر کاربر در هر شرکت حقوق جدا دارد (ADR 0005).
 
 **حداقل برای شروع:**
@@ -473,6 +665,13 @@
 - عمیق‌تر: کتاب **OAuth 2 in Action** (Manning)؛ **Microsoft Learn — Configure JWT bearer authentication in ASP.NET Core**.
 
 ## ۳۷. مجوز بسته‌ها (لایسنس) (مرحله ۱۴)
+
+> **کجای کد:**
+>
+> - `src/**/*.csproj`، `tests/**/*.csproj` — بسته‌های NuGet (`PackageReference`)
+> - `frontend/**/package.json` — بسته‌های npm
+> - `tools/migration/requirements.txt` — بسته‌های Python
+> - `CLAUDE.md` — فهرست بسته‌های ممنوع
 
 **به زبان ساده:** هر کتابخانه‌ای که به پروژه اضافه می‌شود مجوز استفاده دارد. این پروژه فقط کتابخانه متن‌باز می‌پذیرد. چند کتابخانه معروف در نسخه‌های جدیدشان پولی شده‌اند و ممنوع‌اند: MediatR ≥13، AutoMapper ≥15، MassTransit ≥9، FluentAssertions ≥8.
 
@@ -486,6 +685,13 @@
 
 ## ۳۸. بازبینی کد، به‌ویژه کدی که هوش مصنوعی نوشته (مرحله ۱۵)
 
+> **کجای کد:**
+>
+> - `.github/pull_request_template.md` — الگوی توضیح Pull Request
+> - `.github/workflows/ci.yml` — بررسی‌های خودکار
+> - `CLAUDE.md` — «Rules for every change»
+> - `docs/reviewer-workflow.fa.md`، `docs/reviewer-guide.fa.md` (فصل ۱۳) — گردش کار و چک‌لیست
+
 **به زبان ساده:** بازبینی یعنی یک انسان پیش از ورود کد به نسخه اصلی آن را بخواند و بپرسد. در این پروژه کد را هوش مصنوعی می‌نویسد. کد هوش مصنوعی معمولاً **مرتب و قانع‌کننده** است، حتی وقتی قاعده را اشتباه فهمیده باشد. پس معیار تأیید «مرتب به نظر می‌رسد» نیست؛ معیار این است: **قاعده منبع دارد، آزمون دارد، و آزمون واقعاً همان قاعده را می‌سنجد.**
 
 **حداقل برای شروع:**
@@ -497,6 +703,13 @@
 - عمیق‌تر: کتاب **Looks Good to Me: Constructive Code Reviews** از Adrienne Braganza (Manning)؛ فصل ۱۳ `docs/reviewer-guide.fa.md`.
 
 ## ۳۹. مستندات تصمیم و ADR (مرحله ۳)
+
+> **کجای کد:**
+>
+> - `docs/adr/0001` تا `0006` — تصمیم‌های معماری
+> - `docs/decisions.md` — تصمیم‌های مالک محصول
+> - `docs/domain/open-questions.md`، `.fa.md` — پرسش‌های باز
+> - `docs/plan.md` — برنامه و کارهای انجام‌شده
 
 **به زبان ساده:** هر تصمیم کسب‌وکاری که مالک محصول می‌گیرد با تاریخ و دلیل در `docs/decisions.md` ثبت می‌شود. پرسش‌هایی که هنوز جواب ندارند در `docs/domain/open-questions.md` هستند. **ADR** (سند تصمیم معماری) همین کار را برای تصمیم‌های فنی بزرگ می‌کند، مثل «یک پایگاه داده برای هر شرکت».
 
@@ -510,6 +723,14 @@
 
 ## ۴۰. خواندن برنامه قدیمی (MS Access و ASP.NET MVC) (مرحله ۳، ۴)
 
+> **کجای کد:**
+>
+> - `legacy/README.md` — راهنمای پوشه
+> - `legacy/access/` — `vba`، `queries`، `lookup_tables` برنامه `Lcash.mdb`
+> - `legacy/mvc/`، `legacy/db/` — نسخه ASP.NET MVC و رویه‌های ذخیره‌شده بازیابی‌شده
+> - `legacy/manuals/` — راهنماهای کاربر
+> - `legacy/print-service/` — سرویس چاپ قدیمی
+
 **به زبان ساده:** برنامه قدیمی (`Lcash.mdb`، بیش از ۲۰ سال در کار) با Access و زبان VBA نوشته شده و یک نسخه نیمه‌کاره هم با ASP.NET MVC وجود دارد. هر دو در پوشه `legacy/` هستند، **فقط برای خواندن**: برای اینکه بفهمیم برنامه قدیم چه می‌کرد، نه اینکه از آن کپی کنیم یا اجرایش کنیم.
 
 **حداقل برای شروع:**
@@ -520,6 +741,13 @@
 - عمیق‌تر: کتاب **Working Effectively with Legacy Code** از Michael Feathers (روش، نه ابزار).
 
 ## ۴۱. نوشتن و گفت‌وگو (مرحله ۳، ۱۵)
+
+> **کجای کد:**
+>
+> - `README.md`، `README.en.md` — صفحه اصلی فارسی و نسخه انگلیسی
+> - `docs/domain/*.md` و `*.fa.md` — مستندات دوزبانه دامنه
+> - `.github/pull_request_template.md` — دو بخش توضیح: برای مالک و برای بازبین
+> - `frontend/packages/ui-kit/src/i18n.ts` — متن پیام‌ها برای کاربر
 
 **به زبان ساده:** بازبین با دو مخاطب حرف می‌زند: با **مالک محصول** (غیربرنامه‌نویس) به زبان ساده و بدون اصطلاح فنی، یک فهرست کوتاه پرسش در هر نوبت؛ و با **نویسنده کد** روی همان خط کد. مستندات پروژه دوزبانه‌اند و توضیح فنی Pull Requestها انگلیسی است.
 
