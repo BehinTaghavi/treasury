@@ -125,6 +125,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 ## For the reviewer: where to start
 
+1. New to the technologies used here: `docs/reviewer-onboarding.fa.md` (Farsi) — a 12-week path from tester to full reviewer, with the learning order, a test plan for the screens and report templates.
 1. `docs/reviewer-guide.fa.md` (Farsi): the code and its patterns, and how to review a pull request. `docs/reviewer-run-guide.fa.md` (Farsi): build and run any version with only Git and Docker.
 2. `CLAUDE.md`: the rules for every change, and the commands.
 3. `docs/plan.md`: phases, what is done, what is next.

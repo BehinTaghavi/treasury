@@ -137,6 +137,7 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 ## برای بازبین: از کجا شروع کنم؟
 
+1. اگر با فناوری‌های این پروژه تازه آشنا می‌شوید: فایل `docs/reviewer-onboarding.fa.md` — برنامه ۱۲ هفته‌ای از آزمون‌گر تا بازبین کامل، با ترتیب یادگیری، برنامه آزمودن نرم‌افزار و قالب گزارش‌ها.
 1. فایل `docs/reviewer-guide.fa.md`: توضیح کد و الگوهای آن و روش بازبینی یک Pull Request. فایل `docs/reviewer-run-guide.fa.md`: ساخت و اجرای هر نسخه فقط با Git و Docker.
 2. فایل `CLAUDE.md`: قواعد هر تغییر و فرمان‌ها.
 3. فایل `docs/plan.md`: فازها، کارهای انجام‌شده و کار بعدی.
